@@ -1,0 +1,394 @@
+{# admin.html - 部屋ごとCSVファイル対応版 #}
+
+{% extends "base.html" %}
+
+{% block title %}管理者ページ - 世界史単語帳{% endblock %}
+
+{% block content %}
+<div class="admin-container">
+    <h2>管理者ページ</h2>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <ul class="flashes">
+                {% for category, message in messages %}
+                    <li class="{{ category }}">{{ message }}</li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+    {% endwith %}
+
+    <section id="admin-user-management">
+        <h3>ユーザー管理</h3>
+        <p>登録済みユーザー: {{ users|length }}人</p>
+
+        <h4>個別ユーザー追加</h4>
+        <form action="{{ url_for('admin_add_user') }}" method="POST" class="add-user-form">
+            <div class="input-group">
+                <label for="new_room_number">部屋番号:</label>
+                <input type="text" id="new_room_number" name="room_number" required>
+            </div>
+            <div class="input-group">
+                <label for="new_room_password">入室パスワード:</label>
+                <input type="password" id="new_room_password" name="room_password" required>
+            </div>
+            <div class="input-group">
+                <label for="new_student_id">出席番号:</label>
+                <input type="text" id="new_student_id" name="student_id" required>
+            </div>
+            <div class="input-group">
+                <label for="new_individual_password">個別パスワード:</label>
+                <input type="password" id="new_individual_password" name="individual_password" required>
+            </div>
+            <div class="input-group">
+                <label for="new_username">アカウント名:</label>
+                <input type="text" id="new_username" name="username" required>
+            </div>
+            <button type="submit" class="btn btn-primary">ユーザー追加</button>
+        </form>
+
+        <h4>ユーザー一括登録 (CSV)</h4>
+        <p>CSVファイルはヘッダー行に「部屋番号,入室パスワード,出席番号,個別パスワード,アカウント名」を持つ必要があります。</p>
+        <form action="{{ url_for('admin_upload_users') }}" method="POST" enctype="multipart/form-data" class="upload-form">
+            <div class="input-group">
+                <label for="user_csv_file">CSVファイルを選択:</label>
+                <input type="file" id="user_csv_file" name="file" accept=".csv" required>
+            </div>
+            <button type="submit" class="btn btn-secondary">一括登録</button>
+        </form>
+
+        <h4>ユーザーデータダウンロード</h4>
+        <p>現在登録されているユーザー情報をCSV形式でダウンロードできます。</p>
+        <a href="{{ url_for('download_users_csv') }}" class="btn btn-info">ユーザーデータCSVダウンロード</a>
+        <a href="{{ url_for('download_users_template_csv') }}" class="btn btn-outline-info">ユーザーテンプレートCSVダウンロード</a>
+        
+        <!-- データ移行セクション -->
+        <h4 style="margin-top: 30px; color: #e67e22;">⚠️ データ移行・メンテナンス</h4>
+        <div style="background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 5px; padding: 15px; margin-bottom: 20px;">
+            <p><strong>学習履歴データの移行:</strong></p>
+            <p>古いバージョンからの学習履歴を新しい形式に変換します。進捗確認ページで問題が表示されない場合に実行してください。</p>
+            <p><em>⚠️ この操作は一度だけ実行してください。実行前にデータのバックアップを推奨します。</em></p>
+            <div style="margin-top: 10px;">
+                <a href="{{ url_for('admin_debug_progress') }}" class="btn btn-info btn-sm" target="_blank">現在のデータ状況を確認</a>
+                <form action="{{ url_for('admin_migrate_data') }}" method="POST" style="display: inline-block; margin-left: 10px;" onsubmit="return confirm('データ移行を実行しますか？\n\n・この操作は元に戻せません\n・実行中はアプリを停止しないでください\n・実行後は進捗確認ページをテストしてください\n\n実行しますか？')">
+                    <button type="submit" class="btn btn-warning">🔄 学習履歴データを移行</button>
+                </form>
+            </div>
+        </div>
+
+        <h4 style="margin-top: 30px;">登録済みユーザー一覧</h4>
+        <table class="table user-list-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>部屋番号</th>
+                    <th>出席番号</th>
+                    <th>アカウント名</th>
+                    <th>最終ログイン</th>
+                    <th>アクション</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in users %}
+                {% if user.username != 'admin' %}
+                <tr>
+                    <td>{{ user.id }}</td>
+                    <td>{{ user.room_number }}</td>
+                    <td>{{ user.student_id }}</td>
+                    <td>{{ user.username }}</td>
+                    <td>{{ user.last_login.strftime('%Y-%m-%d %H:%M') if user.last_login else '未ログイン' }}</td>
+                    <td>
+                        <button class="btn btn-danger btn-sm delete-user-btn" data-user-id="{{ user.id }}" data-username="{{ user.username }}">削除</button>
+                    </td>
+                </tr>
+                {% endif %}
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+
+    <hr>
+
+    <!-- 新しい部屋ごとCSVファイル管理セクション -->
+    <section id="admin-csv-management">
+        <h3>📁 部屋ごとCSVファイル管理</h3>
+        <p>各部屋で使用する単語帳CSVファイルを個別に設定できます。アップロードしない場合はデフォルトのwords.csvが使用されます。</p>
+
+        <h4>CSVファイルアップロード</h4>
+        <div style="background-color: #e8f4fd; border: 1px solid #b3d7ff; border-radius: 5px; padding: 15px; margin-bottom: 20px;">
+            <p><strong>CSVファイル形式要件:</strong></p>
+            <ul>
+                <li>ヘッダー行: chapter, number, category, question, answer, enabled</li>
+                <li>enabled列: 1（有効）または0（無効）</li>
+                <li>文字エンコーディング: UTF-8</li>
+            </ul>
+        </div>
+        
+        <form action="{{ url_for('admin_upload_room_csv') }}" method="POST" enctype="multipart/form-data" class="upload-form">
+            <div class="input-group">
+                <label for="room_number_for_csv">対象部屋番号:</label>
+                <input type="text" id="room_number_for_csv" name="room_number_for_csv" required placeholder="例: 101">
+            </div>
+            <div class="input-group">
+                <label for="room_csv_file">CSVファイルを選択:</label>
+                <input type="file" id="room_csv_file" name="file" accept=".csv" required>
+            </div>
+            <button type="submit" class="btn btn-success">部屋用CSVアップロード</button>
+        </form>
+
+        <h4>アップロード済みCSVファイル一覧</h4>
+        <div id="csv-files-list">
+            <button class="btn btn-info btn-sm" onclick="loadCsvFilesList()">ファイル一覧を更新</button>
+            <div id="csv-files-container" style="margin-top: 15px;">
+                <!-- JavaScriptで動的に読み込み -->
+            </div>
+        </div>
+    </section>
+
+    <hr>
+
+    <section id="admin-room-settings">
+        <h3>部屋ごとの設定管理</h3>
+        <p>各部屋の学習範囲とCSVファイルを設定します。</p>
+
+        <table class="table room-setting-table">
+            <thead>
+                <tr>
+                    <th>部屋番号</th>
+                    <th>有効な最大単元番号</th>
+                    <th>使用CSVファイル</th>
+                    <th>アクション</th>
+                </tr>
+            </thead>
+            <tbody>
+                {# 登録済みの全ユーザーの部屋番号を重複なく取得し、ソートして表示 #}
+                {% set unique_room_numbers = [] %}
+                {% for user in users %}
+                    {% if user.room_number not in unique_room_numbers and user.room_number != 'ADMIN' %}
+                        {% set _ = unique_room_numbers.append(user.room_number) %}
+                    {% endif %}
+                {% endfor %}
+                
+                {# RoomSettingテーブルに直接存在する部屋番号も取得し、結合する #}
+                {% for setting in room_max_unit_settings.keys() %}
+                    {% if setting not in unique_room_numbers and setting != 'ADMIN' %}
+                        {% set _ = unique_room_numbers.append(setting) %}
+                    {% endif %}
+                {% endfor %}
+
+                {% for room_num in unique_room_numbers|sort %}
+                <tr>
+                    <td><strong>{{ room_num }}</strong></td>
+                    <td>
+                        <input type="text"
+                               id="maxUnit_{{ room_num }}"
+                               value="{{ room_max_unit_settings.get(room_num, '9999') }}"
+                               class="form-control unit-setting-input"
+                               data-room-number="{{ room_num }}"
+                               placeholder="例: 34 または 9999（全て）">
+                    </td>
+                    <td>
+                        <select id="csvFile_{{ room_num }}" 
+                                class="form-control csv-setting-select" 
+                                data-room-number="{{ room_num }}">
+                            <option value="words.csv" {% if room_csv_settings.get(room_num, 'words.csv') == 'words.csv' %}selected{% endif %}>
+                                words.csv (デフォルト)
+                            </option>
+                            <!-- 動的にオプションを追加 -->
+                        </select>
+                    </td>
+                    <td>
+                        <button class="btn btn-primary btn-sm save-room-setting-btn" data-room-number="{{ room_num }}">保存</button>
+                        <button class="btn btn-danger btn-sm delete-room-setting-btn" data-room-number="{{ room_num }}">設定削除</button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        
+        <h4>設定データダウンロード</h4>
+        <p>現在設定されている部屋ごとの設定をCSV形式でダウンロードできます。</p>
+        <a href="{{ url_for('download_room_settings_csv') }}" class="btn btn-info">部屋設定CSVダウンロード</a>
+        <a href="{{ url_for('download_room_settings_template_csv') }}" class="btn btn-outline-info">設定テンプレートCSVダウンロード</a>
+    </section>
+
+
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 初期ロード時にCSVファイル一覧とセレクトボックスを更新
+    loadCsvFilesList();
+    updateCsvSelectOptions();
+
+    // 部屋設定保存ボタンのイベントリスナー
+    document.querySelectorAll('.save-room-setting-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const roomNumber = this.dataset.roomNumber;
+            const maxUnitInput = document.getElementById(`maxUnit_${roomNumber}`);
+            const csvFileSelect = document.getElementById(`csvFile_${roomNumber}`);
+            const maxUnit = maxUnitInput.value.trim();
+            const csvFilename = csvFileSelect.value;
+
+            // ボタンを無効化して重複実行を防ぐ
+            this.disabled = true;
+            this.textContent = '保存中...';
+
+            // 単元設定とCSVファイル設定を同時に更新
+            Promise.all([
+                fetch('{{ url_for("admin_update_room_unit_setting") }}', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        room_number: roomNumber,
+                        max_unit: maxUnit
+                    })
+                }),
+                fetch('{{ url_for("admin_update_room_csv_setting") }}', {
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        room_number: roomNumber,
+                        csv_filename: csvFilename
+                    })
+                })
+            ])
+            .then(responses => Promise.all(responses.map(r => r.json())))
+            .then(results => {
+                const unitResult = results[0];
+                const csvResult = results[1];
+                
+                if (unitResult.status === 'success' && csvResult.status === 'success') {
+                    alert(`部屋 ${roomNumber} の設定を更新しました:\n・最大単元: ${maxUnit}\n・CSVファイル: ${csvFilename}`);
+                    window.location.reload();
+                } else {
+                    alert('設定の保存中にエラーが発生しました。');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('設定の保存中にエラーが発生しました。');
+            })
+            .finally(() => {
+                this.disabled = false;
+                this.textContent = '保存';
+            });
+        });
+    });
+
+    // ユーザー削除ボタンのイベントリスナー
+    document.querySelectorAll('.delete-user-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const userId = this.dataset.userId;
+            const username = this.dataset.username;
+
+            if (confirm(`ユーザー "${username}" (ID: ${userId}) を本当に削除しますか？\n\n⚠️ この操作は元に戻せません。\n⚠️ ユーザーの学習履歴も完全に削除されます。`)) {
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = `{{ url_for('admin_delete_user', user_id=0) }}`.replace('0', userId);
+
+                document.body.appendChild(form);
+                form.submit();
+            }
+        });
+    });
+
+    // 部屋設定削除ボタンのイベントリスナー
+    document.querySelectorAll('.delete-room-setting-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const roomNumber = this.dataset.roomNumber;
+
+            if (confirm(`部屋 "${roomNumber}" の設定を本当に削除しますか？\n\n⚠️ この部屋に属するユーザーの設定はデフォルトに戻ります。\n⚠️ この操作は元に戻せません。`)) {
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = `{{ url_for('admin_delete_room_setting', room_number='_ROOM_NUMBER_') }}`.replace('_ROOM_NUMBER_', roomNumber);
+
+                document.body.appendChild(form);
+                form.submit();
+            }
+        });
+    });
+});
+
+// CSVファイル一覧を動的に読み込む関数
+function loadCsvFilesList() {
+    fetch('{{ url_for("admin_list_room_csv_files") }}')
+        .then(response => response.json())
+        .then(data => {
+            const container = document.getElementById('csv-files-container');
+            
+            if (data.status === 'success' && data.files.length > 0) {
+                let html = '<table class="table table-sm"><thead><tr><th>ファイル名</th><th>サイズ</th><th>更新日時</th><th>アクション</th></tr></thead><tbody>';
+                
+                data.files.forEach(file => {
+                    const sizeKB = Math.round(file.size / 1024 * 100) / 100;
+                    html += `
+                        <tr>
+                            <td><code>${file.filename}</code></td>
+                            <td>${sizeKB} KB</td>
+                            <td>${file.modified}</td>
+                            <td>
+                                <button class="btn btn-danger btn-xs" onclick="deleteCsvFile('${file.filename}')">削除</button>
+                            </td>
+                        </tr>
+                    `;
+                });
+                
+                html += '</tbody></table>';
+                container.innerHTML = html;
+            } else {
+                container.innerHTML = '<p class="text-muted">アップロード済みのCSVファイルはありません。</p>';
+            }
+            
+            // セレクトボックスのオプションも更新
+            updateCsvSelectOptions(data.files || []);
+        })
+        .catch(error => {
+            console.error('Error loading CSV files:', error);
+            document.getElementById('csv-files-container').innerHTML = '<p class="text-danger">ファイル一覧の読み込みに失敗しました。</p>';
+        });
+}
+
+// CSVファイル選択セレクトボックスのオプションを更新
+function updateCsvSelectOptions(csvFiles = []) {
+    // すべてのCSVファイル選択セレクトボックスを更新
+    document.querySelectorAll('.csv-setting-select').forEach(select => {
+        const roomNumber = select.dataset.roomNumber;
+        const currentValue = select.value;
+        
+        // デフォルトオプション以外を一旦削除
+        while (select.children.length > 1) {
+            select.removeChild(select.lastChild);
+        }
+        
+        // アップロード済みファイルのオプションを追加
+        csvFiles.forEach(file => {
+            const option = document.createElement('option');
+            option.value = file.filename;
+            option.textContent = file.filename;
+            if (file.filename === '{{ room_csv_settings.get(room_num, "") }}') {
+                option.selected = true;
+            }
+            select.appendChild(option);
+        });
+        
+        // 現在の値を復元（存在する場合）
+        if (currentValue && Array.from(select.options).some(opt => opt.value === currentValue)) {
+            select.value = currentValue;
+        }
+    });
+}
+
+// CSVファイル削除関数
+function deleteCsvFile(filename) {
+    if (confirm(`CSVファイル "${filename}" を削除しますか？\n\n⚠️ このファイルを使用している部屋設定はデフォルトに戻ります。\n⚠️ この操作は元に戻せません。`)) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = `{{ url_for('admin_delete_room_csv', filename='_FILENAME_') }}`.replace('_FILENAME_', filename);
+        
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+</script>
+{% endblock %}
