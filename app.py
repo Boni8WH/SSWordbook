@@ -207,51 +207,127 @@ def get_problem_id(word):
 
 def create_tables_and_admin_user():
     with app.app_context():
-        # データベースの構造を確認し、必要に応じてマイグレーション
-        try:
-            # テーブルが存在するか確認
-            db.create_all()
-            
-            # last_login カラムが存在するかチェック
-            from sqlalchemy import inspect
-            inspector = inspect(db.engine)
-            columns = [c['name'] for c in inspector.get_columns('user')]
-            
-            if 'last_login' not in columns:
-                print("⚠️ last_login カラムが見つかりません。マイグレーションを実行します...")
-                # last_login カラムを追加
-                db.engine.execute('ALTER TABLE user ADD COLUMN last_login DATETIME')
-                print("✅ last_login カラムを追加しました。")
+        print("🔧 データベース初期化を開始...")
         
-        except Exception as e:
-            print(f"⚠️ マイグレーション中にエラー: {e}")
-            # テーブルを新規作成
+        # 環境変数でデータベースリセットが指定されている場合
+        reset_db = os.environ.get('RESET_DATABASE', '').lower() == 'true'
+        if reset_db:
+            print("🔄 RESET_DATABASE=true が設定されています。データベースを完全にリセットします...")
+            try:
+                db.drop_all()
+                print("✅ 既存のテーブルを削除しました。")
+            except Exception as e:
+                print(f"⚠️ テーブル削除中にエラー: {e}")
+        
+        try:
+            # まずテーブル作成を試行
             db.create_all()
+            print("✅ テーブルを作成しました。")
             
-        # 管理者ユーザーの作成
-        if not User.query.filter_by(username='admin', room_number='ADMIN', student_id='000').first():
-            admin_user = User(username='admin', room_number='ADMIN', student_id='000',
-                              problem_history='{}', incorrect_words='[]')
-            admin_user.set_room_password('Avignon1309')
-            admin_user.set_individual_password('Avignon1309')
-            # last_login は自動的にデフォルト値が設定される
-            db.session.add(admin_user)
-            db.session.commit()
-            print("Admin user 'admin' created with password 'Avignon1309'.")
-        else:
-            print("Admin user 'admin' already exists.")
+            # テーブル構造を確認
+            from sqlalchemy import inspect, text
+            inspector = inspect(db.engine)
+            
+            # userテーブルが存在するかチェック
+            if inspector.has_table('user'):
+                columns = [c['name'] for c in inspector.get_columns('user')]
+                print(f"📋 userテーブルの列: {columns}")
+                
+                if 'last_login' not in columns:
+                    print("⚠️ last_login カラムが見つかりません。カラムを追加します...")
+                    try:
+                        # SQLAlchemy 2.0対応: text()を使用してSQL文を実行
+                        with db.engine.connect() as connection:
+                            connection.execute(text('ALTER TABLE user ADD COLUMN last_login DATETIME'))
+                            connection.commit()
+                        print("✅ last_login カラムを追加しました。")
+                    except Exception as e:
+                        print(f"⚠️ カラム追加中にエラー: {e}")
+                        print("💡 テーブル全体を再作成します...")
+                        # カラム追加に失敗した場合、テーブル全体を再作成
+                        db.drop_all()
+                        db.create_all()
+                        print("✅ テーブルを再作成しました。")
+                else:
+                    print("✅ last_login カラムは既に存在します。")
+            else:
+                print("⚠️ userテーブルが存在しません。新規作成します。")
+                db.create_all()
+                print("✅ テーブルを新規作成しました。")
+                        
+        except Exception as e:
+            print(f"❌ データベース初期化中にエラー: {e}")
+            # 全体的なエラーの場合、強制的にテーブルを再作成
+            try:
+                print("💡 強制的にテーブルを再作成します...")
+                db.drop_all()
+                db.create_all()
+                print("✅ テーブルを強制再作成しました。")
+            except Exception as e2:
+                print(f"❌ テーブル再作成にも失敗: {e2}")
+                raise
+        
+        # 管理者ユーザーの作成（安全な方法で）
+        try:
+            print("👤 管理者ユーザーを確認中...")
+            
+            # 直接SQLクエリで確認（より安全）
+            with db.engine.connect() as connection:
+                result = connection.execute(text(
+                    "SELECT COUNT(*) as count FROM user WHERE username = :username AND room_number = :room_number AND student_id = :student_id"
+                ), {
+                    'username': 'admin',
+                    'room_number': 'ADMIN', 
+                    'student_id': '000'
+                })
+                admin_exists = result.scalar() > 0
+            
+            if not admin_exists:
+                print("👤 管理者ユーザーを作成します...")
+                admin_user = User(
+                    username='admin', 
+                    room_number='ADMIN', 
+                    student_id='000',
+                    problem_history='{}', 
+                    incorrect_words='[]'
+                )
+                admin_user.set_room_password('Avignon1309')
+                admin_user.set_individual_password('Avignon1309')
+                # last_login は自動的にデフォルト値が設定される
+                db.session.add(admin_user)
+                db.session.commit()
+                print("✅ 管理者ユーザー 'admin' を作成しました（パスワード: Avignon1309）")
+            else:
+                print("✅ 管理者ユーザー 'admin' は既に存在します。")
+                
+        except Exception as e:
+            print(f"❌ 管理者ユーザー作成エラー: {e}")
+            db.session.rollback()
+            # 管理者ユーザー作成に失敗してもアプリを起動させる
+            print("⚠️ 管理者ユーザーの作成に失敗しましたが、アプリケーションを続行します。")
         
         # 既存の部屋設定の確認
-        existing_room_numbers = db.session.query(User.room_number).distinct().all()
-        for room_tuple in existing_room_numbers:
-            room_num = room_tuple[0]
-            if room_num == 'ADMIN':
-                continue
-            if not RoomSetting.query.filter_by(room_number=room_num).first():
-                new_setting = RoomSetting(room_number=room_num, max_enabled_unit_number="9999", csv_filename="words.csv")
-                db.session.add(new_setting)
-        db.session.commit()
-        print("Ensured RoomSetting entries exist for all rooms (excluding ADMIN).")
+        try:
+            print("🏠 部屋設定を確認中...")
+            existing_room_numbers = db.session.query(User.room_number).distinct().all()
+            for room_tuple in existing_room_numbers:
+                room_num = room_tuple[0]
+                if room_num == 'ADMIN':
+                    continue
+                if not RoomSetting.query.filter_by(room_number=room_num).first():
+                    new_setting = RoomSetting(
+                        room_number=room_num, 
+                        max_enabled_unit_number="9999", 
+                        csv_filename="words.csv"
+                    )
+                    db.session.add(new_setting)
+            db.session.commit()
+            print("✅ 部屋設定を確認しました。")
+        except Exception as e:
+            print(f"❌ 部屋設定作成エラー: {e}")
+            db.session.rollback()
+        
+        print("🎉 データベース初期化が完了しました！")
 
 # ====================================================================
 # ルーティング
