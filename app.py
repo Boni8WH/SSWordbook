@@ -1205,5 +1205,8 @@ def admin_debug_progress():
                          id_test_results=id_test_results)
 
 if __name__ == '__main__':
+    import os
     create_tables_and_admin_user()
-    app.run(debug=True)
+    # Render用の設定
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=False)
