@@ -10,6 +10,7 @@ from flask import Flask, render_template, request, redirect, url_for, flash, ses
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
+from sqlalchemy import inspect, text
 
 # 日本時間のタイムゾーンオブジェクトを作成
 JST = pytz.timezone('Asia/Tokyo')
@@ -202,22 +203,45 @@ def get_problem_id(word):
     
     return generated_id
 
-# === 初期設定 ===
+# app.py の create_tables_and_admin_user 関数を修正
+
 def create_tables_and_admin_user():
     with app.app_context():
-        db.create_all()
-
+        # データベースの構造を確認し、必要に応じてマイグレーション
+        try:
+            # テーブルが存在するか確認
+            db.create_all()
+            
+            # last_login カラムが存在するかチェック
+            from sqlalchemy import inspect
+            inspector = inspect(db.engine)
+            columns = [c['name'] for c in inspector.get_columns('user')]
+            
+            if 'last_login' not in columns:
+                print("⚠️ last_login カラムが見つかりません。マイグレーションを実行します...")
+                # last_login カラムを追加
+                db.engine.execute('ALTER TABLE user ADD COLUMN last_login DATETIME')
+                print("✅ last_login カラムを追加しました。")
+        
+        except Exception as e:
+            print(f"⚠️ マイグレーション中にエラー: {e}")
+            # テーブルを新規作成
+            db.create_all()
+            
+        # 管理者ユーザーの作成
         if not User.query.filter_by(username='admin', room_number='ADMIN', student_id='000').first():
             admin_user = User(username='admin', room_number='ADMIN', student_id='000',
                               problem_history='{}', incorrect_words='[]')
             admin_user.set_room_password('Avignon1309')
             admin_user.set_individual_password('Avignon1309')
+            # last_login は自動的にデフォルト値が設定される
             db.session.add(admin_user)
             db.session.commit()
             print("Admin user 'admin' created with password 'Avignon1309'.")
         else:
             print("Admin user 'admin' already exists.")
         
+        # 既存の部屋設定の確認
         existing_room_numbers = db.session.query(User.room_number).distinct().all()
         for room_tuple in existing_room_numbers:
             room_num = room_tuple[0]
