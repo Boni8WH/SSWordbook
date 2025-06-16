@@ -1,4 +1,4 @@
-{# admin.html - 部屋ごとCSVファイル対応版 #}
+{# admin.html - 部屋ごとCSVファイル対応版（修正版） #}
 
 {% extends "base.html" %}
 
@@ -59,8 +59,10 @@
 
         <h4>ユーザーデータダウンロード</h4>
         <p>現在登録されているユーザー情報をCSV形式でダウンロードできます。</p>
-        <a href="{{ url_for('download_users_csv') }}" class="btn btn-info">ユーザーデータCSVダウンロード</a>
-        <a href="{{ url_for('download_users_template_csv') }}" class="btn btn-outline-info">ユーザーテンプレートCSVダウンロード</a>
+        <div class="download-buttons">
+            <a href="{{ url_for('download_users_csv') }}" class="btn btn-info">ユーザーデータCSVダウンロード</a>
+            <a href="{{ url_for('download_users_template_csv') }}" class="btn btn-outline-info">ユーザーテンプレートCSVダウンロード</a>
+        </div>
         
         <!-- データ移行セクション -->
         <h4 style="margin-top: 30px; color: #e67e22;">⚠️ データ移行・メンテナンス</h4>
@@ -77,34 +79,36 @@
         </div>
 
         <h4 style="margin-top: 30px;">登録済みユーザー一覧</h4>
-        <table class="table user-list-table">
-            <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>部屋番号</th>
-                    <th>出席番号</th>
-                    <th>アカウント名</th>
-                    <th>最終ログイン</th>
-                    <th>アクション</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for user in users %}
-                {% if user.username != 'admin' %}
-                <tr>
-                    <td>{{ user.id }}</td>
-                    <td>{{ user.room_number }}</td>
-                    <td>{{ user.student_id }}</td>
-                    <td>{{ user.username }}</td>
-                    <td>{{ user.last_login.strftime('%Y-%m-%d %H:%M') if user.last_login else '未ログイン' }}</td>
-                    <td>
-                        <button class="btn btn-danger btn-sm delete-user-btn" data-user-id="{{ user.id }}" data-username="{{ user.username }}">削除</button>
-                    </td>
-                </tr>
-                {% endif %}
-                {% endfor %}
-            </tbody>
-        </table>
+        <div class="table-responsive">
+            <table class="table table-striped user-list-table">
+                <thead class="table-dark">
+                    <tr>
+                        <th>ID</th>
+                        <th>部屋</th>
+                        <th>出席番号</th>
+                        <th>名前</th>
+                        <th>最終ログイン</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                    {% if user.username != 'admin' %}
+                    <tr>
+                        <td>{{ user.id }}</td>
+                        <td>{{ user.room_number }}</td>
+                        <td>{{ user.student_id }}</td>
+                        <td>{{ user.username }}</td>
+                        <td>{{ user.last_login.strftime('%Y-%m-%d %H:%M') if user.last_login else '未ログイン' }}</td>
+                        <td>
+                            <button class="btn btn-danger btn-sm delete-user-btn" data-user-id="{{ user.id }}" data-username="{{ user.username }}">削除</button>
+                        </td>
+                    </tr>
+                    {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </section>
 
     <hr>
@@ -151,67 +155,72 @@
         <h3>部屋ごとの設定管理</h3>
         <p>各部屋の学習範囲とCSVファイルを設定します。</p>
 
-        <table class="table room-setting-table">
-            <thead>
-                <tr>
-                    <th>部屋番号</th>
-                    <th>有効な最大単元番号</th>
-                    <th>使用CSVファイル</th>
-                    <th>アクション</th>
-                </tr>
-            </thead>
-            <tbody>
-                {# 登録済みの全ユーザーの部屋番号を重複なく取得し、ソートして表示 #}
-                {% set unique_room_numbers = [] %}
-                {% for user in users %}
-                    {% if user.room_number not in unique_room_numbers and user.room_number != 'ADMIN' %}
-                        {% set _ = unique_room_numbers.append(user.room_number) %}
-                    {% endif %}
-                {% endfor %}
-                
-                {# RoomSettingテーブルに直接存在する部屋番号も取得し、結合する #}
-                {% for setting in room_max_unit_settings.keys() %}
-                    {% if setting not in unique_room_numbers and setting != 'ADMIN' %}
-                        {% set _ = unique_room_numbers.append(setting) %}
-                    {% endif %}
-                {% endfor %}
+        <div class="table-responsive">
+            <table class="table table-striped room-setting-table">
+                <thead class="table-dark">
+                    <tr>
+                        <th>部屋番号</th>
+                        <th>最大単元番号</th>
+                        <th>使用CSVファイル</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {# 登録済みの全ユーザーの部屋番号を重複なく取得し、ソートして表示 #}
+                    {% set unique_room_numbers = [] %}
+                    {% for user in users %}
+                        {% if user.room_number not in unique_room_numbers and user.room_number != 'ADMIN' %}
+                            {% set _ = unique_room_numbers.append(user.room_number) %}
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {# RoomSettingテーブルに直接存在する部屋番号も取得し、結合する #}
+                    {% for setting in room_max_unit_settings.keys() %}
+                        {% if setting not in unique_room_numbers and setting != 'ADMIN' %}
+                            {% set _ = unique_room_numbers.append(setting) %}
+                        {% endif %}
+                    {% endfor %}
 
-                {% for room_num in unique_room_numbers|sort %}
-                <tr>
-                    <td><strong>{{ room_num }}</strong></td>
-                    <td>
-                        <input type="text"
-                               id="maxUnit_{{ room_num }}"
-                               value="{{ room_max_unit_settings.get(room_num, '9999') }}"
-                               class="form-control unit-setting-input"
-                               data-room-number="{{ room_num }}"
-                               placeholder="例: 34 または 9999（全て）">
-                    </td>
-                    <td>
-                        <select id="csvFile_{{ room_num }}" 
-                                class="form-control csv-setting-select" 
-                                data-room-number="{{ room_num }}">
-                            <option value="words.csv" {% if room_csv_settings.get(room_num, 'words.csv') == 'words.csv' %}selected{% endif %}>
-                                words.csv (デフォルト)
-                            </option>
-                            <!-- 動的にオプションを追加 -->
-                        </select>
-                    </td>
-                    <td>
-                        <button class="btn btn-primary btn-sm save-room-setting-btn" data-room-number="{{ room_num }}">保存</button>
-                        <button class="btn btn-danger btn-sm delete-room-setting-btn" data-room-number="{{ room_num }}">設定削除</button>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+                    {% for room_num in unique_room_numbers|sort %}
+                    <tr>
+                        <td><strong>{{ room_num }}</strong></td>
+                        <td>
+                            <input type="text"
+                                   id="maxUnit_{{ room_num }}"
+                                   value="{{ room_max_unit_settings.get(room_num, '9999') }}"
+                                   class="form-control unit-setting-input"
+                                   data-room-number="{{ room_num }}"
+                                   placeholder="例: 34 または 9999（全て）">
+                        </td>
+                        <td>
+                            <select id="csvFile_{{ room_num }}" 
+                                    class="form-control csv-setting-select" 
+                                    data-room-number="{{ room_num }}">
+                                <option value="words.csv" {% if room_csv_settings.get(room_num, 'words.csv') == 'words.csv' %}selected{% endif %}>
+                                    words.csv (デフォルト)
+                                </option>
+                                <!-- 動的にオプションを追加 -->
+                            </select>
+                        </td>
+                        <td>
+                            <div class="btn-group-vertical btn-group-sm">
+                                <button class="btn btn-primary btn-sm save-room-setting-btn" data-room-number="{{ room_num }}">保存</button>
+                                <button class="btn btn-danger btn-sm delete-room-setting-btn" data-room-number="{{ room_num }}">削除</button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
         
         <h4>設定データダウンロード</h4>
         <p>現在設定されている部屋ごとの設定をCSV形式でダウンロードできます。</p>
-        <a href="{{ url_for('download_room_settings_csv') }}" class="btn btn-info">部屋設定CSVダウンロード</a>
-        <a href="{{ url_for('download_room_settings_template_csv') }}" class="btn btn-outline-info">設定テンプレートCSVダウンロード</a>
+        <div class="download-buttons">
+            <a href="{{ url_for('download_room_settings_csv') }}" class="btn btn-info">部屋設定CSVダウンロード</a>
+            <a href="{{ url_for('download_room_settings_template_csv') }}" class="btn btn-outline-info">設定テンプレートCSVダウンロード</a>
+        </div>
     </section>
-
 
 </div>
 
@@ -318,7 +327,7 @@ function loadCsvFilesList() {
             const container = document.getElementById('csv-files-container');
             
             if (data.status === 'success' && data.files.length > 0) {
-                let html = '<table class="table table-sm"><thead><tr><th>ファイル名</th><th>サイズ</th><th>更新日時</th><th>アクション</th></tr></thead><tbody>';
+                let html = '<div class="table-responsive"><table class="table table-sm"><thead><tr><th>ファイル名</th><th>サイズ</th><th>更新日時</th><th>アクション</th></tr></thead><tbody>';
                 
                 data.files.forEach(file => {
                     const sizeKB = Math.round(file.size / 1024 * 100) / 100;
@@ -334,7 +343,7 @@ function loadCsvFilesList() {
                     `;
                 });
                 
-                html += '</tbody></table>';
+                html += '</tbody></table></div>';
                 container.innerHTML = html;
             } else {
                 container.innerHTML = '<p class="text-muted">アップロード済みのCSVファイルはありません。</p>';
@@ -391,4 +400,40 @@ function deleteCsvFile(filename) {
     }
 }
 </script>
+
+<style>
+/* 管理者ページ専用の追加スタイル */
+.download-buttons {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+}
+
+.btn-group-vertical .btn {
+    margin-bottom: 2px;
+}
+
+@media (max-width: 767px) {
+    .download-buttons {
+        flex-direction: column;
+    }
+    
+    .download-buttons .btn {
+        width: 100%;
+        margin-bottom: 5px;
+    }
+    
+    .btn-group-vertical {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+    
+    .btn-group-vertical .btn {
+        font-size: 0.7rem;
+        padding: 4px 8px;
+    }
+}
+</style>
 {% endblock %}

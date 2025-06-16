@@ -2281,3 +2281,308 @@ body {
         display: none !important;
     }
 }
+
+/* スマホ表示緊急修正 - style.cssの末尾に追加 */
+
+/* ===============================
+   スマホ表示緊急修正
+   =============================== */
+
+/* 1. 「全て選択」「選択解除」ボタンの修正 */
+.select-all-chapter-btn {
+    padding: 4px 8px !important;
+    font-size: 0.75rem !important;
+    min-width: 60px !important;
+    max-width: 80px !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+@media (max-width: 480px) {
+    .select-all-chapter-btn {
+        padding: 3px 6px !important;
+        font-size: 0.7rem !important;
+        min-width: 50px !important;
+        max-width: 70px !important;
+    }
+}
+
+/* 2. 章ヘッダーのレイアウト修正 */
+.chapter-header {
+    padding: 8px 12px !important;
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    flex-wrap: nowrap !important;
+    gap: 8px !important;
+}
+
+.chapter-title {
+    flex: 1;
+    min-width: 0;
+    font-size: 0.9rem;
+}
+
+.chapter-options {
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    flex-shrink: 0 !important;
+}
+
+@media (max-width: 480px) {
+    .chapter-header {
+        padding: 6px 8px !important;
+        gap: 4px !important;
+    }
+    
+    .chapter-title {
+        font-size: 0.85rem;
+    }
+    
+    .chapter-options {
+        gap: 4px !important;
+    }
+}
+
+/* 3. テーブルの横スクロール対応 */
+.ranking-container,
+.progress-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.ranking-container table,
+.progress-container table,
+.user-list-table,
+.room-setting-table {
+    min-width: 600px;
+    width: 100%;
+    display: table !important;
+    white-space: nowrap;
+}
+
+/* 4. テーブルのフォントサイズ調整 */
+@media (max-width: 767px) {
+    .ranking-container table,
+    .progress-container table {
+        font-size: 0.7rem !important;
+        min-width: 500px;
+    }
+    
+    .ranking-container table th,
+    .ranking-container table td {
+        padding: 4px 2px !important;
+        min-width: 40px;
+        max-width: 80px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+}
+
+@media (max-width: 480px) {
+    .ranking-container table,
+    .progress-container table {
+        font-size: 0.65rem !important;
+        min-width: 450px;
+    }
+    
+    .ranking-container table th,
+    .ranking-container table td {
+        padding: 3px 1px !important;
+        min-width: 35px;
+        max-width: 70px;
+    }
+}
+
+/* 5. ボタン群の修正 */
+.bottom-controls {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 10px !important;
+    margin-top: 15px !important;
+    align-items: stretch !important;
+}
+
+.bottom-controls button {
+    width: 100% !important;
+    max-width: none !important;
+    padding: 12px 16px !important;
+    font-size: 0.9rem !important;
+    white-space: nowrap;
+}
+
+@media (min-width: 768px) {
+    .bottom-controls {
+        flex-direction: row !important;
+        justify-content: center !important;
+        align-items: center !important;
+    }
+    
+    .bottom-controls button {
+        width: auto !important;
+        flex: 0 0 auto !important;
+    }
+}
+
+/* 6. コンテナの改善 */
+@media (max-width: 767px) {
+    .container {
+        padding: 8px !important;
+        margin: 5px auto !important;
+    }
+    
+    .controls-area {
+        padding: 12px !important;
+        gap: 15px !important;
+    }
+    
+    .chapters-container {
+        max-height: 300px !important;
+        padding: 8px !important;
+    }
+}
+
+/* 7. ナビゲーションバーの修正 */
+@media (max-width: 767px) {
+    .navbar {
+        padding: 5px 8px !important;
+    }
+    
+    .navbar-brand {
+        font-size: 1rem !important;
+    }
+    
+    .navbar-nav .nav-link {
+        font-size: 0.8rem !important;
+        padding: 4px 8px !important;
+    }
+}
+
+/* 8. カードエリアの修正 */
+@media (max-width: 767px) {
+    .card {
+        padding: 12px !important;
+        margin-bottom: 15px !important;
+    }
+    
+    .question-content p {
+        font-size: 1.1rem !important;
+        line-height: 1.3 !important;
+        margin-bottom: 15px !important;
+    }
+    
+    .answer-content {
+        position: static !important;
+        margin-top: 15px !important;
+    }
+    
+    .answer-content p {
+        font-size: 1.3rem !important;
+        line-height: 1.2 !important;
+    }
+    
+    .card-buttons {
+        gap: 10px !important;
+        margin-top: 15px !important;
+    }
+}
+
+/* 9. 進捗ページの特別対応 */
+.progress-section {
+    overflow-x: hidden;
+}
+
+.progress-section h2 {
+    font-size: 1.2rem !important;
+    line-height: 1.3;
+    word-wrap: break-word;
+}
+
+/* 10. テキストの折り返し改善 */
+.unit-item label {
+    word-wrap: break-word !important;
+    word-break: break-word !important;
+    hyphens: auto !important;
+    line-height: 1.3 !important;
+}
+
+/* 11. 重要：全体の横スクロール防止 */
+html, body {
+    overflow-x: hidden !important;
+    max-width: 100vw !important;
+}
+
+* {
+    box-sizing: border-box !important;
+}
+
+/* 12. フォーム要素の調整 */
+@media (max-width: 767px) {
+    .input-group {
+        margin-bottom: 10px !important;
+    }
+    
+    .input-group label {
+        font-size: 0.9rem !important;
+        margin-bottom: 4px !important;
+    }
+    
+    .input-group input,
+    .input-group select {
+        padding: 8px !important;
+        font-size: 0.9rem !important;
+    }
+}
+
+/* 13. 管理者ページの特別対応 */
+@media (max-width: 767px) {
+    .admin-container {
+        padding: 8px !important;
+    }
+    
+    .admin-panel {
+        padding: 12px !important;
+        margin-bottom: 15px !important;
+    }
+    
+    .admin-panel h3 {
+        font-size: 1.1rem !important;
+        margin-bottom: 10px !important;
+    }
+    
+    .user-list-table {
+        font-size: 0.7rem !important;
+    }
+    
+    .user-list-table th,
+    .user-list-table td {
+        padding: 4px 2px !important;
+        word-break: break-all !important;
+    }
+}
+
+/* 14. 緊急：はみ出し防止 */
+.ranking-container,
+.progress-container,
+.admin-panel,
+.container,
+.controls-area,
+.card-area,
+.quiz-result-area {
+    max-width: 100% !important;
+    overflow-x: auto !important;
+}
+
+/* 15. テーブル専用スクロールコンテナ */
+.table-responsive {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    margin: 0 -8px !important;
+    padding: 0 8px !important;
+}
+
+.table-responsive table {
+    margin-bottom: 0 !important;
+}
