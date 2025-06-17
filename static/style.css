@@ -2594,3 +2594,230 @@ body {
         display: none !important;
     }
 }
+
+/* ログインページとパスワード再発行ページの入力フィールド視認性改善 */
+
+/* より強力なセレクターで基本的な入力フィールドのスタイル修正 */
+.auth-section .auth-container .input-group input[type="text"],
+.auth-section .auth-container .input-group input[type="password"],
+.auth-section .auth-container .input-group input[type="email"],
+body .auth-container .input-group input[type="text"],
+body .auth-container .input-group input[type="password"],
+body .auth-container .input-group input[type="email"],
+html .auth-container .input-group input {
+    width: 100% !important;
+    padding: 12px 16px !important;
+    border: 2px solid #e9ecef !important;
+    border-radius: 10px !important;
+    font-size: 1rem !important;
+    box-sizing: border-box !important;
+    transition: all 0.3s ease !important;
+    
+    /* 最重要: 背景色とテキスト色を強制的に指定 */
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    color: #2c3e50 !important;
+    
+    /* WebKit系ブラウザ対応 */
+    -webkit-text-fill-color: #2c3e50 !important;
+    -webkit-background-color: #ffffff !important;
+    
+    /* その他のブラウザ固有プロパティ */
+    -moz-appearance: textfield !important;
+    -webkit-appearance: none !important;
+    appearance: none !important;
+}
+
+/* プレースホルダーのスタイル - より強力なセレクター */
+.auth-section .auth-container .input-group input::placeholder,
+body .auth-container .input-group input::placeholder,
+html .auth-container .input-group input::placeholder,
+.auth-container .input-group input::-webkit-input-placeholder,
+.auth-container .input-group input::-moz-placeholder,
+.auth-container .input-group input:-ms-input-placeholder {
+    color: #95a5a6 !important;
+    opacity: 1 !important;
+    font-style: italic !important;
+    -webkit-text-fill-color: #95a5a6 !important;
+}
+
+/* フォーカス時のスタイル - より強力なセレクター */
+.auth-section .auth-container .input-group input:focus,
+body .auth-container .input-group input:focus,
+html .auth-container .input-group input:focus {
+    border-color: #3498db !important;
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    color: #2c3e50 !important;
+    outline: none !important;
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1) !important;
+    transform: translateY(-1px) !important;
+    -webkit-text-fill-color: #2c3e50 !important;
+}
+
+/* ホバー時のスタイル */
+.auth-section .auth-container .input-group input:hover,
+body .auth-container .input-group input:hover {
+    border-color: #bdc3c7 !important;
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    color: #2c3e50 !important;
+    -webkit-text-fill-color: #2c3e50 !important;
+}
+
+/* オートフィル時のスタイル（ブラウザによる自動入力） */
+.auth-container .input-group input:-webkit-autofill,
+.auth-container .input-group input:-webkit-autofill:hover,
+.auth-container .input-group input:-webkit-autofill:focus {
+    -webkit-box-shadow: 0 0 0 30px #ffffff inset !important;
+    -webkit-text-fill-color: #2c3e50 !important;
+    background-color: #ffffff !important;
+    color: #2c3e50 !important;
+}
+
+/* Firefox対応 */
+.auth-container .input-group input:-moz-autofill {
+    background-color: #ffffff !important;
+    color: #2c3e50 !important;
+}
+
+/* 無効化された入力フィールド */
+.auth-container .input-group input:disabled {
+    background-color: #f8f9fa !important;
+    color: #6c757d !important;
+    border-color: #dee2e6;
+    cursor: not-allowed;
+}
+
+/* ダークモード環境での対応 */
+@media (prefers-color-scheme: dark) {
+    .auth-container {
+        background: rgba(44, 62, 80, 0.95) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .auth-container .input-group input[type="text"],
+    .auth-container .input-group input[type="password"],
+    .auth-container .input-group input[type="email"] {
+        background-color: #34495e !important;
+        color: #ecf0f1 !important;
+        border-color: #5d6d7e;
+        -webkit-text-fill-color: #ecf0f1 !important;
+    }
+    
+    .auth-container .input-group input::placeholder {
+        color: #95a5a6 !important;
+    }
+    
+    .auth-container .input-group input:focus {
+        background-color: #34495e !important;
+        color: #ecf0f1 !important;
+        border-color: #3498db;
+    }
+    
+    .auth-container .input-group input:-webkit-autofill,
+    .auth-container .input-group input:-webkit-autofill:hover,
+    .auth-container .input-group input:-webkit-autofill:focus {
+        -webkit-box-shadow: 0 0 0 30px #34495e inset !important;
+        -webkit-text-fill-color: #ecf0f1 !important;
+        background-color: #34495e !important;
+        color: #ecf0f1 !important;
+    }
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 767px) {
+    .auth-container .input-group input[type="text"],
+    .auth-container .input-group input[type="password"],
+    .auth-container .input-group input[type="email"] {
+        padding: 10px 14px;
+        font-size: 16px; /* iOS Safariでのズーム防止 */
+        background-color: #ffffff !important;
+        color: #2c3e50 !important;
+    }
+}
+
+/* iOS Safari特有の問題対応 */
+@supports (-webkit-touch-callout: none) {
+    .auth-container .input-group input[type="text"],
+    .auth-container .input-group input[type="password"],
+    .auth-container .input-group input[type="email"] {
+        -webkit-appearance: none;
+        appearance: none;
+        background-color: #ffffff !important;
+        color: #2c3e50 !important;
+        -webkit-text-fill-color: #2c3e50 !important;
+    }
+}
+
+/* ラベルの視認性も改善 */
+.auth-container .input-group label {
+    display: block;
+    font-weight: 600;
+    color: #34495e;
+    margin-bottom: 8px;
+    font-size: 0.95rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.auth-container .input-group label i {
+    color: #3498db;
+    width: 16px;
+    text-align: center;
+    font-size: 0.9rem;
+}
+
+/* ダークモード時のラベル */
+@media (prefers-color-scheme: dark) {
+    .auth-container .input-group label {
+        color: #ecf0f1;
+    }
+    
+    .auth-container .input-group label i {
+        color: #3498db;
+    }
+}
+
+/* 追加: 特定のブラウザでの問題対応 */
+.auth-container .input-group input {
+    /* Edge/Chrome系での透明化防止 */
+    -webkit-background-clip: text;
+    background-clip: text;
+}
+
+/* 特に重要: すべての状態での強制的なテキスト色指定 */
+.auth-container input,
+.auth-container input[type="text"],
+.auth-container input[type="password"], 
+.auth-container input[type="email"],
+.auth-section input,
+.auth-section input[type="text"],
+.auth-section input[type="password"],
+.auth-section input[type="email"] {
+    color: #2c3e50 !important;
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    -webkit-text-fill-color: #2c3e50 !important;
+    -moz-text-fill-color: #2c3e50 !important;
+}
+
+/* 入力中のテキスト色を強制 */
+.auth-container input:not(:placeholder-shown),
+.auth-section input:not(:placeholder-shown) {
+    color: #2c3e50 !important;
+    -webkit-text-fill-color: #2c3e50 !important;
+}
+
+/* CSS変数を使用した最終手段 */
+:root {
+    --auth-input-text-color: #2c3e50;
+    --auth-input-bg-color: #ffffff;
+}
+
+.auth-container .input-group input {
+    color: var(--auth-input-text-color) !important;
+    background-color: var(--auth-input-bg-color) !important;
+    -webkit-text-fill-color: var(--auth-input-text-color) !important;
+}
