@@ -252,18 +252,77 @@ def get_problem_id(word):
         print(f"Error generating problem ID: {e}")
         return "invalid_problem_id"
 
+# データベースマイグレーション関数
+def migrate_database():
+    """データベーススキーマの変更を処理する"""
+    with app.app_context():
+        print("🔄 データベースマイグレーションを開始...")
+        
+        try:
+            # SQLiteの場合、カラムの追加をチェック
+            inspector = inspect(db.engine)
+            
+            # Userテーブルの確認
+            if inspector.has_table('user'):
+                columns = [col['name'] for col in inspector.get_columns('user')]
+                print(f"📋 既存のUserテーブルカラム: {columns}")
+                
+                # last_loginカラムが存在しない場合は追加
+                if 'last_login' not in columns:
+                    print("🔧 last_loginカラムを追加します...")
+                    db.engine.execute(text('ALTER TABLE user ADD COLUMN last_login DATETIME'))
+                    print("✅ last_loginカラムを追加しました。")
+                
+            # AppInfoテーブルの確認
+            if inspector.has_table('app_info'):
+                columns = [col['name'] for col in inspector.get_columns('app_info')]
+                missing_columns = []
+                
+                expected_columns = [
+                    ('footer_text', 'VARCHAR(200)'),
+                    ('contact_email', 'VARCHAR(100)'),
+                    ('app_settings', 'TEXT'),
+                    ('created_at', 'DATETIME'),
+                    ('updated_at', 'DATETIME'),
+                    ('updated_by', 'VARCHAR(80)')
+                ]
+                
+                for col_name, col_type in expected_columns:
+                    if col_name not in columns:
+                        missing_columns.append((col_name, col_type))
+                
+                for col_name, col_type in missing_columns:
+                    print(f"🔧 {col_name}カラムを追加します...")
+                    db.engine.execute(text(f'ALTER TABLE app_info ADD COLUMN {col_name} {col_type}'))
+                    print(f"✅ {col_name}カラムを追加しました。")
+            
+            print("✅ データベースマイグレーションが完了しました。")
+            
+        except Exception as e:
+            print(f"⚠️ マイグレーション中にエラーが発生しました（続行します）: {e}")
+
 # データベース初期化関数
 def create_tables_and_admin_user():
     with app.app_context():
         print("🔧 データベース初期化を開始...")
         
         try:
-            # テーブル作成
+            # 既存のテーブルがある場合はマイグレーションを実行
+            inspector = inspect(db.engine)
+            if inspector.has_table('user') or inspector.has_table('app_info'):
+                migrate_database()
+            
+            # テーブル作成（既存の場合は何もしない）
             db.create_all()
-            print("✅ テーブルを作成しました。")
+            print("✅ テーブルを作成/確認しました。")
             
             # 管理者ユーザーの確認・作成
-            admin_user = User.query.filter_by(username='admin', room_number='ADMIN').first()
+            try:
+                admin_user = User.query.filter_by(username='admin', room_number='ADMIN').first()
+            except Exception as e:
+                print(f"⚠️ 管理者ユーザー検索エラー（新規作成します）: {e}")
+                admin_user = None
+                
             if not admin_user:
                 print("👤 管理者ユーザーを作成します...")
                 admin_user = User(
@@ -282,7 +341,12 @@ def create_tables_and_admin_user():
                 print("✅ 管理者ユーザー 'admin' は既に存在します。")
                 
             # デフォルトのアプリ情報を作成
-            app_info = AppInfo.query.first()
+            try:
+                app_info = AppInfo.query.first()
+            except Exception as e:
+                print(f"⚠️ アプリ情報検索エラー（新規作成します）: {e}")
+                app_info = None
+                
             if not app_info:
                 print("📱 デフォルトのアプリ情報を作成します...")
                 default_app_info = AppInfo()
@@ -295,6 +359,13 @@ def create_tables_and_admin_user():
         except Exception as e:
             print(f"❌ データベース初期化エラー: {e}")
             db.session.rollback()
+            
+            # 致命的エラーの場合、データベースファイルを削除して再作成を提案
+            print("🚨 致命的なデータベースエラーが発生しました。")
+            print("💡 解決方法:")
+            print("   1. アプリを停止")
+            print("   2. quiz_data.db ファイルを削除")
+            print("   3. アプリを再起動")
             raise
         
         print("🎉 データベース初期化が完了しました！")
