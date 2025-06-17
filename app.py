@@ -80,16 +80,24 @@ def get_app_info_dict(user_id=None, username=None, room_number=None):
 # データベースモデル定義
 # ====================================================================
 
+# app.py の User モデルの定義を以下に置き換え
+
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(80), unique=True, nullable=False)
+    username = db.Column(db.String(80), nullable=False)  # unique=True を削除
     room_number = db.Column(db.String(50), nullable=False)
     _room_password_hash = db.Column(db.String(128))
-    student_id = db.Column(db.String(50), nullable=False)
+    student_id = db.Column(db.String(50), nullable=False)  # unique=True を削除
     _individual_password_hash = db.Column(db.String(128))
     problem_history = db.Column(db.Text)
     incorrect_words = db.Column(db.Text)
     last_login = db.Column(db.DateTime, default=lambda: datetime.now(JST))
+
+    # 複合ユニーク制約を追加：部屋番号 + 出席番号 + ユーザー名の組み合わせでユニーク
+    __table_args__ = (
+        db.UniqueConstraint('room_number', 'student_id', 'username', 
+                          name='unique_room_student_username'),
+    )
 
     def set_room_password(self, password):
         self._room_password_hash = generate_password_hash(password)
@@ -1464,7 +1472,7 @@ def password_reset(token):
         else:
             # 既にawareな場合はそのまま使用
             expires_at_aware = reset_token.expires_at
-            
+
         # GET リクエスト時 - フォーム表示
         time_remaining = expires_at_aware - now
         minutes_remaining = max(0, int(time_remaining.total_seconds() / 60))
@@ -2182,6 +2190,8 @@ def admin_app_info_reset():
 # app.py の該当部分を以下に置き換え
 
 # ユーザー管理 - 同一アカウント名登録対応版
+# app.py の admin_add_user 関数を以下に置き換え
+
 @app.route('/admin/add_user', methods=['POST'])
 def admin_add_user():
     try:
@@ -2199,10 +2209,14 @@ def admin_add_user():
             flash('すべての項目を入力してください。', 'danger')
             return redirect(url_for('admin_page'))
 
-        # 修正: 同一部屋の同一出席番号の重複チェックのみ（アカウント名の重複は許可）
-        existing_user = User.query.filter_by(room_number=room_number, student_id=student_id).first()
+        # 部屋番号 + ユーザー名の組み合わせでの重複チェック（出席番号の重複は許可）
+        existing_user = User.query.filter_by(
+            room_number=room_number, 
+            username=username
+        ).first()
+                    
         if existing_user:
-            flash(f'部屋番号 {room_number} の出席番号 {student_id} は既に登録されています。', 'danger')
+            flash(f'部屋{room_number}にユーザー名{username}は既に存在します。', 'danger')
             return redirect(url_for('admin_page'))
 
         new_user = User(room_number=room_number, student_id=student_id, username=username)
@@ -2221,7 +2235,7 @@ def admin_add_user():
             db.session.commit()
             flash(f'部屋 {room_number} の設定をデフォルトで作成しました。', 'info')
 
-        flash(f'ユーザー {username} (部屋: {room_number}) を登録しました。', 'success')
+        flash(f'ユーザー {username} (部屋: {room_number}, 出席番号: {student_id}) を登録しました。', 'success')
         return redirect(url_for('admin_page'))
     except Exception as e:
         print(f"Error in admin_add_user: {e}")
@@ -2232,7 +2246,7 @@ def admin_add_user():
 def admin_upload_users():
     if not session.get('admin_logged_in'):
         flash('管理者権限がありません。', 'danger')
-        return redirect(url_for('admin_page'))
+        return redirect(url_for('login_page'))
 
     if 'file' not in request.files:
         flash('ファイルが選択されていません。', 'danger')
@@ -2267,11 +2281,15 @@ def admin_upload_users():
                         errors.append(f"行{row_num}: 必須項目が不足しています")
                         continue
 
-                    # 修正: 同一部屋の同一出席番号の重複チェックのみ（アカウント名の重複は許可）
-                    existing_user = User.query.filter_by(room_number=room_number, student_id=student_id).first()
+                    # 修正: 部屋番号 + 出席番号 + ユーザー名の組み合わせでの重複チェック
+                    existing_user = User.query.filter_by(
+                        room_number=room_number, 
+                        student_id=student_id,
+                        username=username
+                    ).first()
                     
                     if existing_user:
-                        errors.append(f"行{row_num}: 部屋{room_number}の出席番号{student_id}は既に存在します (既存ユーザー: {existing_user.username})")
+                        errors.append(f"行{row_num}: 部屋{room_number}の出席番号{student_id}のユーザー名{username}は既に存在します")
                         skipped_existing += 1
                         continue
 
@@ -2300,7 +2318,13 @@ def admin_upload_users():
                 
                 # 新しい部屋のデフォルト設定を作成
                 added_rooms = set()
-                for row in csv.DictReader(StringIO(file.stream.read().decode("utf-8"))):
+                
+                # ★ 修正: ファイルを再読み込みして部屋番号を取得
+                file.stream.seek(0)  # ファイルポインタを先頭に戻す
+                stream_for_rooms = StringIO(file.stream.read().decode("utf-8"))
+                reader_for_rooms = csv.DictReader(stream_for_rooms)
+                
+                for row in reader_for_rooms:
                     room_num = row.get('部屋番号', '').strip()
                     if room_num and room_num not in added_rooms:
                         if not RoomSetting.query.filter_by(room_number=room_num).first():
@@ -2319,7 +2343,7 @@ def admin_upload_users():
                     flash(f'✅ {users_added_count}人のユーザーを追加しました。', 'success')
                 
                 if skipped_existing > 0:
-                    flash(f'⚠️ {skipped_existing}人のユーザーは部屋番号+出席番号が重複するため、スキップされました。', 'warning')
+                    flash(f'⚠️ {skipped_existing}人のユーザーは部屋番号+出席番号+ユーザー名が重複するため、スキップされました。', 'warning')
                     
                 if errors:
                     error_summary = f"❌ {len(errors)}件のエラーが発生しました。"

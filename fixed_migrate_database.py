@@ -227,10 +227,68 @@ def migrate_database():
             print(f"✅ {affected_rows}個の古いトークンを無効化しました。")
         else:
             print("📄 無効化すべきトークンはありませんでした。")
+
+        # 7. ★ ユーザーテーブルのユニーク制約修正
+        print("🔧 ユーザーテーブルのユニーク制約を修正中...")
         
+        try:
+            # 既存のユニーク制約を確認
+            cursor.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='user';")
+            table_sql = cursor.fetchone()[0]
+            print(f"現在のユーザーテーブル定義: {table_sql}")
+            
+            # 新しいテーブル構造を作成（複合ユニーク制約付き）
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS user_new (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    username VARCHAR(80) NOT NULL,
+                    room_number VARCHAR(50) NOT NULL,
+                    _room_password_hash VARCHAR(128),
+                    student_id VARCHAR(50) NOT NULL,
+                    _individual_password_hash VARCHAR(128),
+                    problem_history TEXT,
+                    incorrect_words TEXT,
+                    last_login DATETIME,
+                    UNIQUE(room_number, student_id, username)
+                )
+            ''')
+            
+            # 既存データを新しいテーブルにコピー
+            cursor.execute('''
+                INSERT OR IGNORE INTO user_new 
+                SELECT * FROM user
+            ''')
+            
+            # 重複確認
+            cursor.execute("SELECT COUNT(*) FROM user;")
+            old_count = cursor.fetchone()[0]
+            cursor.execute("SELECT COUNT(*) FROM user_new;")
+            new_count = cursor.fetchone()[0]
+            
+            if old_count == new_count:
+                # 古いテーブルを削除し、新しいテーブルをリネーム
+                cursor.execute("DROP TABLE user;")
+                cursor.execute("ALTER TABLE user_new RENAME TO user;")
+                print(f"✅ ユーザーテーブルの制約修正が完了しました。データ数: {new_count}")
+            else:
+                # 重複があった場合
+                print(f"⚠️ 重複データが検出されました。元: {old_count}, 新: {new_count}")
+                print(f"重複データ数: {old_count - new_count}")
+                cursor.execute("DROP TABLE user_new;")
+                print("重複データがあるため、制約修正をスキップしました。")
+                
+        except Exception as constraint_error:
+            print(f"⚠️ ユーザー制約修正でエラー（続行）: {constraint_error}")
+            # 新しいテーブルが作成されていた場合は削除
+            try:
+                cursor.execute("DROP TABLE IF EXISTS user_new;")
+            except:
+                pass
+
         # 変更をコミット（最終）
         conn.commit()
         print("✅ データベースのマイグレーション（タイムゾーン修正含む）が完了しました。")
+
         # 変更をコミット
         conn.commit()
         print("✅ データベースのマイグレーションが完了しました。")
