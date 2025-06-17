@@ -79,6 +79,29 @@
             <button type="submit" class="btn btn-primary">ユーザー追加</button>
         </form>
 
+        <h4>CSV一括ユーザー追加</h4>
+        <div style="background-color: #e8f4fd; border: 1px solid #b3d7ff; border-radius: 5px; padding: 15px; margin-bottom: 20px;">
+            <p><strong>CSVファイル形式要件:</strong></p>
+            <ul>
+                <li>ヘッダー行: 部屋番号,入室パスワード,出席番号,個別パスワード,アカウント名</li>
+                <li>文字エンコーディング: UTF-8</li>
+                <li>例: 101,password123,001,student001,田中太郎</li>
+            </ul>
+            <a href="{{ url_for('download_users_template_csv') }}" class="btn btn-outline-info btn-sm">
+                <i class="fas fa-download"></i> テンプレートをダウンロード
+            </a>
+        </div>
+
+        <form action="{{ url_for('admin_upload_users') }}" method="POST" enctype="multipart/form-data" class="upload-form">
+            <div class="input-group">
+                <label for="users_csv_file">ユーザーCSVファイルを選択:</label>
+                <input type="file" id="users_csv_file" name="file" accept=".csv" required>
+            </div>
+            <button type="submit" class="btn btn-success">
+                <i class="fas fa-upload"></i> CSV一括ユーザー追加
+            </button>
+        </form>
+
         <h4>登録済みユーザー一覧</h4>
         <div class="table-responsive">
             <table class="table table-striped user-list-table">
@@ -113,77 +136,32 @@
             </table>
         </div>
     </section>
-    
-    <!-- admin.htmlの適切な位置（部屋設定管理セクションの後など）に追加 -->
 
-<hr>
+    <hr>
 
-<section id="admin-data-migration">
-    <h3>🔧 データベース管理</h3>
-    <p>学習履歴データの整合性確認とデータ移行を行います。</p>
+    <section id="admin-data-migration">
+        <h3>🔧 データベース管理</h3>
+        <p>学習履歴データの整合性確認とデータ移行を行います。</p>
 
-    <div class="admin-panel" style="background-color: #e8f5e8; border-left: 5px solid #28a745; margin-top: 20px;">
-        <h4>🔧データ修正</h4>
-        <p>全ユーザーの学習履歴を新しいID形式に統一し、マッチしない問題を解決します。<br>
-        <strong>⚠️ 注意：</strong>この操作は全ユーザーの学習履歴に影響し、元に戻せません。</p>
-        
-        <div style="margin-top: 15px;">
-            <form action="{{ url_for('admin_fix_all_data') }}" method="POST" style="display: inline;" 
-                onsubmit="return confirm('全ユーザーデータを修正しますか？\n\n⚠️ この操作は元に戻せません。\n⚠️ すべての学習履歴が新しい形式に変換されます。\n⚠️ 処理に時間がかかる場合があります。')">
-                <button type="submit" class="btn btn-success">
-                    <i class="fas fa-wrench"></i> 🔧 全データ完全修正
-                </button>
-            </form>
+        <div class="admin-panel" style="background-color: #e8f5e8; border-left: 5px solid #28a745; margin-top: 20px;">
+            <h4>🔧データ修正</h4>
+            <p>全ユーザーの学習履歴を新しいID形式に統一し、マッチしない問題を解決します。<br>
+            <strong>⚠️ 注意：</strong>この操作は全ユーザーの学習履歴に影響し、元に戻せません。</p>
             
-            <a href="{{ url_for('admin_debug_progress') }}" class="btn btn-info" target="_blank" style="margin-left: 10px;">
-                <i class="fas fa-chart-line"></i> 📊 修正前の状態確認
-            </a>
+            <div style="margin-top: 15px;">
+                <form action="{{ url_for('admin_fix_all_data') }}" method="POST" style="display: inline;" 
+                    onsubmit="return confirm('全ユーザーデータを修正しますか？\n\n⚠️ この操作は元に戻せません。\n⚠️ すべての学習履歴が新しい形式に変換されます。\n⚠️ 処理に時間がかかる場合があります。')">
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-wrench"></i> 🔧 全データ完全修正
+                    </button>
+                </form>
+                
+                <a href="{{ url_for('admin_debug_progress') }}" class="btn btn-info" target="_blank" style="margin-left: 10px;">
+                    <i class="fas fa-chart-line"></i> 📊 修正前の状態確認
+                </a>
+            </div>
         </div>
-    </div>
-
-</section>
-
-<script>
-// 強制修復関数
-function forceFixAllUsers() {
-    if (!confirm('全ユーザーのデータを強制修復しますか？\n\n⚠️ この操作は時間がかかる場合があります。\n⚠️ 実行中はページを閉じないでください。')) {
-        return;
-    }
-    
-    const button = event.target;
-    button.disabled = true;
-    button.textContent = '修復中...';
-    
-    fetch('/debug/force_fix_all_users', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.status === 'success') {
-            alert(`修復完了！\n修復ユーザー数: ${data.fixed_users}\n修復履歴数: ${data.total_fixed_histories}`);
-            window.location.reload();
-        } else {
-            alert('修復中にエラーが発生しました: ' + (data.error || data.message));
-        }
-    })
-    .catch(error => {
-        console.error('修復エラー:', error);
-        alert('修復中にエラーが発生しました。コンソールを確認してください。');
-    })
-    .finally(() => {
-        button.disabled = false;
-        button.innerHTML = '<i class="fas fa-tools"></i> 🚨 全ユーザーデータ強制修復';
-    });
-}
-
-// データ整合性チェック関数
-function checkDataIntegrity() {
-    window.open('/admin/debug_progress', '_blank');
-}
-</script>
+    </section>
 
     <hr>
 
@@ -199,26 +177,31 @@ function checkDataIntegrity() {
                 <li>ヘッダー行: chapter, number, category, question, answer, enabled</li>
                 <li>enabled列: 1（有効）または0（無効）</li>
                 <li>文字エンコーディング: UTF-8</li>
+                <li>ファイル名は元の名前のまま保存されます</li>
             </ul>
         </div>
         
         <form action="{{ url_for('admin_upload_room_csv') }}" method="POST" enctype="multipart/form-data" class="upload-form">
             <div class="input-group">
-                <label for="room_number_for_csv">対象部屋番号:</label>
-                <input type="text" id="room_number_for_csv" name="room_number_for_csv" required placeholder="例: 101">
-            </div>
-            <div class="input-group">
                 <label for="room_csv_file">CSVファイルを選択:</label>
                 <input type="file" id="room_csv_file" name="file" accept=".csv" required>
+                <small class="form-text text-muted">＊ファイル名は半角英数字＊</small>
             </div>
-            <button type="submit" class="btn btn-success">部屋用CSVアップロード</button>
+            <button type="submit" class="btn btn-success">CSVファイルアップロード</button>
         </form>
 
         <h4>アップロード済みCSVファイル一覧</h4>
         <div id="csv-files-list">
-            <button class="btn btn-info btn-sm" onclick="loadCsvFilesList()">ファイル一覧を更新</button>
+            <div class="d-flex gap-2 mb-3">
+                <button class="btn btn-info btn-sm" onclick="loadCsvFilesList()">
+                    <i class="fas fa-sync-alt"></i> ファイル一覧を更新
+                </button>
+                <button class="btn btn-outline-secondary btn-sm" onclick="debugCsvInfo()">
+                    <i class="fas fa-bug"></i> デバッグ情報
+                </button>
+            </div>
             <div id="csv-files-container" style="margin-top: 15px;">
-                <!-- JavaScriptで動的に読み込み -->
+                <p class="text-info">📋 ファイル一覧を読み込み中...</p>
             </div>
         </div>
     </section>
@@ -273,11 +256,20 @@ function checkDataIntegrity() {
                                 </option>
                                 <!-- 動的にオプションを追加 -->
                             </select>
+                            <small class="form-text text-muted">
+                                現在の設定: <code id="current_csv_{{ room_num }}">{{ room_csv_settings.get(room_num, 'words.csv') }}</code>
+                            </small>
                         </td>
                         <td>
                             <div class="btn-group-vertical btn-group-sm">
-                                <button class="btn btn-primary btn-sm save-room-setting-btn" data-room-number="{{ room_num }}">保存</button>
-                                <button class="btn btn-danger btn-sm delete-room-setting-btn" data-room-number="{{ room_num }}">削除</button>
+                                <button class="btn btn-primary btn-sm save-room-setting-btn" 
+                                        data-room-number="{{ room_num }}">保存</button>
+                                <button class="btn btn-danger btn-sm delete-room-setting-btn" 
+                                        data-room-number="{{ room_num }}">削除</button>
+                                <button class="btn btn-info btn-sm" 
+                                        onclick="debugRoomSetting('{{ room_num }}'); return false;">デバッグ</button>
+                                <button class="btn btn-outline-secondary btn-sm" 
+                                        onclick="testDebugFunction(); return false;">テスト</button>
                             </div>
                         </td>
                     </tr>
@@ -286,16 +278,331 @@ function checkDataIntegrity() {
             </table>
         </div>
     </section>
-
 </div>
 
 <script>
+// ========================================
+// 1. 最初に関数を定義（グローバルスコープ）
+// ========================================
+
+console.log('🔧 admin.html スクリプト読み込み開始');
+
+// デバッグ関数をグローバルで定義
+function debugRoomSetting(roomNumber) {
+    console.log(`🔍 部屋${roomNumber}のデバッグ情報:`);
+    
+    const maxUnitInput = document.getElementById('maxUnit_' + roomNumber);
+    const csvFileSelect = document.getElementById('csvFile_' + roomNumber);
+    const currentCsvDisplay = document.getElementById('current_csv_' + roomNumber);
+    
+    console.log('📋 DOM要素の存在確認:', {
+        maxUnitInput: !!maxUnitInput,
+        csvFileSelect: !!csvFileSelect,
+        currentCsvDisplay: !!currentCsvDisplay
+    });
+    
+    if (maxUnitInput) {
+        console.log(`📝 最大単元設定: ${maxUnitInput.value}`);
+    }
+    
+    if (csvFileSelect) {
+        console.log(`📄 現在のCSV選択: ${csvFileSelect.value}`);
+        console.log('🎯 利用可能なオプション:');
+        Array.from(csvFileSelect.options).forEach((option, index) => {
+            console.log(`  ${index + 1}. ${option.value} ${option.selected ? '(選択中)' : ''}`);
+        });
+    }
+    
+    if (currentCsvDisplay) {
+        console.log(`📊 表示中の設定: ${currentCsvDisplay.textContent}`);
+    }
+    
+    // サーバーから最新の設定を取得
+    console.log('📡 サーバーから設定を取得中...');
+    fetch('/admin/get_room_setting', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ room_number: roomNumber })
+    })
+    .then(response => {
+        console.log(`📡 レスポンス状態: ${response.status}`);
+        return response.json();
+    })
+    .then(data => {
+        console.log('📊 サーバーからの設定:', data);
+        
+        if (data.status === 'success') {
+            // 表示を更新
+            if (currentCsvDisplay) {
+                currentCsvDisplay.textContent = data.csv_filename;
+                console.log(`✅ 表示更新: ${data.csv_filename}`);
+            }
+            if (csvFileSelect) {
+                csvFileSelect.value = data.csv_filename;
+                console.log(`✅ セレクト更新: ${data.csv_filename}`);
+            }
+            
+            // 結果をアラートで表示
+            alert(`✅ 部屋${roomNumber}の設定:\n・最大単元: ${data.max_enabled_unit_number}\n・CSVファイル: ${data.csv_filename}`);
+        } else {
+            console.error('❌ サーバーエラー:', data.message);
+            alert(`❌ エラー: ${data.message}`);
+        }
+    })
+    .catch(error => {
+        console.error('❌ 通信エラー:', error);
+        alert(`❌ 通信エラー: ${error.message}`);
+    });
+}
+
+// テスト関数
+function testDebugFunction() {
+    console.log('🧪 テスト関数が呼び出されました');
+    alert('✅ テスト関数は正常に動作しています');
+}
+
+// 部屋設定を再読み込みする関数
+function loadRoomSettings() {
+    console.log('🔄 部屋設定を再読み込み中...');
+    
+    document.querySelectorAll('.csv-setting-select').forEach(select => {
+        const roomNumber = select.dataset.roomNumber;
+        if (!roomNumber) return;
+        
+        fetch('/admin/get_room_setting', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ room_number: roomNumber })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                const csvFilename = data.csv_filename || 'words.csv';
+                console.log(`📋 部屋${roomNumber}の設定読み込み: ${csvFilename}`);
+                
+                select.value = csvFilename;
+                
+                const optionExists = Array.from(select.options).some(option => option.value === csvFilename);
+                if (!optionExists && csvFilename !== 'words.csv') {
+                    const newOption = document.createElement('option');
+                    newOption.value = csvFilename;
+                    newOption.textContent = csvFilename;
+                    select.appendChild(newOption);
+                    select.value = csvFilename;
+                    console.log(`➕ 新しいオプション追加: ${csvFilename}`);
+                }
+            }
+        })
+        .catch(error => {
+            console.error(`❌ 部屋${roomNumber}の設定読み込みエラー:`, error);
+        });
+    });
+}
+
+// CSVファイル一覧を読み込む関数
+function loadCsvFilesList() {
+    console.log('🔍 CSV ファイル一覧読み込み開始...');
+    
+    const container = document.getElementById('csv-files-container');
+    if (container) {
+        container.innerHTML = '<p class="text-info">📋 ファイル一覧を読み込み中...</p>';
+    }
+    
+    fetch('{{ url_for("admin_list_room_csv_files") }}')
+        .then(response => {
+            console.log('📡 レスポンス受信:', response.status);
+            return response.json();
+        })
+        .then(data => {
+            console.log('📊 受信データ:', data);
+            
+            if (data.status === 'success') {
+                console.log(`✅ ファイル一覧取得成功: ${data.files.length}件`);
+                updateCsvFilesDisplay(data.files);
+                updateCsvSelectOptions(data.files);
+            } else {
+                console.error('❌ ファイル一覧取得失敗:', data.message);
+                if (container) {
+                    container.innerHTML = '<p class="text-danger">❌ ファイル一覧の取得に失敗しました: ' + (data.message || '不明なエラー') + '</p>';
+                }
+            }
+        })
+        .catch(error => {
+            console.error('❌ ファイル一覧取得エラー:', error);
+            if (container) {
+                container.innerHTML = '<p class="text-danger">❌ ファイル一覧の取得中にエラーが発生しました: ' + error.message + '</p>';
+            }
+        });
+}
+
+// CSVファイル表示を更新する関数
+function updateCsvFilesDisplay(files) {
+    console.log('🔄 ファイル表示更新:', files);
+    
+    const container = document.getElementById('csv-files-container');
+    if (!container) {
+        console.error('❌ csv-files-container が見つかりません');
+        return;
+    }
+    
+    if (files.length === 0) {
+        console.log('📭 アップロードされたファイルなし');
+        container.innerHTML = '<p class="text-muted">📭 アップロードされたCSVファイルはありません。</p>';
+        return;
+    }
+    
+    console.log(`📋 ${files.length}件のファイルを表示中...`);
+    
+    let html = '<div class="table-responsive"><table class="table table-sm table-striped">';
+    html += '<thead class="table-dark"><tr><th>ファイル名</th><th>単語数</th><th>サイズ</th><th>更新日時</th><th>操作</th></tr></thead><tbody>';
+    
+    files.forEach((file, index) => {
+        const sizeKB = Math.round(file.size / 1024);
+        const wordCountDisplay = file.word_count > 0 ? `${file.word_count}問` : '不明';
+        
+        html += '<tr>' +
+                '<td><code>' + file.filename + '</code></td>' +
+                '<td><span class="badge bg-primary">' + wordCountDisplay + '</span></td>' +
+                '<td>' + sizeKB + ' KB</td>' +
+                '<td><small>' + file.modified + '</small></td>' +
+                '<td><button class="btn btn-danger btn-sm" onclick="deleteCsvFile(\'' + file.filename + '\')">削除</button></td>' +
+                '</tr>';
+    });
+    
+    html += '</tbody></table></div>';
+    container.innerHTML = html;
+    
+    console.log('✅ ファイル表示更新完了');
+}
+
+// セレクトボックスのオプションを更新する関数
+function updateCsvSelectOptions(files) {
+    console.log('🔄 CSVセレクトオプション更新:', files);
+    
+    const selects = document.querySelectorAll('.csv-setting-select');
+    console.log(`📋 更新対象セレクト数: ${selects.length}`);
+    
+    selects.forEach((select, index) => {
+        const roomNumber = select.dataset.roomNumber;
+        const currentValue = select.value;
+        
+        // デフォルト以外のオプションを削除
+        Array.from(select.options).forEach(option => {
+            if (option.value !== 'words.csv') {
+                option.remove();
+            }
+        });
+        
+        // アップロードされたファイルをオプションに追加
+        if (files && Array.isArray(files)) {
+            files.forEach(file => {
+                if (file.filename !== 'words.csv') {
+                    const option = document.createElement('option');
+                    option.value = file.filename;
+                    option.textContent = file.filename;
+                    select.appendChild(option);
+                }
+            });
+        }
+        
+        // 元の値を復元
+        if (currentValue && currentValue !== '') {
+            select.value = currentValue;
+        }
+    });
+}
+
+// CSVファイル削除関数
+function deleteCsvFile(filename) {
+    if (confirm('CSVファイル "' + filename + '" を削除しますか？\n\n⚠️ このファイルを使用している部屋の設定はデフォルトに戻ります。')) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '{{ url_for("admin_delete_room_csv", filename="_FILENAME_") }}'.replace('_FILENAME_', filename);
+        
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+
+// デバッグ関数
+function debugCsvInfo() {
+    console.log('🔍 CSV管理デバッグ情報:');
+    console.log('- ROOM_CSV_FOLDER:', '{{ ROOM_CSV_FOLDER }}');
+    console.log('- 現在のページURL:', window.location.href);
+    
+    fetch('{{ url_for("admin_list_room_csv_files") }}')
+        .then(response => response.text())
+        .then(text => {
+            console.log('📡 サーバーレスポンス（生）:', text);
+            try {
+                const data = JSON.parse(text);
+                console.log('📊 パース済みデータ:', data);
+            } catch (e) {
+                console.error('❌ JSON パースエラー:', e);
+            }
+        })
+        .catch(error => {
+            console.error('❌ デバッグ通信エラー:', error);
+        });
+}
+
+// 強制修復関数
+function forceFixAllUsers() {
+    if (!confirm('全ユーザーのデータを強制修復しますか？\n\n⚠️ この操作は時間がかかる場合があります。\n⚠️ 実行中はページを閉じないでください。')) {
+        return;
+    }
+    
+    const button = event.target;
+    button.disabled = true;
+    button.textContent = '修復中...';
+    
+    fetch('/debug/force_fix_all_users', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            alert(`修復完了！\n修復ユーザー数: ${data.fixed_users}\n修復履歴数: ${data.total_fixed_histories}`);
+            window.location.reload();
+        } else {
+            alert('修復中にエラーが発生しました: ' + (data.error || data.message));
+        }
+    })
+    .catch(error => {
+        console.error('修復エラー:', error);
+        alert('修復中にエラーが発生しました。コンソールを確認してください。');
+    })
+    .finally(() => {
+        button.disabled = false;
+        button.innerHTML = '<i class="fas fa-tools"></i> 🚨 全ユーザーデータ強制修復';
+    });
+}
+
+console.log('✅ 全ての関数定義完了');
+console.log('- debugRoomSetting:', typeof debugRoomSetting);
+console.log('- testDebugFunction:', typeof testDebugFunction);
+
+// ========================================
+// 2. DOMContentLoaded イベントリスナー
+// ========================================
+
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('Admin page loaded');
+    console.log('📋 管理者ページ読み込み完了');
+    
+    // 関数の存在確認
+    console.log('🔍 関数存在確認:');
+    console.log('- debugRoomSetting:', typeof debugRoomSetting);
+    console.log('- testDebugFunction:', typeof testDebugFunction);
     
     // 初期ロード時にCSVファイル一覧とセレクトボックスを更新
-    loadCsvFilesList();
-    updateCsvSelectOptions();
+    setTimeout(() => {
+        console.log('🔄 初期データ読み込み開始');
+        loadCsvFilesList();
+        loadRoomSettings();
+    }, 500);
 
     // 部屋設定保存ボタンのイベントリスナー
     document.querySelectorAll('.save-room-setting-btn').forEach(button => {
@@ -304,13 +611,25 @@ document.addEventListener('DOMContentLoaded', function() {
             const maxUnitInput = document.getElementById('maxUnit_' + roomNumber);
             const csvFileSelect = document.getElementById('csvFile_' + roomNumber);
             
+            console.log(`🔧 部屋設定保存開始: ${roomNumber}`);
+            
             if (!maxUnitInput || !csvFileSelect) {
                 alert('設定要素が見つかりません。');
+                console.error('❌ 設定要素が見つかりません:', {
+                    maxUnit: !!maxUnitInput,
+                    csvFile: !!csvFileSelect
+                });
                 return;
             }
             
             const maxUnit = maxUnitInput.value.trim();
             const csvFilename = csvFileSelect.value;
+            
+            console.log(`📝 保存する設定:`, {
+                roomNumber: roomNumber,
+                maxUnit: maxUnit,
+                csvFilename: csvFilename
+            });
 
             // ボタンを無効化して重複実行を防ぐ
             this.disabled = true;
@@ -335,21 +654,46 @@ document.addEventListener('DOMContentLoaded', function() {
                     })
                 })
             ])
-            .then(responses => Promise.all(responses.map(r => r.json())))
+            .then(responses => {
+                console.log('📡 サーバーレスポンス受信:', responses.map(r => r.status));
+                return Promise.all(responses.map(r => r.json()));
+            })
             .then(results => {
                 const unitResult = results[0];
                 const csvResult = results[1];
                 
+                console.log('📊 保存結果:', { unitResult, csvResult });
+                
                 if (unitResult.status === 'success' && csvResult.status === 'success') {
-                    alert('部屋 ' + roomNumber + ' の設定を更新しました:\\n・最大単元: ' + maxUnit + '\\n・CSVファイル: ' + csvFilename);
-                    window.location.reload();
+                    alert(`✅ 部屋 ${roomNumber} の設定を更新しました:\n・最大単元: ${maxUnit}\n・CSVファイル: ${csvFilename}`);
+                    
+                    // 保存成功後、セレクトボックスの値を再確認
+                    setTimeout(() => {
+                        const currentValue = csvFileSelect.value;
+                        console.log(`✅ 保存後の選択値確認: ${currentValue}`);
+                        if (currentValue !== csvFilename) {
+                            console.warn(`⚠️ 選択値が変更されています: ${csvFilename} -> ${currentValue}`);
+                            csvFileSelect.value = csvFilename; // 強制的に設定
+                        }
+                        
+                        // 現在の設定表示も更新
+                        const currentDisplay = document.getElementById('current_csv_' + roomNumber);
+                        if (currentDisplay) {
+                            currentDisplay.textContent = csvFilename;
+                        }
+                    }, 100);
+                    
+                    // 設定の再読み込み
+                    loadRoomSettings();
                 } else {
-                    alert('設定の保存中にエラーが発生しました。');
+                    const errorMsg = (unitResult.message || csvResult.message || '不明なエラー');
+                    alert('❌ 設定の保存中にエラーが発生しました: ' + errorMsg);
+                    console.error('❌ 保存エラー:', { unitResult, csvResult });
                 }
             })
             .catch(error => {
-                console.error('Error:', error);
-                alert('設定の保存中にエラーが発生しました。');
+                console.error('❌ 通信エラー:', error);
+                alert('❌ 設定の保存中にエラーが発生しました: ' + error.message);
             })
             .finally(() => {
                 this.disabled = false;
@@ -364,7 +708,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const userId = this.dataset.userId;
             const username = this.dataset.username;
 
-            if (confirm('ユーザー "' + username + '" (ID: ' + userId + ') を本当に削除しますか？\\n\\n⚠️ この操作は元に戻せません。\\n⚠️ ユーザーの学習履歴も完全に削除されます。')) {
+            if (confirm('ユーザー "' + username + '" (ID: ' + userId + ') を本当に削除しますか？\n\n⚠️ この操作は元に戻せません。\n⚠️ ユーザーの学習履歴も完全に削除されます。')) {
                 const form = document.createElement('form');
                 form.method = 'POST';
                 form.action = '{{ url_for("admin_delete_user", user_id=0) }}'.replace('0', userId);
@@ -380,7 +724,7 @@ document.addEventListener('DOMContentLoaded', function() {
         button.addEventListener('click', function() {
             const roomNumber = this.dataset.roomNumber;
 
-            if (confirm('部屋 "' + roomNumber + '" の設定を本当に削除しますか？\\n\\n⚠️ この部屋に属するユーザーの設定はデフォルトに戻ります。\\n⚠️ この操作は元に戻せません。')) {
+            if (confirm('部屋 "' + roomNumber + '" の設定を本当に削除しますか？\n\n⚠️ この部屋に属するユーザーの設定はデフォルトに戻ります。\n⚠️ この操作は元に戻せません。')) {
                 const form = document.createElement('form');
                 form.method = 'POST';
                 form.action = '{{ url_for("admin_delete_room_setting", room_number="_ROOM_NUMBER_") }}'.replace('_ROOM_NUMBER_', roomNumber);
@@ -392,91 +736,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
-// CSVファイル一覧を読み込む関数
-function loadCsvFilesList() {
-    console.log('Loading CSV files list...');
-    fetch('{{ url_for("admin_list_room_csv_files") }}')
-        .then(response => response.json())
-        .then(data => {
-            if (data.status === 'success') {
-                updateCsvFilesDisplay(data.files);
-                updateCsvSelectOptions(data.files);
-            } else {
-                console.error('Failed to load CSV files:', data.message);
-            }
-        })
-        .catch(error => {
-            console.error('Error loading CSV files:', error);
-        });
-}
-
-// CSVファイル表示を更新する関数
-function updateCsvFilesDisplay(files) {
-    const container = document.getElementById('csv-files-container');
-    if (!container) return;
-    
-    if (files.length === 0) {
-        container.innerHTML = '<p class="text-muted">アップロードされたCSVファイルはありません。</p>';
-        return;
-    }
-    
-    let html = '<div class="table-responsive"><table class="table table-sm"><thead><tr><th>ファイル名</th><th>サイズ</th><th>更新日時</th><th>操作</th></tr></thead><tbody>';
-    
-    files.forEach(file => {
-        const sizeKB = Math.round(file.size / 1024);
-        html += '<tr>' +
-                '<td>' + file.filename + '</td>' +
-                '<td>' + sizeKB + ' KB</td>' +
-                '<td>' + file.modified + '</td>' +
-                '<td><button class="btn btn-danger btn-sm" onclick="deleteCsvFile(\'' + file.filename + '\')">削除</button></td>' +
-                '</tr>';
-    });
-    
-    html += '</tbody></table></div>';
-    container.innerHTML = html;
-}
-
-// セレクトボックスのオプションを更新する関数
-function updateCsvSelectOptions(files) {
-    const selects = document.querySelectorAll('.csv-setting-select');
-    
-    selects.forEach(select => {
-        const currentValue = select.value;
-        // デフォルト以外のオプションを削除
-        Array.from(select.options).forEach(option => {
-            if (option.value !== 'words.csv') {
-                option.remove();
-            }
-        });
-        
-        // アップロードされたファイルをオプションに追加
-        if (files) {
-            files.forEach(file => {
-                if (file.filename !== 'words.csv') {
-                    const option = document.createElement('option');
-                    option.value = file.filename;
-                    option.textContent = file.filename;
-                    select.appendChild(option);
-                }
-            });
-        }
-        
-        // 元の値を復元
-        select.value = currentValue;
-    });
-}
-
-// CSVファイル削除関数
-function deleteCsvFile(filename) {
-    if (confirm('CSVファイル "' + filename + '" を削除しますか？\\n\\n⚠️ このファイルを使用している部屋の設定はデフォルトに戻ります。')) {
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = '{{ url_for("admin_delete_room_csv", filename="_FILENAME_") }}'.replace('_FILENAME_', filename);
-        
-        document.body.appendChild(form);
-        form.submit();
-    }
-}
+console.log('🎉 admin.html スクリプト読み込み完了');
 </script>
 
 <style>
