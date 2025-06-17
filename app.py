@@ -174,6 +174,8 @@ class AppInfo(db.Model):
             'contactEmail': self.contact_email
         }
 
+# app.py のPasswordResetTokenクラスを以下に置き換え
+
 class PasswordResetToken(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
@@ -181,14 +183,25 @@ class PasswordResetToken(db.Model):
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))
     expires_at = db.Column(db.DateTime, nullable=False)
     used = db.Column(db.Boolean, default=False)
+    used_at = db.Column(db.DateTime)  # 使用された日時
     
     user = db.relationship('User', backref=db.backref('reset_tokens', lazy=True))
     
     def is_expired(self):
+        """トークンが期限切れかどうかを確認"""
         return datetime.now(JST) > self.expires_at
     
     def is_valid(self):
+        """トークンが有効かどうかを確認（未使用かつ期限内）"""
         return not self.used and not self.is_expired()
+    
+    def mark_as_used(self):
+        """トークンを使用済みにマーク"""
+        self.used = True
+        self.used_at = datetime.now(JST)
+        
+    def __repr__(self):
+        return f'<PasswordResetToken {self.token[:10]}... for user {self.user_id}>'
 
 # ====================================================================
 # ヘルパー関数
@@ -1141,13 +1154,8 @@ def password_change_page():
 @app.route('/password_reset_request', methods=['GET', 'POST'])
 def password_reset_request():
     try:
-        # メール設定の確認
-        mail_configured = all([
-            app.config.get('MAIL_SERVER'),
-            app.config.get('MAIL_USERNAME'),
-            app.config.get('MAIL_PASSWORD'),
-            app.config.get('MAIL_DEFAULT_SENDER')
-        ])
+        # メール設定の確認（関数を使用）
+        mail_configured = is_mail_configured()
         
         if request.method == 'POST':
             room_number = request.form.get('room_number', '').strip()
@@ -1168,7 +1176,7 @@ def password_reset_request():
                 context['mail_configured'] = mail_configured
                 return render_template('password_reset_request.html', **context)
             
-            # ユーザー検索（部屋番号・出席番号・アカウント名の3つで特定）
+            # ユーザー検索
             user = User.query.filter_by(
                 room_number=room_number, 
                 student_id=student_id,
@@ -1190,7 +1198,7 @@ def password_reset_request():
             
             # 新しいトークンを生成
             reset_token = generate_reset_token()
-            expires_at = datetime.now(JST) + timedelta(hours=1)  # 1時間有効
+            expires_at = datetime.now(JST) + timedelta(hours=1)
             
             password_reset_token = PasswordResetToken(
                 user_id=user.id,
@@ -1207,6 +1215,8 @@ def password_reset_request():
                 flash('入力された情報に一致するアカウントが見つかりました。パスワード再発行のご案内をメールで送信しました。メールをご確認ください。', 'success')
             except Exception as email_error:
                 print(f"メール送信エラー: {email_error}")
+                import traceback
+                traceback.print_exc()
                 flash('メール送信中にエラーが発生しました。しばらく後に再度お試しください。', 'danger')
                 # トークンを無効化
                 password_reset_token.used = True
@@ -1214,8 +1224,9 @@ def password_reset_request():
             
             return redirect(url_for('login_page'))
         
+        # GET リクエスト時
         context = get_template_context()
-        context['mail_configured'] = mail_configured  # テンプレートにメール設定状況を渡す
+        context['mail_configured'] = mail_configured
         return render_template('password_reset_request.html', **context)
         
     except Exception as e:
@@ -1259,64 +1270,127 @@ def admin_cleanup_expired_tokens():
 # パスワードリセット実行
 # app.py に追加するパスワードリセット実行ルート
 
+# app.py に追加するパスワードリセット実行ルート（既存のpassword_reset_requestルートの後に追加）
+
+# app.py に追加するパスワードリセット実行ルート（既存のpassword_reset_requestルートの後に追加）
+
+# app.py の password_reset 関数を以下に置き換える（約1067行目付近）
+
+# app.py の password_reset 関数を完全に置き換える
+# 3268行目付近の問題のあるprint文も削除し、以下のコードに置き換える
+
 @app.route('/password_reset/<token>', methods=['GET', 'POST'])
 def password_reset(token):
-    try:
-        # トークンの検証
-        reset_token = PasswordResetToken.query.filter_by(token=token).first()
-        
-        if not reset_token or not reset_token.is_valid():
-            flash('無効なリンクまたは期限切れです。新しいパスワード再発行をリクエストしてください。', 'danger')
-            return redirect(url_for('password_reset_request'))
-        
-        if request.method == 'POST':
-            new_password = request.form.get('new_password', '').strip()
-            confirm_password = request.form.get('confirm_password', '').strip()
+    print(f"🔍 Password reset requested for token: {token}")
+    
+    def password_reset(token):
+        """パスワード再設定の実行"""
+        try:
+            # デバッグ用ログ（関数内に正しく配置）
+            print(f"🔍 Password reset requested for token: {token}")
+            print(f"🔍 Request method: {request.method}")
             
-            if not new_password or not confirm_password:
-                flash('パスワードを入力してください。', 'danger')
-                return render_template('password_reset.html', token=token, **get_template_context())
+            # トークンの検証
+            reset_token = PasswordResetToken.query.filter_by(token=token).first()
+            print(f"🔍 Token found in database: {reset_token is not None}")
             
-            if new_password != confirm_password:
-                flash('パスワードが一致しません。', 'danger')
-                return render_template('password_reset.html', token=token, **get_template_context())
+            if reset_token:
+                print(f"🔍 Token user_id: {reset_token.user_id}")
+                print(f"🔍 Token used: {reset_token.used}")
+                print(f"🔍 Token expires_at: {reset_token.expires_at}")
+                print(f"🔍 Current time: {datetime.now(JST)}")
+                print(f"🔍 Token is_valid: {reset_token.is_valid()}")
             
-            if len(new_password) < 6:
-                flash('パスワードは6文字以上で入力してください。', 'danger')
-                return render_template('password_reset.html', token=token, **get_template_context())
+            if not reset_token or not reset_token.is_valid():
+                if not reset_token:
+                    print("❌ Token not found in database")
+                else:
+                    print(f"❌ Token invalid - used: {reset_token.used}, expired: {reset_token.is_expired()}")
+                flash('無効なリンクまたは期限切れです。新しいパスワード再発行をリクエストしてください。', 'danger')
+                return redirect(url_for('password_reset_request'))
             
-            # パスワード更新
-            user = reset_token.user
-            user.set_individual_password(new_password)
+            if request.method == 'POST':
+                new_password = request.form.get('new_password', '').strip()
+                confirm_password = request.form.get('confirm_password', '').strip()
+                
+                if not new_password or not confirm_password:
+                    flash('パスワードを入力してください。', 'danger')
+                    context = get_template_context()
+                    context.update({
+                        'token': token,
+                        'user': reset_token.user,
+                        'minutes_remaining': max(0, int((reset_token.expires_at - datetime.now(JST)).total_seconds() / 60))
+                    })
+                    return render_template('password_reset.html', **context)
+                
+                if new_password != confirm_password:
+                    flash('パスワードが一致しません。', 'danger')
+                    context = get_template_context()
+                    context.update({
+                        'token': token,
+                        'user': reset_token.user,
+                        'minutes_remaining': max(0, int((reset_token.expires_at - datetime.now(JST)).total_seconds() / 60))
+                    })
+                    return render_template('password_reset.html', **context)
+                
+                if len(new_password) < 6:
+                    flash('パスワードは6文字以上で入力してください。', 'danger')
+                    context = get_template_context()
+                    context.update({
+                        'token': token,
+                        'user': reset_token.user,
+                        'minutes_remaining': max(0, int((reset_token.expires_at - datetime.now(JST)).total_seconds() / 60))
+                    })
+                    return render_template('password_reset.html', **context)
+                
+                # パスワード更新
+                user = reset_token.user
+                user.set_individual_password(new_password)
+                
+                # トークンを使用済みにする
+                reset_token.mark_as_used()
+                
+                db.session.commit()
+                
+                flash('パスワードが正常に更新されました。新しいパスワードでログインしてください。', 'success')
+                return redirect(url_for('login_page'))
             
-            # トークンを使用済みにする
-            reset_token.used = True
-            reset_token.used_at = datetime.now(JST)
+            # GET リクエスト時 - フォーム表示
+            time_remaining = reset_token.expires_at - datetime.now(JST)
+            minutes_remaining = max(0, int(time_remaining.total_seconds() / 60))
             
-            db.session.commit()
+            context = get_template_context()
+            context.update({
+                'token': token,
+                'user': reset_token.user,
+                'minutes_remaining': minutes_remaining
+            })
             
-            flash('パスワードが正常に更新されました。新しいパスワードでログインしてください。', 'success')
+            return render_template('password_reset.html', **context)
+            
+        except Exception as e:
+            print(f"❌ Error in password_reset: {e}")
+            import traceback
+            traceback.print_exc()
+            
+            flash('システムエラーが発生しました。管理者にお問い合わせください。', 'danger')
             return redirect(url_for('login_page'))
-        
-        # トークンの有効期限を確認して表示
-        time_remaining = reset_token.expires_at - datetime.now(JST)
-        minutes_remaining = int(time_remaining.total_seconds() / 60)
-        
-        context = get_template_context()
-        context.update({
-            'token': token,
-            'user': reset_token.user,
-            'minutes_remaining': minutes_remaining
-        })
-        
-        return render_template('password_reset.html', **context)
-        
-    except Exception as e:
-        print(f"Error in password_reset: {e}")
-        import traceback
-        traceback.print_exc()
-        flash('システムエラーが発生しました。管理者にお問い合わせください。', 'danger')
-        return redirect(url_for('login_page'))
+
+def is_mail_configured():
+    """メール設定が完了しているかをチェック"""
+    required_settings = [
+        'MAIL_SERVER',
+        'MAIL_USERNAME', 
+        'MAIL_PASSWORD',
+        'MAIL_DEFAULT_SENDER'
+    ]
+    
+    for setting in required_settings:
+        value = app.config.get(setting)
+        if not value or (isinstance(value, str) and not value.strip()):
+            return False
+    
+    return True
 
 # ====================================================================
 # APIエンドポイント
@@ -3187,7 +3261,11 @@ def debug_force_fix_user_data():
         db.session.rollback()
         print(f"強制修正エラー: {e}")
         return jsonify(error=str(e)), 500
-    
+
+# app.py の先頭付近に追加
+import logging
+logging.basicConfig(level=logging.DEBUG)
+
 # ====================================================================
 # アプリケーション起動
 # ====================================================================
