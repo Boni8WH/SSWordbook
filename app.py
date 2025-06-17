@@ -275,6 +275,19 @@ def migrate_database():
                         conn.execute(text('ALTER TABLE user ADD COLUMN last_login DATETIME'))
                         conn.commit()
                     print("✅ last_loginカラムを追加しました。")
+            
+            # RoomSettingテーブルの確認
+            if inspector.has_table('room_setting'):
+                columns = [col['name'] for col in inspector.get_columns('room_setting')]
+                print(f"📋 既存のRoomSettingテーブルカラム: {columns}")
+                
+                # csv_filenameカラムが存在しない場合は追加
+                if 'csv_filename' not in columns:
+                    print("🔧 csv_filenameカラムを追加します...")
+                    with db.engine.connect() as conn:
+                        conn.execute(text('ALTER TABLE room_setting ADD COLUMN csv_filename VARCHAR(100) DEFAULT "words.csv"'))
+                        conn.commit()
+                    print("✅ csv_filenameカラムを追加しました。")
                 
             # AppInfoテーブルの確認
             if inspector.has_table('app_info'):
@@ -312,21 +325,30 @@ def create_tables_and_admin_user():
     with app.app_context():
         print("🔧 データベース初期化を開始...")
         
+        # 環境変数でデータベースリセットを確認
+        reset_database = os.environ.get('RESET_DATABASE', 'false').lower() == 'true'
+        
         try:
             # Renderでは毎回新しい環境なので、データベースファイルがない場合が多い
             inspector = inspect(db.engine)
             existing_tables = inspector.get_table_names()
             
-            if existing_tables:
+            if reset_database:
+                print("🔄 RESET_DATABASE=trueのため、データベースを完全リセットします...")
+                db.drop_all()  # 全てのテーブルを削除
+                db.create_all()  # 新しいテーブルを作成
+                print("✅ データベースを完全リセットしました。")
+            elif existing_tables:
                 print(f"📋 既存のテーブル: {existing_tables}")
                 # 既存のテーブルがある場合はマイグレーションを実行
                 migrate_database()
+                # テーブル作成（既存の場合は何もしない）
+                db.create_all()
+                print("✅ テーブルを作成/確認しました。")
             else:
                 print("📋 新しいデータベースを作成します。")
-            
-            # テーブル作成（既存の場合は何もしない）
-            db.create_all()
-            print("✅ テーブルを作成/確認しました。")
+                db.create_all()
+                print("✅ テーブルを作成しました。")
             
             # 管理者ユーザーの確認・作成（マイグレーション後に実行）
             try:
