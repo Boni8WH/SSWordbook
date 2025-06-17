@@ -113,6 +113,19 @@ class RoomSetting(db.Model):
     max_enabled_unit_number = db.Column(db.String(50), default="9999", nullable=False)
     csv_filename = db.Column(db.String(100), default="words.csv", nullable=False)
 
+class RoomCsvFile(db.Model):
+    """部屋ごとのカスタムCSVファイル情報を管理するモデル"""
+    id = db.Column(db.Integer, primary_key=True)
+    filename = db.Column(db.String(100), unique=True, nullable=False)
+    original_filename = db.Column(db.String(100), nullable=False)  # アップロード時の元のファイル名
+    file_size = db.Column(db.Integer, nullable=False)  # バイト単位
+    word_count = db.Column(db.Integer, default=0)  # 単語数
+    upload_date = db.Column(db.DateTime, default=lambda: datetime.now(JST))
+    description = db.Column(db.Text)  # ファイルの説明（オプション）
+    
+    def __repr__(self):
+        return f'<RoomCsvFile {self.filename} ({self.word_count} words)>'
+
 class AppInfo(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     app_name = db.Column(db.String(100), default="世界史単語帳", nullable=False)
@@ -155,22 +168,40 @@ class AppInfo(db.Model):
 
 # 部屋ごとの単語データを読み込む関数
 def load_word_data_for_room(room_number):
-    """指定された部屋の単語データを読み込む"""
+    """指定された部屋の単語データを読み込む（CSV設定永続化対応）"""
     try:
+        # データベースから部屋設定を取得
         room_setting = RoomSetting.query.filter_by(room_number=room_number).first()
         
         if room_setting and room_setting.csv_filename:
             csv_filename = room_setting.csv_filename
+            print(f"🔍 部屋{room_number}の設定: {csv_filename}")
         else:
             csv_filename = "words.csv"
+            print(f"⚠️ 部屋{room_number}の設定なし、デフォルト使用: {csv_filename}")
         
-        room_csv_path = os.path.join(ROOM_CSV_FOLDER, csv_filename)
-        
-        if not os.path.exists(room_csv_path):
+        # ファイルパスを決定
+        if csv_filename == "words.csv":
+            # デフォルトファイル
             csv_path = 'words.csv'
         else:
-            csv_path = room_csv_path
+            # カスタムファイル
+            room_csv_path = os.path.join(ROOM_CSV_FOLDER, csv_filename)
+            if os.path.exists(room_csv_path):
+                csv_path = room_csv_path
+                print(f"✅ カスタムCSV使用: {room_csv_path}")
+            else:
+                # ファイルが見つからない場合はデフォルトにフォールバック
+                csv_path = 'words.csv'
+                print(f"❌ カスタムCSVが見つからない: {room_csv_path}, デフォルト使用")
+                
+                # データベースの設定も修正
+                if room_setting:
+                    room_setting.csv_filename = "words.csv"
+                    db.session.commit()
+                    print(f"🔧 部屋{room_number}の設定をデフォルトに修正")
         
+        # ファイル読み込み
         word_data = []
         with open(csv_path, 'r', encoding='utf-8') as f:
             reader = csv.DictReader(f)
@@ -180,14 +211,14 @@ def load_word_data_for_room(room_number):
                 row['number'] = str(row['number'])
                 word_data.append(row)
         
-        print(f"Loaded {len(word_data)} words from {csv_path} for room {room_number}.")
+        print(f"📊 読み込み完了: {len(word_data)}問 from {csv_path}")
         return word_data
         
     except FileNotFoundError:
-        print(f"Error: CSV file not found for room {room_number}")
+        print(f"❌ ファイルエラー: {csv_path} が見つかりません")
         return []
     except Exception as e:
-        print(f"Error loading word data: {e}")
+        print(f"❌ 読み込みエラー: {e}")
         return []
 
 # 管理者用：全体のデフォルト単語データを読み込む関数
@@ -450,127 +481,319 @@ def migrate_database():
                             print(f"✅ {col_name}カラムを追加しました。")
                         conn.commit()
             
+            # 4. userテーブルにlast_loginカラムを追加（重複チェック）
+            if inspector.has_table('user'):
+                user_columns = [col['name'] for col in inspector.get_columns('user')]
+                
+                if 'last_login' not in user_columns:
+                    print("userテーブルにlast_loginカラムを追加します...")
+                    with db.engine.connect() as conn:
+                        conn.execute(text("ALTER TABLE user ADD COLUMN last_login DATETIME"))
+                        # 既存ユーザーには現在時刻を設定
+                        conn.execute(text("UPDATE user SET last_login = datetime('now', 'localtime') WHERE last_login IS NULL"))
+                        conn.commit()
+                    print("✅ last_loginカラムを追加しました。")
+                else:
+                    print("last_loginカラムは既に存在します。")
+            
+            # 5. RoomCsvFileテーブルの作成
+            if inspector.has_table('room_csv_file'):
+                print("room_csv_fileテーブルは既に存在します。")
+            else:
+                print("room_csv_fileテーブルを作成します...")
+                try:
+                    with db.engine.connect() as conn:
+                        conn.execute(text('''
+                            CREATE TABLE room_csv_file (
+                                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                filename VARCHAR(100) NOT NULL UNIQUE,
+                                original_filename VARCHAR(100) NOT NULL,
+                                file_size INTEGER NOT NULL,
+                                word_count INTEGER DEFAULT 0,
+                                upload_date DATETIME DEFAULT (datetime('now', 'localtime')),
+                                description TEXT
+                            )
+                        '''))
+                        conn.commit()
+                    print("✅ room_csv_fileテーブルを作成しました。")
+                except Exception as e:
+                    print(f"⚠️ room_csv_fileテーブル作成でエラー（続行）: {e}")
+
+            # 6. 既存CSVファイルをroom_csv_fileテーブルに登録（初回のみ）
+            try:
+                if os.path.exists(ROOM_CSV_FOLDER):
+                    for filename in os.listdir(ROOM_CSV_FOLDER):
+                        if filename.endswith('.csv'):
+                            # データベースに既に登録されているかチェック
+                            with db.engine.connect() as conn:
+                                result = conn.execute(text("SELECT COUNT(*) FROM room_csv_file WHERE filename = :filename"), 
+                                                    {"filename": filename})
+                                exists = result.scalar() > 0
+                            
+                            if not exists:
+                                file_path = os.path.join(ROOM_CSV_FOLDER, filename)
+                                file_size = os.path.getsize(file_path)
+                                
+                                # 単語数をカウント
+                                word_count = 0
+                                try:
+                                    with open(file_path, 'r', encoding='utf-8') as f:
+                                        reader = csv.DictReader(f)
+                                        word_count = sum(1 for row in reader)
+                                except:
+                                    word_count = 0
+                                
+                                # データベースに登録
+                                with db.engine.connect() as conn:
+                                    conn.execute(text('''
+                                        INSERT INTO room_csv_file (filename, original_filename, file_size, word_count)
+                                        VALUES (:filename, :original_filename, :file_size, :word_count)
+                                    '''), {
+                                        "filename": filename,
+                                        "original_filename": filename,
+                                        "file_size": file_size,
+                                        "word_count": word_count
+                                    })
+                                    conn.commit()
+                                
+                                print(f"📝 既存CSVファイルを登録: {filename} ({word_count}問)")
+            except Exception as e:
+                print(f"⚠️ 既存CSVファイル登録でエラー（続行）: {e}")
+            
             print("✅ データベースマイグレーションが完了しました。")
             
         except Exception as e:
             print(f"⚠️ マイグレーション中にエラーが発生しました（続行します）: {e}")
+            import traceback
+            traceback.print_exc()
 
 # データベース初期化関数（完全リセット対応版）
 def create_tables_and_admin_user():
     with app.app_context():
         print("🔧 データベース初期化を開始...")
         
-        # 環境変数でデータベースリセットを確認
+        # ===== RENDER環境対策 =====
         reset_database = os.environ.get('RESET_DATABASE', 'false').lower() == 'true'
+        is_render_env = os.environ.get('RENDER') == 'true'
+        
+        if reset_database:
+            print("⚠️ 警告: RESET_DATABASE=true が設定されています！")
+            if is_render_env:
+                print("🚨 Render環境でのデータベースリセットが検出されました")
+                print("💡 本番運用では RESET_DATABASE=false に設定してください")
+            else:
+                print("🏠 ローカル環境でのリセットです")
         
         try:
-            # Renderでは毎回新しい環境なので、データベースファイルがない場合が多い
+            # 既存のテーブル確認
             inspector = inspect(db.engine)
             existing_tables = inspector.get_table_names()
             
-            if reset_database:
-                print("🔄 RESET_DATABASE=trueのため、データベースを完全リセットします...")
-                db.drop_all()  # 全てのテーブルを削除
-                db.create_all()  # 新しいテーブルを作成
+            if reset_database and existing_tables:
+                print("🔄 データベースを完全リセットします...")
+                db.drop_all()
+                db.create_all()
                 print("✅ データベースを完全リセットしました。")
+                force_create_admin = True
             elif existing_tables:
                 print(f"📋 既存のテーブル: {existing_tables}")
-                # 既存のテーブルがある場合はマイグレーションを実行
                 migrate_database()
-                # テーブル作成（既存の場合は何もしない）
                 db.create_all()
-                print("✅ テーブルを作成/確認しました。")
+                print("✅ テーブルを確認/更新しました。")
+                force_create_admin = False
             else:
                 print("📋 新しいデータベースを作成します。")
                 db.create_all()
                 print("✅ テーブルを作成しました。")
+                force_create_admin = True
             
-            # 管理者ユーザーの確認・作成（マイグレーション後に実行）
+            # ===== 管理者ユーザー確認/作成 =====
             try:
                 admin_user = User.query.filter_by(username='admin', room_number='ADMIN').first()
-                print("✅ 管理者ユーザーの検索が成功しました。")
-            except Exception as e:
-                print(f"⚠️ 管理者ユーザー検索エラー（新規作成します）: {e}")
-                admin_user = None
                 
-            if not admin_user:
-                print("👤 管理者ユーザーを作成します...")
-                admin_user = User(
-                    username='admin',
-                    room_number='ADMIN',
-                    student_id='000',
-                    problem_history='{}',
-                    incorrect_words='[]'
-                )
-                # last_loginカラムがない場合は明示的に設定しない
-                try:
-                    admin_user.last_login = datetime.now(JST)
-                except Exception:
-                    print("⚠️ last_loginカラムがないため、デフォルト値を使用します。")
+                if not admin_user or force_create_admin:
+                    if admin_user:
+                        print("🔄 既存の管理者ユーザーを削除して再作成します...")
+                        db.session.delete(admin_user)
                     
-                admin_user.set_room_password('Avignon1309')
-                admin_user.set_individual_password('Avignon1309')
-                db.session.add(admin_user)
-                db.session.commit()
-                print("✅ 管理者ユーザー 'admin' を作成しました（パスワード: Avignon1309）")
-            else:
-                print("✅ 管理者ユーザー 'admin' は既に存在します。")
-                
-            # デフォルトのアプリ情報を作成
-            try:
-                app_info = AppInfo.query.first()
-                print("✅ アプリ情報の検索が成功しました。")
+                    print("👤 管理者ユーザーを作成します...")
+                    admin_user = User(
+                        username='admin',
+                        room_number='ADMIN',
+                        student_id='000',
+                        problem_history='{}',
+                        incorrect_words='[]'
+                    )
+                    admin_user.last_login = datetime.now(JST)
+                    admin_user.set_room_password('Avignon1309')
+                    admin_user.set_individual_password('Avignon1309')
+                    db.session.add(admin_user)
+                    db.session.commit()
+                    print("✅ 管理者ユーザー 'admin' を作成しました（パスワード: Avignon1309）")
+                else:
+                    print("✅ 管理者ユーザー 'admin' は既に存在します。")
+                    
             except Exception as e:
-                print(f"⚠️ アプリ情報検索エラー（新規作成します）: {e}")
-                app_info = None
+                print(f"⚠️ 管理者ユーザー処理エラー: {e}")
+                db.session.rollback()
                 
-            if not app_info:
-                print("📱 デフォルトのアプリ情報を作成します...")
-                default_app_info = AppInfo()
-                db.session.add(default_app_info)
-                db.session.commit()
-                print("✅ デフォルトのアプリ情報を作成しました。")
-            else:
-                print("✅ アプリ情報は既に存在します。")
+                # フォールバック: 強制的に管理者ユーザーを作成
+                try:
+                    admin_user = User(
+                        username='admin',
+                        room_number='ADMIN',
+                        student_id='000',
+                        problem_history='{}',
+                        incorrect_words='[]'
+                    )
+                    admin_user.set_room_password('Avignon1309')
+                    admin_user.set_individual_password('Avignon1309')
+                    db.session.add(admin_user)
+                    db.session.commit()
+                    print("✅ フォールバック: 管理者ユーザーを作成しました")
+                except Exception as fallback_error:
+                    print(f"❌ 管理者ユーザー作成失敗: {fallback_error}")
+                
+            # ===== アプリ情報確認/作成 =====
+            try:
+                app_info = AppInfo.get_current_info()
+                print("✅ アプリ情報を確認/作成しました")
+                
+            except Exception as e:
+                print(f"⚠️ アプリ情報処理エラー: {e}")
+                try:
+                    default_app_info = AppInfo()
+                    db.session.add(default_app_info)
+                    db.session.commit()
+                    print("✅ フォールバック: デフォルトアプリ情報を作成しました")
+                except Exception as fallback_error:
+                    print(f"❌ アプリ情報作成失敗: {fallback_error}")
                 
         except Exception as e:
             print(f"❌ データベース初期化エラー: {e}")
             db.session.rollback()
             
-            # Renderでは一時的なエラーが発生しても続行する
-            print("🔄 Render環境での一時的なエラーの可能性があります。")
-            print("💡 エラーを無視してテーブルを強制作成します...")
-            
-            try:
-                # 強制的にテーブルを作成
-                db.drop_all()  # 既存のテーブルを削除
-                db.create_all()  # 新しいテーブルを作成
-                print("✅ テーブルを強制再作成しました。")
-                
-                # 管理者ユーザーを作成
-                admin_user = User(
-                    username='admin',
-                    room_number='ADMIN',
-                    student_id='000',
-                    problem_history='{}',
-                    incorrect_words='[]'
-                )
-                admin_user.set_room_password('Avignon1309')
-                admin_user.set_individual_password('Avignon1309')
-                db.session.add(admin_user)
-                
-                # アプリ情報を作成
-                default_app_info = AppInfo()
-                db.session.add(default_app_info)
-                
-                db.session.commit()
-                print("✅ 管理者ユーザーとアプリ情報を作成しました。")
-                
-            except Exception as fatal_error:
-                print(f"🚨 致命的なエラー: {fatal_error}")
+            # ===== Render対応: 強制初期化 =====
+            if is_render_env:
+                print("🔄 Render環境での強制初期化を実行...")
+                try:
+                    db.drop_all()
+                    db.create_all()
+                    
+                    # 最小限の管理者ユーザー作成
+                    admin_user = User(
+                        username='admin',
+                        room_number='ADMIN',
+                        student_id='000',
+                        problem_history='{}',
+                        incorrect_words='[]'
+                    )
+                    admin_user.set_room_password('Avignon1309')
+                    admin_user.set_individual_password('Avignon1309')
+                    db.session.add(admin_user)
+                    
+                    # デフォルトアプリ情報
+                    default_app_info = AppInfo()
+                    db.session.add(default_app_info)
+                    
+                    db.session.commit()
+                    print("✅ Render環境での強制初期化が完了しました")
+                    
+                except Exception as render_error:
+                    print(f"🚨 Render強制初期化失敗: {render_error}")
+                    raise
+            else:
                 raise
         
         print("🎉 データベース初期化が完了しました！")
+
+# ===== PostgreSQL設定（Render用） =====
+def configure_production_database():
+    """本番環境用のデータベース設定"""
+    database_url = os.environ.get('DATABASE_URL')
+    
+    if database_url:
+        print("🐘 PostgreSQL設定を適用中...")
+        
+        # PostgreSQL用のURLフォーマット修正
+        if database_url.startswith('postgres://'):
+            database_url = database_url.replace('postgres://', 'postgresql://', 1)
+        
+        app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+        app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+            'pool_timeout': 20,
+            'pool_recycle': -1,
+            'pool_pre_ping': True,
+            'connect_args': {
+                'connect_timeout': 10,
+            }
+        }
+        print(f"✅ PostgreSQL接続設定完了: {database_url[:50]}...")
+        return True
+    else:
+        print("📄 SQLite設定を維持")
+        return False
+    
+# ===== データ永続化チェック機能 =====
+def check_data_persistence():
+    """データの永続化状況をチェック"""
+    try:
+        user_count = User.query.count()
+        admin_count = User.query.filter_by(room_number='ADMIN').count()
+        room_settings_count = RoomSetting.query.count()
+        
+        print(f"📊 データ永続化状況:")
+        print(f"   総ユーザー数: {user_count}")
+        print(f"   管理者ユーザー: {admin_count}")
+        print(f"   部屋設定数: {room_settings_count}")
+        
+        if admin_count == 0:
+            print("⚠️ 管理者ユーザーが見つかりません！")
+            return False
+        
+        return True
+        
+    except Exception as e:
+        print(f"❌ データ永続化チェックエラー: {e}")
+        return False
+
+# ===== 環境変数設定推奨機能 =====
+def print_render_recommendations():
+    """Render環境での推奨設定を表示"""
+    is_render = os.environ.get('RENDER') == 'true'
+    reset_db = os.environ.get('RESET_DATABASE', 'false').lower() == 'true'
+    has_postgres = bool(os.environ.get('DATABASE_URL'))
+    
+    print("\n" + "="*60)
+    print("🚀 RENDER環境設定推奨事項")
+    print("="*60)
+    
+    if is_render:
+        print("✅ Render環境を検出")
+        
+        if reset_db:
+            print("⚠️ RESET_DATABASE=true が設定されています")
+            print("💡 本番運用時は以下を設定してください:")
+            print("   Environment Variable: RESET_DATABASE = false")
+        else:
+            print("✅ RESET_DATABASE=false (推奨)")
+        
+        if has_postgres:
+            print("✅ PostgreSQLデータベースが設定されています")
+        else:
+            print("⚠️ PostgreSQLデータベースが推奨されます")
+            print("💡 Render Dashboardで PostgreSQL Add-on を追加してください")
+        
+        print("\n📋 推奨環境変数設定:")
+        print("   RESET_DATABASE = false")
+        print("   PYTHON_VERSION = 3.11.9")
+        if not has_postgres:
+            print("   DATABASE_URL = <PostgreSQL接続URL>")
+        
+    else:
+        print("🏠 ローカル環境で実行中")
+    
+    print("="*60 + "\n")
 
 # ====================================================================
 # ルーティング
@@ -1259,6 +1482,8 @@ def progress_page():
 # 管理者ページ
 # ====================================================================
 
+# app.pyのadmin_pageルートを以下に置き換え
+
 @app.route('/admin')
 def admin_page():
     try:
@@ -1266,19 +1491,67 @@ def admin_page():
             flash('管理者権限がありません。', 'danger')
             return redirect(url_for('login_page'))
 
+        print("🔍 管理者ページ表示開始...")
+
         users = User.query.all()
         room_settings = RoomSetting.query.all()
+        
+        # 部屋設定のマッピングを作成
         room_max_unit_settings = {rs.room_number: rs.max_enabled_unit_number for rs in room_settings}
         room_csv_settings = {rs.room_number: rs.csv_filename for rs in room_settings}
         
+        print(f"📊 部屋設定状況:")
+        for room_num, csv_file in room_csv_settings.items():
+            print(f"  部屋{room_num}: {csv_file}")
+        
+        # 部屋番号のリストを取得（ユーザーがいる部屋と設定のある部屋を統合）
+        unique_room_numbers = set()
+        for user in users:
+            if user.room_number != 'ADMIN':
+                unique_room_numbers.add(user.room_number)
+        
+        for setting in room_settings:
+            if setting.room_number != 'ADMIN':
+                unique_room_numbers.add(setting.room_number)
+        
+        print(f"📋 管理対象部屋: {sorted(unique_room_numbers)}")
+        
+        # 各部屋の設定が正しく存在するかチェック
+        for room_num in unique_room_numbers:
+            if room_num not in room_csv_settings:
+                print(f"⚠️ 部屋{room_num}のCSV設定が見つかりません - デフォルト設定を作成")
+                # デフォルト設定を作成
+                default_room_setting = RoomSetting(
+                    room_number=room_num,
+                    max_enabled_unit_number="9999",
+                    csv_filename="words.csv"
+                )
+                db.session.add(default_room_setting)
+                room_max_unit_settings[room_num] = "9999"
+                room_csv_settings[room_num] = "words.csv"
+        
+        try:
+            db.session.commit()
+            print("✅ デフォルト設定作成完了")
+        except Exception as e:
+            print(f"⚠️ デフォルト設定作成エラー: {e}")
+            db.session.rollback()
+        
         context = get_template_context()
-        return render_template('admin.html', 
-                               users=users, 
-                               room_max_unit_settings=room_max_unit_settings,
-                               room_csv_settings=room_csv_settings,
-                               **context)
+        
+        template_context = {
+            'users': users,
+            'room_max_unit_settings': room_max_unit_settings,
+            'room_csv_settings': room_csv_settings,
+            'ROOM_CSV_FOLDER': ROOM_CSV_FOLDER,
+            **context
+        }
+        
+        print("✅ 管理者ページ表示準備完了")
+        return render_template('admin.html', **template_context)
+        
     except Exception as e:
-        print(f"Error in admin route: {e}")
+        print(f"❌ 管理者ページエラー: {e}")
         import traceback
         traceback.print_exc()
         return f"Admin Error: {e}", 500
@@ -1437,6 +1710,8 @@ def admin_add_user():
         flash(f'ユーザー追加中にエラーが発生しました: {e}', 'danger')
         return redirect(url_for('admin_page'))
 
+# app.pyに追加するルート（admin_upload_usersの修正版）
+
 @app.route('/admin/upload_users', methods=['POST'])
 def admin_upload_users():
     if not session.get('admin_logged_in'):
@@ -1453,60 +1728,105 @@ def admin_upload_users():
         return redirect(url_for('admin_page'))
 
     if file and file.filename.endswith('.csv'):
-        stream = StringIO(file.stream.read().decode("utf-8"))
-        reader = csv.DictReader(stream)
-        
-        users_added_count = 0
-        errors = []
+        try:
+            # CSVファイルを読み込み
+            stream = StringIO(file.stream.read().decode("utf-8"))
+            reader = csv.DictReader(stream)
+            
+            users_added_count = 0
+            errors = []
+            skipped_existing = 0
 
-        rows_to_process = list(reader)
+            for row_num, row in enumerate(reader, start=2):  # ヘッダー行を考慮して2から開始
+                try:
+                    # データの取得と検証
+                    room_number = row.get('部屋番号', '').strip()
+                    room_password = row.get('入室パスワード', '').strip()
+                    student_id = row.get('出席番号', '').strip()
+                    individual_password = row.get('個別パスワード', '').strip()
+                    username = row.get('アカウント名', '').strip()
 
-        for row in rows_to_process:
+                    # 必須項目チェック
+                    if not all([room_number, room_password, student_id, individual_password, username]):
+                        errors.append(f"行{row_num}: 必須項目が不足しています")
+                        continue
+
+                    # 既存ユーザーチェック（ユーザー名または部屋番号+出席番号の重複）
+                    existing_user = User.query.filter(
+                        (User.username == username) | 
+                        ((User.room_number == room_number) & (User.student_id == student_id))
+                    ).first()
+                    
+                    if existing_user:
+                        if existing_user.username == username:
+                            errors.append(f"行{row_num}: アカウント名'{username}'は既に存在します")
+                        else:
+                            errors.append(f"行{row_num}: 部屋{room_number}の出席番号{student_id}は既に存在します")
+                        skipped_existing += 1
+                        continue
+
+                    # 新規ユーザー作成
+                    new_user = User(
+                        room_number=room_number,
+                        student_id=student_id,
+                        username=username
+                    )
+                    new_user.set_room_password(room_password)
+                    new_user.set_individual_password(individual_password)
+                    new_user.problem_history = "{}"
+                    new_user.incorrect_words = "[]"
+                    new_user.last_login = datetime.now(JST)
+
+                    db.session.add(new_user)
+                    users_added_count += 1
+
+                except Exception as e:
+                    errors.append(f"行{row_num}: データ処理エラー - {str(e)}")
+                    continue
+
+            # データベースにコミット
             try:
-                room_number = row.get('部屋番号')
-                room_password = row.get('入室パスワード')
-                student_id = row.get('出席番号')
-                individual_password = row.get('個別パスワード')
-                username = row.get('アカウント名')
-
-                if not all([room_number, room_password, student_id, individual_password, username]):
-                    errors.append(f"スキップされた行 (必須項目不足): {row}")
-                    continue
-
-                if User.query.filter_by(username=username).first():
-                    errors.append(f"スキップされた行 (アカウント名 '{username}' は既に存在します): {row}")
-                    continue
-
-                new_user = User(room_number=room_number, student_id=student_id, username=username)
-                new_user.set_room_password(room_password)
-                new_user.set_individual_password(individual_password)
-                new_user.problem_history = "{}"
-                new_user.incorrect_words = "[]"
-
-                db.session.add(new_user)
-                users_added_count += 1
+                db.session.commit()
+                
+                # 新しい部屋のデフォルト設定を作成
+                added_rooms = set()
+                for row in csv.DictReader(StringIO(file.stream.read().decode("utf-8"))):
+                    room_num = row.get('部屋番号', '').strip()
+                    if room_num and room_num not in added_rooms:
+                        if not RoomSetting.query.filter_by(room_number=room_num).first():
+                            default_room_setting = RoomSetting(
+                                room_number=room_num,
+                                max_enabled_unit_number="9999",
+                                csv_filename="words.csv"
+                            )
+                            db.session.add(default_room_setting)
+                            added_rooms.add(room_num)
+                
+                db.session.commit()
+                
+                # 結果メッセージ
+                if users_added_count > 0:
+                    flash(f'✅ {users_added_count}人のユーザーを追加しました。', 'success')
+                
+                if skipped_existing > 0:
+                    flash(f'⚠️ {skipped_existing}人のユーザーは既に存在するため、スキップされました。', 'warning')
+                    
+                if errors:
+                    error_summary = f"❌ {len(errors)}件のエラーが発生しました。"
+                    if len(errors) <= 5:
+                        error_summary += " " + " / ".join(errors)
+                    else:
+                        error_summary += f" 最初の5件: {' / '.join(errors[:5])}"
+                    flash(error_summary, 'danger')
+                    
             except Exception as e:
                 db.session.rollback()
-                errors.append(f"ユーザー追加エラー ({row}): {e}")
-
-        try:
-            db.session.commit()
-            
-            for row in rows_to_process:
-                room_num_from_csv = row.get('部屋番号')
-                if room_num_from_csv and not RoomSetting.query.filter_by(room_number=room_num_from_csv).first():
-                    default_room_setting = RoomSetting(room_number=room_num_from_csv, max_enabled_unit_number="9999", csv_filename="words.csv")
-                    db.session.add(default_room_setting)
-            db.session.commit()
-            
-            flash(f'{users_added_count}件のユーザーを登録しました。', 'success')
-            if errors:
-                flash(f'以下のエラーが発生した行がありました: {"; ".join(errors)}', 'warning')
+                flash(f'データベースエラーが発生しました: {str(e)}', 'danger')
+                
+        except UnicodeDecodeError:
+            flash('CSVファイルの文字エンコーディングを確認してください（UTF-8である必要があります）。', 'danger')
         except Exception as e:
-            db.session.rollback()
-            flash(f'データベースエラーが発生しました: {e}', 'danger')
-            if errors:
-                flash(f'以下のエラーが発生した行がありました: {"; ".join(errors)}', 'warning')
+            flash(f'CSVファイルの処理中にエラーが発生しました: {str(e)}', 'danger')
     else:
         flash('CSVファイルを選択してください。', 'danger')
 
@@ -1536,6 +1856,48 @@ def admin_delete_user(user_id):
         return redirect(url_for('admin_page'))
 
 # 部屋設定管理
+@app.route('/admin/get_room_setting', methods=['POST'])
+def admin_get_room_setting():
+    """部屋設定を取得するAPI"""
+    try:
+        if not session.get('admin_logged_in'):
+            return jsonify(status='error', message='管理者権限がありません。'), 403
+
+        data = request.get_json()
+        room_number = data.get('room_number')
+
+        if not room_number:
+            return jsonify(status='error', message='部屋番号が指定されていません。'), 400
+
+        print(f"🔍 部屋設定取得: {room_number}")
+
+        # 部屋設定を取得
+        room_setting = RoomSetting.query.filter_by(room_number=room_number).first()
+
+        if room_setting:
+            result = {
+                'status': 'success',
+                'room_number': room_setting.room_number,
+                'max_enabled_unit_number': room_setting.max_enabled_unit_number,
+                'csv_filename': room_setting.csv_filename
+            }
+            print(f"✅ 部屋設定取得成功: {room_setting.csv_filename}")
+        else:
+            # デフォルト設定を返す
+            result = {
+                'status': 'success',
+                'room_number': room_number,
+                'max_enabled_unit_number': '9999',
+                'csv_filename': 'words.csv'
+            }
+            print(f"📄 デフォルト設定を返却: {room_number}")
+
+        return jsonify(result)
+        
+    except Exception as e:
+        print(f"❌ 部屋設定取得エラー: {e}")
+        return jsonify(status='error', message=str(e)), 500
+
 @app.route('/admin/update_room_unit_setting', methods=['POST'])
 def admin_update_room_unit_setting():
     try:
@@ -1578,25 +1940,101 @@ def admin_update_room_csv_setting():
         room_number = data.get('room_number')
         csv_filename = data.get('csv_filename')
 
+        print(f"🔧 CSV設定更新リクエスト: 部屋{room_number} -> {csv_filename}")
+
         if not room_number:
             return jsonify(status='error', message='部屋番号が指定されていません。'), 400
 
         if not csv_filename:
             csv_filename = "words.csv"
 
+        # ファイルの存在確認（words.csv以外の場合）
+        if csv_filename != "words.csv":
+            file_path = os.path.join(ROOM_CSV_FOLDER, csv_filename)
+            if not os.path.exists(file_path):
+                print(f"⚠️ 指定されたCSVファイルが見つかりません: {file_path}")
+                return jsonify(
+                    status='error', 
+                    message=f'指定されたCSVファイル "{csv_filename}" が見つかりません。'
+                ), 400
+
+        # 部屋設定を取得または作成
         room_setting = RoomSetting.query.filter_by(room_number=room_number).first()
 
         if room_setting:
+            # 既存設定を更新
+            old_filename = room_setting.csv_filename
             room_setting.csv_filename = csv_filename
+            room_setting.updated_at = datetime.now(JST)
+            print(f"📝 既存設定更新: {old_filename} -> {csv_filename}")
         else:
-            new_room_setting = RoomSetting(room_number=room_number, max_enabled_unit_number="9999", csv_filename=csv_filename)
-            db.session.add(new_room_setting)
+            # 新規設定を作成
+            room_setting = RoomSetting(
+                room_number=room_number,
+                max_enabled_unit_number="9999",
+                csv_filename=csv_filename
+            )
+            db.session.add(room_setting)
+            print(f"➕ 新規設定作成: 部屋{room_number} with {csv_filename}")
+        
+        # データベースにコミット
+        db.session.commit()
+        
+        # 保存後の確認
+        saved_setting = RoomSetting.query.filter_by(room_number=room_number).first()
+        if saved_setting:
+            actual_filename = saved_setting.csv_filename
+            print(f"✅ 保存確認成功: 部屋{room_number} = {actual_filename}")
+            
+            if actual_filename != csv_filename:
+                print(f"⚠️ 保存値が異なります: 期待値={csv_filename}, 実際値={actual_filename}")
+                return jsonify(
+                    status='error', 
+                    message=f'設定の保存に失敗しました。期待値と実際値が異なります。'
+                ), 500
+        else:
+            print(f"❌ 保存確認失敗: 部屋{room_number}の設定が見つかりません")
+            return jsonify(status='error', message='設定の保存確認に失敗しました。'), 500
+        
+        return jsonify(
+            status='success', 
+            message=f'部屋 {room_number} のCSVファイル設定を {csv_filename} に更新しました。',
+            room_number=room_number,
+            csv_filename=actual_filename
+        )
+        
+    except Exception as e:
+        print(f"❌ CSV設定更新エラー: {e}")
+        import traceback
+        traceback.print_exc()
+        db.session.rollback()
+        return jsonify(status='error', message=str(e)), 500
+    
+def verify_room_settings():
+    """起動時に部屋設定の整合性をチェック"""
+    print("\n🔍 部屋設定の整合性確認中...")
+    
+    try:
+        settings = RoomSetting.query.all()
+        print(f"📋 登録済み部屋設定: {len(settings)}件")
+        
+        for setting in settings:
+            csv_path = setting.csv_filename
+            if csv_path != "words.csv":
+                full_path = os.path.join(ROOM_CSV_FOLDER, csv_path)
+                if not os.path.exists(full_path):
+                    print(f"⚠️ 部屋{setting.room_number}: {csv_path} が見つからない -> デフォルトに変更")
+                    setting.csv_filename = "words.csv"
+                else:
+                    print(f"✅ 部屋{setting.room_number}: {csv_path} 確認OK")
+            else:
+                print(f"📄 部屋{setting.room_number}: デフォルト使用")
         
         db.session.commit()
-        return jsonify(status='success', message=f'部屋 {room_number} のCSVファイル設定を {csv_filename} に更新しました。')
+        print("✅ 部屋設定確認完了\n")
+        
     except Exception as e:
-        print(f"Error in admin_update_room_csv_setting: {e}")
-        return jsonify(status='error', message=str(e)), 500
+        print(f"❌ 部屋設定確認エラー: {e}\n")
 
 @app.route('/admin/delete_room_setting/<string:room_number>', methods=['POST'])
 def admin_delete_room_setting(room_number):
@@ -1622,106 +2060,242 @@ def admin_delete_room_setting(room_number):
         return redirect(url_for('admin_page'))
 
 # CSV管理
+# app.pyのadmin_upload_room_csvルートをデバッグ版に置き換え
+
 @app.route('/admin/upload_room_csv', methods=['POST'])
 def admin_upload_room_csv():
     try:
+        print("🔍 CSV アップロード開始...")
+        
         if not session.get('admin_logged_in'):
             flash('管理者権限がありません。', 'danger')
             return redirect(url_for('admin_page'))
 
         if 'file' not in request.files:
+            print("❌ ファイルが選択されていません")
             flash('ファイルが選択されていません。', 'danger')
             return redirect(url_for('admin_page'))
 
         file = request.files['file']
-        room_number = request.form.get('room_number_for_csv')
+        print(f"📁 受信ファイル: {file.filename}")
 
         if file.filename == '':
+            print("❌ ファイル名が空です")
             flash('ファイルが選択されていません。', 'danger')
             return redirect(url_for('admin_page'))
 
-        if not room_number:
-            flash('部屋番号が指定されていません。', 'danger')
-            return redirect(url_for('admin_page'))
-
         if file and file.filename.endswith('.csv'):
-            filename = secure_filename(f"room_{room_number}_{file.filename}")
+            # 元のファイル名をそのまま使用（セキュリティ対応）
+            original_filename = file.filename
+            filename = secure_filename(original_filename)
+            
+            # ROOM_CSV_FOLDERの存在確認と作成
+            if not os.path.exists(ROOM_CSV_FOLDER):
+                print(f"📁 フォルダを作成: {ROOM_CSV_FOLDER}")
+                os.makedirs(ROOM_CSV_FOLDER)
+            
             file_path = os.path.join(ROOM_CSV_FOLDER, filename)
+            print(f"💾 保存先: {file_path}")
             
             try:
+                # ファイル保存
                 file.save(file_path)
+                print(f"✅ ファイル保存成功: {file_path}")
+                
+                # ファイルの存在確認
+                if not os.path.exists(file_path):
+                    print(f"❌ 保存後にファイルが見つかりません: {file_path}")
+                    flash('ファイルの保存に失敗しました。', 'danger')
+                    return redirect(url_for('admin_page'))
+                
+                # ファイルサイズ確認
+                file_size = os.path.getsize(file_path)
+                print(f"📊 ファイルサイズ: {file_size} bytes")
+                
+                if file_size == 0:
+                    print("❌ ファイルサイズが0です")
+                    os.remove(file_path)
+                    flash('アップロードされたファイルが空です。', 'danger')
+                    return redirect(url_for('admin_page'))
                 
                 # CSVファイルの形式を検証
+                word_count = 0
                 try:
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                        print(f"📄 ファイル内容の最初の100文字: {content[:100]}")
+                        
                     with open(file_path, 'r', encoding='utf-8') as f:
                         reader = csv.DictReader(f)
                         required_columns = ['chapter', 'number', 'category', 'question', 'answer', 'enabled']
                         
-                        if not all(col in reader.fieldnames for col in required_columns):
-                            os.remove(file_path)  # 無効なファイルを削除
-                            flash(f'CSVファイルの形式が正しくありません。必要な列: {", ".join(required_columns)}', 'danger')
+                        print(f"📋 検出されたヘッダー: {reader.fieldnames}")
+                        
+                        if not reader.fieldnames:
+                            os.remove(file_path)
+                            flash('CSVファイルにヘッダー行がありません。', 'danger')
                             return redirect(url_for('admin_page'))
                         
-                        # 最初の数行をテスト読み込み
+                        missing_cols = [col for col in required_columns if col not in reader.fieldnames]
+                        if missing_cols:
+                            os.remove(file_path)
+                            flash(f'CSVファイルに必要な列が不足しています: {", ".join(missing_cols)}', 'danger')
+                            print(f"❌ 不足している列: {missing_cols}")
+                            return redirect(url_for('admin_page'))
+                        
+                        # 全行をチェックして単語数をカウント
                         for i, row in enumerate(reader):
-                            if i >= 5:  # 最初の5行だけチェック
-                                break
-                            # 各行のデータが存在することを確認
-                            if not all(row.get(col) for col in required_columns):
+                            # 必須データの存在確認
+                            missing_data = []
+                            for col in ['chapter', 'number', 'question', 'answer']:
+                                if not row.get(col, '').strip():
+                                    missing_data.append(col)
+                            
+                            if missing_data:
                                 os.remove(file_path)
-                                flash('CSVファイルにデータが不足している行があります。', 'danger')
+                                flash(f'CSVファイルの{i+2}行目に必須データが不足しています: {", ".join(missing_data)}', 'danger')
+                                print(f"❌ {i+2}行目のデータ不足: {missing_data}")
                                 return redirect(url_for('admin_page'))
-                except Exception as e:
+                            word_count += 1
+                        
+                        print(f"📊 検証完了: {word_count}問")
+                        
+                        if word_count == 0:
+                            os.remove(file_path)
+                            flash('CSVファイルにデータが含まれていません。', 'danger')
+                            return redirect(url_for('admin_page'))
+                        
+                except Exception as csv_error:
+                    print(f"❌ CSV読み込みエラー: {csv_error}")
                     if os.path.exists(file_path):
                         os.remove(file_path)
-                    flash(f'CSVファイルの読み込み中にエラーが発生しました: {str(e)}', 'danger')
+                    flash(f'CSVファイルの読み込み中にエラーが発生しました: {str(csv_error)}', 'danger')
                     return redirect(url_for('admin_page'))
                 
-                # RoomSettingにCSVファイル名を保存
-                room_setting = RoomSetting.query.filter_by(room_number=room_number).first()
-                if room_setting:
-                    room_setting.csv_filename = filename
+                # RoomCsvFileテーブルに記録（存在する場合のみ）
+                try:
+                    # テーブルの存在確認
+                    inspector = inspect(db.engine)
+                    if inspector.has_table('room_csv_file'):
+                        print("📝 room_csv_fileテーブルに記録中...")
+                        
+                        # 既存のファイル記録があれば更新、なければ新規作成
+                        csv_file_record = RoomCsvFile.query.filter_by(filename=filename).first()
+                        if csv_file_record:
+                            print(f"🔄 既存レコード更新: {filename}")
+                            csv_file_record.original_filename = original_filename
+                            csv_file_record.file_size = file_size
+                            csv_file_record.word_count = word_count
+                            csv_file_record.upload_date = datetime.now(JST)
+                        else:
+                            print(f"➕ 新規レコード作成: {filename}")
+                            csv_file_record = RoomCsvFile(
+                                filename=filename,
+                                original_filename=original_filename,
+                                file_size=file_size,
+                                word_count=word_count
+                            )
+                            db.session.add(csv_file_record)
+                        
+                        db.session.commit()
+                        print("✅ データベース記録完了")
+                    else:
+                        print("⚠️ room_csv_fileテーブルが存在しません（ファイルのみ保存）")
+                        
+                except Exception as db_error:
+                    print(f"⚠️ データベース記録エラー（ファイルは保存済み）: {db_error}")
+                    db.session.rollback()
+                
+                # 最終確認
+                final_check_path = os.path.join(ROOM_CSV_FOLDER, filename)
+                if os.path.exists(final_check_path):
+                    final_size = os.path.getsize(final_check_path)
+                    print(f"✅ 最終確認成功: {final_check_path} ({final_size} bytes)")
+                    
+                    # 成功メッセージ
+                    file_size_kb = round(file_size / 1024, 1)
+                    flash(f'✅ CSVファイル "{filename}" をアップロードしました', 'success')
+                    flash(f'📊 ファイル情報: {word_count}問, {file_size_kb}KB', 'info')
+                    flash('💡 各部屋の設定で、このファイルを使用するように設定してください。', 'info')
                 else:
-                    new_room_setting = RoomSetting(room_number=room_number, max_enabled_unit_number="9999", csv_filename=filename)
-                    db.session.add(new_room_setting)
+                    print(f"❌ 最終確認失敗: ファイルが見つかりません")
+                    flash('ファイルのアップロードに失敗しました。', 'danger')
                 
-                db.session.commit()
-                flash(f'部屋 {room_number} 用のCSVファイル "{filename}" をアップロードしました。', 'success')
-                
-            except Exception as e:
-                flash(f'ファイルの保存中にエラーが発生しました: {str(e)}', 'danger')
+            except Exception as save_error:
+                print(f"❌ ファイル保存エラー: {save_error}")
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+                flash(f'ファイルの保存中にエラーが発生しました: {str(save_error)}', 'danger')
         else:
+            print("❌ CSVファイルではありません")
             flash('CSVファイルを選択してください。', 'danger')
 
         return redirect(url_for('admin_page'))
     except Exception as e:
-        print(f"Error in admin_upload_room_csv: {e}")
+        print(f"❌ 全体エラー: {e}")
+        import traceback
+        traceback.print_exc()
         flash(f'ファイルアップロード中にエラーが発生しました: {e}', 'danger')
         return redirect(url_for('admin_page'))
 
+# admin_list_room_csv_filesルートもデバッグ版に修正
 @app.route('/admin/list_room_csv_files')
 def admin_list_room_csv_files():
     try:
+        print("🔍 CSVファイル一覧取得開始...")
+        
         if not session.get('admin_logged_in'):
             return jsonify(status='error', message='管理者権限がありません。'), 403
 
+        # フォルダの存在確認
+        if not os.path.exists(ROOM_CSV_FOLDER):
+            print(f"📁 フォルダが存在しません: {ROOM_CSV_FOLDER}")
+            return jsonify(status='success', files=[])
+        
+        print(f"📁 フォルダパス: {ROOM_CSV_FOLDER}")
+        
         csv_files = []
-        if os.path.exists(ROOM_CSV_FOLDER):
-            for filename in os.listdir(ROOM_CSV_FOLDER):
-                if filename.endswith('.csv'):
-                    file_path = os.path.join(ROOM_CSV_FOLDER, filename)
+        all_files = os.listdir(ROOM_CSV_FOLDER)
+        print(f"📋 フォルダ内の全ファイル: {all_files}")
+        
+        for filename in all_files:
+            if filename.endswith('.csv'):
+                file_path = os.path.join(ROOM_CSV_FOLDER, filename)
+                
+                try:
                     file_size = os.path.getsize(file_path)
                     modified_time = datetime.fromtimestamp(os.path.getmtime(file_path)).strftime('%Y-%m-%d %H:%M:%S')
+                    
+                    # 単語数をカウント
+                    word_count = 0
+                    try:
+                        with open(file_path, 'r', encoding='utf-8') as f:
+                            reader = csv.DictReader(f)
+                            word_count = sum(1 for row in reader)
+                    except Exception as count_error:
+                        print(f"⚠️ {filename}の単語数カウントエラー: {count_error}")
+                        word_count = 0
                     
                     csv_files.append({
                         'filename': filename,
                         'size': file_size,
-                        'modified': modified_time
+                        'modified': modified_time,
+                        'word_count': word_count
                     })
+                    
+                    print(f"✅ ファイル情報取得: {filename} ({word_count}問, {file_size}bytes)")
+                    
+                except Exception as file_error:
+                    print(f"⚠️ {filename}の情報取得エラー: {file_error}")
+                    continue
         
+        print(f"📊 検出されたCSVファイル数: {len(csv_files)}")
         return jsonify(status='success', files=csv_files)
+        
     except Exception as e:
-        print(f"Error in admin_list_room_csv_files: {e}")
+        print(f"❌ CSVファイル一覧取得エラー: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify(status='error', message=str(e)), 500
 
 @app.route('/admin/delete_room_csv/<filename>', methods=['POST'])
@@ -2292,10 +2866,35 @@ def debug_force_fix_user_data():
 # アプリケーション起動
 # ====================================================================
 
+# ===== メイン起動処理の修正 =====
 if __name__ == '__main__':
     try:
+        # 環境設定
+        print_render_recommendations()
+        
+        # PostgreSQL設定（該当する場合）
+        is_postgres = configure_production_database()
+        
+        # データベース初期化
         create_tables_and_admin_user()
-        port = int(os.environ.get('PORT', 5001))  # ポートを5001に変更
-        app.run(host='0.0.0.0', port=port, debug=True)  # デバッグモードを有効に
+        
+        # 部屋設定確認
+        verify_room_settings()
+        
+        # データ永続化確認
+        if not check_data_persistence():
+            print("⚠️ データ永続化に問題がある可能性があります")
+        
+        # サーバー起動
+        port = int(os.environ.get('PORT', 5001))
+        debug_mode = os.environ.get('RENDER') != 'true'  # Render環境ではdebug=False
+        
+        print(f"🌐 サーバーを起動します: http://0.0.0.0:{port}")
+        print(f"🔧 デバッグモード: {debug_mode}")
+        
+        app.run(host='0.0.0.0', port=port, debug=debug_mode)
+        
     except Exception as e:
-        print(f"Failed to start application: {e}")
+        print(f"💥 アプリケーション起動失敗: {e}")
+        import traceback
+        traceback.print_exc()

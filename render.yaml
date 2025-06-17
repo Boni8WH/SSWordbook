@@ -1,0 +1,53 @@
+# render.yaml - Render.com用設定ファイル
+# プロジェクトルートに配置してください
+
+services:
+  # Webサービス（メインアプリケーション）
+  - type: web
+    name: sekaishi-app
+    env: python
+    plan: free  # または starter, standard
+    region: singapore  # 日本から最も近いリージョン
+    
+    # ビルドコマンド
+    buildCommand: |
+      pip install --upgrade pip &&
+      pip install -r requirements.txt &&
+      python -c "
+      import os
+      print('📊 環境変数確認:')
+      print(f'RESET_DATABASE: {os.environ.get(\"RESET_DATABASE\", \"未設定\")}')
+      print(f'DATABASE_URL: {\"設定済み\" if os.environ.get(\"DATABASE_URL\") else \"未設定\"}')
+      print(f'RENDER: {os.environ.get(\"RENDER\", \"未設定\")}')
+      "
+    
+    # 起動コマンド
+    startCommand: python app.py
+    
+    # 環境変数
+    envVars:
+      - key: RESET_DATABASE
+        value: "false"  # 本番環境では必ずfalse
+      - key: RENDER
+        value: "true"
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: sekaishi-postgres
+          property: connectionString
+
+    # 自動デプロイ設定
+    autoDeploy: true
+
+# データベースサービス（PostgreSQL）
+databases:
+  - name: sekaishi-postgres
+    databaseName: sekaishi_db
+    user: sekaishi_user
+    plan: free  # または starter
+    region: singapore
+    
+    # データベース初期化時のみリセット
+    # 本番運用後は削除推奨
+    postgresMajorVersion: 15
