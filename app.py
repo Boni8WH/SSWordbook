@@ -182,10 +182,6 @@ class AppInfo(db.Model):
             'contactEmail': self.contact_email
         }
 
-# app.py のPasswordResetTokenクラスを以下に置き換え
-
-# app.py の PasswordResetTokenクラスを以下に置き換え
-
 class PasswordResetToken(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
@@ -223,61 +219,74 @@ class PasswordResetToken(db.Model):
     def __repr__(self):
         return f'<PasswordResetToken {self.token[:10]}... for user {self.user_id}>'
 
+class CsvFileContent(db.Model):
+    """CSVファイルの内容をデータベースに保存"""
+    id = db.Column(db.Integer, primary_key=True)
+    filename = db.Column(db.String(100), unique=True, nullable=False)
+    original_filename = db.Column(db.String(100), nullable=False)
+    content = db.Column(db.Text, nullable=False)  # CSV内容をテキストとして保存
+    file_size = db.Column(db.Integer, nullable=False)
+    word_count = db.Column(db.Integer, default=0)
+    upload_date = db.Column(db.DateTime, default=lambda: datetime.now(JST))
+    
+    def get_csv_data(self):
+        """CSV内容を辞書リストとして返す"""
+        try:
+            reader = csv.DictReader(StringIO(self.content))
+            return list(reader)
+        except Exception as e:
+            print(f"CSV parsing error: {e}")
+            return []
+
 # ====================================================================
 # ヘルパー関数
 # ====================================================================
 
 # 部屋ごとの単語データを読み込む関数
 def load_word_data_for_room(room_number):
-    """指定された部屋の単語データを読み込む（CSV設定永続化対応）"""
+    """指定された部屋の単語データを読み込む（データベース対応版）"""
     try:
         # データベースから部屋設定を取得
         room_setting = RoomSetting.query.filter_by(room_number=room_number).first()
         
         if room_setting and room_setting.csv_filename:
             csv_filename = room_setting.csv_filename
-            print(f"🔍 部屋{room_number}の設定: {csv_filename}")
         else:
             csv_filename = "words.csv"
-            print(f"⚠️ 部屋{room_number}の設定なし、デフォルト使用: {csv_filename}")
         
-        # ファイルパスを決定
+        # デフォルトファイルの場合
         if csv_filename == "words.csv":
-            # デフォルトファイル
-            csv_path = 'words.csv'
+            word_data = []
+            try:
+                with open('words.csv', 'r', encoding='utf-8') as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        row['enabled'] = row.get('enabled', '1') == '1'
+                        row['chapter'] = str(row['chapter'])
+                        row['number'] = str(row['number'])
+                        word_data.append(row)
+            except FileNotFoundError:
+                print(f"❌ デフォルトファイルが見つかりません: words.csv")
+                return []
         else:
-            # カスタムファイル
-            room_csv_path = os.path.join(ROOM_CSV_FOLDER, csv_filename)
-            if os.path.exists(room_csv_path):
-                csv_path = room_csv_path
-                print(f"✅ カスタムCSV使用: {room_csv_path}")
+            # データベースからカスタムCSVの内容を取得
+            csv_file = CsvFileContent.query.filter_by(filename=csv_filename).first()
+            if csv_file:
+                word_data = csv_file.get_csv_data()
+                # データ形式を統一
+                for row in word_data:
+                    row['enabled'] = row.get('enabled', '1') == '1'
+                    row['chapter'] = str(row['chapter'])
+                    row['number'] = str(row['number'])
+                print(f"✅ データベースからCSV読み込み: {len(word_data)}問")
             else:
-                # ファイルが見つからない場合はデフォルトにフォールバック
-                csv_path = 'words.csv'
-                print(f"❌ カスタムCSVが見つからない: {room_csv_path}, デフォルト使用")
-                
-                # データベースの設定も修正
-                if room_setting:
-                    room_setting.csv_filename = "words.csv"
-                    db.session.commit()
-                    print(f"🔧 部屋{room_number}の設定をデフォルトに修正")
+                print(f"❌ データベースにCSVが見つかりません: {csv_filename}")
+                # フォールバック: デフォルトファイル使用
+                return load_word_data_for_room("default")
         
-        # ファイル読み込み
-        word_data = []
-        with open(csv_path, 'r', encoding='utf-8') as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                row['enabled'] = row.get('enabled', '1') == '1'
-                row['chapter'] = str(row['chapter'])
-                row['number'] = str(row['number'])
-                word_data.append(row)
-        
-        print(f"📊 読み込み完了: {len(word_data)}問 from {csv_path}")
+        print(f"📊 読み込み完了: {len(word_data)}問 from {csv_filename}")
         return word_data
         
-    except FileNotFoundError:
-        print(f"❌ ファイルエラー: {csv_path} が見つかりません")
-        return []
     except Exception as e:
         print(f"❌ 読み込みエラー: {e}")
         return []
@@ -2242,129 +2251,81 @@ def admin_add_user():
         flash(f'ユーザー追加中にエラーが発生しました: {e}', 'danger')
         return redirect(url_for('admin_page'))
 
-@app.route('/admin/upload_users', methods=['POST'])
-def admin_upload_users():
-    if not session.get('admin_logged_in'):
-        flash('管理者権限がありません。', 'danger')
-        return redirect(url_for('login_page'))
+@app.route('/admin/upload_room_csv', methods=['POST'])
+def admin_upload_room_csv():
+    try:
+        if not session.get('admin_logged_in'):
+            flash('管理者権限がありません。', 'danger')
+            return redirect(url_for('admin_page'))
 
-    if 'file' not in request.files:
-        flash('ファイルが選択されていません。', 'danger')
-        return redirect(url_for('admin_page'))
+        if 'file' not in request.files:
+            flash('ファイルが選択されていません。', 'danger')
+            return redirect(url_for('admin_page'))
 
-    file = request.files['file']
-    if file.filename == '':
-        flash('ファイルが選択されていません。', 'danger')
-        return redirect(url_for('admin_page'))
+        file = request.files['file']
+        if file.filename == '' or not file.filename.endswith('.csv'):
+            flash('CSVファイルを選択してください。', 'danger')
+            return redirect(url_for('admin_page'))
 
-    if file and file.filename.endswith('.csv'):
+        filename = secure_filename(file.filename)
+        
+        # ファイル内容を読み込み
+        content = file.read().decode('utf-8')
+        file_size = len(content.encode('utf-8'))
+        
+        # CSV形式を検証
         try:
-            # CSVファイルを読み込み
-            stream = StringIO(file.stream.read().decode("utf-8"))
-            reader = csv.DictReader(stream)
+            reader = csv.DictReader(StringIO(content))
+            required_columns = ['chapter', 'number', 'category', 'question', 'answer', 'enabled']
             
-            users_added_count = 0
-            errors = []
-            skipped_existing = 0
-
-            for row_num, row in enumerate(reader, start=2):  # ヘッダー行を考慮して2から開始
-                try:
-                    # データの取得と検証
-                    room_number = row.get('部屋番号', '').strip()
-                    room_password = row.get('入室パスワード', '').strip()
-                    student_id = row.get('出席番号', '').strip()
-                    individual_password = row.get('個別パスワード', '').strip()
-                    username = row.get('アカウント名', '').strip()
-
-                    # 必須項目チェック
-                    if not all([room_number, room_password, student_id, individual_password, username]):
-                        errors.append(f"行{row_num}: 必須項目が不足しています")
-                        continue
-
-                    # 修正: 部屋番号 + 出席番号 + ユーザー名の組み合わせでの重複チェック
-                    existing_user = User.query.filter_by(
-                        room_number=room_number, 
-                        student_id=student_id,
-                        username=username
-                    ).first()
-                    
-                    if existing_user:
-                        errors.append(f"行{row_num}: 部屋{room_number}の出席番号{student_id}のユーザー名{username}は既に存在します")
-                        skipped_existing += 1
-                        continue
-
-                    # 新規ユーザー作成
-                    new_user = User(
-                        room_number=room_number,
-                        student_id=student_id,
-                        username=username
-                    )
-                    new_user.set_room_password(room_password)
-                    new_user.set_individual_password(individual_password)
-                    new_user.problem_history = "{}"
-                    new_user.incorrect_words = "[]"
-                    new_user.last_login = datetime.now(JST)
-
-                    db.session.add(new_user)
-                    users_added_count += 1
-
-                except Exception as e:
-                    errors.append(f"行{row_num}: データ処理エラー - {str(e)}")
-                    continue
-
-            # データベースにコミット
-            try:
-                db.session.commit()
+            if not reader.fieldnames or not all(col in reader.fieldnames for col in required_columns):
+                flash(f'CSVファイルに必要な列が不足しています: {", ".join(required_columns)}', 'danger')
+                return redirect(url_for('admin_page'))
+            
+            # 単語数をカウント
+            word_count = sum(1 for row in reader)
+            
+            if word_count == 0:
+                flash('CSVファイルにデータが含まれていません。', 'danger')
+                return redirect(url_for('admin_page'))
                 
-                # 新しい部屋のデフォルト設定を作成
-                added_rooms = set()
-                
-                # ★ 修正: ファイルを再読み込みして部屋番号を取得
-                file.stream.seek(0)  # ファイルポインタを先頭に戻す
-                stream_for_rooms = StringIO(file.stream.read().decode("utf-8"))
-                reader_for_rooms = csv.DictReader(stream_for_rooms)
-                
-                for row in reader_for_rooms:
-                    room_num = row.get('部屋番号', '').strip()
-                    if room_num and room_num not in added_rooms:
-                        if not RoomSetting.query.filter_by(room_number=room_num).first():
-                            default_room_setting = RoomSetting(
-                                room_number=room_num,
-                                max_enabled_unit_number="9999",
-                                csv_filename="words.csv"
-                            )
-                            db.session.add(default_room_setting)
-                            added_rooms.add(room_num)
-                
-                db.session.commit()
-                
-                # 結果メッセージ
-                if users_added_count > 0:
-                    flash(f'✅ {users_added_count}人のユーザーを追加しました。', 'success')
-                
-                if skipped_existing > 0:
-                    flash(f'⚠️ {skipped_existing}人のユーザーは部屋番号+出席番号+ユーザー名が重複するため、スキップされました。', 'warning')
-                    
-                if errors:
-                    error_summary = f"❌ {len(errors)}件のエラーが発生しました。"
-                    if len(errors) <= 5:
-                        error_summary += " " + " / ".join(errors)
-                    else:
-                        error_summary += f" 最初の5件: {' / '.join(errors[:5])}"
-                    flash(error_summary, 'danger')
-                    
-            except Exception as e:
-                db.session.rollback()
-                flash(f'データベースエラーが発生しました: {str(e)}', 'danger')
-                
-        except UnicodeDecodeError:
-            flash('CSVファイルの文字エンコーディングを確認してください（UTF-8である必要があります）。', 'danger')
         except Exception as e:
-            flash(f'CSVファイルの処理中にエラーが発生しました: {str(e)}', 'danger')
-    else:
-        flash('CSVファイルを選択してください。', 'danger')
-
-    return redirect(url_for('admin_page'))
+            flash(f'CSVファイルの読み込み中にエラーが発生しました: {str(e)}', 'danger')
+            return redirect(url_for('admin_page'))
+        
+        # データベースに保存
+        existing_file = CsvFileContent.query.filter_by(filename=filename).first()
+        if existing_file:
+            # 既存ファイルを更新
+            existing_file.content = content
+            existing_file.file_size = file_size
+            existing_file.word_count = word_count
+            existing_file.upload_date = datetime.now(JST)
+            flash(f'CSVファイル "{filename}" を更新しました。', 'success')
+        else:
+            # 新規作成
+            csv_file = CsvFileContent(
+                filename=filename,
+                original_filename=file.filename,
+                content=content,
+                file_size=file_size,
+                word_count=word_count
+            )
+            db.session.add(csv_file)
+            flash(f'CSVファイル "{filename}" をアップロードしました。', 'success')
+        
+        db.session.commit()
+        
+        # 成功メッセージ
+        file_size_kb = round(file_size / 1024, 1)
+        flash(f'📊 ファイル情報: {word_count}問, {file_size_kb}KB', 'info')
+        flash('💡 各部屋の設定で、このファイルを使用するように設定してください。', 'info')
+        
+        return redirect(url_for('admin_page'))
+        
+    except Exception as e:
+        flash(f'ファイルアップロード中にエラーが発生しました: {e}', 'danger')
+        return redirect(url_for('admin_page'))
 
 @app.route('/admin/delete_user/<int:user_id>', methods=['POST'])
 def admin_delete_user(user_id):
