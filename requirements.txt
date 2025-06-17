@@ -1,6 +1,7 @@
-# requirements.txt - PostgreSQL対応版
+# requirements.txt - メール機能追加版
 Flask==3.0.3
 Flask-SQLAlchemy==3.1.1
+Flask-Mail==0.9.1
 Werkzeug==3.0.4
 pytz==2024.1
 SQLAlchemy==2.0.36
@@ -11,3 +12,6 @@ gunicorn==21.2.0
 
 # データベースURL解析
 dj-database-url==2.1.0
+
+# セキュリティ関連
+cryptography==41.0.7

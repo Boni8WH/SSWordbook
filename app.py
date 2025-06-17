@@ -1,4 +1,3 @@
-# app.py の修正版 - エラー対策・重複削除
 import os
 import json
 import csv
@@ -6,6 +5,11 @@ import re
 from io import StringIO
 from datetime import datetime
 import pytz
+import secrets
+import string
+from datetime import datetime, timedelta
+from flask_mail import Mail, Message
+import hashlib
 
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, Response
 from flask_sqlalchemy import SQLAlchemy
@@ -22,6 +26,14 @@ basedir = os.path.abspath(os.path.dirname(__file__))
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'quiz_data.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['PERMANENT_SESSION_LIFETIME'] = 3600 * 24 * 7
+app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
+app.config['MAIL_PORT'] = int(os.environ.get('MAIL_PORT', '587'))
+app.config['MAIL_USE_TLS'] = os.environ.get('MAIL_USE_TLS', 'true').lower() in ['true', 'on', '1']
+app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME')
+app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
+app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_DEFAULT_SENDER', app.config['MAIL_USERNAME'])
+
+mail = Mail(app)
 
 # dbオブジェクトを初期化
 db = SQLAlchemy()
@@ -161,6 +173,22 @@ class AppInfo(db.Model):
             'footerText': self.footer_text,
             'contactEmail': self.contact_email
         }
+
+class PasswordResetToken(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    token = db.Column(db.String(100), unique=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))
+    expires_at = db.Column(db.DateTime, nullable=False)
+    used = db.Column(db.Boolean, default=False)
+    
+    user = db.relationship('User', backref=db.backref('reset_tokens', lazy=True))
+    
+    def is_expired(self):
+        return datetime.now(JST) > self.expires_at
+    
+    def is_valid(self):
+        return not self.used and not self.is_expired()
 
 # ====================================================================
 # ヘルパー関数
@@ -795,6 +823,124 @@ def print_render_recommendations():
     
     print("="*60 + "\n")
 
+# ヘルパー関数
+def generate_reset_token():
+    """セキュアなリセットトークンを生成"""
+    return secrets.token_urlsafe(32)
+
+def generate_temp_password():
+    """一時パスワードを生成"""
+    characters = string.ascii_letters + string.digits
+    return ''.join(secrets.choice(characters) for _ in range(8))
+
+def send_password_reset_email(user, email, token):
+    """パスワード再発行メールを送信"""
+    app_info = AppInfo.get_current_info()
+    
+    reset_url = url_for('password_reset', token=token, _external=True)
+    
+    subject = f'[{app_info.app_name}] パスワード再発行のご案内'
+    
+    # メール本文（HTML）
+    html_body = f'''
+    <html>
+    <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 8px;">
+            <h2 style="color: #2c3e50; text-align: center;">{app_info.app_name}</h2>
+            <h3 style="color: #34495e;">パスワード再発行のご案内</h3>
+            
+            <p>いつもご利用いただきありがとうございます。</p>
+            
+            <p>以下のアカウントのパスワード再発行が要求されました：</p>
+            <ul style="background-color: #f8f9fa; padding: 15px; border-radius: 5px;">
+                <li><strong>部屋番号:</strong> {user.room_number}</li>
+                <li><strong>出席番号:</strong> {user.student_id}</li>
+                <li><strong>アカウント名:</strong> {user.username}</li>
+                <li><strong>送信先メール:</strong> {email}</li>
+            </ul>
+            
+            <p>下記のリンクをクリックして、新しいパスワードを設定してください：</p>
+            
+            <div style="text-align: center; margin: 30px 0;">
+                <a href="{reset_url}" 
+                   style="display: inline-block; padding: 12px 30px; background-color: #3498db; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">
+                    パスワードを再設定する
+                </a>
+            </div>
+            
+            <div style="background-color: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 5px; margin: 20px 0;">
+                <h4 style="color: #856404; margin-top: 0;">⚠️ 重要事項</h4>
+                <ul style="color: #856404; margin-bottom: 0;">
+                    <li>このリンクは<strong>1時間以内</strong>に使用してください</li>
+                    <li>リンクは<strong>1回のみ</strong>使用可能です</li>
+                    <li>パスワード再発行を要求していない場合は、このメールを無視してください</li>
+                </ul>
+            </div>
+            
+            <p>リンクがクリックできない場合は、以下のURLをコピーしてブラウザのアドレスバーに貼り付けてください：</p>
+            <p style="word-break: break-all; background-color: #f8f9fa; padding: 10px; border-radius: 3px; font-family: monospace;">
+                {reset_url}
+            </p>
+            
+            <hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;">
+            
+            <p style="font-size: 0.9em; color: #666;">
+                このメールに心当たりがない場合は、誰かが間違ってあなたのメールアドレスを入力した可能性があります。<br>
+                その場合は、このメールを無視していただいて構いません。
+            </p>
+            
+            <p style="font-size: 0.9em; color: #666; text-align: center; margin-top: 30px;">
+                {app_info.app_name} システム<br>
+                {app_info.contact_email if app_info.contact_email else ''}
+            </p>
+        </div>
+    </body>
+    </html>
+    '''
+    
+    # テキスト版メール本文
+    text_body = f'''
+{app_info.app_name} パスワード再発行のご案内
+
+いつもご利用いただきありがとうございます。
+
+以下のアカウントのパスワード再発行が要求されました：
+- 部屋番号: {user.room_number}
+- 出席番号: {user.student_id}
+- アカウント名: {user.username}
+- 送信先メール: {email}
+
+下記のリンクにアクセスして、新しいパスワードを設定してください：
+{reset_url}
+
+【重要事項】
+- このリンクは1時間以内に使用してください
+- リンクは1回のみ使用可能です
+- パスワード再発行を要求していない場合は、このメールを無視してください
+
+このメールに心当たりがない場合は、誰かが間違ってあなたのメールアドレスを入力した可能性があります。
+その場合は、このメールを無視していただいて構いません。
+
+{app_info.app_name} システム
+{app_info.contact_email if app_info.contact_email else ''}
+    '''
+    
+    try:
+        msg = Message(
+            subject=subject,
+            recipients=[email],
+            html=html_body,
+            body=text_body
+        )
+        
+        mail.send(msg)
+        print(f"パスワード再発行メール送信成功: {email}")
+        
+    except Exception as e:
+        print(f"メール送信エラー: {e}")
+        raise
+
+
 # ====================================================================
 # ルーティング
 # ====================================================================
@@ -989,6 +1135,162 @@ def password_change_page():
         import traceback
         traceback.print_exc()
         return f"Password Change Error: {e}", 500
+
+@app.route('/password_reset_request', methods=['GET', 'POST'])
+def password_reset_request():
+    try:
+        if request.method == 'POST':
+            room_number = request.form.get('room_number', '').strip()
+            student_id = request.form.get('student_id', '').strip()
+            username = request.form.get('username', '').strip()
+            email = request.form.get('email', '').strip()
+            
+            if not all([room_number, student_id, username, email]):
+                flash('すべての項目を入力してください。', 'danger')
+                return render_template('password_reset_request.html', **get_template_context())
+            
+            # ユーザー検索（部屋番号・出席番号・アカウント名の3つで特定）
+            user = User.query.filter_by(
+                room_number=room_number, 
+                student_id=student_id,
+                username=username
+            ).first()
+            
+            if not user:
+                # セキュリティのため、ユーザーが見つからない場合も成功メッセージを表示
+                flash('入力された情報に一致するアカウントが見つかった場合、パスワード再発行のご案内をメールで送信しました。メールをご確認ください。', 'success')
+                return redirect(url_for('login_page'))
+            
+            # 既存の未使用トークンがあれば無効化
+            existing_tokens = PasswordResetToken.query.filter_by(
+                user_id=user.id, 
+                used=False
+            ).all()
+            for token in existing_tokens:
+                token.used = True
+            
+            # 新しいトークンを生成
+            reset_token = generate_reset_token()
+            expires_at = datetime.now(JST) + timedelta(hours=1)  # 1時間有効
+            
+            password_reset_token = PasswordResetToken(
+                user_id=user.id,
+                token=reset_token,
+                expires_at=expires_at
+            )
+            
+            db.session.add(password_reset_token)
+            db.session.commit()
+            
+            # メール送信
+            try:
+                send_password_reset_email(user, email, reset_token)
+                flash('入力された情報に一致するアカウントが見つかりました。パスワード再発行のご案内をメールで送信しました。メールをご確認ください。', 'success')
+            except Exception as email_error:
+                print(f"メール送信エラー: {email_error}")
+                flash('メール送信中にエラーが発生しました。しばらく後に再度お試しください。', 'danger')
+                # トークンを無効化
+                password_reset_token.used = True
+                db.session.commit()
+            
+            return redirect(url_for('login_page'))
+        
+        context = get_template_context()
+        return render_template('password_reset_request.html', **context)
+        
+    except Exception as e:
+        print(f"Error in password_reset_request: {e}")
+        flash('システムエラーが発生しました。管理者にお問い合わせください。', 'danger')
+        return redirect(url_for('login_page'))
+
+
+# 管理者用：期限切れトークンの自動削除（定期実行推奨）
+@app.route('/admin/cleanup_expired_tokens', methods=['POST'])
+def admin_cleanup_expired_tokens():
+    if not session.get('admin_logged_in'):
+        return jsonify({'status': 'error', 'message': '管理者権限がありません。'}), 403
+    
+    try:
+        # 期限切れまたは使用済みトークンを削除
+        expired_tokens = PasswordResetToken.query.filter(
+            (PasswordResetToken.expires_at < datetime.now(JST)) |
+            (PasswordResetToken.used == True)
+        ).all()
+        
+        deleted_count = len(expired_tokens)
+        
+        for token in expired_tokens:
+            db.session.delete(token)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'status': 'success',
+            'message': f'{deleted_count}個の期限切れトークンを削除しました。',
+            'deleted_count': deleted_count
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+# パスワードリセット実行
+@app.route('/password_reset/<token>', methods=['GET', 'POST'])
+def password_reset(token):
+    try:
+        # トークンの検証
+        reset_token = PasswordResetToken.query.filter_by(token=token).first()
+        
+        if not reset_token or not reset_token.is_valid():
+            flash('無効なリンクまたは期限切れです。新しいパスワード再発行をリクエストしてください。', 'danger')
+            return redirect(url_for('password_reset_request'))
+        
+        if request.method == 'POST':
+            new_password = request.form.get('new_password', '').strip()
+            confirm_password = request.form.get('confirm_password', '').strip()
+            
+            if not new_password or not confirm_password:
+                flash('パスワードを入力してください。', 'danger')
+                return render_template('password_reset.html', token=token, **get_template_context())
+            
+            if new_password != confirm_password:
+                flash('パスワードが一致しません。', 'danger')
+                return render_template('password_reset.html', token=token, **get_template_context())
+            
+            if len(new_password) < 6:
+                flash('パスワードは6文字以上で入力してください。', 'danger')
+                return render_template('password_reset.html', token=token, **get_template_context())
+            
+            # パスワード更新
+            user = reset_token.user
+            user.set_individual_password(new_password)
+            
+            # トークンを使用済みにする
+            reset_token.used = True
+            reset_token.used_at = datetime.now(JST)
+            
+            db.session.commit()
+            
+            flash('パスワードが正常に更新されました。新しいパスワードでログインしてください。', 'success')
+            return redirect(url_for('login_page'))
+        
+        # トークンの有効期限を確認して表示
+        time_remaining = reset_token.expires_at - datetime.now(JST)
+        minutes_remaining = int(time_remaining.total_seconds() / 60)
+        
+        context = get_template_context()
+        context.update({
+            'token': token,
+            'user': reset_token.user,
+            'minutes_remaining': minutes_remaining
+        })
+        
+        return render_template('password_reset.html', **context)
+        
+    except Exception as e:
+        print(f"Error in password_reset: {e}")
+        flash('システムエラーが発生しました。管理者にお問い合わせください。', 'danger')
+        return redirect(url_for('login_page'))
 
 # ====================================================================
 # APIエンドポイント
@@ -1667,6 +1969,9 @@ def admin_app_info_reset():
         return redirect(url_for('admin_app_info'))
 
 # ユーザー管理
+# app.py の該当部分を以下に置き換え
+
+# ユーザー管理 - 同一アカウント名登録対応版
 @app.route('/admin/add_user', methods=['POST'])
 def admin_add_user():
     try:
@@ -1684,8 +1989,10 @@ def admin_add_user():
             flash('すべての項目を入力してください。', 'danger')
             return redirect(url_for('admin_page'))
 
-        if User.query.filter_by(username=username).first():
-            flash('そのアカウント名はすでに存在します。別のアカウント名を使用してください。', 'danger')
+        # 修正: 同一部屋の同一出席番号の重複チェックのみ（アカウント名の重複は許可）
+        existing_user = User.query.filter_by(room_number=room_number, student_id=student_id).first()
+        if existing_user:
+            flash(f'部屋番号 {room_number} の出席番号 {student_id} は既に登録されています。', 'danger')
             return redirect(url_for('admin_page'))
 
         new_user = User(room_number=room_number, student_id=student_id, username=username)
@@ -1697,20 +2004,19 @@ def admin_add_user():
         db.session.add(new_user)
         db.session.commit()
         
+        # 部屋設定の自動作成
         if not RoomSetting.query.filter_by(room_number=room_number).first():
             default_room_setting = RoomSetting(room_number=room_number, max_enabled_unit_number="9999", csv_filename="words.csv")
             db.session.add(default_room_setting)
             db.session.commit()
             flash(f'部屋 {room_number} の設定をデフォルトで作成しました。', 'info')
 
-        flash(f'ユーザー {username} を登録しました。', 'success')
+        flash(f'ユーザー {username} (部屋: {room_number}) を登録しました。', 'success')
         return redirect(url_for('admin_page'))
     except Exception as e:
         print(f"Error in admin_add_user: {e}")
         flash(f'ユーザー追加中にエラーが発生しました: {e}', 'danger')
         return redirect(url_for('admin_page'))
-
-# app.pyに追加するルート（admin_upload_usersの修正版）
 
 @app.route('/admin/upload_users', methods=['POST'])
 def admin_upload_users():
@@ -1751,17 +2057,11 @@ def admin_upload_users():
                         errors.append(f"行{row_num}: 必須項目が不足しています")
                         continue
 
-                    # 既存ユーザーチェック（ユーザー名または部屋番号+出席番号の重複）
-                    existing_user = User.query.filter(
-                        (User.username == username) | 
-                        ((User.room_number == room_number) & (User.student_id == student_id))
-                    ).first()
+                    # 修正: 同一部屋の同一出席番号の重複チェックのみ（アカウント名の重複は許可）
+                    existing_user = User.query.filter_by(room_number=room_number, student_id=student_id).first()
                     
                     if existing_user:
-                        if existing_user.username == username:
-                            errors.append(f"行{row_num}: アカウント名'{username}'は既に存在します")
-                        else:
-                            errors.append(f"行{row_num}: 部屋{room_number}の出席番号{student_id}は既に存在します")
+                        errors.append(f"行{row_num}: 部屋{room_number}の出席番号{student_id}は既に存在します (既存ユーザー: {existing_user.username})")
                         skipped_existing += 1
                         continue
 
@@ -1809,7 +2109,7 @@ def admin_upload_users():
                     flash(f'✅ {users_added_count}人のユーザーを追加しました。', 'success')
                 
                 if skipped_existing > 0:
-                    flash(f'⚠️ {skipped_existing}人のユーザーは既に存在するため、スキップされました。', 'warning')
+                    flash(f'⚠️ {skipped_existing}人のユーザーは部屋番号+出席番号が重複するため、スキップされました。', 'warning')
                     
                 if errors:
                     error_summary = f"❌ {len(errors)}件のエラーが発生しました。"
