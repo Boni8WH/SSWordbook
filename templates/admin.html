@@ -75,6 +75,7 @@
             <div class="input-group">
                 <label for="new_username">アカウント名:</label>
                 <input type="text" id="new_username" name="username" required>
+                <small class="form-text text-muted">※同一人物が複数の部屋に参加する場合、同じアカウント名でも登録可能です</small>
             </div>
             <button type="submit" class="btn btn-primary">ユーザー追加</button>
         </form>
@@ -86,6 +87,7 @@
                 <li>ヘッダー行: 部屋番号,入室パスワード,出席番号,個別パスワード,アカウント名</li>
                 <li>文字エンコーディング: UTF-8</li>
                 <li>例: 101,password123,001,student001,田中太郎</li>
+                <li>同一アカウント名の登録も可能です（同一人物が複数部屋に参加する場合）</li>
             </ul>
             <a href="{{ url_for('download_users_template_csv') }}" class="btn btn-outline-info btn-sm">
                 <i class="fas fa-download"></i> テンプレートをダウンロード
@@ -103,37 +105,66 @@
         </form>
 
         <h4>登録済みユーザー一覧</h4>
-        <div class="table-responsive">
-            <table class="table table-striped user-list-table">
-                <thead class="table-dark">
-                    <tr>
-                        <th>ID</th>
-                        <th>部屋</th>
-                        <th>出席番号</th>
-                        <th>名前</th>
-                        <th>最終ログイン</th>
-                        <th>操作</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for user in users %}
-                    {% if user.username != 'admin' %}
-                    <tr>
-                        <td>{{ user.id }}</td>
-                        <td>{{ user.room_number }}</td>
-                        <td>{{ user.student_id }}</td>
-                        <td>{{ user.username }}</td>
-                        <td>{{ user.last_login.strftime('%Y-%m-%d %H:%M') if user.last_login else '未ログイン' }}</td>
-                        <td>
-                            <button class="btn btn-danger btn-sm delete-user-btn" 
-                                    data-user-id="{{ user.id }}" 
-                                    data-username="{{ user.username }}">削除</button>
-                        </td>
-                    </tr>
-                    {% endif %}
-                    {% endfor %}
-                </tbody>
-            </table>
+        <!-- ソート機能付きユーザーリスト -->
+        <div class="table-controls mb-3">
+            <div class="row">
+                <div class="col-md-6">
+                    <label for="roomSortSelect">部屋でソート:</label>
+                    <select id="roomSortSelect" class="form-control form-control-sm">
+                        <option value="">全ての部屋</option>
+                        {% set room_numbers = [] %}
+                        {% for user in users %}
+                            {% if user.room_number not in room_numbers and user.room_number != 'ADMIN' %}
+                                {% set _ = room_numbers.append(user.room_number) %}
+                            {% endif %}
+                        {% endfor %}
+                        {% for room_num in room_numbers|sort %}
+                            <option value="{{ room_num }}">部屋 {{ room_num }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label for="userSearchInput">ユーザー検索:</label>
+                    <input type="text" id="userSearchInput" class="form-control form-control-sm" placeholder="名前、出席番号で検索...">
+                </div>
+            </div>
+        </div>
+
+        <!-- スクロール可能なテーブルコンテナ -->
+        <div class="scrollable-table-container">
+            <div class="table-responsive">
+                <table class="table table-striped user-list-table" id="userTable">
+                    <thead class="table-dark sticky-header">
+                        <tr>
+                            <th>ID</th>
+                            <th>部屋 <i class="fas fa-sort sort-icon" data-column="room" style="cursor: pointer;"></i></th>
+                            <th>出席番号</th>
+                            <th>名前 <i class="fas fa-sort sort-icon" data-column="name" style="cursor: pointer;"></i></th>
+                            <th>最終ログイン <i class="fas fa-sort sort-icon" data-column="login" style="cursor: pointer;"></i></th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="userTableBody">
+                        {% for user in users %}
+                        {% if user.username != 'admin' %}
+                        <tr data-room="{{ user.room_number }}" data-name="{{ user.username|lower }}" data-student="{{ user.student_id|lower }}">
+                            <td>{{ user.id }}</td>
+                            <td><span class="badge bg-secondary">{{ user.room_number }}</span></td>
+                            <td>{{ user.student_id }}</td>
+                            <td>{{ user.username }}</td>
+                            <td>{{ user.last_login.strftime('%Y-%m-%d %H:%M') if user.last_login else '未ログイン' }}</td>
+                            <td>
+                                <button class="btn btn-danger btn-sm delete-user-btn" 
+                                        data-user-id="{{ user.id }}" 
+                                        data-username="{{ user.username }}"
+                                        data-room="{{ user.room_number }}">削除</button>
+                            </td>
+                        </tr>
+                        {% endif %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
     </section>
 
@@ -196,12 +227,12 @@
                 <button class="btn btn-info btn-sm" onclick="loadCsvFilesList()">
                     <i class="fas fa-sync-alt"></i> ファイル一覧を更新
                 </button>
-                <button class="btn btn-outline-secondary btn-sm" onclick="debugCsvInfo()">
-                    <i class="fas fa-bug"></i> デバッグ情報
-                </button>
             </div>
-            <div id="csv-files-container" style="margin-top: 15px;">
-                <p class="text-info">📋 ファイル一覧を読み込み中...</p>
+            <!-- スクロール可能なCSVファイルリスト -->
+            <div class="scrollable-table-container">
+                <div id="csv-files-container" style="margin-top: 15px;">
+                    <p class="text-info">📋 ファイル一覧を読み込み中...</p>
+                </div>
             </div>
         </div>
     </section>
@@ -212,73 +243,76 @@
         <h3>🏠 部屋ごとの設定管理</h3>
         <p>各部屋の学習範囲とCSVファイルを設定します。</p>
 
-        <div class="table-responsive">
-            <table class="table table-striped room-setting-table">
-                <thead class="table-dark">
-                    <tr>
-                        <th>部屋番号</th>
-                        <th>最大単元番号</th>
-                        <th>使用CSVファイル</th>
-                        <th>操作</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% set unique_room_numbers = [] %}
-                    {% for user in users %}
-                        {% if user.room_number not in unique_room_numbers and user.room_number != 'ADMIN' %}
-                            {% set _ = unique_room_numbers.append(user.room_number) %}
-                        {% endif %}
-                    {% endfor %}
-                    
-                    {% for setting in room_max_unit_settings.keys() %}
-                        {% if setting not in unique_room_numbers and setting != 'ADMIN' %}
-                            {% set _ = unique_room_numbers.append(setting) %}
-                        {% endif %}
-                    {% endfor %}
+        <!-- スクロール可能な部屋設定テーブル -->
+        <div class="scrollable-table-container">
+            <div class="table-responsive">
+                <table class="table table-striped room-setting-table">
+                    <thead class="table-dark sticky-header">
+                        <tr>
+                            <th>部屋番号</th>
+                            <th>最大単元番号</th>
+                            <th>使用CSVファイル</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% set unique_room_numbers = [] %}
+                        {% for user in users %}
+                            {% if user.room_number not in unique_room_numbers and user.room_number != 'ADMIN' %}
+                                {% set _ = unique_room_numbers.append(user.room_number) %}
+                            {% endif %}
+                        {% endfor %}
+                        
+                        {% for setting in room_max_unit_settings.keys() %}
+                            {% if setting not in unique_room_numbers and setting != 'ADMIN' %}
+                                {% set _ = unique_room_numbers.append(setting) %}
+                            {% endif %}
+                        {% endfor %}
 
-                    {% for room_num in unique_room_numbers|sort %}
-                    <tr>
-                        <td><strong>{{ room_num }}</strong></td>
-                        <td>
-                            <input type="text"
-                                   id="maxUnit_{{ room_num }}"
-                                   value="{{ room_max_unit_settings.get(room_num, '9999') }}"
-                                   class="form-control unit-setting-input"
-                                   data-room-number="{{ room_num }}"
-                                   placeholder="例: 34 または 9999（全て）">
-                        </td>
-                        <td>
-                            <select id="csvFile_{{ room_num }}" 
-                                    class="form-control csv-setting-select" 
-                                    data-room-number="{{ room_num }}">
-                                <option value="words.csv" {% if room_csv_settings.get(room_num, 'words.csv') == 'words.csv' %}selected{% endif %}>
-                                    words.csv (デフォルト)
-                                </option>
-                                <!-- 動的にオプションを追加 -->
-                            </select>
-                            <small class="form-text text-muted">
-                                現在の設定: <code id="current_csv_{{ room_num }}">{{ room_csv_settings.get(room_num, 'words.csv') }}</code>
-                            </small>
-                        </td>
-                        <td>
-                            <div class="btn-group-vertical btn-group-sm">
-                                <button class="btn btn-primary btn-sm save-room-setting-btn" 
-                                        data-room-number="{{ room_num }}">保存</button>
-                                <button class="btn btn-danger btn-sm delete-room-setting-btn" 
-                                        data-room-number="{{ room_num }}">削除</button>
-                                <button class="btn btn-info btn-sm" 
-                                        onclick="debugRoomSetting('{{ room_num }}'); return false;">デバッグ</button>
-                                <button class="btn btn-outline-secondary btn-sm" 
-                                        onclick="testDebugFunction(); return false;">テスト</button>
-                            </div>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                        {% for room_num in unique_room_numbers|sort %}
+                        <tr>
+                            <td><strong>{{ room_num }}</strong></td>
+                            <td>
+                                <input type="text"
+                                       id="maxUnit_{{ room_num }}"
+                                       value="{{ room_max_unit_settings.get(room_num, '9999') }}"
+                                       class="form-control unit-setting-input"
+                                       data-room-number="{{ room_num }}"
+                                       placeholder="例: 34 または 9999（全て）">
+                            </td>
+                            <td>
+                                <select id="csvFile_{{ room_num }}" 
+                                        class="form-control csv-setting-select" 
+                                        data-room-number="{{ room_num }}">
+                                    <option value="words.csv" {% if room_csv_settings.get(room_num, 'words.csv') == 'words.csv' %}selected{% endif %}>
+                                        words.csv (デフォルト)
+                                    </option>
+                                    <!-- 動的にオプションを追加 -->
+                                </select>
+                                <small class="form-text text-muted">
+                                    現在の設定: <code id="current_csv_{{ room_num }}">{{ room_csv_settings.get(room_num, 'words.csv') }}</code>
+                                </small>
+                            </td>
+                            <td>
+                                <div class="btn-group-vertical btn-group-sm">
+                                    <button class="btn btn-primary btn-sm save-room-setting-btn" 
+                                            data-room-number="{{ room_num }}">保存</button>
+                                    <button class="btn btn-danger btn-sm delete-room-setting-btn" 
+                                            data-room-number="{{ room_num }}">削除</button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
     </section>
 </div>
+
+<!-- リセット確認フォーム（非表示） -->
+<form id="resetForm" action="{{ url_for('admin_app_info_reset') }}" method="POST" style="display: none;">
+</form>
 
 <script>
 // ========================================
@@ -286,80 +320,6 @@
 // ========================================
 
 console.log('🔧 admin.html スクリプト読み込み開始');
-
-// デバッグ関数をグローバルで定義
-function debugRoomSetting(roomNumber) {
-    console.log(`🔍 部屋${roomNumber}のデバッグ情報:`);
-    
-    const maxUnitInput = document.getElementById('maxUnit_' + roomNumber);
-    const csvFileSelect = document.getElementById('csvFile_' + roomNumber);
-    const currentCsvDisplay = document.getElementById('current_csv_' + roomNumber);
-    
-    console.log('📋 DOM要素の存在確認:', {
-        maxUnitInput: !!maxUnitInput,
-        csvFileSelect: !!csvFileSelect,
-        currentCsvDisplay: !!currentCsvDisplay
-    });
-    
-    if (maxUnitInput) {
-        console.log(`📝 最大単元設定: ${maxUnitInput.value}`);
-    }
-    
-    if (csvFileSelect) {
-        console.log(`📄 現在のCSV選択: ${csvFileSelect.value}`);
-        console.log('🎯 利用可能なオプション:');
-        Array.from(csvFileSelect.options).forEach((option, index) => {
-            console.log(`  ${index + 1}. ${option.value} ${option.selected ? '(選択中)' : ''}`);
-        });
-    }
-    
-    if (currentCsvDisplay) {
-        console.log(`📊 表示中の設定: ${currentCsvDisplay.textContent}`);
-    }
-    
-    // サーバーから最新の設定を取得
-    console.log('📡 サーバーから設定を取得中...');
-    fetch('/admin/get_room_setting', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ room_number: roomNumber })
-    })
-    .then(response => {
-        console.log(`📡 レスポンス状態: ${response.status}`);
-        return response.json();
-    })
-    .then(data => {
-        console.log('📊 サーバーからの設定:', data);
-        
-        if (data.status === 'success') {
-            // 表示を更新
-            if (currentCsvDisplay) {
-                currentCsvDisplay.textContent = data.csv_filename;
-                console.log(`✅ 表示更新: ${data.csv_filename}`);
-            }
-            if (csvFileSelect) {
-                csvFileSelect.value = data.csv_filename;
-                console.log(`✅ セレクト更新: ${data.csv_filename}`);
-            }
-            
-            // 結果をアラートで表示
-            alert(`✅ 部屋${roomNumber}の設定:\n・最大単元: ${data.max_enabled_unit_number}\n・CSVファイル: ${data.csv_filename}`);
-        } else {
-            console.error('❌ サーバーエラー:', data.message);
-            alert(`❌ エラー: ${data.message}`);
-        }
-    })
-    .catch(error => {
-        console.error('❌ 通信エラー:', error);
-        alert(`❌ 通信エラー: ${error.message}`);
-    });
-}
-
-// テスト関数
-function testDebugFunction() {
-    console.log('🧪 テスト関数が呼び出されました');
-    alert('✅ テスト関数は正常に動作しています');
-}
 
 // 部屋設定を再読み込みする関数
 function loadRoomSettings() {
@@ -524,66 +484,106 @@ function deleteCsvFile(filename) {
     }
 }
 
-// デバッグ関数
-function debugCsvInfo() {
-    console.log('🔍 CSV管理デバッグ情報:');
-    console.log('- ROOM_CSV_FOLDER:', '{{ ROOM_CSV_FOLDER }}');
-    console.log('- 現在のページURL:', window.location.href);
+// ユーザーテーブルのソート機能
+function initializeUserTableSort() {
+    const table = document.getElementById('userTable');
+    const tbody = document.getElementById('userTableBody');
     
-    fetch('{{ url_for("admin_list_room_csv_files") }}')
-        .then(response => response.text())
-        .then(text => {
-            console.log('📡 サーバーレスポンス（生）:', text);
-            try {
-                const data = JSON.parse(text);
-                console.log('📊 パース済みデータ:', data);
-            } catch (e) {
-                console.error('❌ JSON パースエラー:', e);
-            }
-        })
-        .catch(error => {
-            console.error('❌ デバッグ通信エラー:', error);
+    if (!table || !tbody) return;
+    
+    // ソートアイコンクリック処理
+    document.querySelectorAll('.sort-icon').forEach(icon => {
+        icon.addEventListener('click', function() {
+            const column = this.dataset.column;
+            const isAscending = this.classList.contains('fa-sort-up');
+            
+            // 全アイコンをリセット
+            document.querySelectorAll('.sort-icon').forEach(i => {
+                i.className = 'fas fa-sort sort-icon';
+            });
+            
+            // 現在のアイコンを更新
+            this.className = `fas fa-sort-${isAscending ? 'down' : 'up'} sort-icon`;
+            
+            sortUserTable(column, !isAscending);
         });
+    });
 }
 
-// 強制修復関数
-function forceFixAllUsers() {
-    if (!confirm('全ユーザーのデータを強制修復しますか？\n\n⚠️ この操作は時間がかかる場合があります。\n⚠️ 実行中はページを閉じないでください。')) {
-        return;
+function sortUserTable(column, ascending) {
+    const tbody = document.getElementById('userTableBody');
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+    
+    rows.sort((a, b) => {
+        let aVal, bVal;
+        
+        switch(column) {
+            case 'room':
+                aVal = a.cells[1].textContent.trim();
+                bVal = b.cells[1].textContent.trim();
+                break;
+            case 'name':
+                aVal = a.cells[3].textContent.trim();
+                bVal = b.cells[3].textContent.trim();
+                break;
+            case 'login':
+                aVal = a.cells[4].textContent.trim();
+                bVal = b.cells[4].textContent.trim();
+                // 日付の場合は Date オブジェクトに変換
+                if (aVal !== '未ログイン') aVal = new Date(aVal);
+                if (bVal !== '未ログイン') bVal = new Date(bVal);
+                break;
+            default:
+                return 0;
+        }
+        
+        if (aVal < bVal) return ascending ? -1 : 1;
+        if (aVal > bVal) return ascending ? 1 : -1;
+        return 0;
+    });
+    
+    // テーブルを再構築
+    tbody.innerHTML = '';
+    rows.forEach(row => tbody.appendChild(row));
+}
+
+// ユーザー検索・フィルタリング機能
+function initializeUserFiltering() {
+    const roomSelect = document.getElementById('roomSortSelect');
+    const searchInput = document.getElementById('userSearchInput');
+    
+    if (roomSelect) {
+        roomSelect.addEventListener('change', filterUsers);
     }
     
-    const button = event.target;
-    button.disabled = true;
-    button.textContent = '修復中...';
+    if (searchInput) {
+        searchInput.addEventListener('input', filterUsers);
+    }
+}
+
+function filterUsers() {
+    const roomSelect = document.getElementById('roomSortSelect');
+    const searchInput = document.getElementById('userSearchInput');
+    const tbody = document.getElementById('userTableBody');
     
-    fetch('/debug/force_fix_all_users', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.status === 'success') {
-            alert(`修復完了！\n修復ユーザー数: ${data.fixed_users}\n修復履歴数: ${data.total_fixed_histories}`);
-            window.location.reload();
-        } else {
-            alert('修復中にエラーが発生しました: ' + (data.error || data.message));
-        }
-    })
-    .catch(error => {
-        console.error('修復エラー:', error);
-        alert('修復中にエラーが発生しました。コンソールを確認してください。');
-    })
-    .finally(() => {
-        button.disabled = false;
-        button.innerHTML = '<i class="fas fa-tools"></i> 🚨 全ユーザーデータ強制修復';
+    if (!tbody) return;
+    
+    const selectedRoom = roomSelect ? roomSelect.value : '';
+    const searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
+    
+    const rows = tbody.querySelectorAll('tr');
+    
+    rows.forEach(row => {
+        const roomMatch = !selectedRoom || row.dataset.room === selectedRoom;
+        const searchMatch = !searchTerm || 
+            row.dataset.name.includes(searchTerm) || 
+            row.dataset.student.includes(searchTerm);
+        
+        row.style.display = (roomMatch && searchMatch) ? '' : 'none';
     });
 }
 
 console.log('✅ 全ての関数定義完了');
-console.log('- debugRoomSetting:', typeof debugRoomSetting);
-console.log('- testDebugFunction:', typeof testDebugFunction);
 
 // ========================================
 // 2. DOMContentLoaded イベントリスナー
@@ -592,17 +592,16 @@ console.log('- testDebugFunction:', typeof testDebugFunction);
 document.addEventListener('DOMContentLoaded', function() {
     console.log('📋 管理者ページ読み込み完了');
     
-    // 関数の存在確認
-    console.log('🔍 関数存在確認:');
-    console.log('- debugRoomSetting:', typeof debugRoomSetting);
-    console.log('- testDebugFunction:', typeof testDebugFunction);
-    
     // 初期ロード時にCSVファイル一覧とセレクトボックスを更新
     setTimeout(() => {
         console.log('🔄 初期データ読み込み開始');
         loadCsvFilesList();
         loadRoomSettings();
     }, 500);
+
+    // ユーザーテーブル機能初期化
+    initializeUserTableSort();
+    initializeUserFiltering();
 
     // 部屋設定保存ボタンのイベントリスナー
     document.querySelectorAll('.save-room-setting-btn').forEach(button => {
@@ -707,8 +706,9 @@ document.addEventListener('DOMContentLoaded', function() {
         button.addEventListener('click', function() {
             const userId = this.dataset.userId;
             const username = this.dataset.username;
+            const roomNumber = this.dataset.room;
 
-            if (confirm('ユーザー "' + username + '" (ID: ' + userId + ') を本当に削除しますか？\n\n⚠️ この操作は元に戻せません。\n⚠️ ユーザーの学習履歴も完全に削除されます。')) {
+            if (confirm(`ユーザー "${username}" (部屋: ${roomNumber}, ID: ${userId}) を本当に削除しますか？\n\n⚠️ この操作は元に戻せません。\n⚠️ ユーザーの学習履歴も完全に削除されます。`)) {
                 const form = document.createElement('form');
                 form.method = 'POST';
                 form.action = '{{ url_for("admin_delete_user", user_id=0) }}'.replace('0', userId);
@@ -759,6 +759,68 @@ console.log('🎉 admin.html スクリプト読み込み完了');
     margin-bottom: 2px;
 }
 
+/* スクロール可能なテーブルコンテナ */
+.scrollable-table-container {
+    max-height: 400px;
+    overflow-y: auto;
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+    margin-bottom: 1rem;
+}
+
+.scrollable-table-container .table {
+    margin-bottom: 0;
+}
+
+/* 固定ヘッダー */
+.sticky-header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background-color: #343a40 !important;
+}
+
+/* テーブル制御要素 */
+.table-controls {
+    background-color: #f8f9fa;
+    padding: 15px;
+    border-radius: 0.375rem;
+    border: 1px solid #dee2e6;
+}
+
+.table-controls label {
+    font-weight: 600;
+    margin-bottom: 5px;
+    display: block;
+}
+
+/* ソートアイコン */
+.sort-icon {
+    margin-left: 5px;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+
+.sort-icon:hover {
+    opacity: 1;
+}
+
+/* バッジスタイル */
+.badge {
+    font-size: 0.8em;
+}
+
+/* ユーザー行のホバー効果 */
+#userTableBody tr:hover {
+    background-color: #f8f9fa;
+}
+
+/* 削除ボタンのスタイル統一 */
+.delete-user-btn {
+    font-size: 0.8rem;
+    padding: 0.25rem 0.5rem;
+}
+
 @media (max-width: 767px) {
     .download-buttons {
         flex-direction: column;
@@ -778,6 +840,29 @@ console.log('🎉 admin.html スクリプト読み込み完了');
     .btn-group-vertical .btn {
         font-size: 0.7rem;
         padding: 4px 8px;
+    }
+    
+    .scrollable-table-container {
+        max-height: 300px;
+    }
+    
+    .table-controls .row {
+        margin-bottom: 0;
+    }
+    
+    .table-controls .col-md-6 {
+        margin-bottom: 10px;
+    }
+    
+    /* スマホでのテーブル表示改善 */
+    .table {
+        font-size: 0.8rem;
+    }
+    
+    .table th,
+    .table td {
+        padding: 0.3rem;
+        white-space: nowrap;
     }
 }
 </style>
