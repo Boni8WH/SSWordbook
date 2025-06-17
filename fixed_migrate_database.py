@@ -215,7 +215,22 @@ def migrate_database():
                 )
             ''')
             print("✅ password_reset_tokenテーブルを作成しました。")
+
+        # 6. ★ タイムゾーン問題の修正（password_reset_tokenテーブル）
+        print("🔧 既存のpassword_reset_tokenレコードのタイムゾーン問題を修正中...")
         
+        # 既存のトークンをすべて無効にする（タイムゾーン問題のため）
+        cursor.execute("UPDATE password_reset_token SET used = 1, used_at = datetime('now', 'localtime') WHERE used = 0;")
+        affected_rows = cursor.rowcount
+        
+        if affected_rows > 0:
+            print(f"✅ {affected_rows}個の古いトークンを無効化しました。")
+        else:
+            print("📄 無効化すべきトークンはありませんでした。")
+        
+        # 変更をコミット（最終）
+        conn.commit()
+        print("✅ データベースのマイグレーション（タイムゾーン修正含む）が完了しました。")
         # 変更をコミット
         conn.commit()
         print("✅ データベースのマイグレーションが完了しました。")

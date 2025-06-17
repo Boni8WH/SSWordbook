@@ -176,6 +176,8 @@ class AppInfo(db.Model):
 
 # app.py のPasswordResetTokenクラスを以下に置き換え
 
+# app.py の PasswordResetTokenクラスを以下に置き換え
+
 class PasswordResetToken(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
@@ -188,8 +190,18 @@ class PasswordResetToken(db.Model):
     user = db.relationship('User', backref=db.backref('reset_tokens', lazy=True))
     
     def is_expired(self):
-        """トークンが期限切れかどうかを確認"""
-        return datetime.now(JST) > self.expires_at
+        """トークンが期限切れかどうかを確認（タイムゾーン対応版）"""
+        now = datetime.now(JST)
+        
+        # expires_atがタイムゾーン情報を持っているかチェック
+        if self.expires_at.tzinfo is None:
+            # expires_atがnaiveな場合、JSTタイムゾーンを設定
+            expires_at_aware = JST.localize(self.expires_at)
+        else:
+            # 既にawareな場合はそのまま使用
+            expires_at_aware = self.expires_at
+        
+        return now > expires_at_aware
     
     def is_valid(self):
         """トークンが有効かどうかを確認（未使用かつ期限内）"""
@@ -1266,15 +1278,16 @@ def password_reset_request():
             ).all()
             for token in existing_tokens:
                 token.used = True
+                token.used_at = datetime.now(JST)  # タイムゾーン情報付きで設定
             
-            # 新しいトークンを生成
+            # 新しいトークンを生成（タイムゾーン対応版）
             reset_token = generate_reset_token()
-            expires_at = datetime.now(JST) + timedelta(hours=1)
+            expires_at = datetime.now(JST) + timedelta(hours=1)  # JSTタイムゾーン付きで作成
             
             password_reset_token = PasswordResetToken(
                 user_id=user.id,
                 token=reset_token,
-                expires_at=expires_at
+                expires_at=expires_at  # タイムゾーン情報付きのdatetimeを保存
             )
             
             db.session.add(password_reset_token)
@@ -1442,8 +1455,18 @@ def password_reset(token):
             flash('パスワードが正常に更新されました。新しいパスワードでログインしてください。', 'success')
             return redirect(url_for('login_page'))
         
+        now = datetime.now(JST)
+        
+        # expires_atがタイムゾーン情報を持っているかチェック
+        if reset_token.expires_at.tzinfo is None:
+            # expires_atがnaiveな場合、JSTタイムゾーンを設定
+            expires_at_aware = JST.localize(reset_token.expires_at)
+        else:
+            # 既にawareな場合はそのまま使用
+            expires_at_aware = reset_token.expires_at
+            
         # GET リクエスト時 - フォーム表示
-        time_remaining = reset_token.expires_at - datetime.now(JST)
+        time_remaining = expires_at_aware - now
         minutes_remaining = max(0, int(time_remaining.total_seconds() / 60))
         
         context = get_template_context()
