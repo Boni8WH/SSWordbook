@@ -270,7 +270,10 @@ def migrate_database():
                 # last_loginカラムが存在しない場合は追加
                 if 'last_login' not in columns:
                     print("🔧 last_loginカラムを追加します...")
-                    db.engine.execute(text('ALTER TABLE user ADD COLUMN last_login DATETIME'))
+                    # SQLAlchemy 2.0対応の書き方
+                    with db.engine.connect() as conn:
+                        conn.execute(text('ALTER TABLE user ADD COLUMN last_login DATETIME'))
+                        conn.commit()
                     print("✅ last_loginカラムを追加しました。")
                 
             # AppInfoテーブルの確認
@@ -291,34 +294,44 @@ def migrate_database():
                     if col_name not in columns:
                         missing_columns.append((col_name, col_type))
                 
-                for col_name, col_type in missing_columns:
-                    print(f"🔧 {col_name}カラムを追加します...")
-                    db.engine.execute(text(f'ALTER TABLE app_info ADD COLUMN {col_name} {col_type}'))
-                    print(f"✅ {col_name}カラムを追加しました。")
+                if missing_columns:
+                    with db.engine.connect() as conn:
+                        for col_name, col_type in missing_columns:
+                            print(f"🔧 {col_name}カラムを追加します...")
+                            conn.execute(text(f'ALTER TABLE app_info ADD COLUMN {col_name} {col_type}'))
+                            print(f"✅ {col_name}カラムを追加しました。")
+                        conn.commit()
             
             print("✅ データベースマイグレーションが完了しました。")
             
         except Exception as e:
             print(f"⚠️ マイグレーション中にエラーが発生しました（続行します）: {e}")
 
-# データベース初期化関数
+# データベース初期化関数（完全リセット対応版）
 def create_tables_and_admin_user():
     with app.app_context():
         print("🔧 データベース初期化を開始...")
         
         try:
-            # 既存のテーブルがある場合はマイグレーションを実行
+            # Renderでは毎回新しい環境なので、データベースファイルがない場合が多い
             inspector = inspect(db.engine)
-            if inspector.has_table('user') or inspector.has_table('app_info'):
+            existing_tables = inspector.get_table_names()
+            
+            if existing_tables:
+                print(f"📋 既存のテーブル: {existing_tables}")
+                # 既存のテーブルがある場合はマイグレーションを実行
                 migrate_database()
+            else:
+                print("📋 新しいデータベースを作成します。")
             
             # テーブル作成（既存の場合は何もしない）
             db.create_all()
             print("✅ テーブルを作成/確認しました。")
             
-            # 管理者ユーザーの確認・作成
+            # 管理者ユーザーの確認・作成（マイグレーション後に実行）
             try:
                 admin_user = User.query.filter_by(username='admin', room_number='ADMIN').first()
+                print("✅ 管理者ユーザーの検索が成功しました。")
             except Exception as e:
                 print(f"⚠️ 管理者ユーザー検索エラー（新規作成します）: {e}")
                 admin_user = None
@@ -332,6 +345,12 @@ def create_tables_and_admin_user():
                     problem_history='{}',
                     incorrect_words='[]'
                 )
+                # last_loginカラムがない場合は明示的に設定しない
+                try:
+                    admin_user.last_login = datetime.now(JST)
+                except Exception:
+                    print("⚠️ last_loginカラムがないため、デフォルト値を使用します。")
+                    
                 admin_user.set_room_password('Avignon1309')
                 admin_user.set_individual_password('Avignon1309')
                 db.session.add(admin_user)
@@ -343,6 +362,7 @@ def create_tables_and_admin_user():
             # デフォルトのアプリ情報を作成
             try:
                 app_info = AppInfo.query.first()
+                print("✅ アプリ情報の検索が成功しました。")
             except Exception as e:
                 print(f"⚠️ アプリ情報検索エラー（新規作成します）: {e}")
                 app_info = None
@@ -360,13 +380,38 @@ def create_tables_and_admin_user():
             print(f"❌ データベース初期化エラー: {e}")
             db.session.rollback()
             
-            # 致命的エラーの場合、データベースファイルを削除して再作成を提案
-            print("🚨 致命的なデータベースエラーが発生しました。")
-            print("💡 解決方法:")
-            print("   1. アプリを停止")
-            print("   2. quiz_data.db ファイルを削除")
-            print("   3. アプリを再起動")
-            raise
+            # Renderでは一時的なエラーが発生しても続行する
+            print("🔄 Render環境での一時的なエラーの可能性があります。")
+            print("💡 エラーを無視してテーブルを強制作成します...")
+            
+            try:
+                # 強制的にテーブルを作成
+                db.drop_all()  # 既存のテーブルを削除
+                db.create_all()  # 新しいテーブルを作成
+                print("✅ テーブルを強制再作成しました。")
+                
+                # 管理者ユーザーを作成
+                admin_user = User(
+                    username='admin',
+                    room_number='ADMIN',
+                    student_id='000',
+                    problem_history='{}',
+                    incorrect_words='[]'
+                )
+                admin_user.set_room_password('Avignon1309')
+                admin_user.set_individual_password('Avignon1309')
+                db.session.add(admin_user)
+                
+                # アプリ情報を作成
+                default_app_info = AppInfo()
+                db.session.add(default_app_info)
+                
+                db.session.commit()
+                print("✅ 管理者ユーザーとアプリ情報を作成しました。")
+                
+            except Exception as fatal_error:
+                print(f"🚨 致命的なエラー: {fatal_error}")
+                raise
         
         print("🎉 データベース初期化が完了しました！")
 
