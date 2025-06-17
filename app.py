@@ -1136,9 +1136,19 @@ def password_change_page():
         traceback.print_exc()
         return f"Password Change Error: {e}", 500
 
+# app.py のパスワード再発行リクエストルートを修正
+
 @app.route('/password_reset_request', methods=['GET', 'POST'])
 def password_reset_request():
     try:
+        # メール設定の確認
+        mail_configured = all([
+            app.config.get('MAIL_SERVER'),
+            app.config.get('MAIL_USERNAME'),
+            app.config.get('MAIL_PASSWORD'),
+            app.config.get('MAIL_DEFAULT_SENDER')
+        ])
+        
         if request.method == 'POST':
             room_number = request.form.get('room_number', '').strip()
             student_id = request.form.get('student_id', '').strip()
@@ -1147,7 +1157,16 @@ def password_reset_request():
             
             if not all([room_number, student_id, username, email]):
                 flash('すべての項目を入力してください。', 'danger')
-                return render_template('password_reset_request.html', **get_template_context())
+                context = get_template_context()
+                context['mail_configured'] = mail_configured
+                return render_template('password_reset_request.html', **context)
+            
+            # メール設定がない場合はエラー
+            if not mail_configured:
+                flash('メール送信機能が設定されていないため、パスワード再発行を実行できません。管理者にお問い合わせください。', 'danger')
+                context = get_template_context()
+                context['mail_configured'] = mail_configured
+                return render_template('password_reset_request.html', **context)
             
             # ユーザー検索（部屋番号・出席番号・アカウント名の3つで特定）
             user = User.query.filter_by(
@@ -1196,10 +1215,13 @@ def password_reset_request():
             return redirect(url_for('login_page'))
         
         context = get_template_context()
+        context['mail_configured'] = mail_configured  # テンプレートにメール設定状況を渡す
         return render_template('password_reset_request.html', **context)
         
     except Exception as e:
         print(f"Error in password_reset_request: {e}")
+        import traceback
+        traceback.print_exc()
         flash('システムエラーが発生しました。管理者にお問い合わせください。', 'danger')
         return redirect(url_for('login_page'))
 
@@ -1235,6 +1257,8 @@ def admin_cleanup_expired_tokens():
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 # パスワードリセット実行
+# app.py に追加するパスワードリセット実行ルート
+
 @app.route('/password_reset/<token>', methods=['GET', 'POST'])
 def password_reset(token):
     try:
@@ -1289,6 +1313,8 @@ def password_reset(token):
         
     except Exception as e:
         print(f"Error in password_reset: {e}")
+        import traceback
+        traceback.print_exc()
         flash('システムエラーが発生しました。管理者にお問い合わせください。', 'danger')
         return redirect(url_for('login_page'))
 
