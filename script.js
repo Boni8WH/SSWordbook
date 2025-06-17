@@ -62,8 +62,25 @@ if (typeof window.chapterDataFromFlask === 'undefined') {
 if (typeof window.appInfoFromFlask === 'undefined') {
     console.error("Error: window.appInfoFromFlask is undefined. Make sure it's passed from Flask.");
 } else {
+    // 基本情報の設定
     if (lastUpdatedDateSpan) lastUpdatedDateSpan.textContent = window.appInfoFromFlask.lastUpdatedDate;
     if (updateContentP) updateContentP.textContent = window.appInfoFromFlask.updateContent;
+    
+    // アプリ名の設定
+    const appInfoTitle = document.getElementById('appInfoTitle');
+    if (appInfoTitle) {
+        appInfoTitle.textContent = window.appInfoFromFlask.appName || 'アプリ情報';
+    }
+    
+    // 連絡先情報の設定
+    const contactSection = document.getElementById('contactSection');
+    const contactEmail = document.getElementById('contactEmail');
+    
+    if (contactSection && contactEmail && window.appInfoFromFlask.contactEmail) {
+        contactEmail.href = 'mailto:' + window.appInfoFromFlask.contactEmail;
+        contactEmail.textContent = window.appInfoFromFlask.contactEmail;
+        contactSection.style.display = 'block';
+    }
 }
 
 // word_data はサーバーから取得する必要があるため、初期化は空に
@@ -224,33 +241,42 @@ function optimizeScrolling() {
 // 問題ID生成関数（修正版 - 衝突を防ぐ）
 // =========================================================
 
+// script.jsの問題ID生成関数を以下に置き換え（約197行目付近）
+
+// script.js の generateProblemId 関数を以下に置き換え
+
+// script.js の generateProblemId 関数を以下に置き換え
+// 既存のID形式に合わせて修正
+
+// script.js の generateProblemId 関数を以下に置き換え
+
+// script.js の generateProblemId 関数を以下に置き換え
+
 function generateProblemId(word) {
-    // ★ 修正: null チェックを追加
-    if (!word) {
-        console.warn('generateProblemId: word parameter is null or undefined');
-        return 'invalid_id';
+    /**
+     * 統一された問題ID生成（Python側と完全一致）
+     */
+    try {
+        const chapter = String(word.chapter || '0').padStart(3, '0');
+        const number = String(word.number || '0').padStart(3, '0');
+        const question = String(word.question || '');
+        const answer = String(word.answer || '');
+        
+        // 問題文と答えから英数字と日本語文字のみ抽出（Python側と同じ処理）
+        const questionClean = question.substring(0, 15).replace(/[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/g, '');
+        const answerClean = answer.substring(0, 10).replace(/[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/g, '');
+        
+        // 統一フォーマット: chapter-number-question-answer
+        const problemId = `${chapter}-${number}-${questionClean}-${answerClean}`;
+        
+        return problemId;
+        
+    } catch (error) {
+        console.error('ID生成エラー:', error);
+        const chapter = String(word.chapter || '0').padStart(3, '0');
+        const number = String(word.number || '0').padStart(3, '0');
+        return `${chapter}-${number}-error`;
     }
-    
-    // より安全なID生成方法
-    const chapterStr = String(word.chapter || '0').padStart(3, '0');
-    const numberStr = String(word.number || '0').padStart(3, '0');
-    const categoryStr = String(word.category || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-    const questionForId = String(word.question || '').trim();
-    const answerForId = String(word.answer || '').trim();
-    
-    // 問題文と答えの組み合わせでユニークなハッシュを生成
-    function createHash(str) {
-        let hash = 0;
-        for (let i = 0; i < str.length; i++) {
-            const char = str.charCodeAt(i);
-            hash = ((hash << 5) - hash) + char;
-            hash = hash & hash;
-        }
-        return Math.abs(hash).toString(36);
-    }
-    
-    const contentHash = createHash(questionForId + '|||' + answerForId + '|||' + categoryStr);
-    return `${chapterStr}-${numberStr}-${contentHash}`;
 }
 
 // =========================================================
@@ -1038,12 +1064,31 @@ function toggleWeakAnswer(index) {
 // =========================================================
 
 function saveQuizProgressToServer() {
+    console.log('\n=== 進捗保存開始 (JavaScript側) ===');
+    console.log(`保存する履歴数: ${Object.keys(problemHistory).length}`);
+    console.log(`保存する苦手問題数: ${incorrectWords.length}`);
+    
+    // 最近の変更を詳細ログ
+    const recentEntries = Object.entries(problemHistory)
+        .filter(([id, history]) => {
+            const lastAnswered = history.last_answered;
+            if (!lastAnswered) return false;
+            const lastTime = new Date(lastAnswered);
+            const now = new Date();
+            return (now - lastTime) < 5 * 60 * 1000; // 5分以内
+        });
+    
+    console.log(`最近5分以内の履歴: ${recentEntries.length}件`);
+    recentEntries.forEach(([id, history]) => {
+        console.log(`  ${id}: 正解${history.correct_attempts}回, 不正解${history.incorrect_attempts}回, 連続${history.correct_streak}回`);
+    });
+
     const dataToSave = {
         problemHistory: problemHistory,
         incorrectWords: incorrectWords
     };
 
-    fetch('/api/save_progress', {
+    fetch('/api/save_progress_debug', {  // デバッグ版エンドポイントを使用
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
@@ -1053,17 +1098,53 @@ function saveQuizProgressToServer() {
     .then(response => response.json())
     .then(data => {
         if (data.status === 'success') {
-            // console.log('進捗が保存されました。');
+            console.log('✅ 進捗保存成功');
+            if (data.debug_info) {
+                console.log('保存デバッグ情報:', data.debug_info);
+            }
         } else {
-            console.error('進捗の保存に失敗しました:', data.message);
+            console.error('❌ 進捗保存失敗:', data.message);
             flashMessage(data.message, 'danger');
         }
+        console.log('=== 進捗保存終了 ===\n');
     })
     .catch(error => {
-        console.error('進捗の保存中にエラーが発生しました:', error);
+        console.error('❌ 進捗保存エラー:', error);
         flashMessage('進捗の保存中にエラーが発生しました。', 'danger');
+        console.log('=== 進捗保存終了（エラー） ===\n');
     });
 }
+
+// デバッグ用：現在の学習状況を表示する関数
+function debugCurrentProgress() {
+    console.log('\n=== 現在の学習状況 ===');
+    console.log(`学習履歴数: ${Object.keys(problemHistory).length}`);
+    console.log(`苦手問題数: ${incorrectWords.length}`);
+    
+    // 回答数の多い順にソート
+    const sortedHistory = Object.entries(problemHistory)
+        .map(([id, history]) => ({
+            id,
+            totalAttempts: (history.correct_attempts || 0) + (history.incorrect_attempts || 0),
+            correct: history.correct_attempts || 0,
+            incorrect: history.incorrect_attempts || 0,
+            streak: history.correct_streak || 0
+        }))
+        .filter(item => item.totalAttempts > 0)
+        .sort((a, b) => b.totalAttempts - a.totalAttempts);
+    
+    console.log(`実際に回答した問題数: ${sortedHistory.length}`);
+    console.log('上位5問:');
+    sortedHistory.slice(0, 5).forEach((item, index) => {
+        console.log(`  ${index + 1}. ID: ${item.id.substring(0, 20)}... (${item.totalAttempts}回: 正解${item.correct}, 不正解${item.incorrect}, 連続${item.streak})`);
+    });
+    console.log('========================\n');
+    
+    return sortedHistory;
+}
+
+// グローバル関数として公開
+window.debugCurrentProgress = debugCurrentProgress;
 
 // =========================================================
 // その他UI機能
@@ -1072,7 +1153,48 @@ function saveQuizProgressToServer() {
 // アプリ情報表示のトグル
 function toggleInfoPanel() {
     if (infoPanel) {
-        infoPanel.classList.toggle('hidden');
+        const isCurrentlyVisible = !infoPanel.classList.contains('hidden');
+        
+        if (isCurrentlyVisible) {
+            closeInfoPanelWithTouch();
+        } else {
+            openInfoPanelWithTouch();
+        }
+    }
+}
+
+function openInfoPanel() {
+    if (infoPanel) {
+        infoPanel.classList.remove('hidden');
+        // 外側クリックイベントを追加（少し遅延させて即座に閉じるのを防ぐ）
+        setTimeout(() => {
+            document.addEventListener('click', handleOutsideClick);
+        }, 100);
+    }
+}
+
+function closeInfoPanel() {
+    if (infoPanel) {
+        infoPanel.classList.add('hidden');
+        // 外側クリックイベントを削除
+        document.removeEventListener('click', handleOutsideClick);
+    }
+}
+
+function handleOutsideClick(event) {
+    // クリックされた要素が情報パネル内かiアイコンかを確認
+    const isClickInside = infoPanel && infoPanel.contains(event.target);
+    const isClickOnIcon = infoIcon && infoIcon.contains(event.target);
+    
+    // パネル外かつiアイコン以外をクリックした場合
+    if (!isClickInside && !isClickOnIcon) {
+        closeInfoPanel();
+    }
+}
+
+function handleEscapeKey(event) {
+    if (event.key === 'Escape' && infoPanel && !infoPanel.classList.contains('hidden')) {
+        closeInfoPanel();
     }
 }
 
@@ -1281,10 +1403,36 @@ function monitorPerformance() {
 
 // パフォーマンス監視の開始
 document.addEventListener('DOMContentLoaded', () => {
-    setTimeout(() => {
-        monitorPerformance();
-    }, 5000);
+    // ESCキーでの閉じる機能を追加
+    document.addEventListener('keydown', handleEscapeKey);
 });
+
+// タッチデバイス対応（追加）
+function handleTouchOutside(event) {
+    // タッチイベントでも同様の処理
+    handleOutsideClick(event);
+}
+
+// タッチデバイス用のイベントも追加
+function addTouchListeners() {
+    if ('ontouchstart' in window) {
+        document.addEventListener('touchstart', handleTouchOutside);
+    }
+}
+
+// パネルを開いた時にタッチイベントも設定
+function openInfoPanelWithTouch() {
+    openInfoPanel();
+    addTouchListeners();
+}
+
+// パネルを閉じた時にタッチイベントも削除
+function closeInfoPanelWithTouch() {
+    closeInfoPanel();
+    if ('ontouchstart' in window) {
+        document.removeEventListener('touchstart', handleTouchOutside);
+    }
+}
 
 // グローバル関数として追加（開発者ツールで実行可能）
 window.investigateIdCollisions = function() {

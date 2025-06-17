@@ -113,6 +113,77 @@
             </table>
         </div>
     </section>
+    
+    <!-- admin.htmlの適切な位置（部屋設定管理セクションの後など）に追加 -->
+
+<hr>
+
+<section id="admin-data-migration">
+    <h3>🔧 データベース管理</h3>
+    <p>学習履歴データの整合性確認とデータ移行を行います。</p>
+
+    <div class="admin-panel" style="background-color: #e8f5e8; border-left: 5px solid #28a745; margin-top: 20px;">
+        <h4>🔧データ修正</h4>
+        <p>全ユーザーの学習履歴を新しいID形式に統一し、マッチしない問題を解決します。<br>
+        <strong>⚠️ 注意：</strong>この操作は全ユーザーの学習履歴に影響し、元に戻せません。</p>
+        
+        <div style="margin-top: 15px;">
+            <form action="{{ url_for('admin_fix_all_data') }}" method="POST" style="display: inline;" 
+                onsubmit="return confirm('全ユーザーデータを修正しますか？\n\n⚠️ この操作は元に戻せません。\n⚠️ すべての学習履歴が新しい形式に変換されます。\n⚠️ 処理に時間がかかる場合があります。')">
+                <button type="submit" class="btn btn-success">
+                    <i class="fas fa-wrench"></i> 🔧 全データ完全修正
+                </button>
+            </form>
+            
+            <a href="{{ url_for('admin_debug_progress') }}" class="btn btn-info" target="_blank" style="margin-left: 10px;">
+                <i class="fas fa-chart-line"></i> 📊 修正前の状態確認
+            </a>
+        </div>
+    </div>
+
+</section>
+
+<script>
+// 強制修復関数
+function forceFixAllUsers() {
+    if (!confirm('全ユーザーのデータを強制修復しますか？\n\n⚠️ この操作は時間がかかる場合があります。\n⚠️ 実行中はページを閉じないでください。')) {
+        return;
+    }
+    
+    const button = event.target;
+    button.disabled = true;
+    button.textContent = '修復中...';
+    
+    fetch('/debug/force_fix_all_users', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            alert(`修復完了！\n修復ユーザー数: ${data.fixed_users}\n修復履歴数: ${data.total_fixed_histories}`);
+            window.location.reload();
+        } else {
+            alert('修復中にエラーが発生しました: ' + (data.error || data.message));
+        }
+    })
+    .catch(error => {
+        console.error('修復エラー:', error);
+        alert('修復中にエラーが発生しました。コンソールを確認してください。');
+    })
+    .finally(() => {
+        button.disabled = false;
+        button.innerHTML = '<i class="fas fa-tools"></i> 🚨 全ユーザーデータ強制修復';
+    });
+}
+
+// データ整合性チェック関数
+function checkDataIntegrity() {
+    window.open('/admin/debug_progress', '_blank');
+}
+</script>
 
     <hr>
 
