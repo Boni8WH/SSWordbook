@@ -9,11 +9,26 @@
             <div class="question-count-selection">
                 <h3>出題数を選択</h3>
                 <div class="radio-group">
-                    <label><input type="radio" name="questionCount" value="10"> 10問</label>
-                    <label><input type="radio" name="questionCount" value="20"> 20問</label>
-                    <label><input type="radio" name="questionCount" value="50"> 50問</label>
-                    <label><input type="radio" name="questionCount" value="all"> 全問</label>
-                    <label><input type="radio" name="questionCount" value="incorrectOnly" id="incorrectOnlyRadio" {% if not session.get('user_id') %}disabled{% endif %}> 苦手問題</label>
+                    <label>
+                        <input type="radio" name="questionCount" value="10"> 
+                        <span>10問</span>
+                    </label>
+                    <label>
+                        <input type="radio" name="questionCount" value="20"> 
+                        <span>20問</span>
+                    </label>
+                    <label>
+                        <input type="radio" name="questionCount" value="50"> 
+                        <span>50問</span>
+                    </label>
+                    <label>
+                        <input type="radio" name="questionCount" value="all"> 
+                        <span>全問</span>
+                    </label>
+                    <label>
+                        <input type="radio" name="questionCount" value="incorrectOnly" id="incorrectOnlyRadio" {% if not session.get('user_id') %}disabled{% endif %}> 
+                        <span>苦手問題</span>
+                    </label>
                 </div>
                 <p class="auth-message-incorrect-only">※苦手問題に取り組むにはログインが必要です。</p>
             </div>
@@ -27,15 +42,22 @@
                     <div class="chapter-header">
                         <span class="chapter-title">第{{ chapter_num }}章</span>
                         <div class="chapter-options">
-                            <button class="select-all-chapter-btn" data-chapter="{{ chapter_num }}">全て選択</button>
+                            <button class="select-all-chapter-btn" data-chapter="{{ chapter_num }}" type="button">選択</button>
                             <span class="toggle-icon">▶</span>
                         </div>
                     </div>
                     <div class="unit-list">
                         {% for unit_num, unit in chapter.units.items() %}
                         <div class="unit-item">
-                            <input type="checkbox" id="unit-{{ chapter_num }}-{{ unit_num }}" value="{{ unit_num }}" data-chapter="{{ chapter_num }}" {% if not unit.enabled %}disabled{% endif %}>
-                            <label for="unit-{{ chapter_num }}-{{ unit_num }}">{{ unit_num }}. {{ unit.categoryName }} {% if not unit.enabled %}(利用不可){% endif %}</label>
+                            <input type="checkbox" 
+                                   id="unit-{{ chapter_num }}-{{ unit_num }}" 
+                                   value="{{ unit_num }}" 
+                                   data-chapter="{{ chapter_num }}" 
+                                   {% if not unit.enabled %}disabled{% endif %}>
+                            <label for="unit-{{ chapter_num }}-{{ unit_num }}">
+                                {{ unit_num }}. {{ unit.categoryName }} 
+                                {% if not unit.enabled %}(利用不可){% endif %}
+                            </label>
                         </div>
                         {% endfor %}
                     </div>
@@ -47,7 +69,7 @@
         <div class="bottom-controls">
             <button id="startButton" class="primary-button">学習開始</button>
             <button id="resetSelectionButton" class="secondary-button">選択リセット</button>
-            <button id="showWeakWordsButton" class="secondary-button" {% if not session.get('user_id') %}hidden{% endif %}>苦手問題一覧</button>
+            <button id="showWeakWordsButton" class="secondary-button" {% if not session.get('user_id') %}style="display: none;"{% endif %}>苦手問題一覧</button>
         </div>
     </div>
 </section>
@@ -88,7 +110,7 @@
     <div id="incorrectWordList" class="incorrect-word-list hidden">
         <h3>今回の不正解問題</h3>
         <ul id="incorrectWordsContainer">
-            </ul>
+        </ul>
     </div>
 
     <div class="result-buttons">
@@ -102,29 +124,31 @@
 <section id="weakWordsListSection" class="weak-words-list-area hidden">
     <h2>苦手問題一覧</h2>
     <p>過去の学習で正答率が低い問題の上位20問です。
-        <br>※苦手問題モードは、1回以上間違え、まだ2回連続正解していない問題から出題されます。</p>
+        <br>※現在の苦手問題モードは、1回以上間違え、まだ2回連続正解していない問題から出題されます。</p>
     <ul id="weakWordsContainer">
-        </ul>
+    </ul>
     <p id="noWeakWordsMessage" class="hidden">まだ問題を解いていません。</p>
     <button id="backToSelectionFromWeakListButton" class="secondary-button">選択画面に戻る</button>
 </section>
 
-
+<!-- 情報パネル -->
 <div class="info-icon" id="infoIcon">i</div>
 <div class="info-panel hidden" id="infoPanel">
     <h3>アプリ情報</h3>
     <p>最終更新日: <span id="lastUpdatedDate"></span></p>
     <h4>更新内容</h4>
     <p id="updateContent"></p>
-
-    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
 <script>
+    // Flaskからのデータをグローバル変数として設定
     window.appInfoFromFlask = {{ app_info | tojson | safe }};
     window.chapterDataFromFlask = {{ chapter_data | tojson | safe }};
 </script>
+<!-- html2canvas ライブラリの読み込み -->
 <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+<!-- メインのJavaScriptファイル -->
 <script src="{{ url_for('static', filename='script.js') }}"></script>
 {% endblock %}

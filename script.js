@@ -1,4 +1,4 @@
-// static/script.js - 完全修正版
+// static/script.js - 完全修正版（全機能保持）
 
 // デバッグ用: window オブジェクトが存在するかどうかを確認
 if (typeof window === 'undefined') {
@@ -70,16 +70,173 @@ if (typeof window.appInfoFromFlask === 'undefined') {
 let word_data = [];
 
 // =========================================================
+// スマホ対応関数
+// =========================================================
+
+// 「全て選択」ボタンのテキストと色を更新する関数（スマホ対応版）
+function updateSelectAllButtonText(button, isAllSelected) {
+    // ★ 修正: null チェックを追加
+    if (!button) {
+        console.warn('updateSelectAllButtonText: button parameter is null or undefined');
+        return;
+    }
+    
+    const isMobile = window.innerWidth <= 767;
+    
+    if (isAllSelected) {
+        button.textContent = isMobile ? '解除' : '選択解除';
+        button.style.backgroundColor = '#e74c3c';
+        button.style.borderColor = '#c0392b';
+        button.classList.add('deselect-mode');
+    } else {
+        button.textContent = isMobile ? '選択' : '全て選択';
+        button.style.backgroundColor = '#3498db';
+        button.style.borderColor = '#2980b9';
+        button.classList.remove('deselect-mode');
+    }
+}
+
+// スマホでの表示を最適化するための初期化関数
+function initializeMobileOptimizations() {
+    // 画面サイズをチェック
+    const isMobile = window.innerWidth <= 767;
+    
+    if (isMobile) {
+        // 「全て選択」ボタンのテキストを短縮
+        document.querySelectorAll('.select-all-chapter-btn').forEach(button => {
+            const chapterNum = button.dataset.chapter;
+            const chapterItem = button.closest('.chapter-item');
+            if (chapterItem) {
+                const checkboxes = chapterItem.querySelectorAll(`input[type="checkbox"][data-chapter="${chapterNum}"]`);
+                
+                const enabledCheckboxes = Array.from(checkboxes).filter(cb => !cb.disabled);
+                const allChecked = enabledCheckboxes.length > 0 && enabledCheckboxes.every(cb => cb.checked);
+                
+                updateSelectAllButtonText(button, allChecked);
+            }
+        });
+        
+        // テーブルにラッパーを追加してスクロール対応
+        const tables = document.querySelectorAll('.ranking-container table, .progress-container table, .user-list-table');
+        tables.forEach(table => {
+            if (!table.closest('.table-responsive')) {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'table-responsive';
+                table.parentNode.insertBefore(wrapper, table);
+                wrapper.appendChild(table);
+            }
+        });
+        
+        // 長いテキストの省略対応
+        const longTexts = document.querySelectorAll('.chapter-title, .unit-item label');
+        longTexts.forEach(element => {
+            if (element.textContent.length > 20) {
+                element.title = element.textContent; // ツールチップで全文表示
+            }
+        });
+    }
+}
+
+// 画面サイズ変更時の対応
+function handleResize() {
+    const isMobile = window.innerWidth <= 767;
+    
+    // ボタンテキストの動的変更
+    document.querySelectorAll('.select-all-chapter-btn').forEach(button => {
+        const chapterNum = button.dataset.chapter;
+        const chapterItem = button.closest('.chapter-item');
+        if (chapterItem) {
+            const checkboxes = chapterItem.querySelectorAll(`input[type="checkbox"][data-chapter="${chapterNum}"]`);
+            
+            const enabledCheckboxes = Array.from(checkboxes).filter(cb => !cb.disabled);
+            const allChecked = enabledCheckboxes.length > 0 && enabledCheckboxes.every(cb => cb.checked);
+            
+            updateSelectAllButtonText(button, allChecked);
+        }
+    });
+}
+
+// スマホでのタッチ操作改善
+function improveTouchExperience() {
+    // タッチデバイスの検出
+    const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+    
+    if (isTouchDevice) {
+        // チェックボックスとラベルのタッチエリア拡大
+        document.querySelectorAll('.unit-item').forEach(item => {
+            const checkbox = item.querySelector('input[type="checkbox"]');
+            const label = item.querySelector('label');
+            
+            if (checkbox && label) {
+                // ラベルクリックでチェックボックスを切り替え
+                label.addEventListener('touchstart', (e) => {
+                    e.stopPropagation();
+                }, { passive: true });
+                
+                label.addEventListener('click', (e) => {
+                    if (!checkbox.disabled) {
+                        checkbox.checked = !checkbox.checked;
+                    }
+                    e.preventDefault();
+                });
+            }
+        });
+        
+        // 章ヘッダーのタッチフィードバック
+        document.querySelectorAll('.chapter-header').forEach(header => {
+            header.addEventListener('touchstart', () => {
+                header.style.backgroundColor = '#d5dbdb';
+            }, { passive: true });
+            
+            header.addEventListener('touchend', () => {
+                setTimeout(() => {
+                    header.style.backgroundColor = '';
+                }, 150);
+            }, { passive: true });
+        });
+    }
+}
+
+// スクロール最適化（スマホ用）
+function optimizeScrolling() {
+    const containers = document.querySelectorAll('.chapters-container, .ranking-container, .progress-container');
+    
+    containers.forEach(container => {
+        // スムーズスクロールの有効化
+        container.style.scrollBehavior = 'smooth';
+        
+        // iOS Safari のバウンス効果対策
+        container.addEventListener('touchstart', (e) => {
+            const startY = e.touches[0].clientY;
+            const scrollTop = container.scrollTop;
+            const maxScroll = container.scrollHeight - container.clientHeight;
+            
+            if (scrollTop <= 0 && startY > 0) {
+                container.scrollTop = 1;
+            } else if (scrollTop >= maxScroll && startY < 0) {
+                container.scrollTop = maxScroll - 1;
+            }
+        }, { passive: true });
+    });
+}
+
+// =========================================================
 // 問題ID生成関数（修正版 - 衝突を防ぐ）
 // =========================================================
 
 function generateProblemId(word) {
+    // ★ 修正: null チェックを追加
+    if (!word) {
+        console.warn('generateProblemId: word parameter is null or undefined');
+        return 'invalid_id';
+    }
+    
     // より安全なID生成方法
-    const chapterStr = String(word.chapter).padStart(3, '0');
-    const numberStr = String(word.number).padStart(3, '0');
+    const chapterStr = String(word.chapter || '0').padStart(3, '0');
+    const numberStr = String(word.number || '0').padStart(3, '0');
     const categoryStr = String(word.category || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-    const questionForId = String(word.question).trim();
-    const answerForId = String(word.answer).trim();
+    const questionForId = String(word.question || '').trim();
+    const answerForId = String(word.answer || '').trim();
     
     // 問題文と答えの組み合わせでユニークなハッシュを生成
     function createHash(str) {
@@ -101,20 +258,29 @@ function generateProblemId(word) {
 // =========================================================
 
 document.addEventListener('DOMContentLoaded', () => {
-    updateIncorrectOnlyRadio();
-    loadUserData();
-    loadWordDataFromServer();
-    setupEventListeners();
+    console.log('DOM loaded, initializing application...');
+    
+    try {
+        updateIncorrectOnlyRadio();
+        loadUserData();
+        loadWordDataFromServer();
+        setupEventListeners();
 
-    // データロード後に選択状態を復元
-    setTimeout(() => {
-        loadSelectionState();
-        initializeSelectAllButtons();
-        updateIncorrectOnlySelection(); // 苦手問題選択状態の視覚的フィードバックを初期化
-    }, 1000);
+        // データロード後に選択状態を復元
+        setTimeout(() => {
+            loadSelectionState();
+            initializeSelectAllButtons();
+            updateIncorrectOnlySelection(); // 苦手問題選択状態の視覚的フィードバックを初期化
+            initializeMobileOptimizations(); // スマホ最適化
+            improveTouchExperience(); // タッチ操作改善
+            optimizeScrolling(); // スクロール最適化
+        }, 1000);
 
-    if (noWeakWordsMessage) {
-        noWeakWordsMessage.classList.add('hidden');
+        if (noWeakWordsMessage) {
+            noWeakWordsMessage.classList.add('hidden');
+        }
+    } catch (error) {
+        console.error('Error during initialization:', error);
     }
 });
 
@@ -287,82 +453,78 @@ function updateIncorrectOnlySelection() {
 }
 
 // =========================================================
-// イベントリスナーの設定
+// イベントリスナーの設定（修正版）
 // =========================================================
 
-// setupEventListeners関数の修正版（該当部分のみ）
 function setupEventListeners() {
-    if (startButton) startButton.addEventListener('click', startQuiz);
-    if (showAnswerButton) showAnswerButton.addEventListener('click', showAnswer);
-    if (correctButton) correctButton.addEventListener('click', () => handleAnswer(true));
-    if (incorrectButton) incorrectButton.addEventListener('click', () => handleAnswer(false));
-    if (backToSelectionButton) backToSelectionButton.addEventListener('click', backToSelectionScreen);
-    if (restartQuizButton) restartQuizButton.addEventListener('click', restartQuiz);
-    if (backToSelectionFromCardButton) backToSelectionFromCardButton.addEventListener('click', backToSelectionScreen);
-    if (resetSelectionButton) resetSelectionButton.addEventListener('click', resetSelections);
-    if (showWeakWordsButton) showWeakWordsButton.addEventListener('click', showWeakWordsList);
-    if (backToSelectionFromWeakListButton) backToSelectionFromWeakListButton.addEventListener('click', backToSelectionScreen);
-    if (infoIcon) infoIcon.addEventListener('click', toggleInfoPanel);
-    if (shareXButton) shareXButton.addEventListener('click', shareOnX);
-    if (downloadImageButton) downloadImageButton.addEventListener('click', downloadQuizResultImage);
+    console.log('Setting up event listeners...');
+    
+    try {
+        if (startButton) startButton.addEventListener('click', startQuiz);
+        if (showAnswerButton) showAnswerButton.addEventListener('click', showAnswer);
+        if (correctButton) correctButton.addEventListener('click', () => handleAnswer(true));
+        if (incorrectButton) incorrectButton.addEventListener('click', () => handleAnswer(false));
+        if (backToSelectionButton) backToSelectionButton.addEventListener('click', backToSelectionScreen);
+        if (restartQuizButton) restartQuizButton.addEventListener('click', restartQuiz);
+        if (backToSelectionFromCardButton) backToSelectionFromCardButton.addEventListener('click', backToSelectionScreen);
+        if (resetSelectionButton) resetSelectionButton.addEventListener('click', resetSelections);
+        if (showWeakWordsButton) showWeakWordsButton.addEventListener('click', showWeakWordsList);
+        if (backToSelectionFromWeakListButton) backToSelectionFromWeakListButton.addEventListener('click', backToSelectionScreen);
+        if (infoIcon) infoIcon.addEventListener('click', toggleInfoPanel);
+        if (shareXButton) shareXButton.addEventListener('click', shareOnX);
+        if (downloadImageButton) downloadImageButton.addEventListener('click', downloadQuizResultImage);
 
-    // 出題数選択のラジオボタンにイベントリスナーを追加
-    questionCountRadios.forEach(radio => {
-        radio.addEventListener('change', updateIncorrectOnlySelection);
-    });
+        // 出題数選択のラジオボタンにイベントリスナーを追加
+        questionCountRadios.forEach(radio => {
+            radio.addEventListener('change', updateIncorrectOnlySelection);
+        });
 
-    // 章のヘッダーをクリックで単元リストの表示/非表示を切り替え
-    if (chaptersContainer) {
-        chaptersContainer.addEventListener('click', (event) => {
-            // 「全て選択」ボタンがクリックされた場合の処理
-            const selectAllBtn = event.target.closest('.select-all-chapter-btn');
-            if (selectAllBtn) {
-                event.stopPropagation(); // イベントの伝播を停止
-                event.preventDefault();  // デフォルト動作を防止
+        // 章のヘッダーをクリックで単元リストの表示/非表示を切り替え（スマホ対応版）
+        if (chaptersContainer) {
+            chaptersContainer.addEventListener('click', (event) => {
+                // 「全て選択」ボタンがクリックされた場合の処理
+                const selectAllBtn = event.target.closest('.select-all-chapter-btn');
+                if (selectAllBtn) {
+                    event.stopPropagation();
+                    event.preventDefault();
+                    
+                    const chapterNum = selectAllBtn.dataset.chapter;
+                    const chapterItem = selectAllBtn.closest('.chapter-item');
+                    if (!chapterItem) return;
+                    
+                    const checkboxes = chapterItem.querySelectorAll(`input[type="checkbox"][data-chapter="${chapterNum}"]`);
+                    
+                    const enabledCheckboxes = Array.from(checkboxes).filter(cb => !cb.disabled);
+                    const allChecked = enabledCheckboxes.every(cb => cb.checked);
+                    
+                    enabledCheckboxes.forEach(checkbox => {
+                        checkbox.checked = !allChecked;
+                    });
+                    
+                    updateSelectAllButtonText(selectAllBtn, !allChecked);
+                    
+                    // 章の展開状態は変更しない
+                    return false;
+                }
                 
-                const chapterNum = selectAllBtn.dataset.chapter;
-                const chapterItem = selectAllBtn.closest('.chapter-item');
-                const checkboxes = chapterItem.querySelectorAll(`input[type="checkbox"][data-chapter="${chapterNum}"]`);
-                
-                const enabledCheckboxes = Array.from(checkboxes).filter(cb => !cb.disabled);
-                const allChecked = enabledCheckboxes.every(cb => cb.checked);
-                
-                enabledCheckboxes.forEach(checkbox => {
-                    checkbox.checked = !allChecked;
-                });
-                
-                updateSelectAllButtonText(selectAllBtn, !allChecked);
-                
-                // 章の展開状態は変更しない
-                return false; // さらなる伝播を防止
-            }
-            
-            // 章ヘッダーがクリックされた場合のみ展開/折りたたみ処理
-            const chapterHeader = event.target.closest('.chapter-header');
-            if (chapterHeader && !event.target.closest('.select-all-chapter-btn')) {
-                const chapterItem = chapterHeader.closest('.chapter-item');
-                if (chapterItem) {
-                    chapterItem.classList.toggle('expanded');
-                    const toggleIcon = chapterHeader.querySelector('.toggle-icon');
-                    if (toggleIcon) {
-                        toggleIcon.textContent = chapterItem.classList.contains('expanded') ? '▼' : '▶';
+                // 章ヘッダーがクリックされた場合のみ展開/折りたたみ処理
+                const chapterHeader = event.target.closest('.chapter-header');
+                if (chapterHeader && !event.target.closest('.select-all-chapter-btn')) {
+                    const chapterItem = chapterHeader.closest('.chapter-item');
+                    if (chapterItem) {
+                        chapterItem.classList.toggle('expanded');
+                        const toggleIcon = chapterHeader.querySelector('.toggle-icon');
+                        if (toggleIcon) {
+                            toggleIcon.textContent = chapterItem.classList.contains('expanded') ? '▼' : '▶';
+                        }
                     }
                 }
-            }
-        });
-    }
-}
-
-// 「全て選択」ボタンのテキストと色を更新する関数
-function updateSelectAllButtonText(button, isAllSelected) {
-    if (isAllSelected) {
-        button.textContent = '選択解除';
-        button.style.backgroundColor = '#e74c3c';
-        button.style.borderColor = '#c0392b';
-    } else {
-        button.textContent = '全て選択';
-        button.style.backgroundColor = '#3498db';
-        button.style.borderColor = '#2980b9';
+            });
+        }
+        
+        console.log('Event listeners setup completed.');
+    } catch (error) {
+        console.error('Error setting up event listeners:', error);
     }
 }
 
@@ -371,12 +533,14 @@ function initializeSelectAllButtons() {
     document.querySelectorAll('.select-all-chapter-btn').forEach(button => {
         const chapterNum = button.dataset.chapter;
         const chapterItem = button.closest('.chapter-item');
-        const checkboxes = chapterItem.querySelectorAll(`input[type="checkbox"][data-chapter="${chapterNum}"]`);
-        
-        const enabledCheckboxes = Array.from(checkboxes).filter(cb => !cb.disabled);
-        const allChecked = enabledCheckboxes.length > 0 && enabledCheckboxes.every(cb => cb.checked);
-        
-        updateSelectAllButtonText(button, allChecked);
+        if (chapterItem) {
+            const checkboxes = chapterItem.querySelectorAll(`input[type="checkbox"][data-chapter="${chapterNum}"]`);
+            
+            const enabledCheckboxes = Array.from(checkboxes).filter(cb => !cb.disabled);
+            const allChecked = enabledCheckboxes.length > 0 && enabledCheckboxes.every(cb => cb.checked);
+            
+            updateSelectAllButtonText(button, allChecked);
+        }
     });
 }
 
@@ -532,6 +696,12 @@ function showAnswer() {
 // ★ 修正版 handleAnswer 関数
 function handleAnswer(isCorrect) {
     const currentWord = currentQuizData[currentQuestionIndex];
+    
+    // ★ 修正: null チェックを追加
+    if (!currentWord) {
+        console.error('handleAnswer: currentWord is undefined');
+        return;
+    }
     
     console.log(`\n=== "${currentWord.question}" ===`);
     
@@ -934,15 +1104,12 @@ function downloadQuizResultImage() {
     if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(hashtagText).then(() => {
             console.log('ハッシュタグがクリップボードにコピーされました');
-            // 成功時の視覚的フィードバック（オプション）
             flashMessage('ハッシュタグがクリップボードにコピーされました！', 'success');
         }).catch(err => {
             console.error('クリップボードへのコピーに失敗しました:', err);
-            // フォールバック: 古いブラウザ対応
             fallbackCopyToClipboard(hashtagText);
         });
     } else {
-        // フォールバック: 古いブラウザ対応
         fallbackCopyToClipboard(hashtagText);
     }
 
@@ -964,11 +1131,9 @@ function downloadQuizResultImage() {
         height: targetHeight,
         scrollX: 0,
         scrollY: 0,
-        // 要素を縦16:横9の比率に合わせて調整
         onclone: function(clonedDoc) {
             const clonedElement = clonedDoc.getElementById('quizResultContent');
             if (clonedElement) {
-                // 要素のスタイルを縦16:横9キャンバスに最適化
                 clonedElement.style.width = targetWidth + 'px';
                 clonedElement.style.height = targetHeight + 'px';
                 clonedElement.style.padding = '40px';
@@ -976,7 +1141,7 @@ function downloadQuizResultImage() {
                 clonedElement.style.display = 'flex';
                 clonedElement.style.flexDirection = 'column';
                 clonedElement.style.justifyContent = 'center';
-                clonedElement.style.fontSize = '28px'; // 縦長なのでフォントサイズを大きく
+                clonedElement.style.fontSize = '28px';
                 clonedElement.style.lineHeight = '1.6';
             }
         }
@@ -984,30 +1149,25 @@ function downloadQuizResultImage() {
 
     if (typeof html2canvas !== 'undefined') {
         html2canvas(quizResultContent, options).then(canvas => {
-            // キャンバスのサイズを縦16:横9に確実に設定
             const finalCanvas = document.createElement('canvas');
             finalCanvas.width = targetWidth;
             finalCanvas.height = targetHeight;
             const ctx = finalCanvas.getContext('2d');
             
-            // 背景色を設定
             ctx.fillStyle = '#f8f9fa';
             ctx.fillRect(0, 0, targetWidth, targetHeight);
             
-            // 元の画像を中央に配置
             const sourceAspectRatio = canvas.width / canvas.height;
-            const targetAspectRatio = targetWidth / targetHeight; // 9/16 = 0.5625
+            const targetAspectRatio = targetWidth / targetHeight;
             
             let drawWidth, drawHeight, offsetX, offsetY;
             
             if (sourceAspectRatio > targetAspectRatio) {
-                // 元画像の方が横長（相対的に） - 幅を基準に調整
                 drawWidth = targetWidth;
                 drawHeight = targetWidth / sourceAspectRatio;
                 offsetX = 0;
                 offsetY = (targetHeight - drawHeight) / 2;
             } else {
-                // 元画像の方が縦長（相対的に） - 高さを基準に調整
                 drawHeight = targetHeight;
                 drawWidth = targetHeight * sourceAspectRatio;
                 offsetX = (targetWidth - drawWidth) / 2;
@@ -1033,7 +1193,6 @@ function downloadQuizResultImage() {
         tempHiddenElements.forEach(el => el.classList.add('hidden'));
     }
 }
-
 
 // フォールバック: 古いブラウザ用のクリップボードコピー
 function fallbackCopyToClipboard(text) {
@@ -1064,11 +1223,71 @@ function fallbackCopyToClipboard(text) {
 }
 
 // =========================================================
-// デバッグ用関数
+// モバイル対応イベントリスナー
 // =========================================================
 
-// 問題ID衝突調査
-function investigateIdCollisions() {
+// リサイズイベントの追加
+window.addEventListener('resize', handleResize);
+
+// 横向き・縦向き変更への対応
+window.addEventListener('orientationchange', () => {
+    setTimeout(() => {
+        handleResize();
+        initializeMobileOptimizations();
+    }, 100);
+});
+
+// エラーハンドリング強化（スマホ環境向け）
+window.addEventListener('error', (event) => {
+    console.error('JavaScript Error:', event.error);
+    
+    // スマホでの主要な問題への対処
+    if (event.error && event.error.message) {
+        const message = event.error.message.toLowerCase();
+        
+        // タッチイベント関連のエラー
+        if (message.includes('touch') || message.includes('passive')) {
+            console.warn('Touch event issue detected, attempting to fix...');
+            setTimeout(() => {
+                improveTouchExperience();
+            }, 500);
+        }
+        
+        // レイアウト関連のエラー
+        if (message.includes('layout') || message.includes('resize')) {
+            console.warn('Layout issue detected, attempting to fix...');
+            setTimeout(() => {
+                handleResize();
+                initializeMobileOptimizations();
+            }, 300);
+        }
+    }
+});
+
+// パフォーマンス監視（スマホ用）
+function monitorPerformance() {
+    if ('performance' in window && 'memory' in performance) {
+        setInterval(() => {
+            const memory = performance.memory;
+            if (memory.usedJSHeapSize > memory.jsHeapSizeLimit * 0.9) {
+                console.warn('Memory usage high, attempting cleanup...');
+                if (typeof gc === 'function') {
+                    gc();
+                }
+            }
+        }, 30000);
+    }
+}
+
+// パフォーマンス監視の開始
+document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(() => {
+        monitorPerformance();
+    }, 5000);
+});
+
+// グローバル関数として追加（開発者ツールで実行可能）
+window.investigateIdCollisions = function() {
     console.log('🔍 === 問題ID衝突調査 ===');
     
     const idMap = new Map();
@@ -1097,10 +1316,9 @@ function investigateIdCollisions() {
     console.log(`ユニークID数: ${idMap.size}`);
     
     return collisions;
-}
+};
 
-// 苦手問題状態確認
-function checkWeakProblemsStatus() {
+window.checkWeakProblemsStatus = function() {
     console.log('\n🔍 === 苦手問題状態確認 ===');
     console.log(`苦手問題数: ${incorrectWords.length}`);
     
@@ -1114,342 +1332,8 @@ function checkWeakProblemsStatus() {
         console.log(`   正解/不正解: ${history.correct_attempts || 0}/${history.incorrect_attempts || 0}`);
     });
     console.log('========================\n');
-}
+};
 
-// グローバル関数として追加（開発者ツールで実行可能）
-window.investigateIdCollisions = investigateIdCollisions;
-window.checkWeakProblemsStatus = checkWeakProblemsStatus;
-
-// 進捗確認ページの問題調査と修正
-
-// 1. 現在の進捗データの状況を確認
-function debugProgressIssue() {
-    console.log('🔍 === 進捗確認ページの問題調査 ===');
-    
-    console.log('\n📊 現在の学習履歴:');
-    console.log(`problemHistory のエントリ数: ${Object.keys(problemHistory).length}`);
-    
-    // 学習履歴の内容を確認
-    Object.entries(problemHistory).forEach(([problemId, history]) => {
-        const word = word_data.find(w => generateProblemId(w) === problemId);
-        const isIdMatched = word !== undefined;
-        
-        console.log(`ID: ${problemId}`);
-        console.log(`  マッチする問題: ${isIdMatched ? word.question : '見つからない'}`);
-        console.log(`  正解/不正解: ${history.correct_attempts}/${history.incorrect_attempts}`);
-        console.log(`  連続正解: ${history.correct_streak}`);
-        console.log('---');
-    });
-    
-    console.log('\n🎯 苦手問題リスト:');
-    console.log(`incorrectWords のエントリ数: ${incorrectWords.length}`);
-    
-    incorrectWords.forEach(problemId => {
-        const word = word_data.find(w => generateProblemId(w) === problemId);
-        const isIdMatched = word !== undefined;
-        
-        console.log(`ID: ${problemId}`);
-        console.log(`  マッチする問題: ${isIdMatched ? word.question : '見つからない'}`);
-    });
-    
-    console.log('\n📈 単元別の問題数:');
-    const unitCounts = {};
-    word_data.forEach(word => {
-        const unitKey = `${word.chapter}-${word.number}`;
-        if (!unitCounts[unitKey]) {
-            unitCounts[unitKey] = {
-                unit: word.number,
-                category: word.category,
-                totalProblems: 0,
-                problemsWithHistory: 0
-            };
-        }
-        unitCounts[unitKey].totalProblems++;
-        
-        const problemId = generateProblemId(word);
-        if (problemHistory[problemId]) {
-            unitCounts[unitKey].problemsWithHistory++;
-        }
-    });
-    
-    Object.entries(unitCounts).forEach(([unitKey, data]) => {
-        console.log(`単元 ${data.unit}: ${data.category}`);
-        console.log(`  総問題数: ${data.totalProblems}`);
-        console.log(`  履歴ある問題数: ${data.problemsWithHistory}`);
-        console.log('---');
-    });
-    
-    console.log('===============================');
-}
-
-// 2. 古いIDから新しいIDへの変換を確認
-function checkIdMigration() {
-    console.log('🔄 === ID変換状況の確認 ===');
-    
-    // 古いID生成方法（推測）
-    function generateOldProblemId(word) {
-        const questionForId = String(word.question).trim();
-        const cleanedQuestion = questionForId.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-        const chapterStr = String(word.chapter);
-        const numberStr = String(word.number);
-        return `${chapterStr}-${numberStr}-${cleanedQuestion}`;
-    }
-    
-    let matchedCount = 0;
-    let unmatchedOldIds = [];
-    
-    Object.keys(problemHistory).forEach(problemId => {
-        const word = word_data.find(w => generateProblemId(w) === problemId);
-        if (word) {
-            matchedCount++;
-        } else {
-            // 古いIDで試してみる
-            const wordWithOldId = word_data.find(w => generateOldProblemId(w) === problemId);
-            if (wordWithOldId) {
-                unmatchedOldIds.push({
-                    oldId: problemId,
-                    newId: generateProblemId(wordWithOldId),
-                    question: wordWithOldId.question
-                });
-            }
-        }
-    });
-    
-    console.log(`新しいIDでマッチ: ${matchedCount}件`);
-    console.log(`古いIDのまま: ${unmatchedOldIds.length}件`);
-    
-    if (unmatchedOldIds.length > 0) {
-        console.log('\n古いIDが残っている問題:');
-        unmatchedOldIds.slice(0, 5).forEach(item => {
-            console.log(`"${item.question}"`);
-            console.log(`  古いID: ${item.oldId}`);
-            console.log(`  新しいID: ${item.newId}`);
-        });
-        
-        if (unmatchedOldIds.length > 5) {
-            console.log(`... 他 ${unmatchedOldIds.length - 5}件`);
-        }
-    }
-    
-    return unmatchedOldIds;
-}
-
-// 3. 進捗データの修正
-function fixProgressData() {
-    console.log('🔧 === 進捗データの修正 ===');
-    
-    // 古いID生成方法
-    function generateOldProblemId(word) {
-        const questionForId = String(word.question).trim();
-        const cleanedQuestion = questionForId.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-        const chapterStr = String(word.chapter);
-        const numberStr = String(word.number);
-        return `${chapterStr}-${numberStr}-${cleanedQuestion}`;
-    }
-    
-    const oldToNewIdMap = new Map();
-    const newProblemHistory = {};
-    const newIncorrectWords = [];
-    
-    // すべての問題に対してID変換マップを作成
-    word_data.forEach(word => {
-        const oldId = generateOldProblemId(word);
-        const newId = generateProblemId(word);
-        oldToNewIdMap.set(oldId, newId);
-    });
-    
-    console.log(`ID変換マップ作成: ${oldToNewIdMap.size}件`);
-    
-    // problemHistory の変換
-    let historyConverted = 0;
-    Object.entries(problemHistory).forEach(([oldId, history]) => {
-        if (oldToNewIdMap.has(oldId)) {
-            const newId = oldToNewIdMap.get(oldId);
-            newProblemHistory[newId] = history;
-            historyConverted++;
-        } else {
-            // 既に新しいIDの場合はそのまま保持
-            newProblemHistory[oldId] = history;
-        }
-    });
-    
-    // incorrectWords の変換
-    let wordsConverted = 0;
-    incorrectWords.forEach(oldId => {
-        if (oldToNewIdMap.has(oldId)) {
-            const newId = oldToNewIdMap.get(oldId);
-            if (!newIncorrectWords.includes(newId)) {
-                newIncorrectWords.push(newId);
-                wordsConverted++;
-            }
-        } else {
-            // 既に新しいIDの場合はそのまま保持
-            if (!newIncorrectWords.includes(oldId)) {
-                newIncorrectWords.push(oldId);
-            }
-        }
-    });
-    
-    // データ更新
-    Object.keys(problemHistory).forEach(key => delete problemHistory[key]);
-    Object.assign(problemHistory, newProblemHistory);
-    
-    incorrectWords.length = 0;
-    incorrectWords.push(...newIncorrectWords);
-    
-    console.log(`学習履歴変換: ${historyConverted}件`);
-    console.log(`苦手問題変換: ${wordsConverted}件`);
-    console.log('変換完了！');
-    
-    // サーバーに保存
-    saveQuizProgressToServer();
-    
-    console.log('サーバーに保存しました。');
-    console.log('進捗確認ページを再読み込みしてください。');
-}
-
-// 4. 進捗確認ページ用の統計情報計算
-function calculateProgressStats() {
-    console.log('📊 === 進捗統計情報 ===');
-    
-    const unitStats = {};
-    
-    // 各単元の統計を初期化
-    word_data.forEach(word => {
-        const unitKey = word.number;
-        if (!unitStats[unitKey]) {
-            unitStats[unitKey] = {
-                categoryName: word.category,
-                totalQuestions: 0,
-                attemptedProblems: 0,
-                masteredProblems: 0,
-                totalAttempts: 0
-            };
-        }
-        unitStats[unitKey].totalQuestions++;
-        
-        const problemId = generateProblemId(word);
-        const history = problemHistory[problemId];
-        
-        if (history) {
-            const correctAttempts = history.correct_attempts || 0;
-            const incorrectAttempts = history.incorrect_attempts || 0;
-            const totalAttempts = correctAttempts + incorrectAttempts;
-            
-            if (totalAttempts > 0) {
-                unitStats[unitKey].attemptedProblems++;
-                unitStats[unitKey].totalAttempts += totalAttempts;
-                
-                // 正答率80%以上でマスター
-                const accuracyRate = (correctAttempts / totalAttempts) * 100;
-                if (accuracyRate >= 80) {
-                    unitStats[unitKey].masteredProblems++;
-                }
-            }
-        }
-    });
-    
-    // 結果表示
-    Object.entries(unitStats).forEach(([unitNum, stats]) => {
-        const masteryRate = stats.totalQuestions > 0 ? 
-            (stats.masteredProblems / stats.totalQuestions * 100).toFixed(1) : '0.0';
-        
-        console.log(`単元 ${unitNum}: ${stats.categoryName}`);
-        console.log(`  総問題数: ${stats.totalQuestions}`);
-        console.log(`  取り組んだ問題: ${stats.attemptedProblems}`);
-        console.log(`  マスター問題: ${stats.masteredProblems}`);
-        console.log(`  マスター率: ${masteryRate}%`);
-        console.log(`  総回答数: ${stats.totalAttempts}`);
-        console.log('---');
-    });
-    
-    return unitStats;
-}
-
-// グローバル関数として追加
-window.debugProgressIssue = debugProgressIssue;
-window.checkIdMigration = checkIdMigration;
-window.fixProgressData = fixProgressData;
-window.calculateProgressStats = calculateProgressStats;
-
-// より正確なMD5ハッシュを使用した版（script.jsに追加）
-
-// MD5ハッシュ関数（軽量版）
-function md5(str) {
-    function md5cycle(x, k) {
-        var a = x[0], b = x[1], c = x[2], d = x[3];
-        
-        a = ff(a, b, c, d, k[0], 7, -680876936);
-        d = ff(d, a, b, c, k[1], 12, -389564586);
-        c = ff(c, d, a, b, k[2], 17, 606105819);
-        b = ff(b, c, d, a, k[3], 22, -1044525330);
-        // ... 簡略化版
-        
-        x[0] = add32(a, x[0]);
-        x[1] = add32(b, x[1]);
-        x[2] = add32(c, x[2]);
-        x[3] = add32(d, x[3]);
-    }
-    
-    function cmn(q, a, b, x, s, t) {
-        a = add32(add32(a, q), add32(x, t));
-        return add32((a << s) | (a >>> (32 - s)), b);
-    }
-    
-    function ff(a, b, c, d, x, s, t) {
-        return cmn((b & c) | ((~b) & d), a, b, x, s, t);
-    }
-    
-    function add32(a, b) {
-        return (a + b) & 0xFFFFFFFF;
-    }
-    
-    // 簡易版のMD5実装（完全版は長すぎるため）
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-        const char = str.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
-        hash = hash & hash;
-    }
-    
-    const hex = Math.abs(hash).toString(16);
-    return hex.padStart(10, '0').substring(0, 10);
-}
-
-function generateProblemId(word) {
-    // Python側と完全に同じロジック
-    const chapterStr = String(word.chapter).padStart(3, '0');
-    const numberStr = String(word.number).padStart(3, '0');
-    const categoryStr = String(word.category || '').replace(/\s/g, '').toLowerCase();
-    const questionForId = String(word.question).trim();
-    const answerForId = String(word.answer).trim();
-    
-    // Python側と同じ文字列結合
-    const contentString = questionForId + '|||' + answerForId + '|||' + categoryStr;
-    const contentHash = md5(contentString);
-    
-    const generatedId = `${chapterStr}-${numberStr}-${contentHash}`;
-    
-    return generatedId;
-}
-
-// IDの一致を確認するテスト関数
-function testIdConsistency() {
-    console.log('🧪 === JavaScript/Python ID一致テスト ===');
-    
-    // 最初の5個の問題でテスト
-    const testWords = word_data.slice(0, 5);
-    
-    testWords.forEach(word => {
-        const jsId = generateProblemId(word);
-        console.log(`問題: "${word.question.substring(0, 30)}..."`);
-        console.log(`JavaScript ID: ${jsId}`);
-        console.log(`章-単元: ${word.chapter}-${word.number}`);
-        console.log('---');
-    });
-    
-    console.log('\nPython側のログと比較して、同じIDが生成されているか確認してください。');
-}
-
-window.testIdConsistency = testIdConsistency;
+// グローバル関数として関数を公開（onclickから呼び出せるように）
 window.toggleIncorrectAnswer = toggleIncorrectAnswer;
+window.toggleWeakAnswer = toggleWeakAnswer;
