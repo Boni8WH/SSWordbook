@@ -1,13 +1,11 @@
-# render.yaml - Render.com用設定ファイル
-# プロジェクトルートに配置してください
-
+# render.yaml - 本番環境対応版
 services:
   # Webサービス（メインアプリケーション）
   - type: web
     name: sekaishi-app
     env: python
-    plan: free  # または starter, standard
-    region: singapore  # 日本から最も近いリージョン
+    plan: free
+    region: singapore
     
     # ビルドコマンド
     buildCommand: |
@@ -21,17 +19,19 @@ services:
       print(f'RENDER: {os.environ.get(\"RENDER\", \"未設定\")}')
       "
     
-    # 起動コマンド
-    startCommand: python app.py
+    # 本番環境用：Gunicornを使用
+    startCommand: gunicorn --bind 0.0.0.0:$PORT --workers 2 --timeout 120 app:app
     
     # 環境変数
     envVars:
       - key: RESET_DATABASE
-        value: "false"  # 本番環境では必ずfalse
+        value: "false"
       - key: RENDER
         value: "true"
       - key: PYTHON_VERSION
         value: "3.11.9"
+      - key: FLASK_ENV
+        value: "production"
       - key: DATABASE_URL
         fromDatabase:
           name: sekaishi-postgres
@@ -45,9 +45,6 @@ databases:
   - name: sekaishi-postgres
     databaseName: sekaishi_db
     user: sekaishi_user
-    plan: free  # または starter
+    plan: free
     region: singapore
-    
-    # データベース初期化時のみリセット
-    # 本番運用後は削除推奨
     postgresMajorVersion: 15

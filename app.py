@@ -460,8 +460,10 @@ def admin_fix_all_data():
     return redirect(url_for('admin_page'))
 
 # データベースマイグレーション関数
+# app.py の migrate_database 関数を以下に置き換え
+
 def migrate_database():
-    """データベーススキーマの変更を処理する"""
+    """データベーススキーマの変更を処理する（強化版）"""
     with app.app_context():
         print("🔄 データベースマイグレーションを開始...")
         
@@ -469,7 +471,7 @@ def migrate_database():
             # SQLiteの場合、カラムの追加をチェック
             inspector = inspect(db.engine)
             
-            # Userテーブルの確認
+            # 1. Userテーブルの確認
             if inspector.has_table('user'):
                 columns = [col['name'] for col in inspector.get_columns('user')]
                 print(f"📋 既存のUserテーブルカラム: {columns}")
@@ -477,13 +479,14 @@ def migrate_database():
                 # last_loginカラムが存在しない場合は追加
                 if 'last_login' not in columns:
                     print("🔧 last_loginカラムを追加します...")
-                    # SQLAlchemy 2.0対応の書き方
                     with db.engine.connect() as conn:
                         conn.execute(text('ALTER TABLE user ADD COLUMN last_login DATETIME'))
                         conn.commit()
                     print("✅ last_loginカラムを追加しました。")
+                else:
+                    print("last_loginカラムは既に存在します。")
             
-            # RoomSettingテーブルの確認
+            # 2. RoomSettingテーブルの確認
             if inspector.has_table('room_setting'):
                 columns = [col['name'] for col in inspector.get_columns('room_setting')]
                 print(f"📋 既存のRoomSettingテーブルカラム: {columns}")
@@ -496,7 +499,38 @@ def migrate_database():
                         conn.commit()
                     print("✅ csv_filenameカラムを追加しました。")
                 
-            # AppInfoテーブルの確認
+                # created_at, updated_atカラムの確認と追加
+                missing_columns = []
+                for col_name in ['created_at', 'updated_at']:
+                    if col_name not in columns:
+                        missing_columns.append(col_name)
+                
+                if missing_columns:
+                    with db.engine.connect() as conn:
+                        for col_name in missing_columns:
+                            print(f"🔧 {col_name}カラムを追加します...")
+                            conn.execute(text(f'ALTER TABLE room_setting ADD COLUMN {col_name} DATETIME'))
+                            print(f"✅ {col_name}カラムを追加しました。")
+                        conn.commit()
+            
+            # 3. ★ 重要：password_reset_tokenテーブルの確認と修正
+            if inspector.has_table('password_reset_token'):
+                columns = [col['name'] for col in inspector.get_columns('password_reset_token')]
+                if 'used_at' not in columns:
+                    print("🔧 password_reset_tokenテーブルにused_atカラムを追加します...")
+                    with db.engine.connect() as conn:
+                        conn.execute(text('ALTER TABLE password_reset_token ADD COLUMN used_at DATETIME'))
+                        conn.commit()
+                    print("✅ used_atカラムを追加しました。")
+                else:
+                    print("used_atカラムは既に存在します。")
+            else:
+                print("🔧 password_reset_tokenテーブルを作成します...")
+                # テーブルが存在しない場合は作成
+                db.create_all()
+                print("✅ password_reset_tokenテーブルを作成しました。")
+            
+            # 4. AppInfoテーブルの確認
             if inspector.has_table('app_info'):
                 columns = [col['name'] for col in inspector.get_columns('app_info')]
                 missing_columns = []
@@ -522,26 +556,9 @@ def migrate_database():
                             print(f"✅ {col_name}カラムを追加しました。")
                         conn.commit()
             
-            # 4. userテーブルにlast_loginカラムを追加（重複チェック）
-            if inspector.has_table('user'):
-                user_columns = [col['name'] for col in inspector.get_columns('user')]
-                
-                if 'last_login' not in user_columns:
-                    print("userテーブルにlast_loginカラムを追加します...")
-                    with db.engine.connect() as conn:
-                        conn.execute(text("ALTER TABLE user ADD COLUMN last_login DATETIME"))
-                        # 既存ユーザーには現在時刻を設定
-                        conn.execute(text("UPDATE user SET last_login = datetime('now', 'localtime') WHERE last_login IS NULL"))
-                        conn.commit()
-                    print("✅ last_loginカラムを追加しました。")
-                else:
-                    print("last_loginカラムは既に存在します。")
-            
             # 5. RoomCsvFileテーブルの作成
-            if inspector.has_table('room_csv_file'):
-                print("room_csv_fileテーブルは既に存在します。")
-            else:
-                print("room_csv_fileテーブルを作成します...")
+            if not inspector.has_table('room_csv_file'):
+                print("🔧 room_csv_fileテーブルを作成します...")
                 try:
                     with db.engine.connect() as conn:
                         conn.execute(text('''
@@ -559,6 +576,8 @@ def migrate_database():
                     print("✅ room_csv_fileテーブルを作成しました。")
                 except Exception as e:
                     print(f"⚠️ room_csv_fileテーブル作成でエラー（続行）: {e}")
+            else:
+                print("room_csv_fileテーブルは既に存在します。")
 
             # 6. 既存CSVファイルをroom_csv_fileテーブルに登録（初回のみ）
             try:
@@ -779,20 +798,21 @@ def configure_production_database():
 def check_data_persistence():
     """データの永続化状況をチェック"""
     try:
-        user_count = User.query.count()
-        admin_count = User.query.filter_by(room_number='ADMIN').count()
-        room_settings_count = RoomSetting.query.count()
-        
-        print(f"📊 データ永続化状況:")
-        print(f"   総ユーザー数: {user_count}")
-        print(f"   管理者ユーザー: {admin_count}")
-        print(f"   部屋設定数: {room_settings_count}")
-        
-        if admin_count == 0:
-            print("⚠️ 管理者ユーザーが見つかりません！")
-            return False
-        
-        return True
+        with app.app_context():  # ★ アプリケーションコンテキストを追加
+            user_count = User.query.count()
+            admin_count = User.query.filter_by(room_number='ADMIN').count()
+            room_settings_count = RoomSetting.query.count()
+            
+            print(f"📊 データ永続化状況:")
+            print(f"   総ユーザー数: {user_count}")
+            print(f"   管理者ユーザー: {admin_count}")
+            print(f"   部屋設定数: {room_settings_count}")
+            
+            if admin_count == 0:
+                print("⚠️ 管理者ユーザーが見つかりません！")
+                return False
+            
+            return True
         
     except Exception as e:
         print(f"❌ データ永続化チェックエラー: {e}")
@@ -1347,102 +1367,101 @@ def admin_cleanup_expired_tokens():
 # app.py の password_reset 関数を完全に置き換える
 # 3268行目付近の問題のあるprint文も削除し、以下のコードに置き換える
 
+# app.py の password_reset 関数を以下に置き換える（重複する関数定義を削除し、1つに統一）
+
 @app.route('/password_reset/<token>', methods=['GET', 'POST'])
 def password_reset(token):
-    print(f"🔍 Password reset requested for token: {token}")
-    
-    def password_reset(token):
-        """パスワード再設定の実行"""
-        try:
-            # デバッグ用ログ（関数内に正しく配置）
-            print(f"🔍 Password reset requested for token: {token}")
-            print(f"🔍 Request method: {request.method}")
+    """パスワード再設定の実行"""
+    try:
+        # デバッグ用ログ
+        print(f"🔍 Password reset requested for token: {token}")
+        print(f"🔍 Request method: {request.method}")
+        
+        # トークンの検証
+        reset_token = PasswordResetToken.query.filter_by(token=token).first()
+        print(f"🔍 Token found in database: {reset_token is not None}")
+        
+        if reset_token:
+            print(f"🔍 Token user_id: {reset_token.user_id}")
+            print(f"🔍 Token used: {reset_token.used}")
+            print(f"🔍 Token expires_at: {reset_token.expires_at}")
+            print(f"🔍 Current time: {datetime.now(JST)}")
+            print(f"🔍 Token is_valid: {reset_token.is_valid()}")
+        
+        if not reset_token or not reset_token.is_valid():
+            if not reset_token:
+                print("❌ Token not found in database")
+            else:
+                print(f"❌ Token invalid - used: {reset_token.used}, expired: {reset_token.is_expired()}")
+            flash('無効なリンクまたは期限切れです。新しいパスワード再発行をリクエストしてください。', 'danger')
+            return redirect(url_for('password_reset_request'))
+        
+        if request.method == 'POST':
+            new_password = request.form.get('new_password', '').strip()
+            confirm_password = request.form.get('confirm_password', '').strip()
             
-            # トークンの検証
-            reset_token = PasswordResetToken.query.filter_by(token=token).first()
-            print(f"🔍 Token found in database: {reset_token is not None}")
+            if not new_password or not confirm_password:
+                flash('パスワードを入力してください。', 'danger')
+                context = get_template_context()
+                context.update({
+                    'token': token,
+                    'user': reset_token.user,
+                    'minutes_remaining': max(0, int((reset_token.expires_at - datetime.now(JST)).total_seconds() / 60))
+                })
+                return render_template('password_reset.html', **context)
             
-            if reset_token:
-                print(f"🔍 Token user_id: {reset_token.user_id}")
-                print(f"🔍 Token used: {reset_token.used}")
-                print(f"🔍 Token expires_at: {reset_token.expires_at}")
-                print(f"🔍 Current time: {datetime.now(JST)}")
-                print(f"🔍 Token is_valid: {reset_token.is_valid()}")
+            if new_password != confirm_password:
+                flash('パスワードが一致しません。', 'danger')
+                context = get_template_context()
+                context.update({
+                    'token': token,
+                    'user': reset_token.user,
+                    'minutes_remaining': max(0, int((reset_token.expires_at - datetime.now(JST)).total_seconds() / 60))
+                })
+                return render_template('password_reset.html', **context)
             
-            if not reset_token or not reset_token.is_valid():
-                if not reset_token:
-                    print("❌ Token not found in database")
-                else:
-                    print(f"❌ Token invalid - used: {reset_token.used}, expired: {reset_token.is_expired()}")
-                flash('無効なリンクまたは期限切れです。新しいパスワード再発行をリクエストしてください。', 'danger')
-                return redirect(url_for('password_reset_request'))
+            if len(new_password) < 6:
+                flash('パスワードは6文字以上で入力してください。', 'danger')
+                context = get_template_context()
+                context.update({
+                    'token': token,
+                    'user': reset_token.user,
+                    'minutes_remaining': max(0, int((reset_token.expires_at - datetime.now(JST)).total_seconds() / 60))
+                })
+                return render_template('password_reset.html', **context)
             
-            if request.method == 'POST':
-                new_password = request.form.get('new_password', '').strip()
-                confirm_password = request.form.get('confirm_password', '').strip()
-                
-                if not new_password or not confirm_password:
-                    flash('パスワードを入力してください。', 'danger')
-                    context = get_template_context()
-                    context.update({
-                        'token': token,
-                        'user': reset_token.user,
-                        'minutes_remaining': max(0, int((reset_token.expires_at - datetime.now(JST)).total_seconds() / 60))
-                    })
-                    return render_template('password_reset.html', **context)
-                
-                if new_password != confirm_password:
-                    flash('パスワードが一致しません。', 'danger')
-                    context = get_template_context()
-                    context.update({
-                        'token': token,
-                        'user': reset_token.user,
-                        'minutes_remaining': max(0, int((reset_token.expires_at - datetime.now(JST)).total_seconds() / 60))
-                    })
-                    return render_template('password_reset.html', **context)
-                
-                if len(new_password) < 6:
-                    flash('パスワードは6文字以上で入力してください。', 'danger')
-                    context = get_template_context()
-                    context.update({
-                        'token': token,
-                        'user': reset_token.user,
-                        'minutes_remaining': max(0, int((reset_token.expires_at - datetime.now(JST)).total_seconds() / 60))
-                    })
-                    return render_template('password_reset.html', **context)
-                
-                # パスワード更新
-                user = reset_token.user
-                user.set_individual_password(new_password)
-                
-                # トークンを使用済みにする
-                reset_token.mark_as_used()
-                
-                db.session.commit()
-                
-                flash('パスワードが正常に更新されました。新しいパスワードでログインしてください。', 'success')
-                return redirect(url_for('login_page'))
+            # パスワード更新
+            user = reset_token.user
+            user.set_individual_password(new_password)
             
-            # GET リクエスト時 - フォーム表示
-            time_remaining = reset_token.expires_at - datetime.now(JST)
-            minutes_remaining = max(0, int(time_remaining.total_seconds() / 60))
+            # トークンを使用済みにする
+            reset_token.mark_as_used()
             
-            context = get_template_context()
-            context.update({
-                'token': token,
-                'user': reset_token.user,
-                'minutes_remaining': minutes_remaining
-            })
+            db.session.commit()
             
-            return render_template('password_reset.html', **context)
-            
-        except Exception as e:
-            print(f"❌ Error in password_reset: {e}")
-            import traceback
-            traceback.print_exc()
-            
-            flash('システムエラーが発生しました。管理者にお問い合わせください。', 'danger')
+            flash('パスワードが正常に更新されました。新しいパスワードでログインしてください。', 'success')
             return redirect(url_for('login_page'))
+        
+        # GET リクエスト時 - フォーム表示
+        time_remaining = reset_token.expires_at - datetime.now(JST)
+        minutes_remaining = max(0, int(time_remaining.total_seconds() / 60))
+        
+        context = get_template_context()
+        context.update({
+            'token': token,
+            'user': reset_token.user,
+            'minutes_remaining': minutes_remaining
+        })
+        
+        return render_template('password_reset.html', **context)
+        
+    except Exception as e:
+        print(f"❌ Error in password_reset: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        flash('システムエラーが発生しました。管理者にお問い合わせください。', 'danger')
+        return redirect(url_for('login_page'))
 
 def is_mail_configured():
     """メール設定が完了しているかをチェック"""
@@ -2483,23 +2502,24 @@ def verify_room_settings():
     print("\n🔍 部屋設定の整合性確認中...")
     
     try:
-        settings = RoomSetting.query.all()
-        print(f"📋 登録済み部屋設定: {len(settings)}件")
-        
-        for setting in settings:
-            csv_path = setting.csv_filename
-            if csv_path != "words.csv":
-                full_path = os.path.join(ROOM_CSV_FOLDER, csv_path)
-                if not os.path.exists(full_path):
-                    print(f"⚠️ 部屋{setting.room_number}: {csv_path} が見つからない -> デフォルトに変更")
-                    setting.csv_filename = "words.csv"
+        with app.app_context():  # ★ アプリケーションコンテキストを追加
+            settings = RoomSetting.query.all()
+            print(f"📋 登録済み部屋設定: {len(settings)}件")
+            
+            for setting in settings:
+                csv_path = setting.csv_filename
+                if csv_path != "words.csv":
+                    full_path = os.path.join(ROOM_CSV_FOLDER, csv_path)
+                    if not os.path.exists(full_path):
+                        print(f"⚠️ 部屋{setting.room_number}: {csv_path} が見つからない -> デフォルトに変更")
+                        setting.csv_filename = "words.csv"
+                    else:
+                        print(f"✅ 部屋{setting.room_number}: {csv_path} 確認OK")
                 else:
-                    print(f"✅ 部屋{setting.room_number}: {csv_path} 確認OK")
-            else:
-                print(f"📄 部屋{setting.room_number}: デフォルト使用")
-        
-        db.session.commit()
-        print("✅ 部屋設定確認完了\n")
+                    print(f"📄 部屋{setting.room_number}: デフォルト使用")
+            
+            db.session.commit()
+            print("✅ 部屋設定確認完了\n")
         
     except Exception as e:
         print(f"❌ 部屋設定確認エラー: {e}\n")

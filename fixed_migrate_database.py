@@ -1,5 +1,5 @@
 # fixed_migrate_database.py
-# SQLite対応版 - non-constant default問題を解決
+# SQLite対応版 - password_reset_tokenテーブル修正を含む完全版
 
 import sqlite3
 import os
@@ -7,7 +7,7 @@ from datetime import datetime
 import shutil
 
 def migrate_database():
-    """SQLite対応のデータベースマイグレーション"""
+    """SQLite対応のデータベースマイグレーション（完全版）"""
     
     # データベースファイルのパス
     db_path = 'quiz_data.db'
@@ -69,9 +69,7 @@ def migrate_database():
             # created_atとupdated_atカラムの追加（SQLite対応版）
             if 'created_at' not in columns:
                 print("created_atカラムを追加します...")
-                # SQLiteではnon-constant defaultを使えないため、NULL許可で追加後に更新
                 cursor.execute("ALTER TABLE room_setting ADD COLUMN created_at DATETIME;")
-                # 既存のレコードに現在時刻を設定
                 cursor.execute("UPDATE room_setting SET created_at = datetime('now', 'localtime') WHERE created_at IS NULL;")
                 print("✅ created_atカラムを追加しました。")
             
@@ -185,6 +183,39 @@ def migrate_database():
         else:
             print("last_loginカラムは既に存在します。")
         
+        # 5. ★ 新規追加：password_reset_tokenテーブルの修正
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='password_reset_token';")
+        password_token_table_exists = cursor.fetchone() is not None
+        
+        if password_token_table_exists:
+            print("password_reset_tokenテーブルの構造を確認します...")
+            cursor.execute("PRAGMA table_info(password_reset_token);")
+            password_token_columns = [column[1] for column in cursor.fetchall()]
+            print(f"password_reset_tokenテーブルの現在の列: {password_token_columns}")
+            
+            # used_atカラムが存在しない場合は追加
+            if 'used_at' not in password_token_columns:
+                print("used_atカラムを追加します...")
+                cursor.execute("ALTER TABLE password_reset_token ADD COLUMN used_at DATETIME;")
+                print("✅ used_atカラムを追加しました。")
+            else:
+                print("used_atカラムは既に存在します。")
+        else:
+            print("password_reset_tokenテーブルを作成します...")
+            cursor.execute('''
+                CREATE TABLE password_reset_token (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    token VARCHAR(100) NOT NULL UNIQUE,
+                    created_at DATETIME DEFAULT (datetime('now', 'localtime')),
+                    expires_at DATETIME NOT NULL,
+                    used BOOLEAN DEFAULT 0,
+                    used_at DATETIME,
+                    FOREIGN KEY (user_id) REFERENCES user (id)
+                )
+            ''')
+            print("✅ password_reset_tokenテーブルを作成しました。")
+        
         # 変更をコミット
         conn.commit()
         print("✅ データベースのマイグレーションが完了しました。")
@@ -210,6 +241,13 @@ def migrate_database():
         cursor.execute("PRAGMA table_info(user);")
         columns = cursor.fetchall()
         print("userテーブル:")
+        for column in columns:
+            print(f"  - {column[1]} ({column[2]})")
+        
+        # password_reset_tokenテーブル
+        cursor.execute("PRAGMA table_info(password_reset_token);")
+        columns = cursor.fetchall()
+        print("password_reset_tokenテーブル:")
         for column in columns:
             print(f"  - {column[1]} ({column[2]})")
         
@@ -239,26 +277,31 @@ def verify_migration():
     cursor = conn.cursor()
     
     try:
-        # app_infoテーブルの存在確認
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='app_info';")
-        app_info_table_exists = cursor.fetchone() is not None
+        # 必要なテーブルの存在確認
+        required_tables = ['app_info', 'password_reset_token', 'room_setting', 'room_csv_file', 'user']
         
-        if not app_info_table_exists:
-            print("❌ app_infoテーブルが存在しません。")
-            return False
+        for table_name in required_tables:
+            cursor.execute(f"SELECT name FROM sqlite_master WHERE type='table' AND name='{table_name}';")
+            table_exists = cursor.fetchone() is not None
+            
+            if not table_exists:
+                print(f"❌ {table_name}テーブルが存在しません。")
+                return False
+            else:
+                print(f"✅ {table_name}テーブル: 存在確認OK")
         
-        # app_infoテーブルの構造確認
-        cursor.execute("PRAGMA table_info(app_info);")
-        app_info_columns = [column[1] for column in cursor.fetchall()]
+        # password_reset_tokenテーブルの構造確認
+        cursor.execute("PRAGMA table_info(password_reset_token);")
+        password_token_columns = [column[1] for column in cursor.fetchall()]
         
-        required_columns = ['id', 'app_name', 'version', 'last_updated_date', 'update_content']
-        missing_columns = [col for col in required_columns if col not in app_info_columns]
+        required_columns = ['id', 'user_id', 'token', 'created_at', 'expires_at', 'used', 'used_at']
+        missing_columns = [col for col in required_columns if col not in password_token_columns]
         
         if missing_columns:
-            print(f"❌ app_infoテーブルに必要なカラムが不足しています: {missing_columns}")
+            print(f"❌ password_reset_tokenテーブルに必要なカラムが不足しています: {missing_columns}")
             return False
         
-        # デフォルトデータの存在確認
+        # app_infoテーブルのデータ確認
         cursor.execute("SELECT COUNT(*) FROM app_info;")
         app_info_count = cursor.fetchone()[0]
         
@@ -287,6 +330,7 @@ if __name__ == "__main__":
             print("これでアプリケーションを起動できます。")
             print("\n📱 新機能：")
             print("- アプリ情報管理機能が追加されました")
+            print("- パスワードリセット機能が修正されました")
             print("- 管理者ページからアプリ名、更新内容等を編集できます")
         else:
             print("\n❌ マイグレーションの検証に失敗しました。")
