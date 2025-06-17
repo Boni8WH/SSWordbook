@@ -846,73 +846,101 @@ def generate_temp_password():
     characters = string.ascii_letters + string.digits
     return ''.join(secrets.choice(characters) for _ in range(8))
 
+# app.py のメール送信関数を以下に置き換え
+
 def send_password_reset_email(user, email, token):
-    """パスワード再発行メールを送信"""
-    app_info = AppInfo.get_current_info()
-    
-    reset_url = url_for('password_reset', token=token, _external=True)
-    
-    subject = f'[{app_info.app_name}] パスワード再発行のご案内'
-    
-    # メール本文（HTML）
-    html_body = f'''
-    <html>
-    <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-        <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 8px;">
-            <h2 style="color: #2c3e50; text-align: center;">{app_info.app_name}</h2>
-            <h3 style="color: #34495e;">パスワード再発行のご案内</h3>
-            
-            <p>いつもご利用いただきありがとうございます。</p>
-            
-            <p>以下のアカウントのパスワード再発行が要求されました：</p>
-            <ul style="background-color: #f8f9fa; padding: 15px; border-radius: 5px;">
-                <li><strong>部屋番号:</strong> {user.room_number}</li>
-                <li><strong>出席番号:</strong> {user.student_id}</li>
-                <li><strong>アカウント名:</strong> {user.username}</li>
-                <li><strong>送信先メール:</strong> {email}</li>
-            </ul>
-            
-            <p>下記のリンクをクリックして、新しいパスワードを設定してください：</p>
-            
-            <div style="text-align: center; margin: 30px 0;">
-                <a href="{reset_url}" 
-                   style="display: inline-block; padding: 12px 30px; background-color: #3498db; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">
-                    パスワードを再設定する
-                </a>
-            </div>
-            
-            <div style="background-color: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 5px; margin: 20px 0;">
-                <h4 style="color: #856404; margin-top: 0;">⚠️ 重要事項</h4>
-                <ul style="color: #856404; margin-bottom: 0;">
-                    <li>このリンクは<strong>1時間以内</strong>に使用してください</li>
-                    <li>リンクは<strong>1回のみ</strong>使用可能です</li>
-                    <li>パスワード再発行を要求していない場合は、このメールを無視してください</li>
+    """パスワード再発行メールを送信（エラーハンドリング強化版）"""
+    try:
+        print(f"🔍 メール送信開始: {email}")
+        
+        # メール設定の再確認
+        mail_server = app.config.get('MAIL_SERVER')
+        mail_username = app.config.get('MAIL_USERNAME')
+        mail_password = app.config.get('MAIL_PASSWORD')
+        mail_sender = app.config.get('MAIL_DEFAULT_SENDER')
+        
+        print(f"🔍 メール設定確認:")
+        print(f"  MAIL_SERVER: {mail_server}")
+        print(f"  MAIL_USERNAME: {mail_username}")
+        print(f"  MAIL_DEFAULT_SENDER: {mail_sender}")
+        print(f"  MAIL_PASSWORD: {'設定済み' if mail_password else '未設定'}")
+        
+        if not all([mail_server, mail_username, mail_password, mail_sender]):
+            missing = []
+            if not mail_server: missing.append('MAIL_SERVER')
+            if not mail_username: missing.append('MAIL_USERNAME') 
+            if not mail_password: missing.append('MAIL_PASSWORD')
+            if not mail_sender: missing.append('MAIL_DEFAULT_SENDER')
+            raise Exception(f"メール設定が不完全です。不足: {', '.join(missing)}")
+        
+        # AppInfo取得
+        app_info = AppInfo.get_current_info()
+        
+        # リセットURL生成
+        reset_url = url_for('password_reset', token=token, _external=True)
+        print(f"🔍 リセットURL: {reset_url}")
+        
+        subject = f'[{app_info.app_name}] パスワード再発行のご案内'
+        
+        # HTML版メール本文
+        html_body = f'''
+        <html>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+            <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 8px;">
+                <h2 style="color: #2c3e50; text-align: center;">{app_info.app_name}</h2>
+                <h3 style="color: #34495e;">パスワード再発行のご案内</h3>
+                
+                <p>いつもご利用いただきありがとうございます。</p>
+                
+                <p>以下のアカウントのパスワード再発行が要求されました：</p>
+                <ul style="background-color: #f8f9fa; padding: 15px; border-radius: 5px;">
+                    <li><strong>部屋番号:</strong> {user.room_number}</li>
+                    <li><strong>出席番号:</strong> {user.student_id}</li>
+                    <li><strong>アカウント名:</strong> {user.username}</li>
+                    <li><strong>送信先メール:</strong> {email}</li>
                 </ul>
+                
+                <p>下記のリンクをクリックして、新しいパスワードを設定してください：</p>
+                
+                <div style="text-align: center; margin: 30px 0;">
+                    <a href="{reset_url}" 
+                       style="display: inline-block; padding: 12px 30px; background-color: #3498db; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">
+                        パスワードを再設定する
+                    </a>
+                </div>
+                
+                <div style="background-color: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 5px; margin: 20px 0;">
+                    <h4 style="color: #856404; margin-top: 0;">⚠️ 重要事項</h4>
+                    <ul style="color: #856404; margin-bottom: 0;">
+                        <li>このリンクは<strong>1時間以内</strong>に使用してください</li>
+                        <li>リンクは<strong>1回のみ</strong>使用可能です</li>
+                        <li>パスワード再発行を要求していない場合は、このメールを無視してください</li>
+                    </ul>
+                </div>
+                
+                <p>リンクがクリックできない場合は、以下のURLをコピーしてブラウザのアドレスバーに貼り付けてください：</p>
+                <p style="word-break: break-all; background-color: #f8f9fa; padding: 10px; border-radius: 3px; font-family: monospace;">
+                    {reset_url}
+                </p>
+                
+                <hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;">
+                
+                <p style="font-size: 0.9em; color: #666;">
+                    このメールに心当たりがない場合は、誰かが間違ってあなたのメールアドレスを入力した可能性があります。<br>
+                    その場合は、このメールを無視していただいて構いません。
+                </p>
+                
+                <p style="font-size: 0.9em; color: #666; text-align: center; margin-top: 30px;">
+                    {app_info.app_name} システム<br>
+                    {app_info.contact_email if app_info.contact_email else ''}
+                </p>
             </div>
-            
-            <p>リンクがクリックできない場合は、以下のURLをコピーしてブラウザのアドレスバーに貼り付けてください：</p>
-            <p style="word-break: break-all; background-color: #f8f9fa; padding: 10px; border-radius: 3px; font-family: monospace;">
-                {reset_url}
-            </p>
-            
-            <hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;">
-            
-            <p style="font-size: 0.9em; color: #666;">
-                このメールに心当たりがない場合は、誰かが間違ってあなたのメールアドレスを入力した可能性があります。<br>
-                その場合は、このメールを無視していただいて構いません。
-            </p>
-            
-            <p style="font-size: 0.9em; color: #666; text-align: center; margin-top: 30px;">
-                {app_info.app_name} システム<br>
-                {app_info.contact_email if app_info.contact_email else ''}
-            </p>
-        </div>
-    </body>
-    </html>
-    '''
-    
-    # テキスト版メール本文
-    text_body = f'''
+        </body>
+        </html>
+        '''
+        
+        # テキスト版メール本文
+        text_body = f'''
 {app_info.app_name} パスワード再発行のご案内
 
 いつもご利用いただきありがとうございます。
@@ -936,22 +964,45 @@ def send_password_reset_email(user, email, token):
 
 {app_info.app_name} システム
 {app_info.contact_email if app_info.contact_email else ''}
-    '''
-    
-    try:
+        '''
+        
+        # メッセージ作成
+        print(f"🔍 メッセージ作成中...")
         msg = Message(
             subject=subject,
             recipients=[email],
             html=html_body,
-            body=text_body
+            body=text_body,
+            sender=mail_sender
         )
         
+        print(f"🔍 メッセージ詳細:")
+        print(f"  件名: {subject}")
+        print(f"  送信者: {mail_sender}")
+        print(f"  受信者: {email}")
+        
+        # メール送信
+        print(f"🔍 メール送信実行中...")
         mail.send(msg)
-        print(f"パスワード再発行メール送信成功: {email}")
+        print(f"✅ パスワード再発行メール送信成功: {email}")
+        
+        return True
         
     except Exception as e:
-        print(f"メール送信エラー: {e}")
-        raise
+        print(f"❌ メール送信エラー: {e}")
+        print(f"❌ エラータイプ: {type(e).__name__}")
+        import traceback
+        traceback.print_exc()
+        
+        # 具体的なエラー情報
+        if 'authentication' in str(e).lower():
+            print("❌ Gmail認証エラー: アプリパスワードを確認してください")
+        elif 'connection' in str(e).lower():
+            print("❌ 接続エラー: SMTPサーバーへの接続に失敗しました")
+        elif 'timeout' in str(e).lower():
+            print("❌ タイムアウトエラー: ネットワーク接続を確認してください")
+        
+        raise e
 
 
 # ====================================================================
@@ -1211,13 +1262,30 @@ def password_reset_request():
             
             # メール送信
             try:
-                send_password_reset_email(user, email, reset_token)
-                flash('入力された情報に一致するアカウントが見つかりました。パスワード再発行のご案内をメールで送信しました。メールをご確認ください。', 'success')
+                print(f"🔍 メール送信処理開始...")
+                success = send_password_reset_email(user, email, reset_token)
+                if success:
+                    flash('入力された情報に一致するアカウントが見つかりました。パスワード再発行のご案内をメールで送信しました。メールをご確認ください。', 'success')
+                    print(f"✅ メール送信完了")
+                else:
+                    flash('メール送信に失敗しました。しばらく後に再度お試しください。', 'danger')
+                    # トークンを無効化
+                    password_reset_token.used = True
+                    db.session.commit()
             except Exception as email_error:
-                print(f"メール送信エラー: {email_error}")
+                print(f"❌ メール送信例外: {email_error}")
                 import traceback
                 traceback.print_exc()
-                flash('メール送信中にエラーが発生しました。しばらく後に再度お試しください。', 'danger')
+                
+                # ユーザーフレンドリーなエラーメッセージ
+                error_msg = str(email_error).lower()
+                if 'authentication' in error_msg:
+                    flash('メール送信の認証に失敗しました。システム管理者にお問い合わせください。', 'danger')
+                elif 'connection' in error_msg or 'timeout' in error_msg:
+                    flash('メールサーバーへの接続に失敗しました。しばらく後に再度お試しください。', 'danger')
+                else:
+                    flash('メール送信中にエラーが発生しました。システム管理者にお問い合わせください。', 'danger')
+                
                 # トークンを無効化
                 password_reset_token.used = True
                 db.session.commit()
@@ -3265,6 +3333,27 @@ def debug_force_fix_user_data():
 # app.py の先頭付近に追加
 import logging
 logging.basicConfig(level=logging.DEBUG)
+
+# app.pyに追加する診断関数
+def diagnose_mail_config():
+    """メール設定を診断"""
+    print("\n=== メール設定診断 ===")
+    required_vars = ['MAIL_SERVER', 'MAIL_USERNAME', 'MAIL_PASSWORD', 'MAIL_DEFAULT_SENDER']
+    
+    for var in required_vars:
+        value = os.environ.get(var)
+        if value:
+            if 'PASSWORD' in var:
+                print(f"{var}: {'*' * len(value)} (設定済み)")
+            else:
+                print(f"{var}: {value}")
+        else:
+            print(f"{var}: ❌ 未設定")
+    
+    print("===================\n")
+
+# アプリ起動時に診断実行
+diagnose_mail_config()
 
 # ====================================================================
 # アプリケーション起動
