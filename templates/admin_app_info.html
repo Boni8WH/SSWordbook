@@ -1,0 +1,250 @@
+{% extends "base.html" %}
+
+{% block title %}アプリ情報管理 - 世界史単語帳{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h2>📱 アプリ情報管理</h2>
+    
+    <div class="alert alert-info">
+        <strong>このページについて：</strong> アプリの表示名、更新日時、更新内容などを編集できます。<br>
+        ここで設定した情報は、ログイン画面や学習画面のアプリ情報として表示されます。
+    </div>
+
+    <!-- 現在の設定内容の表示 -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <h3>📋 現在の設定</h3>
+            <div class="card">
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>アプリ名:</strong> {{ app_info.app_name }}</p>
+                            <p><strong>バージョン:</strong> {{ app_info.version }}</p>
+                            <p><strong>最終更新日:</strong> {{ app_info.last_updated_date }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>フッターテキスト:</strong> {{ app_info.footer_text or "（未設定）" }}</p>
+                            <p><strong>連絡先:</strong> {{ app_info.contact_email or "（未設定）" }}</p>
+                            <p><strong>最終更新者:</strong> {{ app_info.updated_by }}</p>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-12">
+                            <p><strong>更新内容:</strong></p>
+                            <div class="alert alert-light">{{ app_info.update_content }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- アプリ情報編集フォーム -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <h3>✏️ アプリ情報編集</h3>
+            <form action="{{ url_for('admin_app_info') }}" method="POST" class="app-info-form">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="app_name" class="form-label">アプリ名:</label>
+                            <input type="text" 
+                                   id="app_name" 
+                                   name="app_name" 
+                                   class="form-control" 
+                                   value="{{ app_info.app_name }}" 
+                                   required 
+                                   maxlength="100"
+                                   placeholder="例: 世界史単語帳">
+                            <div class="form-text">アプリのタイトルとして表示されます</div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="version" class="form-label">バージョン:</label>
+                            <input type="text" 
+                                   id="version" 
+                                   name="version" 
+                                   class="form-control" 
+                                   value="{{ app_info.version }}" 
+                                   required 
+                                   maxlength="20"
+                                   placeholder="例: 1.2.0">
+                            <div class="form-text">バージョン番号（セマンティックバージョニング推奨）</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="last_updated_date" class="form-label">最終更新日:</label>
+                            <input type="text" 
+                                   id="last_updated_date" 
+                                   name="last_updated_date" 
+                                   class="form-control" 
+                                   value="{{ app_info.last_updated_date }}" 
+                                   required 
+                                   maxlength="50"
+                                   placeholder="例: 2025年6月15日">
+                            <div class="form-text">ユーザーに表示される更新日</div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="contact_email" class="form-label">連絡先メール:</label>
+                            <input type="email" 
+                                   id="contact_email" 
+                                   name="contact_email" 
+                                   class="form-control" 
+                                   value="{{ app_info.contact_email }}" 
+                                   maxlength="100"
+                                   placeholder="例: contact@example.com">
+                            <div class="form-text">問い合わせ先として表示（任意）</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-12">
+                        <div class="mb-3">
+                            <label for="footer_text" class="form-label">フッターテキスト:</label>
+                            <input type="text" 
+                                   id="footer_text" 
+                                   name="footer_text" 
+                                   class="form-control" 
+                                   value="{{ app_info.footer_text }}" 
+                                   maxlength="200"
+                                   placeholder="例: © 2025 学校名. All rights reserved.">
+                            <div class="form-text">ページ下部に表示されるテキスト（任意）</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-12">
+                        <div class="mb-3">
+                            <label for="update_content" class="form-label">更新内容:</label>
+                            <textarea id="update_content" 
+                                      name="update_content" 
+                                      class="form-control" 
+                                      rows="4" 
+                                      required 
+                                      placeholder="例: 新機能として苦手問題の自動出題機能を追加しました。">{{ app_info.update_content }}</textarea>
+                            <div class="form-text">ユーザーに表示される更新内容の説明</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex gap-2 mb-4">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> 保存
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" onclick="window.location.reload()">
+                        <i class="fas fa-undo"></i> 変更を破棄
+                    </button>
+                    <button type="button" class="btn btn-warning" onclick="confirmReset()">
+                        <i class="fas fa-refresh"></i> デフォルトに戻す
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- プレビューセクション -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <h3>👁️ プレビュー</h3>
+            <div class="card">
+                <div class="card-header">
+                    <strong>ユーザーに表示される情報</strong>
+                </div>
+                <div class="card-body">
+                    <div id="preview-area">
+                        <h4 id="preview-app-name">{{ app_info.app_name }}</h4>
+                        <p><strong>バージョン:</strong> <span id="preview-version">{{ app_info.version }}</span></p>
+                        <p><strong>最終更新日:</strong> <span id="preview-date">{{ app_info.last_updated_date }}</span></p>
+                        <div class="alert alert-info">
+                            <strong>更新内容:</strong><br>
+                            <span id="preview-content">{{ app_info.update_content }}</span>
+                        </div>
+                        <div id="preview-footer" class="text-muted small">
+                            {{ app_info.footer_text }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- アクションボタン -->
+    <div class="d-flex gap-2 mb-4">
+        <a href="{{ url_for('admin_page') }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> 管理者ページに戻る
+        </a>
+        <a href="{{ url_for('index') }}" class="btn btn-success" target="_blank">
+            <i class="fas fa-external-link-alt"></i> 実際の表示を確認
+        </a>
+    </div>
+
+    <!-- 変更履歴 -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <h3>📝 変更履歴</h3>
+            <div class="card">
+                <div class="card-body">
+                    <p><strong>最終更新:</strong> {{ app_info.updated_at.strftime('%Y年%m月%d日 %H:%M:%S') if app_info.updated_at else '不明' }}</p>
+                    <p><strong>更新者:</strong> {{ app_info.updated_by }}</p>
+                    <p><strong>作成日:</strong> {{ app_info.created_at.strftime('%Y年%m月%d日 %H:%M:%S') if app_info.created_at else '不明' }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- リセット確認フォーム（非表示） -->
+<form id="resetForm" action="{{ url_for('admin_app_info_reset') }}" method="POST" style="display: none;">
+</form>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // リアルタイムプレビュー機能
+    const form = document.querySelector('.app-info-form');
+    const inputs = form.querySelectorAll('input, textarea');
+    
+    inputs.forEach(input => {
+        input.addEventListener('input', updatePreview);
+    });
+    
+    function updatePreview() {
+        const appName = document.getElementById('app_name').value;
+        const version = document.getElementById('version').value;
+        const lastUpdatedDate = document.getElementById('last_updated_date').value;
+        const updateContent = document.getElementById('update_content').value;
+        const footerText = document.getElementById('footer_text').value;
+        
+        // プレビューを更新
+        document.getElementById('preview-app-name').textContent = appName || '世界史単語帳';
+        document.getElementById('preview-version').textContent = version || '1.0.0';
+        document.getElementById('preview-date').textContent = lastUpdatedDate || '2025年6月15日';
+        document.getElementById('preview-content').textContent = updateContent || 'アプリケーションが開始されました。';
+        document.getElementById('preview-footer').textContent = footerText || '';
+    }
+    
+    // フォーム送信時の確認
+    form.addEventListener('submit', function(e) {
+        if (!confirm('アプリ情報を更新しますか？\n\n変更内容は即座にユーザーに反映されます。')) {
+            e.preventDefault();
+        }
+    });
+});
+
+// デフォルトリセット確認
+function confirmReset() {
+    if (confirm('アプリ情報をデフォルト値にリセットしますか？\n\n⚠️ この操作は元に戻せません。')) {
+        document.getElementById('resetForm').submit();
+    }
+}
+</script>
+{% endblock %}
