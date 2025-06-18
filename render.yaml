@@ -1,4 +1,4 @@
-# render.yaml - データ永続化対応版
+# render.yaml - データ永続化対応版（修正版）
 services:
   # Webサービス（メインアプリケーション）
   - type: web
@@ -34,17 +34,12 @@ services:
         value: "production"
       - key: DATABASE_URL
         fromDatabase:
-          name: world_history_postgres
+          name: world_history_postgres  # ←修正：実際のサービス名に変更
           property: connectionString
 
     # 自動デプロイ設定
     autoDeploy: true
 
 # データベースサービス（PostgreSQL）
-databases:
-  - name: world_history_postgres
-    databaseName: sekaishi_db
-    user: sekaishi_user
-    plan: free
-    region: singapore
-    postgresMajorVersion: 15
+# 注意: 既存のPostgreSQLサービスを使用するため、databases セクションは削除
+# 既存の world_history_postgres サービスが fromDatabase で参照されます
