@@ -20,6 +20,37 @@ from sqlalchemy import inspect, text
 # 日本時間のタイムゾーンオブジェクトを作成
 JST = pytz.timezone('Asia/Tokyo')
 
+# ===== PostgreSQL設定（Render用） =====
+def configure_production_database():
+    """本番環境用のデータベース設定"""
+    database_url = os.environ.get('DATABASE_URL')
+    
+    if database_url:
+        print("🐘 PostgreSQL設定を適用中...")
+        
+        # PostgreSQL用のURLフォーマット修正
+        if database_url.startswith('postgres://'):
+            database_url = database_url.replace('postgres://', 'postgresql://', 1)
+        
+        app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+        app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+            'pool_timeout': 20,
+            'pool_recycle': -1,
+            'pool_pre_ping': True,
+            'connect_args': {
+                'connect_timeout': 10,
+            }
+        }
+        print(f"✅ PostgreSQL接続設定完了: {database_url[:50]}...")
+        return True
+    else:
+        print("📄 ローカル環境用SQLite設定")
+        app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'quiz_data.db')
+        return False
+
+# PostgreSQL設定（該当する場合）
+is_postgres = configure_production_database()
+
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your_secret_key_here_please_change_this_in_production'
 basedir = os.path.abspath(os.path.dirname(__file__))
@@ -658,33 +689,6 @@ def create_tables_and_admin_user():
             db.session.rollback()
             # 例外を再発生させてアプリケーションの起動を停止
             raise
-
-# ===== PostgreSQL設定（Render用） =====
-def configure_production_database():
-    """本番環境用のデータベース設定"""
-    database_url = os.environ.get('DATABASE_URL')
-    
-    if database_url:
-        print("🐘 PostgreSQL設定を適用中...")
-        
-        # PostgreSQL用のURLフォーマット修正
-        if database_url.startswith('postgres://'):
-            database_url = database_url.replace('postgres://', 'postgresql://', 1)
-        
-        app.config['SQLALCHEMY_DATABASE_URI'] = database_url
-        app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-            'pool_timeout': 20,
-            'pool_recycle': -1,
-            'pool_pre_ping': True,
-            'connect_args': {
-                'connect_timeout': 10,
-            }
-        }
-        print(f"✅ PostgreSQL接続設定完了: {database_url[:50]}...")
-        return True
-    else:
-        print("📄 SQLite設定を維持")
-        return False
     
 # ===== データ永続化チェック機能 =====
 def check_data_persistence():
@@ -3288,18 +3292,12 @@ def diagnose_mail_config():
 # アプリ起動時に診断実行
 diagnose_mail_config()
 
-# ====================================================================
-# アプリケーション起動
-# ====================================================================
-
 # ===== メイン起動処理の修正 =====
 if __name__ == '__main__':
     try:
         # 環境設定
         print_render_recommendations()
         
-        # PostgreSQL設定（該当する場合）
-        is_postgres = configure_production_database()
         
         # データベース初期化
         create_tables_and_admin_user()
