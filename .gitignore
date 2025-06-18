@@ -2,6 +2,16 @@
 quiz_data.db
 *.db
 
+# 移行ファイル（セキュリティ）
+migration_data.json
+create_users_csv.py
+users_for_upload.csv
+fixed_migrate_database.py
+
+# アップロードファイル
+uploads/
+room_csv/
+
 # Python
 __pycache__/
 *.pyc
@@ -10,7 +20,3 @@ __pycache__/
 # 環境設定
 .env
 .venv/
-
-# アップロードファイル
-uploads/
-room_csv/
