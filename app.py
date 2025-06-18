@@ -579,7 +579,7 @@ def migrate_database():
 
 # データベース初期化関数（完全リセット対応版）
 def create_tables_and_admin_user():
-    """データベース初期化関数（データ永続化対応版）"""
+    """データベース初期化関数（PostgreSQLスキーマ対応版）"""
     with app.app_context():
         print("🔧 PostgreSQL専用データベース初期化を開始...")
         
@@ -592,9 +592,20 @@ def create_tables_and_admin_user():
                 print("⚠️ 警告: PostgreSQL以外のデータベースが検出されました")
                 print(f"DB URL: {db_url[:50]}...")
             
-            # 既存のテーブル確認
+            # 既存のテーブル確認（PostgreSQLスキーマ対応）
             inspector = inspect(db.engine)
-            existing_tables = inspector.get_table_names()
+            
+            # PostgreSQLの場合、publicスキーマとschema=Noneの両方をチェック
+            existing_tables = []
+            if is_postgres:
+                # publicスキーマのテーブルを取得
+                public_tables = inspector.get_table_names(schema='public')
+                # デフォルトスキーマのテーブルを取得
+                default_tables = inspector.get_table_names()
+                existing_tables = list(set(public_tables + default_tables))
+                print(f"📋 PostgreSQL接続: publicスキーマ={len(public_tables)}テーブル, デフォルト={len(default_tables)}テーブル")
+            else:
+                existing_tables = inspector.get_table_names()
             
             if existing_tables:
                 print(f"📋 既存のテーブル: {existing_tables}")
