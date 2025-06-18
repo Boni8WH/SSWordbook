@@ -48,8 +48,6 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 
 # 部屋ごとのCSVファイルを保存するフォルダ
 ROOM_CSV_FOLDER = 'room_csv'
-if not os.path.exists(ROOM_CSV_FOLDER):
-    os.makedirs(ROOM_CSV_FOLDER)
 
 # ====================================================================
 # アプリ情報を取得するヘルパー関数
@@ -244,7 +242,7 @@ class CsvFileContent(db.Model):
 
 # 部屋ごとの単語データを読み込む関数
 def load_word_data_for_room(room_number):
-    """指定された部屋の単語データを読み込む（データベース対応版）"""
+    """指定された部屋の単語データを読み込む（完全DB対応版）"""
     try:
         # データベースから部屋設定を取得
         room_setting = RoomSetting.query.filter_by(room_number=room_number).first()
@@ -253,6 +251,8 @@ def load_word_data_for_room(room_number):
             csv_filename = room_setting.csv_filename
         else:
             csv_filename = "words.csv"
+        
+        print(f"🔍 部屋{room_number}のCSVファイル: {csv_filename}")
         
         # デフォルトファイルの場合
         if csv_filename == "words.csv":
@@ -265,30 +265,40 @@ def load_word_data_for_room(room_number):
                         row['chapter'] = str(row['chapter'])
                         row['number'] = str(row['number'])
                         word_data.append(row)
+                print(f"✅ デフォルトファイル読み込み: {len(word_data)}問")
             except FileNotFoundError:
                 print(f"❌ デフォルトファイルが見つかりません: words.csv")
                 return []
         else:
-            # データベースからカスタムCSVの内容を取得
+            # ★重要：データベースからカスタムCSVの内容を取得
             csv_file = CsvFileContent.query.filter_by(filename=csv_filename).first()
             if csv_file:
-                word_data = csv_file.get_csv_data()
-                # データ形式を統一
-                for row in word_data:
-                    row['enabled'] = row.get('enabled', '1') == '1'
-                    row['chapter'] = str(row['chapter'])
-                    row['number'] = str(row['number'])
-                print(f"✅ データベースからCSV読み込み: {len(word_data)}問")
+                try:
+                    # CSV内容をパース
+                    content = csv_file.content
+                    reader = csv.DictReader(StringIO(content))
+                    word_data = []
+                    for row in reader:
+                        row['enabled'] = row.get('enabled', '1') == '1'
+                        row['chapter'] = str(row['chapter'])
+                        row['number'] = str(row['number'])
+                        word_data.append(row)
+                    print(f"✅ データベースからCSV読み込み: {len(word_data)}問 from {csv_filename}")
+                except Exception as parse_error:
+                    print(f"❌ CSVパースエラー: {parse_error}")
+                    return []
             else:
                 print(f"❌ データベースにCSVが見つかりません: {csv_filename}")
                 # フォールバック: デフォルトファイル使用
+                print("🔄 デフォルトファイルにフォールバック")
                 return load_word_data_for_room("default")
         
-        print(f"📊 読み込み完了: {len(word_data)}問 from {csv_filename}")
         return word_data
         
     except Exception as e:
         print(f"❌ 読み込みエラー: {e}")
+        import traceback
+        traceback.print_exc()
         return []
 
 # 管理者用：全体のデフォルト単語データを読み込む関数
@@ -607,47 +617,6 @@ def migrate_database():
                     print(f"⚠️ room_csv_fileテーブル作成でエラー（続行）: {e}")
             else:
                 print("room_csv_fileテーブルは既に存在します。")
-
-            # 6. 既存CSVファイルをroom_csv_fileテーブルに登録（初回のみ）
-            try:
-                if os.path.exists(ROOM_CSV_FOLDER):
-                    for filename in os.listdir(ROOM_CSV_FOLDER):
-                        if filename.endswith('.csv'):
-                            # データベースに既に登録されているかチェック
-                            with db.engine.connect() as conn:
-                                result = conn.execute(text("SELECT COUNT(*) FROM room_csv_file WHERE filename = :filename"), 
-                                                    {"filename": filename})
-                                exists = result.scalar() > 0
-                            
-                            if not exists:
-                                file_path = os.path.join(ROOM_CSV_FOLDER, filename)
-                                file_size = os.path.getsize(file_path)
-                                
-                                # 単語数をカウント
-                                word_count = 0
-                                try:
-                                    with open(file_path, 'r', encoding='utf-8') as f:
-                                        reader = csv.DictReader(f)
-                                        word_count = sum(1 for row in reader)
-                                except:
-                                    word_count = 0
-                                
-                                # データベースに登録
-                                with db.engine.connect() as conn:
-                                    conn.execute(text('''
-                                        INSERT INTO room_csv_file (filename, original_filename, file_size, word_count)
-                                        VALUES (:filename, :original_filename, :file_size, :word_count)
-                                    '''), {
-                                        "filename": filename,
-                                        "original_filename": filename,
-                                        "file_size": file_size,
-                                        "word_count": word_count
-                                    })
-                                    conn.commit()
-                                
-                                print(f"📝 既存CSVファイルを登録: {filename} ({word_count}問)")
-            except Exception as e:
-                print(f"⚠️ 既存CSVファイル登録でエラー（続行）: {e}")
             
             print("✅ データベースマイグレーションが完了しました。")
             
@@ -2072,7 +2041,6 @@ def admin_page():
             'users': users,
             'room_max_unit_settings': room_max_unit_settings,
             'room_csv_settings': room_csv_settings,
-            'ROOM_CSV_FOLDER': ROOM_CSV_FOLDER,
             **context
         }
         
@@ -2367,16 +2335,6 @@ def admin_update_room_csv_setting():
         if not csv_filename:
             csv_filename = "words.csv"
 
-        # ファイルの存在確認（words.csv以外の場合）
-        if csv_filename != "words.csv":
-            file_path = os.path.join(ROOM_CSV_FOLDER, csv_filename)
-            if not os.path.exists(file_path):
-                print(f"⚠️ 指定されたCSVファイルが見つかりません: {file_path}")
-                return jsonify(
-                    status='error', 
-                    message=f'指定されたCSVファイル "{csv_filename}" が見つかりません。'
-                ), 400
-
         # 部屋設定を取得または作成
         room_setting = RoomSetting.query.filter_by(room_number=room_number).first()
 
@@ -2430,28 +2388,29 @@ def admin_update_room_csv_setting():
         return jsonify(status='error', message=str(e)), 500
     
 def verify_room_settings():
-    """起動時に部屋設定の整合性をチェック"""
-    print("\n🔍 部屋設定の整合性確認中...")
+    """起動時に部屋設定の整合性をチェック（DB版）"""
+    print("\n🔍 部屋設定の整合性確認中（DB版）...")
     
     try:
-        with app.app_context():  # ★ アプリケーションコンテキストを追加
+        with app.app_context():
             settings = RoomSetting.query.all()
             print(f"📋 登録済み部屋設定: {len(settings)}件")
             
             for setting in settings:
-                csv_path = setting.csv_filename
-                if csv_path != "words.csv":
-                    full_path = os.path.join(ROOM_CSV_FOLDER, csv_path)
-                    if not os.path.exists(full_path):
-                        print(f"⚠️ 部屋{setting.room_number}: {csv_path} が見つからない -> デフォルトに変更")
+                csv_filename = setting.csv_filename
+                if csv_filename != "words.csv":
+                    # ★重要：ファイルシステムではなくデータベースで確認
+                    csv_record = CsvFileContent.query.filter_by(filename=csv_filename).first()
+                    if not csv_record:
+                        print(f"⚠️ 部屋{setting.room_number}: {csv_filename} がデータベースに見つからない -> デフォルトに変更")
                         setting.csv_filename = "words.csv"
                     else:
-                        print(f"✅ 部屋{setting.room_number}: {csv_path} 確認OK")
+                        print(f"✅ 部屋{setting.room_number}: {csv_filename} 確認OK（DB内）")
                 else:
                     print(f"📄 部屋{setting.room_number}: デフォルト使用")
             
             db.session.commit()
-            print("✅ 部屋設定確認完了\n")
+            print("✅ 部屋設定確認完了（DB版）\n")
         
     except Exception as e:
         print(f"❌ 部屋設定確認エラー: {e}\n")
@@ -2485,172 +2444,104 @@ def admin_delete_room_setting(room_number):
 @app.route('/admin/upload_room_csv', methods=['POST'])
 def admin_upload_room_csv():
     try:
-        print("🔍 CSV アップロード開始...")
+        print("🔍 CSV アップロード開始（完全DB保存版）...")
         
         if not session.get('admin_logged_in'):
             flash('管理者権限がありません。', 'danger')
             return redirect(url_for('admin_page'))
 
         if 'file' not in request.files:
-            print("❌ ファイルが選択されていません")
             flash('ファイルが選択されていません。', 'danger')
             return redirect(url_for('admin_page'))
 
         file = request.files['file']
-        print(f"📁 受信ファイル: {file.filename}")
-
-        if file.filename == '':
-            print("❌ ファイル名が空です")
-            flash('ファイルが選択されていません。', 'danger')
+        if file.filename == '' or not file.filename.endswith('.csv'):
+            flash('CSVファイルを選択してください。', 'danger')
             return redirect(url_for('admin_page'))
 
-        if file and file.filename.endswith('.csv'):
-            # 元のファイル名をそのまま使用（セキュリティ対応）
-            original_filename = file.filename
-            filename = secure_filename(original_filename)
+        # ★重要：ファイル内容を読み取り（ファイルシステムには保存しない）
+        content = file.read().decode('utf-8')
+        filename = secure_filename(file.filename)
+        original_filename = file.filename
+        file_size = len(content.encode('utf-8'))
+        
+        print(f"📁 ファイル情報: {filename}, サイズ: {file_size}bytes")
+        
+        # CSVファイルの形式を検証
+        word_count = 0
+        try:
+            reader = csv.DictReader(StringIO(content))
+            required_columns = ['chapter', 'number', 'category', 'question', 'answer', 'enabled']
             
-            # ROOM_CSV_FOLDERの存在確認と作成
-            if not os.path.exists(ROOM_CSV_FOLDER):
-                print(f"📁 フォルダを作成: {ROOM_CSV_FOLDER}")
-                os.makedirs(ROOM_CSV_FOLDER)
+            if not reader.fieldnames:
+                flash('CSVファイルにヘッダー行がありません。', 'danger')
+                return redirect(url_for('admin_page'))
             
-            file_path = os.path.join(ROOM_CSV_FOLDER, filename)
-            print(f"💾 保存先: {file_path}")
+            missing_cols = [col for col in required_columns if col not in reader.fieldnames]
+            if missing_cols:
+                flash(f'CSVファイルに必要な列が不足しています: {", ".join(missing_cols)}', 'danger')
+                return redirect(url_for('admin_page'))
             
-            try:
-                # ファイル保存
-                file.save(file_path)
-                print(f"✅ ファイル保存成功: {file_path}")
+            # 全行をチェックして単語数をカウント
+            for i, row in enumerate(reader):
+                missing_data = []
+                for col in ['chapter', 'number', 'question', 'answer']:
+                    if not row.get(col, '').strip():
+                        missing_data.append(col)
                 
-                # ファイルの存在確認
-                if not os.path.exists(file_path):
-                    print(f"❌ 保存後にファイルが見つかりません: {file_path}")
-                    flash('ファイルの保存に失敗しました。', 'danger')
+                if missing_data:
+                    flash(f'CSVファイルの{i+2}行目に必須データが不足しています: {", ".join(missing_data)}', 'danger')
                     return redirect(url_for('admin_page'))
+                word_count += 1
+            
+            if word_count == 0:
+                flash('CSVファイルにデータが含まれていません。', 'danger')
+                return redirect(url_for('admin_page'))
                 
-                # ファイルサイズ確認
-                file_size = os.path.getsize(file_path)
-                print(f"📊 ファイルサイズ: {file_size} bytes")
-                
-                if file_size == 0:
-                    print("❌ ファイルサイズが0です")
-                    os.remove(file_path)
-                    flash('アップロードされたファイルが空です。', 'danger')
-                    return redirect(url_for('admin_page'))
-                
-                # CSVファイルの形式を検証
-                word_count = 0
-                try:
-                    with open(file_path, 'r', encoding='utf-8') as f:
-                        content = f.read()
-                        print(f"📄 ファイル内容の最初の100文字: {content[:100]}")
-                        
-                    with open(file_path, 'r', encoding='utf-8') as f:
-                        reader = csv.DictReader(f)
-                        required_columns = ['chapter', 'number', 'category', 'question', 'answer', 'enabled']
-                        
-                        print(f"📋 検出されたヘッダー: {reader.fieldnames}")
-                        
-                        if not reader.fieldnames:
-                            os.remove(file_path)
-                            flash('CSVファイルにヘッダー行がありません。', 'danger')
-                            return redirect(url_for('admin_page'))
-                        
-                        missing_cols = [col for col in required_columns if col not in reader.fieldnames]
-                        if missing_cols:
-                            os.remove(file_path)
-                            flash(f'CSVファイルに必要な列が不足しています: {", ".join(missing_cols)}', 'danger')
-                            print(f"❌ 不足している列: {missing_cols}")
-                            return redirect(url_for('admin_page'))
-                        
-                        # 全行をチェックして単語数をカウント
-                        for i, row in enumerate(reader):
-                            # 必須データの存在確認
-                            missing_data = []
-                            for col in ['chapter', 'number', 'question', 'answer']:
-                                if not row.get(col, '').strip():
-                                    missing_data.append(col)
-                            
-                            if missing_data:
-                                os.remove(file_path)
-                                flash(f'CSVファイルの{i+2}行目に必須データが不足しています: {", ".join(missing_data)}', 'danger')
-                                print(f"❌ {i+2}行目のデータ不足: {missing_data}")
-                                return redirect(url_for('admin_page'))
-                            word_count += 1
-                        
-                        print(f"📊 検証完了: {word_count}問")
-                        
-                        if word_count == 0:
-                            os.remove(file_path)
-                            flash('CSVファイルにデータが含まれていません。', 'danger')
-                            return redirect(url_for('admin_page'))
-                        
-                except Exception as csv_error:
-                    print(f"❌ CSV読み込みエラー: {csv_error}")
-                    if os.path.exists(file_path):
-                        os.remove(file_path)
-                    flash(f'CSVファイルの読み込み中にエラーが発生しました: {str(csv_error)}', 'danger')
-                    return redirect(url_for('admin_page'))
-                
-                # RoomCsvFileテーブルに記録（存在する場合のみ）
-                try:
-                    # テーブルの存在確認
-                    inspector = inspect(db.engine)
-                    if inspector.has_table('room_csv_file'):
-                        print("📝 room_csv_fileテーブルに記録中...")
-                        
-                        # 既存のファイル記録があれば更新、なければ新規作成
-                        csv_file_record = RoomCsvFile.query.filter_by(filename=filename).first()
-                        if csv_file_record:
-                            print(f"🔄 既存レコード更新: {filename}")
-                            csv_file_record.original_filename = original_filename
-                            csv_file_record.file_size = file_size
-                            csv_file_record.word_count = word_count
-                            csv_file_record.upload_date = datetime.now(JST)
-                        else:
-                            print(f"➕ 新規レコード作成: {filename}")
-                            csv_file_record = RoomCsvFile(
-                                filename=filename,
-                                original_filename=original_filename,
-                                file_size=file_size,
-                                word_count=word_count
-                            )
-                            db.session.add(csv_file_record)
-                        
-                        db.session.commit()
-                        print("✅ データベース記録完了")
-                    else:
-                        print("⚠️ room_csv_fileテーブルが存在しません（ファイルのみ保存）")
-                        
-                except Exception as db_error:
-                    print(f"⚠️ データベース記録エラー（ファイルは保存済み）: {db_error}")
-                    db.session.rollback()
-                
-                # 最終確認
-                final_check_path = os.path.join(ROOM_CSV_FOLDER, filename)
-                if os.path.exists(final_check_path):
-                    final_size = os.path.getsize(final_check_path)
-                    print(f"✅ 最終確認成功: {final_check_path} ({final_size} bytes)")
-                    
-                    # 成功メッセージ
-                    file_size_kb = round(file_size / 1024, 1)
-                    flash(f'✅ CSVファイル "{filename}" をアップロードしました', 'success')
-                    flash(f'📊 ファイル情報: {word_count}問, {file_size_kb}KB', 'info')
-                    flash('💡 各部屋の設定で、このファイルを使用するように設定してください。', 'info')
-                else:
-                    print(f"❌ 最終確認失敗: ファイルが見つかりません")
-                    flash('ファイルのアップロードに失敗しました。', 'danger')
-                
-            except Exception as save_error:
-                print(f"❌ ファイル保存エラー: {save_error}")
-                if os.path.exists(file_path):
-                    os.remove(file_path)
-                flash(f'ファイルの保存中にエラーが発生しました: {str(save_error)}', 'danger')
-        else:
-            print("❌ CSVファイルではありません")
-            flash('CSVファイルを選択してください。', 'danger')
+        except Exception as csv_error:
+            flash(f'CSVファイルの読み込み中にエラーが発生しました: {str(csv_error)}', 'danger')
+            return redirect(url_for('admin_page'))
+        
+        print(f"✅ CSV検証完了: {word_count}問")
+        
+        # ★重要：データベースに保存（ファイルシステムは使わない）
+        try:
+            # 既存のファイル記録があれば更新、なければ新規作成
+            csv_file_record = CsvFileContent.query.filter_by(filename=filename).first()
+            if csv_file_record:
+                print(f"🔄 既存レコード更新: {filename}")
+                csv_file_record.original_filename = original_filename
+                csv_file_record.content = content
+                csv_file_record.file_size = file_size
+                csv_file_record.word_count = word_count
+                csv_file_record.upload_date = datetime.now(JST)
+            else:
+                print(f"➕ 新規レコード作成: {filename}")
+                csv_file_record = CsvFileContent(
+                    filename=filename,
+                    original_filename=original_filename,
+                    content=content,
+                    file_size=file_size,
+                    word_count=word_count
+                )
+                db.session.add(csv_file_record)
+            
+            db.session.commit()
+            
+            file_size_kb = round(file_size / 1024, 1)
+            flash(f'✅ CSVファイル "{filename}" をデータベースに保存しました', 'success')
+            flash(f'📊 ファイル情報: {word_count}問, {file_size_kb}KB', 'info')
+            flash('💾 ファイルはデータベースに保存されているため、再デプロイ後も保持されます', 'info')
+            
+            print(f"✅ データベース保存完了: {filename}")
+            
+        except Exception as db_error:
+            print(f"❌ データベース保存エラー: {db_error}")
+            db.session.rollback()
+            flash(f'データベース保存中にエラーが発生しました: {str(db_error)}', 'danger')
 
         return redirect(url_for('admin_page'))
+        
     except Exception as e:
         print(f"❌ 全体エラー: {e}")
         import traceback
@@ -2662,58 +2553,35 @@ def admin_upload_room_csv():
 @app.route('/admin/list_room_csv_files')
 def admin_list_room_csv_files():
     try:
-        print("🔍 CSVファイル一覧取得開始...")
+        print("🔍 CSV ファイル一覧取得開始（DB版）...")
         
         if not session.get('admin_logged_in'):
             return jsonify(status='error', message='管理者権限がありません。'), 403
 
-        # フォルダの存在確認
-        if not os.path.exists(ROOM_CSV_FOLDER):
-            print(f"📁 フォルダが存在しません: {ROOM_CSV_FOLDER}")
-            return jsonify(status='success', files=[])
+        # ★重要：データベースからCSVファイル一覧を取得（ファイルシステムは使わない）
+        csv_files_data = []
+        try:
+            csv_records = CsvFileContent.query.filter(CsvFileContent.filename != 'words.csv').all()
+            
+            for record in csv_records:
+                csv_files_data.append({
+                    'filename': record.filename,
+                    'size': record.file_size,
+                    'modified': record.upload_date.strftime('%Y-%m-%d %H:%M:%S'),
+                    'word_count': record.word_count
+                })
+                print(f"📋 ファイル: {record.filename} ({record.word_count}問)")
+            
+            print(f"✅ データベースから{len(csv_files_data)}個のファイルを取得")
+            
+        except Exception as db_error:
+            print(f"❌ データベース取得エラー: {db_error}")
+            return jsonify(status='error', message=f'データベースエラー: {str(db_error)}'), 500
         
-        print(f"📁 フォルダパス: {ROOM_CSV_FOLDER}")
-        
-        csv_files = []
-        all_files = os.listdir(ROOM_CSV_FOLDER)
-        print(f"📋 フォルダ内の全ファイル: {all_files}")
-        
-        for filename in all_files:
-            if filename.endswith('.csv'):
-                file_path = os.path.join(ROOM_CSV_FOLDER, filename)
-                
-                try:
-                    file_size = os.path.getsize(file_path)
-                    modified_time = datetime.fromtimestamp(os.path.getmtime(file_path)).strftime('%Y-%m-%d %H:%M:%S')
-                    
-                    # 単語数をカウント
-                    word_count = 0
-                    try:
-                        with open(file_path, 'r', encoding='utf-8') as f:
-                            reader = csv.DictReader(f)
-                            word_count = sum(1 for row in reader)
-                    except Exception as count_error:
-                        print(f"⚠️ {filename}の単語数カウントエラー: {count_error}")
-                        word_count = 0
-                    
-                    csv_files.append({
-                        'filename': filename,
-                        'size': file_size,
-                        'modified': modified_time,
-                        'word_count': word_count
-                    })
-                    
-                    print(f"✅ ファイル情報取得: {filename} ({word_count}問, {file_size}bytes)")
-                    
-                except Exception as file_error:
-                    print(f"⚠️ {filename}の情報取得エラー: {file_error}")
-                    continue
-        
-        print(f"📊 検出されたCSVファイル数: {len(csv_files)}")
-        return jsonify(status='success', files=csv_files)
+        return jsonify(status='success', files=csv_files_data)
         
     except Exception as e:
-        print(f"❌ CSVファイル一覧取得エラー: {e}")
+        print(f"❌ CSV ファイル一覧取得エラー: {e}")
         import traceback
         traceback.print_exc()
         return jsonify(status='error', message=str(e)), 500
@@ -2725,24 +2593,39 @@ def admin_delete_room_csv(filename):
             flash('管理者権限がありません。', 'danger')
             return redirect(url_for('admin_page'))
 
-        file_path = os.path.join(ROOM_CSV_FOLDER, secure_filename(filename))
-        
-        if os.path.exists(file_path):
-            os.remove(file_path)
+        filename = secure_filename(filename)
+        print(f"🗑️ CSVファイル削除開始: {filename}")
+
+        # ★重要：データベースから削除（ファイルシステムは使わない）
+        csv_record = CsvFileContent.query.filter_by(filename=filename).first()
+        if csv_record:
+            db.session.delete(csv_record)
+            print(f"✅ データベースから削除: {filename}")
             
             # このファイルを使用している部屋設定をデフォルトに戻す
             room_settings = RoomSetting.query.filter_by(csv_filename=filename).all()
+            updated_rooms = []
             for setting in room_settings:
                 setting.csv_filename = "words.csv"
+                updated_rooms.append(setting.room_number)
+            
             db.session.commit()
             
-            flash(f'CSVファイル "{filename}" を削除し、関連する部屋設定をデフォルトに戻しました。', 'success')
+            if updated_rooms:
+                flash(f'CSVファイル "{filename}" を削除し、部屋 {", ".join(updated_rooms)} の設定をデフォルトに戻しました。', 'success')
+            else:
+                flash(f'CSVファイル "{filename}" を削除しました。', 'success')
+                
+            print(f"✅ 削除完了: {filename}")
         else:
             flash('指定されたファイルが見つかりません。', 'danger')
+            print(f"❌ ファイルが見つかりません: {filename}")
 
         return redirect(url_for('admin_page'))
+        
     except Exception as e:
-        print(f"Error in admin_delete_room_csv: {e}")
+        print(f"❌ ファイル削除エラー: {e}")
+        db.session.rollback()
         flash(f'ファイル削除中にエラーが発生しました: {e}', 'danger')
         return redirect(url_for('admin_page'))
 
