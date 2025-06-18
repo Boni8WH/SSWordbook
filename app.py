@@ -502,12 +502,11 @@ def admin_fix_all_data():
 # app.py の migrate_database 関数を以下に置き換え
 
 def migrate_database():
-    """データベーススキーマの変更を処理する（強化版）"""
+    """データベーススキーマの変更を処理する（PostgreSQL専用版）"""
     with app.app_context():
         print("🔄 データベースマイグレーションを開始...")
         
         try:
-            # SQLiteの場合、カラムの追加をチェック
             inspector = inspect(db.engine)
             
             # 1. Userテーブルの確認
@@ -515,11 +514,10 @@ def migrate_database():
                 columns = [col['name'] for col in inspector.get_columns('user')]
                 print(f"📋 既存のUserテーブルカラム: {columns}")
                 
-                # last_loginカラムが存在しない場合は追加
                 if 'last_login' not in columns:
                     print("🔧 last_loginカラムを追加します...")
                     with db.engine.connect() as conn:
-                        conn.execute(text('ALTER TABLE user ADD COLUMN last_login DATETIME'))
+                        conn.execute(text('ALTER TABLE "user" ADD COLUMN last_login TIMESTAMP'))
                         conn.commit()
                     print("✅ last_loginカラムを追加しました。")
                 else:
@@ -530,15 +528,13 @@ def migrate_database():
                 columns = [col['name'] for col in inspector.get_columns('room_setting')]
                 print(f"📋 既存のRoomSettingテーブルカラム: {columns}")
                 
-                # csv_filenameカラムが存在しない場合は追加
                 if 'csv_filename' not in columns:
                     print("🔧 csv_filenameカラムを追加します...")
                     with db.engine.connect() as conn:
-                        conn.execute(text('ALTER TABLE room_setting ADD COLUMN csv_filename VARCHAR(100) DEFAULT "words.csv"'))
+                        conn.execute(text('ALTER TABLE room_setting ADD COLUMN csv_filename VARCHAR(100) DEFAULT \'words.csv\''))
                         conn.commit()
                     print("✅ csv_filenameカラムを追加しました。")
                 
-                # created_at, updated_atカラムの確認と追加
                 missing_columns = []
                 for col_name in ['created_at', 'updated_at']:
                     if col_name not in columns:
@@ -548,132 +544,74 @@ def migrate_database():
                     with db.engine.connect() as conn:
                         for col_name in missing_columns:
                             print(f"🔧 {col_name}カラムを追加します...")
-                            conn.execute(text(f'ALTER TABLE room_setting ADD COLUMN {col_name} DATETIME'))
+                            conn.execute(text(f'ALTER TABLE room_setting ADD COLUMN {col_name} TIMESTAMP'))
                             print(f"✅ {col_name}カラムを追加しました。")
                         conn.commit()
             
-            # 3. ★ 重要：password_reset_tokenテーブルの確認と修正
+            # 3. その他のテーブル確認（password_reset_token, app_info等）
             if inspector.has_table('password_reset_token'):
                 columns = [col['name'] for col in inspector.get_columns('password_reset_token')]
                 if 'used_at' not in columns:
                     print("🔧 password_reset_tokenテーブルにused_atカラムを追加します...")
                     with db.engine.connect() as conn:
-                        conn.execute(text('ALTER TABLE password_reset_token ADD COLUMN used_at DATETIME'))
+                        conn.execute(text('ALTER TABLE password_reset_token ADD COLUMN used_at TIMESTAMP'))
                         conn.commit()
                     print("✅ used_atカラムを追加しました。")
-                else:
-                    print("used_atカラムは既に存在します。")
             else:
                 print("🔧 password_reset_tokenテーブルを作成します...")
-                # テーブルが存在しない場合は作成
                 db.create_all()
                 print("✅ password_reset_tokenテーブルを作成しました。")
             
-            # 4. AppInfoテーブルの確認
-            if inspector.has_table('app_info'):
-                columns = [col['name'] for col in inspector.get_columns('app_info')]
-                missing_columns = []
-                
-                expected_columns = [
-                    ('footer_text', 'VARCHAR(200)'),
-                    ('contact_email', 'VARCHAR(100)'),
-                    ('app_settings', 'TEXT'),
-                    ('created_at', 'DATETIME'),
-                    ('updated_at', 'DATETIME'),
-                    ('updated_by', 'VARCHAR(80)')
-                ]
-                
-                for col_name, col_type in expected_columns:
-                    if col_name not in columns:
-                        missing_columns.append((col_name, col_type))
-                
-                if missing_columns:
-                    with db.engine.connect() as conn:
-                        for col_name, col_type in missing_columns:
-                            print(f"🔧 {col_name}カラムを追加します...")
-                            conn.execute(text(f'ALTER TABLE app_info ADD COLUMN {col_name} {col_type}'))
-                            print(f"✅ {col_name}カラムを追加しました。")
-                        conn.commit()
-            
-            # 5. RoomCsvFileテーブルの作成
-            if not inspector.has_table('room_csv_file'):
-                print("🔧 room_csv_fileテーブルを作成します...")
-                try:
-                    with db.engine.connect() as conn:
-                        conn.execute(text('''
-                            CREATE TABLE room_csv_file (
-                                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                                filename VARCHAR(100) NOT NULL UNIQUE,
-                                original_filename VARCHAR(100) NOT NULL,
-                                file_size INTEGER NOT NULL,
-                                word_count INTEGER DEFAULT 0,
-                                upload_date DATETIME DEFAULT (datetime('now', 'localtime')),
-                                description TEXT
-                            )
-                        '''))
-                        conn.commit()
-                    print("✅ room_csv_fileテーブルを作成しました。")
-                except Exception as e:
-                    print(f"⚠️ room_csv_fileテーブル作成でエラー（続行）: {e}")
+            # 4. CsvFileContentテーブルの確認
+            if not inspector.has_table('csv_file_content'):
+                print("🔧 csv_file_contentテーブルを作成します...")
+                db.create_all()
+                print("✅ csv_file_contentテーブルを作成しました。")
             else:
-                print("room_csv_fileテーブルは既に存在します。")
+                print("csv_file_contentテーブルは既に存在します。")
             
             print("✅ データベースマイグレーションが完了しました。")
             
         except Exception as e:
-            print(f"⚠️ マイグレーション中にエラーが発生しました（続行します）: {e}")
+            print(f"⚠️ マイグレーション中にエラーが発生しました: {e}")
             import traceback
             traceback.print_exc()
 
 # データベース初期化関数（完全リセット対応版）
 def create_tables_and_admin_user():
     with app.app_context():
-        print("🔧 データベース初期化を開始...")
-        
-        # ===== RENDER環境対策 =====
-        reset_database = os.environ.get('RESET_DATABASE', 'false').lower() == 'true'
-        is_render_env = os.environ.get('RENDER') == 'true'
-        
-        if reset_database:
-            print("⚠️ 警告: RESET_DATABASE=true が設定されています！")
-            if is_render_env:
-                print("🚨 Render環境でのデータベースリセットが検出されました")
-                print("💡 本番運用では RESET_DATABASE=false に設定してください")
-            else:
-                print("🏠 ローカル環境でのリセットです")
+        print("🔧 PostgreSQL専用データベース初期化を開始...")
         
         try:
+            # PostgreSQL接続確認
+            db_url = app.config.get('SQLALCHEMY_DATABASE_URI', '')
+            is_postgres = 'postgresql' in db_url.lower()
+            
+            if not is_postgres:
+                print("⚠️ 警告: PostgreSQL以外のデータベースが検出されました")
+                print(f"DB URL: {db_url[:50]}...")
+            
             # 既存のテーブル確認
             inspector = inspect(db.engine)
             existing_tables = inspector.get_table_names()
             
-            if reset_database and existing_tables:
-                print("🔄 データベースを完全リセットします...")
-                db.drop_all()
-                db.create_all()
-                print("✅ データベースを完全リセットしました。")
-                force_create_admin = True
-            elif existing_tables:
+            if existing_tables:
                 print(f"📋 既存のテーブル: {existing_tables}")
+                # マイグレーション実行
                 migrate_database()
+                # 新しいテーブルがあれば作成
                 db.create_all()
                 print("✅ テーブルを確認/更新しました。")
-                force_create_admin = False
             else:
                 print("📋 新しいデータベースを作成します。")
                 db.create_all()
                 print("✅ テーブルを作成しました。")
-                force_create_admin = True
             
             # ===== 管理者ユーザー確認/作成 =====
             try:
                 admin_user = User.query.filter_by(username='admin', room_number='ADMIN').first()
                 
-                if not admin_user or force_create_admin:
-                    if admin_user:
-                        print("🔄 既存の管理者ユーザーを削除して再作成します...")
-                        db.session.delete(admin_user)
-                    
+                if not admin_user:
                     print("👤 管理者ユーザーを作成します...")
                     admin_user = User(
                         username='admin',
@@ -695,23 +633,6 @@ def create_tables_and_admin_user():
                 print(f"⚠️ 管理者ユーザー処理エラー: {e}")
                 db.session.rollback()
                 
-                # フォールバック: 強制的に管理者ユーザーを作成
-                try:
-                    admin_user = User(
-                        username='admin',
-                        room_number='ADMIN',
-                        student_id='000',
-                        problem_history='{}',
-                        incorrect_words='[]'
-                    )
-                    admin_user.set_room_password('Avignon1309')
-                    admin_user.set_individual_password('Avignon1309')
-                    db.session.add(admin_user)
-                    db.session.commit()
-                    print("✅ フォールバック: 管理者ユーザーを作成しました")
-                except Exception as fallback_error:
-                    print(f"❌ 管理者ユーザー作成失敗: {fallback_error}")
-                
             # ===== アプリ情報確認/作成 =====
             try:
                 app_info = AppInfo.get_current_info()
@@ -719,51 +640,16 @@ def create_tables_and_admin_user():
                 
             except Exception as e:
                 print(f"⚠️ アプリ情報処理エラー: {e}")
-                try:
-                    default_app_info = AppInfo()
-                    db.session.add(default_app_info)
-                    db.session.commit()
-                    print("✅ フォールバック: デフォルトアプリ情報を作成しました")
-                except Exception as fallback_error:
-                    print(f"❌ アプリ情報作成失敗: {fallback_error}")
+                
+            # ===== 重要：SQLiteからの自動移行は削除 =====
+            # 以前のコードにあった quiz_data.db からの自動移行処理は削除
+            print("📝 注意: データ移行が必要な場合は手動で行ってください")
                 
         except Exception as e:
             print(f"❌ データベース初期化エラー: {e}")
             db.session.rollback()
-            
-            # ===== Render対応: 強制初期化 =====
-            if is_render_env:
-                print("🔄 Render環境での強制初期化を実行...")
-                try:
-                    db.drop_all()
-                    db.create_all()
-                    
-                    # 最小限の管理者ユーザー作成
-                    admin_user = User(
-                        username='admin',
-                        room_number='ADMIN',
-                        student_id='000',
-                        problem_history='{}',
-                        incorrect_words='[]'
-                    )
-                    admin_user.set_room_password('Avignon1309')
-                    admin_user.set_individual_password('Avignon1309')
-                    db.session.add(admin_user)
-                    
-                    # デフォルトアプリ情報
-                    default_app_info = AppInfo()
-                    db.session.add(default_app_info)
-                    
-                    db.session.commit()
-                    print("✅ Render環境での強制初期化が完了しました")
-                    
-                except Exception as render_error:
-                    print(f"🚨 Render強制初期化失敗: {render_error}")
-                    raise
-            else:
-                raise
         
-        print("🎉 データベース初期化が完了しました！")
+        print("🎉 PostgreSQL専用データベース初期化が完了しました！")
 
 # ===== PostgreSQL設定（Render用） =====
 def configure_production_database():
@@ -3285,6 +3171,90 @@ def debug_force_fix_user_data():
         print(f"強制修正エラー: {e}")
         return jsonify(error=str(e)), 500
 
+@app.route('/admin/check_all_users')
+def admin_check_all_users():
+    """すべてのユーザーデータを詳細確認"""
+    if not session.get('admin_logged_in'):
+        return jsonify(error='管理者権限が必要です'), 403
+    
+    try:
+        # 全ユーザーを取得
+        all_users = User.query.all()
+        
+        user_details = []
+        for user in all_users:
+            user_details.append({
+                'id': user.id,
+                'username': user.username,
+                'room_number': user.room_number,
+                'student_id': user.student_id,
+                'last_login': user.last_login.strftime('%Y-%m-%d %H:%M:%S') if user.last_login else 'なし',
+                'problem_history_count': len(json.loads(user.problem_history or '{}')),
+                'incorrect_words_count': len(json.loads(user.incorrect_words or '[]'))
+            })
+        
+        # 部屋別集計
+        room_stats = {}
+        for user in all_users:
+            if user.room_number not in room_stats:
+                room_stats[user.room_number] = 0
+            room_stats[user.room_number] += 1
+        
+        return jsonify({
+            'total_users': len(all_users),
+            'room_stats': room_stats,
+            'user_details': user_details
+        })
+        
+    except Exception as e:
+        return jsonify(error=str(e)), 500
+
+# 起動時ログを改善
+def enhanced_startup_check():
+    """起動時の詳細チェック"""
+    try:
+        with app.app_context():
+            print("\n" + "="*60)
+            print("🔍 詳細起動チェック")
+            print("="*60)
+            
+            # PostgreSQL接続確認
+            db_url = app.config.get('SQLALCHEMY_DATABASE_URI', '')
+            print(f"📊 DB URL: {db_url[:50]}...")
+            
+            # ユーザー詳細
+            all_users = User.query.all()
+            print(f"📊 総ユーザー数: {len(all_users)}")
+            
+            # 部屋別ユーザー数
+            room_counts = {}
+            for user in all_users:
+                room = user.room_number
+                if room not in room_counts:
+                    room_counts[room] = []
+                room_counts[room].append(user.username)
+            
+            for room, users in room_counts.items():
+                print(f"📊 部屋{room}: {len(users)}人 - {users}")
+            
+            # 最近のユーザー登録
+            recent_users = User.query.filter(User.room_number != 'ADMIN').order_by(User.id.desc()).limit(5).all()
+            if recent_users:
+                print(f"📊 最新ユーザー5人:")
+                for user in recent_users:
+                    print(f"  ID{user.id}: {user.username} (部屋{user.room_number}, 出席{user.student_id})")
+            
+            # CSVファイル確認
+            csv_files = CsvFileContent.query.all()
+            print(f"📊 保存済CSVファイル: {len(csv_files)}個")
+            for csv_file in csv_files:
+                print(f"  {csv_file.filename} ({csv_file.word_count}問)")
+            
+            print("="*60 + "\n")
+            
+    except Exception as e:
+        print(f"❌ 起動チェックエラー: {e}")
+
 # app.py の先頭付近に追加
 import logging
 logging.basicConfig(level=logging.DEBUG)
@@ -3339,10 +3309,9 @@ if __name__ == '__main__':
         
         print(f"🌐 サーバーを起動します: http://0.0.0.0:{port}")
         print(f"🔧 デバッグモード: {debug_mode}")
+        enhanced_startup_check()
         
         app.run(host='0.0.0.0', port=port, debug=debug_mode)
         
     except Exception as e:
-        print(f"💥 アプリケーション起動失敗: {e}")
-        import traceback
-        traceback.print_exc()
+        print(f"💥 起動失敗: {e}")

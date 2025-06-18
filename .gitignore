@@ -1,0 +1,16 @@
+# データベースファイル
+quiz_data.db
+*.db
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# 環境設定
+.env
+.venv/
+
+# アップロードファイル
+uploads/
+room_csv/
