@@ -579,6 +579,7 @@ def migrate_database():
 
 # データベース初期化関数（完全リセット対応版）
 def create_tables_and_admin_user():
+    """データベース初期化関数（データ永続化対応版）"""
     with app.app_context():
         print("🔧 PostgreSQL専用データベース初期化を開始...")
         
@@ -597,15 +598,14 @@ def create_tables_and_admin_user():
             
             if existing_tables:
                 print(f"📋 既存のテーブル: {existing_tables}")
-                # マイグレーション実行
+                # マイグレーション実行（必要に応じてスキーマ更新）
                 migrate_database()
-                # 新しいテーブルがあれば作成
-                db.create_all()
-                print("✅ テーブルを確認/更新しました。")
             else:
-                print("📋 新しいデータベースを作成します。")
-                db.create_all()
-                print("✅ テーブルを作成しました。")
+                print("📋 新しいデータベースを検出しました")
+            
+            # テーブル作成（既存テーブルには影響しない）
+            db.create_all()
+            print("✅ テーブルを確認/作成しました。")
             
             # ===== 管理者ユーザー確認/作成 =====
             try:
@@ -641,15 +641,13 @@ def create_tables_and_admin_user():
             except Exception as e:
                 print(f"⚠️ アプリ情報処理エラー: {e}")
                 
-            # ===== 重要：SQLiteからの自動移行は削除 =====
-            # 以前のコードにあった quiz_data.db からの自動移行処理は削除
-            print("📝 注意: データ移行が必要な場合は手動で行ってください")
+            print("🎉 PostgreSQL専用データベース初期化が完了しました！")
                 
         except Exception as e:
             print(f"❌ データベース初期化エラー: {e}")
             db.session.rollback()
-        
-        print("🎉 PostgreSQL専用データベース初期化が完了しました！")
+            # 例外を再発生させてアプリケーションの起動を停止
+            raise
 
 # ===== PostgreSQL設定（Render用） =====
 def configure_production_database():
