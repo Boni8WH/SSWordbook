@@ -23,7 +23,6 @@ JST = pytz.timezone('Asia/Tokyo')
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your_secret_key_here_please_change_this_in_production'
 basedir = os.path.abspath(os.path.dirname(__file__))
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'quiz_data.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['PERMANENT_SESSION_LIFETIME'] = 3600 * 24 * 7
 app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
