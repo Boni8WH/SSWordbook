@@ -2746,6 +2746,126 @@ def admin_delete_room_csv(filename):
         flash(f'ファイル削除中にエラーが発生しました: {e}', 'danger')
         return redirect(url_for('admin_page'))
 
+@app.route('/admin/upload_users', methods=['POST'])
+def admin_upload_users():
+    if not session.get('admin_logged_in'):
+        flash('管理者権限がありません。', 'danger')
+        return redirect(url_for('login_page'))
+
+    if 'file' not in request.files:
+        flash('ファイルが選択されていません。', 'danger')
+        return redirect(url_for('admin_page'))
+
+    file = request.files['file']
+    if file.filename == '' or not file.filename.endswith('.csv'):
+        flash('CSVファイルを選択してください。', 'danger')
+        return redirect(url_for('admin_page'))
+
+    try:
+        # CSVファイルを読み込み
+        stream = StringIO(file.stream.read().decode("utf-8"))
+        reader = csv.DictReader(stream)
+        
+        users_added_count = 0
+        errors = []
+        skipped_existing = 0
+
+        for row_num, row in enumerate(reader, start=2):  # ヘッダー行を考慮して2から開始
+            try:
+                # データの取得と検証
+                room_number = row.get('部屋番号', '').strip()
+                room_password = row.get('入室パスワード', '').strip()
+                student_id = row.get('出席番号', '').strip()
+                individual_password = row.get('個別パスワード', '').strip()
+                username = row.get('アカウント名', '').strip()
+
+                # 必須項目チェック
+                if not all([room_number, room_password, student_id, individual_password, username]):
+                    errors.append(f"行{row_num}: 必須項目が不足しています")
+                    continue
+
+                # 重複チェック（部屋番号 + ユーザー名の組み合わせ）
+                existing_user = User.query.filter_by(
+                    room_number=room_number, 
+                    username=username
+                ).first()
+                
+                if existing_user:
+                    errors.append(f"行{row_num}: 部屋{room_number}にユーザー名{username}は既に存在します")
+                    skipped_existing += 1
+                    continue
+
+                # 新規ユーザー作成
+                new_user = User(
+                    room_number=room_number,
+                    student_id=student_id,
+                    username=username
+                )
+                new_user.set_room_password(room_password)
+                new_user.set_individual_password(individual_password)
+                new_user.problem_history = "{}"
+                new_user.incorrect_words = "[]"
+                new_user.last_login = datetime.now(JST)
+
+                db.session.add(new_user)
+                users_added_count += 1
+
+            except Exception as e:
+                errors.append(f"行{row_num}: データ処理エラー - {str(e)}")
+                continue
+
+        # データベースにコミット
+        try:
+            db.session.commit()
+            
+            # 新しい部屋のデフォルト設定を作成
+            added_rooms = set()
+            
+            # ファイルを再読み込みして部屋番号を取得
+            file.stream.seek(0)  # ファイルポインタを先頭に戻す
+            stream_for_rooms = StringIO(file.stream.read().decode("utf-8"))
+            reader_for_rooms = csv.DictReader(stream_for_rooms)
+            
+            for row in reader_for_rooms:
+                room_num = row.get('部屋番号', '').strip()
+                if room_num and room_num not in added_rooms:
+                    if not RoomSetting.query.filter_by(room_number=room_num).first():
+                        default_room_setting = RoomSetting(
+                            room_number=room_num,
+                            max_enabled_unit_number="9999",
+                            csv_filename="words.csv"
+                        )
+                        db.session.add(default_room_setting)
+                        added_rooms.add(room_num)
+            
+            db.session.commit()
+            
+            # 結果メッセージ
+            if users_added_count > 0:
+                flash(f'✅ {users_added_count}人のユーザーを追加しました。', 'success')
+            
+            if skipped_existing > 0:
+                flash(f'⚠️ {skipped_existing}人のユーザーは重複するため、スキップされました。', 'warning')
+                
+            if errors:
+                error_summary = f"❌ {len(errors)}件のエラーが発生しました。"
+                if len(errors) <= 5:
+                    error_summary += " " + " / ".join(errors)
+                else:
+                    error_summary += f" 最初の5件: {' / '.join(errors[:5])}"
+                flash(error_summary, 'danger')
+                
+        except Exception as e:
+            db.session.rollback()
+            flash(f'データベースエラーが発生しました: {str(e)}', 'danger')
+            
+    except UnicodeDecodeError:
+        flash('CSVファイルの文字エンコーディングを確認してください（UTF-8である必要があります）。', 'danger')
+    except Exception as e:
+        flash(f'CSVファイルの処理中にエラーが発生しました: {str(e)}', 'danger')
+
+    return redirect(url_for('admin_page'))
+
 # データエクスポート関数
 @app.route('/admin/download_users_csv')
 def download_users_csv():
