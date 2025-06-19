@@ -42,98 +42,30 @@ basedir = os.path.abspath(os.path.dirname(__file__))
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['PERMANENT_SESSION_LIFETIME'] = 3600 * 24 * 7
 
-# ===== PostgreSQL設定（Render用） =====
-def configure_production_database():
-    """本番環境用のデータベース設定"""
-    database_url = os.environ.get('DATABASE_URL')
+database_url = os.environ.get('DATABASE_URL')
+
+if database_url:
+    logger.info("🐘 PostgreSQL設定を適用中...")
     
-    if database_url:
-        print("🐘 PostgreSQL設定を適用中...")
-        
-        # PostgreSQL用のURLフォーマット修正
-        if database_url.startswith('postgres://'):
-            database_url = database_url.replace('postgres://', 'postgresql://', 1)
-        
-        app.config['SQLALCHEMY_DATABASE_URI'] = database_url
-        app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-            'pool_timeout': 20,
-            'pool_recycle': -1,
-            'pool_pre_ping': True,
-            'connect_args': {
-                'connect_timeout': 10,
-            }
+    # PostgreSQL用のURLフォーマット修正
+    if database_url.startswith('postgres://'):
+        database_url = database_url.replace('postgres://', 'postgresql://', 1)
+    
+    app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+        'pool_timeout': 20,
+        'pool_recycle': -1,
+        'pool_pre_ping': True,
+        'connect_args': {
+            'connect_timeout': 10,
         }
-        print(f"✅ PostgreSQL接続設定完了")
-        return True
-    else:
-        print("📄 ローカル環境用SQLite設定")
-        app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'quiz_data.db')
-        return False
-    # デバッグ情報を追加
-    print(f"🔍 DATABASE_URL設定値: {os.environ.get('DATABASE_URL', '未設定')}")
-    print(f"🔍 SQLALCHEMY_DATABASE_URI: {app.config.get('SQLALCHEMY_DATABASE_URI', '未設定')}")
-    
-    return is_postgres
-
-# db.init_app(app) の直前に追加
-print(f"🔍 db.init_app実行前のSQLALCHEMY_DATABASE_URI: {app.config.get('SQLALCHEMY_DATABASE_URI', '未設定')}")
-
-def verify_database_connection():
-    """データベース接続を確認"""
-    try:
-        with app.app_context():
-            # 接続テスト
-            db.engine.execute(text('SELECT 1'))
-            
-            # ユーザー数確認
-            user_count = User.query.count()
-            csv_count = CsvFileContent.query.count()
-            
-            print(f"✅ データベース接続成功")
-            print(f"📊 現在のデータ: ユーザー{user_count}人, CSVファイル{csv_count}個")
-            
-            return True
-    except Exception as e:
-        print(f"❌ データベース接続エラー: {e}")
-        return False
-
-# PostgreSQL設定（該当する場合）
-is_postgres = configure_production_database()
-
-app = Flask(__name__)
-app.config['SECRET_KEY'] = 'your_secret_key_here_please_change_this_in_production'
-basedir = os.path.abspath(os.path.dirname(__file__))
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['PERMANENT_SESSION_LIFETIME'] = 3600 * 24 * 7
-
-def configure_database():
-    """データベース設定を行う"""
-    database_url = os.environ.get('DATABASE_URL')
-    
-    if database_url:
-        logger.info("🐘 PostgreSQL設定を適用中...")
-        
-        # PostgreSQL用のURLフォーマット修正
-        if database_url.startswith('postgres://'):
-            database_url = database_url.replace('postgres://', 'postgresql://', 1)
-        
-        app.config['SQLALCHEMY_DATABASE_URI'] = database_url
-        app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-            'pool_timeout': 20,
-            'pool_recycle': -1,
-            'pool_pre_ping': True,
-            'connect_args': {
-                'connect_timeout': 10,
-            }
-        }
-        logger.info("✅ PostgreSQL接続設定完了")
-        return True
-    else:
-        logger.warning("📄 DATABASE_URLが未設定 - SQLiteを使用")
-        app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'quiz_data.db')
-        return False
-
-is_postgres = configure_database()
+    }
+    logger.info("✅ PostgreSQL接続設定完了")
+    is_postgres = True
+else:
+    logger.warning("📄 DATABASE_URLが未設定 - SQLiteを使用")
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'quiz_data.db')
+    is_postgres = False
 
 # ===== メール設定 =====
 app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
@@ -145,9 +77,9 @@ app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_DEFAULT_SENDER', app.co
 
 mail = Mail(app)
 
-db = SQLAlchemy()
+# ===== SQLAlchemy初期化（1回のみ） =====
+db = SQLAlchemy(app)
 
-# CSV一時保存用フォルダ
 UPLOAD_FOLDER = 'uploads'
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
@@ -685,53 +617,92 @@ def migrate_database():
             import traceback
             traceback.print_exc()
 
+def verify_database_connection():
+    """データベース接続確認関数"""
+    try:
+        with app.app_context():
+            # PostgreSQLの場合の接続確認
+            if is_postgres:
+                db.engine.execute(text('SELECT 1'))
+                print("✅ PostgreSQL接続確認: 成功")
+            else:
+                # SQLiteの場合の接続確認
+                db.engine.execute(text('SELECT 1'))
+                print("✅ SQLite接続確認: 成功")
+            
+            return True
+            
+    except Exception as e:
+        print(f"❌ データベース接続エラー: {e}")
+        print(f"❌ エラータイプ: {type(e).__name__}")
+        
+        # 具体的なエラー情報
+        if 'connection' in str(e).lower():
+            print("💡 対策: DATABASE_URLを確認してください")
+        elif 'authentication' in str(e).lower():
+            print("💡 対策: データベースの認証情報を確認してください")
+        elif 'does not exist' in str(e).lower():
+            print("💡 対策: データベースが存在しません")
+        
+        return False
+
+def diagnose_database_environment():
+    """データベース環境の詳細診断"""
+    print("\n=== データベース環境診断 ===")
+    
+    # 環境変数の確認
+    database_url = os.environ.get('DATABASE_URL', '未設定')
+    render_env = os.environ.get('RENDER', 'false') == 'true'
+    
+    print(f"DATABASE_URL: {'設定済み' if database_url != '未設定' else '未設定'}")
+    print(f"RENDER環境: {render_env}")
+    print(f"is_postgres: {is_postgres}")
+    
+    # SQLAlchemyエンジンの状態確認
+    try:
+        engine_info = str(db.engine.url)
+        # パスワード部分をマスク
+        if '@' in engine_info:
+            parts = engine_info.split('@')
+            if ':' in parts[0]:
+                user_pass = parts[0].split(':')
+                if len(user_pass) > 1:
+                    masked = user_pass[0] + ':***@' + '@'.join(parts[1:])
+                    engine_info = masked
+        
+        print(f"SQLAlchemy Engine: {engine_info}")
+        
+    except Exception as e:
+        print(f"SQLAlchemy Engine確認エラー: {e}")
+    
+    print("========================\n")
+
 # データベース初期化関数（完全リセット対応版）
 def create_tables_and_admin_user():
-    """データベース初期化関数（PostgreSQLスキーマ対応版）"""
-    with app.app_context():
-        print("🔧 PostgreSQL専用データベース初期化を開始...")
-        
-        try:
-            # PostgreSQL接続確認
-            db_url = app.config.get('SQLALCHEMY_DATABASE_URI', '')
-            is_postgres = 'postgresql' in db_url.lower()
+    """データベース初期化関数（app_context付き）"""
+    try:
+        with app.app_context():
+            logger.info("🔧 データベース初期化を開始...")
             
-            if not is_postgres:
-                print("⚠️ 警告: PostgreSQL以外のデータベースが検出されました")
-                print(f"DB URL: {db_url[:50]}...")
+            # データベース接続確認
+            try:
+                # ★修正: app_context内でdb.engineを使用
+                db.engine.execute(text('SELECT 1'))
+                logger.info("✅ データベース接続確認")
+            except Exception as e:
+                logger.error(f"❌ データベース接続失敗: {e}")
+                return
             
-            # 既存のテーブル確認（PostgreSQLスキーマ対応）
-            inspector = inspect(db.engine)
-            
-            # PostgreSQLの場合、publicスキーマとschema=Noneの両方をチェック
-            existing_tables = []
-            if is_postgres:
-                # publicスキーマのテーブルを取得
-                public_tables = inspector.get_table_names(schema='public')
-                # デフォルトスキーマのテーブルを取得
-                default_tables = inspector.get_table_names()
-                existing_tables = list(set(public_tables + default_tables))
-                print(f"📋 PostgreSQL接続: publicスキーマ={len(public_tables)}テーブル, デフォルト={len(default_tables)}テーブル")
-            else:
-                existing_tables = inspector.get_table_names()
-            
-            if existing_tables:
-                print(f"📋 既存のテーブル: {existing_tables}")
-                # マイグレーション実行（必要に応じてスキーマ更新）
-                migrate_database()
-            else:
-                print("📋 新しいデータベースを検出しました")
-            
-            # テーブル作成（既存テーブルには影響しない）
+            # テーブル作成
             db.create_all()
-            print("✅ テーブルを確認/作成しました。")
+            logger.info("✅ テーブルを確認/作成しました。")
             
-            # ===== 管理者ユーザー確認/作成 =====
+            # 管理者ユーザー確認/作成
             try:
                 admin_user = User.query.filter_by(username='admin', room_number='ADMIN').first()
                 
                 if not admin_user:
-                    print("👤 管理者ユーザーを作成します...")
+                    logger.info("👤 管理者ユーザーを作成します...")
                     admin_user = User(
                         username='admin',
                         room_number='ADMIN',
@@ -744,29 +715,27 @@ def create_tables_and_admin_user():
                     admin_user.set_individual_password('Avignon1309')
                     db.session.add(admin_user)
                     db.session.commit()
-                    print("✅ 管理者ユーザー 'admin' を作成しました（パスワード: Avignon1309）")
+                    logger.info("✅ 管理者ユーザー 'admin' を作成しました")
                 else:
-                    print("✅ 管理者ユーザー 'admin' は既に存在します。")
+                    logger.info("✅ 管理者ユーザー 'admin' は既に存在します。")
                     
             except Exception as e:
-                print(f"⚠️ 管理者ユーザー処理エラー: {e}")
+                logger.error(f"⚠️ 管理者ユーザー処理エラー: {e}")
                 db.session.rollback()
                 
-            # ===== アプリ情報確認/作成 =====
+            # アプリ情報確認/作成
             try:
                 app_info = AppInfo.get_current_info()
-                print("✅ アプリ情報を確認/作成しました")
+                logger.info("✅ アプリ情報を確認/作成しました")
                 
             except Exception as e:
-                print(f"⚠️ アプリ情報処理エラー: {e}")
+                logger.error(f"⚠️ アプリ情報処理エラー: {e}")
                 
-            print("🎉 PostgreSQL専用データベース初期化が完了しました！")
+            logger.info("🎉 データベース初期化が完了しました！")
                 
-        except Exception as e:
-            print(f"❌ データベース初期化エラー: {e}")
-            db.session.rollback()
-            # 例外を再発生させてアプリケーションの起動を停止
-            raise
+    except Exception as e:
+        logger.error(f"❌ データベース初期化エラー: {e}")
+        raise
     
 # ===== データ永続化チェック機能 =====
 def check_data_persistence():
@@ -791,44 +760,6 @@ def check_data_persistence():
     except Exception as e:
         print(f"❌ データ永続化チェックエラー: {e}")
         return False
-
-# ===== 環境変数設定推奨機能 =====
-def print_render_recommendations():
-    """Render環境での推奨設定を表示"""
-    is_render = os.environ.get('RENDER') == 'true'
-    reset_db = os.environ.get('RESET_DATABASE', 'false').lower() == 'true'
-    has_postgres = bool(os.environ.get('DATABASE_URL'))
-    
-    print("\n" + "="*60)
-    print("🚀 RENDER環境設定推奨事項")
-    print("="*60)
-    
-    if is_render:
-        print("✅ Render環境を検出")
-        
-        if reset_db:
-            print("⚠️ RESET_DATABASE=true が設定されています")
-            print("💡 本番運用時は以下を設定してください:")
-            print("   Environment Variable: RESET_DATABASE = false")
-        else:
-            print("✅ RESET_DATABASE=false (推奨)")
-        
-        if has_postgres:
-            print("✅ PostgreSQLデータベースが設定されています")
-        else:
-            print("⚠️ PostgreSQLデータベースが推奨されます")
-            print("💡 Render Dashboardで PostgreSQL Add-on を追加してください")
-        
-        print("\n📋 推奨環境変数設定:")
-        print("   RESET_DATABASE = false")
-        print("   PYTHON_VERSION = 3.11.9")
-        if not has_postgres:
-            print("   DATABASE_URL = <PostgreSQL接続URL>")
-        
-    else:
-        print("🏠 ローカル環境で実行中")
-    
-    print("="*60 + "\n")
 
 # ヘルパー関数
 def generate_reset_token():
@@ -3308,39 +3239,37 @@ def enhanced_startup_check():
             print("🔍 データ永続化確認")
             print("="*60)
             
-            # 環境変数確認
-            database_url = os.environ.get('DATABASE_URL', '未設定')
-            is_render = os.environ.get('RENDER', 'false') == 'true'
-            reset_db = os.environ.get('RESET_DATABASE', 'false') == 'true'
-            
-            print(f"📊 環境: {'Render' if is_render else 'ローカル'}")
-            print(f"📊 DATABASE_URL: {'設定済み' if database_url != '未設定' else '未設定'}")
-            print(f"📊 RESET_DATABASE: {reset_db}")
-            
-            if is_render and database_url == '未設定':
-                print("❌ 警告: Render環境でDATABASE_URLが未設定です")
-                print("💡 対策: Render DashboardでPostgreSQLサービスを確認してください")
+            # 環境診断
+            diagnose_database_environment()
             
             # データベース接続確認
             if verify_database_connection():
                 print("✅ データベース接続: 正常")
             else:
                 print("❌ データベース接続: 失敗")
+                return False
                 
             # テーブル存在確認
-            tables = db.engine.table_names()
-            expected_tables = ['user', 'room_setting', 'csv_file_content', 'app_info']
-            
-            missing_tables = [t for t in expected_tables if t not in tables]
-            if missing_tables:
-                print(f"⚠️ 不足テーブル: {missing_tables}")
-            else:
-                print("✅ 全テーブル存在確認")
+            try:
+                inspector = inspect(db.engine)
+                tables = inspector.get_table_names()
+                expected_tables = ['user', 'room_setting', 'csv_file_content', 'app_info']
+                
+                missing_tables = [t for t in expected_tables if t not in tables]
+                if missing_tables:
+                    print(f"⚠️ 不足テーブル: {missing_tables}")
+                else:
+                    print("✅ 全テーブル存在確認")
+                    
+            except Exception as e:
+                print(f"⚠️ テーブル確認エラー: {e}")
             
             print("="*60 + "\n")
+            return True
             
     except Exception as e:
         print(f"❌ 起動チェックエラー: {e}")
+        return False
 
 # app.pyに追加する診断関数
 def diagnose_mail_config():
@@ -3366,35 +3295,18 @@ diagnose_mail_config()
 # ===== メイン起動処理の修正 =====
 if __name__ == '__main__':
     try:
-        # 環境設定表示
-        print_render_recommendations()
-        
-        # データベース設定
-        is_postgres = configure_production_database()
-        
-        if not is_postgres:
-            print("⚠️ 警告: PostgreSQLが設定されていません")
-            print("💡 対策: DATABASE_URL環境変数を設定してください")
-        
         # データベース初期化
         create_tables_and_admin_user()
-        
-        # 起動チェック
-        enhanced_startup_check()
-        
-        # 部屋設定確認
-        verify_room_settings()
         
         # サーバー起動
         port = int(os.environ.get('PORT', 5001))
         debug_mode = os.environ.get('RENDER') != 'true'
         
-        print(f"🌐 サーバーを起動します: http://0.0.0.0:{port}")
-        print(f"🔧 デバッグモード: {debug_mode}")
+        logger.info(f"🌐 サーバーを起動します: http://0.0.0.0:{port}")
         
         app.run(host='0.0.0.0', port=port, debug=debug_mode)
         
     except Exception as e:
-        print(f"💥 起動失敗: {e}")
+        logger.error(f"💥 起動失敗: {e}")
         import traceback
         traceback.print_exc()
