@@ -2875,3 +2875,10 @@ body .auth-container .input-group input:hover {
         padding: 0.2em 0.4em;
     }
 }
+
+.btn-outline-secondary:hover,
+.btn-outline-secondary:focus {
+    background-color: #495057 !important;
+    border-color: #495057 !important;
+    color: #ffffff !important;
+}
