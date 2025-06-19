@@ -104,6 +104,25 @@ def get_app_info_dict(user_id=None, username=None, room_number=None):
         return info_dict
     except Exception as e:
         print(f"Error getting app info: {e}")
+        # エラー時も最新のDB情報を取得しようと試行
+        try:
+            app_info = AppInfo.query.first()
+            if app_info:
+                return {
+                    'appName': app_info.app_name,
+                    'version': app_info.version,
+                    'lastUpdatedDate': app_info.last_updated_date,
+                    'updateContent': app_info.update_content,
+                    'footerText': app_info.footer_text,
+                    'contactEmail': app_info.contact_email,
+                    'isLoggedIn': user_id is not None,
+                    'username': username,
+                    'roomNumber': room_number
+                }
+        except:
+            pass
+        
+        # 最終フォールバック
         return {
             'appName': '世界史単語帳',
             'version': '1.0.0', 
@@ -1142,7 +1161,10 @@ def index():
 
         # フッター用のコンテキストを取得
         context = get_template_context()
-        return render_template('index.html', **context)
+        return render_template('index.html',
+                                app_info=app_info_for_js,  # JavaScript用
+                                chapter_data=sorted_all_chapter_unit_status,
+                                footer_app_info=context['app_info'])  # フッター用
     
     except Exception as e:
         print(f"Error in index route: {e}")
