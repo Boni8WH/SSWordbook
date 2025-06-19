@@ -1121,12 +1121,26 @@ def index():
             flash('ユーザーが見つかりません。再ログインしてください。', 'danger')
             return redirect(url_for('logout'))
 
-        # JavaScript用のapp_info（従来の形式）
-        app_info_for_js = get_app_info_dict(
-            user_id=session.get('user_id'),
-            username=session.get('username'), 
-            room_number=session.get('room_number')
-        )
+        # JavaScript用のapp_info（共通コンテキストから取得するように修正）
+        context = get_template_context()
+        app_info_obj = context['app_info']
+        
+        if app_info_obj:
+            app_info_for_js = app_info_obj.to_dict()
+            app_info_for_js['isLoggedIn'] = True
+            app_info_for_js['username'] = session.get('username')
+            app_info_for_js['roomNumber'] = session.get('room_number')
+        else:
+            # フォールバック
+            app_info_for_js = {
+                'appName': '世界史単語帳',
+                'version': '1.0.0',
+                'lastUpdatedDate': '2025年6月15日',
+                'updateContent': 'アプリケーションが開始されました。',
+                'isLoggedIn': True,
+                'username': session.get('username'),
+                'roomNumber': session.get('room_number')
+            }
         
         word_data = load_word_data_for_room(current_user.room_number)
         
@@ -1159,12 +1173,11 @@ def index():
         sorted_all_chapter_unit_status = dict(sorted(all_chapter_unit_status.items(), 
                                                     key=lambda item: int(item[0]) if item[0].isdigit() else float('inf')))
 
-        # フッター用のコンテキストを取得
-        context = get_template_context()
+        # 統一された形式でテンプレートに渡す
         return render_template('index.html',
                                 app_info=app_info_for_js,  # JavaScript用
                                 chapter_data=sorted_all_chapter_unit_status,
-                                footer_app_info=context['app_info'])  # フッター用
+                                **context)  # フッター用app_infoも含む
     
     except Exception as e:
         print(f"Error in index route: {e}")
