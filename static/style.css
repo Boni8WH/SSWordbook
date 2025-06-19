@@ -168,6 +168,10 @@ header h1 {
     background-color: #2980b9;
 }
 
+.btn-outline-secondary:hover {
+    background-color: #1f9446;
+}
+
 .flash-messages {
     margin-bottom: 15px; /* スマホでは小さく */
 }
@@ -2876,9 +2880,3 @@ body .auth-container .input-group input:hover {
     }
 }
 
-.btn-outline-secondary:hover,
-.btn-outline-secondary:focus {
-    background-color: #495057 !important;
-    border-color: #495057 !important;
-    color: #ffffff !important;
-}
