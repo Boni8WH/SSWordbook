@@ -1142,11 +1142,8 @@ def index():
 
         # フッター用のコンテキストを取得
         context = get_template_context()
-        
-        return render_template('index.html', 
-                               app_info=app_info_for_js,  # JavaScript用（従来形式）
-                               chapter_data=sorted_all_chapter_unit_status,
-                               **context)  # app_infoが含まれる統一されたコンテキスト
+        context['app_info'] = app_info_for_js  # 上書き
+        return render_template('index.html', **context)
     
     except Exception as e:
         print(f"Error in index route: {e}")
