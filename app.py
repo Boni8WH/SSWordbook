@@ -119,17 +119,18 @@ def get_app_info_dict(user_id=None, username=None, room_number=None):
 # ====================================================================
 
 # app.py の User モデルの定義を以下に置き換え
-
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(80), nullable=False)
+    username = db.Column(db.String(80), nullable=False)  # 現在のアカウント名
+    original_username = db.Column(db.String(80), nullable=False)  # 最初に登録したアカウント名（新規追加）
     room_number = db.Column(db.String(50), nullable=False)
-    _room_password_hash = db.Column(db.String(255))  # 128 → 255に拡張
+    _room_password_hash = db.Column(db.String(255))
     student_id = db.Column(db.String(50), nullable=False)
-    _individual_password_hash = db.Column(db.String(255))  # 128 → 255に拡張
+    _individual_password_hash = db.Column(db.String(255))
     problem_history = db.Column(db.Text)
     incorrect_words = db.Column(db.Text)
     last_login = db.Column(db.DateTime, default=lambda: datetime.now(JST))
+    username_changed_at = db.Column(db.DateTime)  # アカウント名変更日時（新規追加）
 
     # 複合ユニーク制約を追加：部屋番号 + 出席番号 + ユーザー名の組み合わせでユニーク
     __table_args__ = (
@@ -137,6 +138,7 @@ class User(db.Model):
                           name='unique_room_student_username'),
     )
 
+    # 既存のメソッドはそのまま
     def set_room_password(self, password):
         self._room_password_hash = generate_password_hash(password)
 
@@ -164,6 +166,16 @@ class User(db.Model):
 
     def set_incorrect_words(self, words):
         self.incorrect_words = json.dumps(words)
+
+    # 新規メソッド：アカウント名変更
+    def change_username(self, new_username):
+        """アカウント名を変更する"""
+        if not self.original_username:
+            # 初回変更の場合、現在の名前を original_username に保存
+            self.original_username = self.username
+        
+        self.username = new_username
+        self.username_changed_at = datetime.now(JST)
 
 class RoomSetting(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -538,6 +550,89 @@ def admin_fix_all_data():
     
     return redirect(url_for('admin_page'))
 
+@app.route('/change_username', methods=['GET', 'POST'])
+def change_username_page():
+    try:
+        if 'user_id' not in session:
+            flash('ログインが必要です。', 'danger')
+            return redirect(url_for('login_page'))
+        
+        current_user = User.query.get(session['user_id'])
+        if not current_user:
+            flash('ユーザーが見つかりません。', 'danger')
+            return redirect(url_for('logout'))
+        
+        if request.method == 'POST':
+            room_password = request.form.get('room_password')
+            individual_password = request.form.get('individual_password')
+            new_username = request.form.get('new_username', '').strip()
+            
+            # パスワード認証
+            if not current_user.check_room_password(room_password):
+                flash('入室パスワードが間違っています。', 'danger')
+                context = get_template_context()
+                context['current_user'] = current_user
+                return render_template('change_username.html', **context)
+            
+            if not current_user.check_individual_password(individual_password):
+                flash('個別パスワードが間違っています。', 'danger')
+                context = get_template_context()
+                context['current_user'] = current_user
+                return render_template('change_username.html', **context)
+            
+            # 新しいユーザー名の検証
+            if not new_username:
+                flash('新しいアカウント名を入力してください。', 'danger')
+                context = get_template_context()
+                context['current_user'] = current_user
+                return render_template('change_username.html', **context)
+            
+            if len(new_username) > 80:
+                flash('アカウント名は80文字以内で入力してください。', 'danger')
+                context = get_template_context()
+                context['current_user'] = current_user
+                return render_template('change_username.html', **context)
+            
+            # 同じ部屋内での重複チェック
+            existing_user = User.query.filter_by(
+                room_number=current_user.room_number,
+                username=new_username
+            ).first()
+            
+            if existing_user and existing_user.id != current_user.id:
+                flash(f'部屋{current_user.room_number}には既に「{new_username}」というアカウント名が存在します。', 'danger')
+                context = get_template_context()
+                context['current_user'] = current_user
+                return render_template('change_username.html', **context)
+            
+            # アカウント名変更の実行
+            old_username = current_user.username
+            current_user.change_username(new_username)
+            
+            try:
+                db.session.commit()
+                
+                # セッションのユーザー名も更新
+                session['username'] = new_username
+                
+                flash(f'アカウント名を「{old_username}」から「{new_username}」に変更しました。', 'success')
+                return redirect(url_for('index'))
+                
+            except Exception as e:
+                db.session.rollback()
+                flash(f'アカウント名の変更中にエラーが発生しました: {str(e)}', 'danger')
+        
+        context = get_template_context()
+        context['current_user'] = current_user
+        return render_template('change_username.html', **context)
+        
+    except Exception as e:
+        print(f"Error in change_username_page: {e}")
+        import traceback
+        traceback.print_exc()
+        flash('システムエラーが発生しました。', 'danger')
+        return redirect(url_for('index'))
+
 # データベースマイグレーション関数
 def migrate_database():
     """データベーススキーマの変更を処理する（PostgreSQL専用版）"""
@@ -552,23 +647,37 @@ def migrate_database():
                 columns = [col['name'] for col in inspector.get_columns('user')]
                 print(f"📋 既存のUserテーブルカラム: {columns}")
                 
+                # アカウント名変更機能用のカラムを追加
+                if 'original_username' not in columns:
+                    print("🔧 original_usernameカラムを追加します...")
+                    with db.engine.connect() as conn:
+                        # 新しいカラムを追加
+                        conn.execute(text('ALTER TABLE "user" ADD COLUMN original_username VARCHAR(80)'))
+                        # 既存ユーザーの original_username を現在の username で初期化
+                        conn.execute(text('UPDATE "user" SET original_username = username WHERE original_username IS NULL'))
+                        # NOT NULL制約を追加
+                        conn.execute(text('ALTER TABLE "user" ALTER COLUMN original_username SET NOT NULL'))
+                        conn.commit()
+                    print("✅ original_usernameカラムを追加しました。")
+                
+                if 'username_changed_at' not in columns:
+                    print("🔧 username_changed_atカラムを追加します...")
+                    with db.engine.connect() as conn:
+                        conn.execute(text('ALTER TABLE "user" ADD COLUMN username_changed_at TIMESTAMP'))
+                        conn.commit()
+                    print("✅ username_changed_atカラムを追加しました。")
+                
+                # 既存のマイグレーション処理...
                 # パスワードハッシュフィールドの文字数制限を拡張
                 print("🔧 パスワードハッシュフィールドの文字数制限を拡張します...")
                 with db.engine.connect() as conn:
                     try:
-                        # room_password_hashの文字数制限拡張
                         conn.execute(text('ALTER TABLE "user" ALTER COLUMN _room_password_hash TYPE VARCHAR(255)'))
-                        print("✅ _room_password_hashを255文字に拡張しました。")
-                        
-                        # individual_password_hashの文字数制限拡張
                         conn.execute(text('ALTER TABLE "user" ALTER COLUMN _individual_password_hash TYPE VARCHAR(255)'))
-                        print("✅ _individual_password_hashを255文字に拡張しました。")
-                        
                         conn.commit()
-                        
+                        print("✅ パスワードハッシュフィールドを255文字に拡張しました。")
                     except Exception as alter_error:
                         print(f"⚠️ カラム変更エラー: {alter_error}")
-                        # すでに255文字になっている可能性があるため、続行
                 
                 # last_loginカラムの確認・追加
                 if 'last_login' not in columns:
@@ -577,8 +686,6 @@ def migrate_database():
                         conn.execute(text('ALTER TABLE "user" ADD COLUMN last_login TIMESTAMP'))
                         conn.commit()
                     print("✅ last_loginカラムを追加しました。")
-                else:
-                    print("last_loginカラムは既に存在します。")
             
             # 2. RoomSettingテーブルの確認
             if inspector.has_table('room_setting'):
@@ -1912,11 +2019,25 @@ def admin_page():
         room_max_unit_settings = {rs.room_number: rs.max_enabled_unit_number for rs in room_settings}
         room_csv_settings = {rs.room_number: rs.csv_filename for rs in room_settings}
         
-        print(f"📊 部屋設定状況:")
-        for room_num, csv_file in room_csv_settings.items():
-            print(f"  部屋{room_num}: {csv_file}")
+        # ユーザー情報を拡張（元のアカウント名と変更履歴を含む）
+        user_list_with_details = []
+        for user in users:
+            if user.username == 'admin':
+                continue
+                
+            user_details = {
+                'id': user.id,
+                'username': user.username,
+                'original_username': user.original_username if user.original_username else user.username,
+                'room_number': user.room_number,
+                'student_id': user.student_id,
+                'last_login': user.last_login.strftime('%Y-%m-%d %H:%M:%S') if user.last_login else 'なし',
+                'username_changed': user.original_username and user.original_username != user.username,
+                'username_changed_at': user.username_changed_at.strftime('%Y-%m-%d %H:%M:%S') if user.username_changed_at else None
+            }
+            user_list_with_details.append(user_details)
         
-        # 部屋番号のリストを取得（ユーザーがいる部屋と設定のある部屋を統合）
+        # 部屋番号のリストを取得
         unique_room_numbers = set()
         for user in users:
             if user.room_number != 'ADMIN':
@@ -1926,13 +2047,9 @@ def admin_page():
             if setting.room_number != 'ADMIN':
                 unique_room_numbers.add(setting.room_number)
         
-        print(f"📋 管理対象部屋: {sorted(unique_room_numbers)}")
-        
-        # 各部屋の設定が正しく存在するかチェック
+        # デフォルト設定の作成処理...
         for room_num in unique_room_numbers:
             if room_num not in room_csv_settings:
-                print(f"⚠️ 部屋{room_num}のCSV設定が見つかりません - デフォルト設定を作成")
-                # デフォルト設定を作成
                 default_room_setting = RoomSetting(
                     room_number=room_num,
                     max_enabled_unit_number="9999",
@@ -1944,7 +2061,6 @@ def admin_page():
         
         try:
             db.session.commit()
-            print("✅ デフォルト設定作成完了")
         except Exception as e:
             print(f"⚠️ デフォルト設定作成エラー: {e}")
             db.session.rollback()
@@ -1952,13 +2068,12 @@ def admin_page():
         context = get_template_context()
         
         template_context = {
-            'users': users,
+            'users': user_list_with_details,  # 拡張されたユーザー情報
             'room_max_unit_settings': room_max_unit_settings,
             'room_csv_settings': room_csv_settings,
             **context
         }
         
-        print("✅ 管理者ページ表示準備完了")
         return render_template('admin.html', **template_context)
         
     except Exception as e:
