@@ -1,22 +1,62 @@
-# データベースファイル
-quiz_data.db
+# .gitignore に以下を追加
+
+# データベース関連
 *.db
+*.sqlite
+*.sqlite3
 
-# 移行ファイル（セキュリティ）
+# 移行・復旧スクリプト
+data_migration.py
+complete_migration.py
 migration_data.json
-create_users_csv.py
-users_for_upload.csv
-fixed_migrate_database.py
 
-# アップロードファイル
-uploads/
-room_csv/
+# バックアップファイル
+*_backup_*.csv
+users_backup_*.csv
+room_settings_backup_*.csv
 
-# Python
-__pycache__/
-*.pyc
-*.pyo
+# 一時的なCSVファイル
+temp_*.csv
+export_*.csv
 
-# 環境設定
+# ログファイル
+*.log
+logs/
+
+# 環境設定ファイル（機密情報含む可能性）
 .env
-.venv/
+.env.local
+config.local.py
+
+# IDE設定
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Python関連
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# 仮想環境
+venv/
+env/
+ENV/
