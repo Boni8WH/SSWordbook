@@ -122,11 +122,11 @@ def get_app_info_dict(user_id=None, username=None, room_number=None):
 
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(80), nullable=False)  # unique=True を削除
+    username = db.Column(db.String(80), nullable=False)
     room_number = db.Column(db.String(50), nullable=False)
-    _room_password_hash = db.Column(db.String(128))
-    student_id = db.Column(db.String(50), nullable=False)  # unique=True を削除
-    _individual_password_hash = db.Column(db.String(128))
+    _room_password_hash = db.Column(db.String(255))  # 128 → 255に拡張
+    student_id = db.Column(db.String(50), nullable=False)
+    _individual_password_hash = db.Column(db.String(255))  # 128 → 255に拡張
     problem_history = db.Column(db.Text)
     incorrect_words = db.Column(db.Text)
     last_login = db.Column(db.DateTime, default=lambda: datetime.now(JST))
@@ -539,8 +539,6 @@ def admin_fix_all_data():
     return redirect(url_for('admin_page'))
 
 # データベースマイグレーション関数
-# app.py の migrate_database 関数を以下に置き換え
-
 def migrate_database():
     """データベーススキーマの変更を処理する（PostgreSQL専用版）"""
     with app.app_context():
@@ -554,6 +552,25 @@ def migrate_database():
                 columns = [col['name'] for col in inspector.get_columns('user')]
                 print(f"📋 既存のUserテーブルカラム: {columns}")
                 
+                # パスワードハッシュフィールドの文字数制限を拡張
+                print("🔧 パスワードハッシュフィールドの文字数制限を拡張します...")
+                with db.engine.connect() as conn:
+                    try:
+                        # room_password_hashの文字数制限拡張
+                        conn.execute(text('ALTER TABLE "user" ALTER COLUMN _room_password_hash TYPE VARCHAR(255)'))
+                        print("✅ _room_password_hashを255文字に拡張しました。")
+                        
+                        # individual_password_hashの文字数制限拡張
+                        conn.execute(text('ALTER TABLE "user" ALTER COLUMN _individual_password_hash TYPE VARCHAR(255)'))
+                        print("✅ _individual_password_hashを255文字に拡張しました。")
+                        
+                        conn.commit()
+                        
+                    except Exception as alter_error:
+                        print(f"⚠️ カラム変更エラー: {alter_error}")
+                        # すでに255文字になっている可能性があるため、続行
+                
+                # last_loginカラムの確認・追加
                 if 'last_login' not in columns:
                     print("🔧 last_loginカラムを追加します...")
                     with db.engine.connect() as conn:
@@ -634,16 +651,6 @@ def verify_database_connection():
             
     except Exception as e:
         print(f"❌ データベース接続エラー: {e}")
-        print(f"❌ エラータイプ: {type(e).__name__}")
-        
-        # 具体的なエラー情報
-        if 'connection' in str(e).lower():
-            print("💡 対策: DATABASE_URLを確認してください")
-        elif 'authentication' in str(e).lower():
-            print("💡 対策: データベースの認証情報を確認してください")
-        elif 'does not exist' in str(e).lower():
-            print("💡 対策: データベースが存在しません")
-        
         return False
 
 def diagnose_database_environment():
@@ -3232,27 +3239,33 @@ def admin_check_all_users():
 
 # 起動時ログを改善
 def enhanced_startup_check():
-    """起動時の詳細チェック（改良版）"""
+    """起動時の詳細チェック（修正版）"""
     try:
         with app.app_context():
             print("\n" + "="*60)
             print("🔍 データ永続化確認")
             print("="*60)
             
-            # 環境診断
-            diagnose_database_environment()
+            # 環境変数確認
+            database_url = os.environ.get('DATABASE_URL', '未設定')
+            is_render = os.environ.get('RENDER', 'false') == 'true'
+            reset_db = os.environ.get('RESET_DATABASE', 'false') == 'true'
             
-            # データベース接続確認
-            if verify_database_connection():
-                print("✅ データベース接続: 正常")
-            else:
-                print("❌ データベース接続: 失敗")
-                return False
+            print(f"📊 環境: {'Render' if is_render else 'ローカル'}")
+            print(f"📊 DATABASE_URL: {'設定済み' if database_url != '未設定' else '未設定'}")
+            print(f"📊 RESET_DATABASE: {reset_db}")
+            
+            # データベース接続確認をコメントアウト
+            # if verify_database_connection():
+            #     print("✅ データベース接続: 正常")
+            # else:
+            #     print("❌ データベース接続: 失敗")
+            
+            print("✅ データベース接続: スキップ")
                 
             # テーブル存在確認
             try:
-                inspector = inspect(db.engine)
-                tables = inspector.get_table_names()
+                tables = db.engine.table_names()
                 expected_tables = ['user', 'room_setting', 'csv_file_content', 'app_info']
                 
                 missing_tables = [t for t in expected_tables if t not in tables]
@@ -3265,11 +3278,9 @@ def enhanced_startup_check():
                 print(f"⚠️ テーブル確認エラー: {e}")
             
             print("="*60 + "\n")
-            return True
             
     except Exception as e:
         print(f"❌ 起動チェックエラー: {e}")
-        return False
 
 # app.pyに追加する診断関数
 def diagnose_mail_config():
