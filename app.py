@@ -136,14 +136,19 @@ def to_jst_filter(dt):
     # datetime の場合、9時間加算
     if hasattr(dt, 'year'):
         from datetime import timedelta
+        
+        # デバッグ用の出力
+        print(f"🔍 元の時刻: {dt}")
+        
+        # 9時間加算
         jst_dt = dt + timedelta(hours=9)
-        return jst_dt.strftime('%Y-%m-%d %H:%M')
+        result = jst_dt.strftime('%Y-%m-%d %H:%M')
+        
+        print(f"🔍 変換後: {result}")
+        return result
     
+    # その他はそのまま
     return str(dt)
-
-@app.template_filter('test_filter')
-def test_filter(value):
-    return f"テスト: {value}"
 
 # ====================================================================
 # データベースモデル定義
