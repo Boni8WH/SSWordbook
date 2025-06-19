@@ -2311,7 +2311,7 @@ def admin_add_user():
             flash('すべての項目を入力してください。', 'danger')
             return redirect(url_for('admin_page'))
 
-        # 部屋番号 + ユーザー名の組み合わせでの重複チェック（出席番号の重複は許可）
+        # 部屋番号 + ユーザー名の組み合わせでの重複チェック
         existing_user = User.query.filter_by(
             room_number=room_number, 
             username=username
@@ -2321,16 +2321,22 @@ def admin_add_user():
             flash(f'部屋{room_number}にユーザー名{username}は既に存在します。', 'danger')
             return redirect(url_for('admin_page'))
 
-        new_user = User(room_number=room_number, student_id=student_id, username=username)
+        new_user = User(
+        room_number=room_number,
+        student_id=student_id,
+        username=username,
+        original_username=username  # ★ 追加：初回登録時は同じ名前を設定
+        )
         new_user.set_room_password(room_password)
         new_user.set_individual_password(individual_password)
         new_user.problem_history = "{}"
         new_user.incorrect_words = "[]"
+        new_user.last_login = datetime.now(JST)
 
         db.session.add(new_user)
         db.session.commit()
         
-        # 部屋設定の自動作成
+        # 部屋設定の自動作成（既存のコード）
         if not RoomSetting.query.filter_by(room_number=room_number).first():
             default_room_setting = RoomSetting(room_number=room_number, max_enabled_unit_number="9999", csv_filename="words.csv")
             db.session.add(default_room_setting)
