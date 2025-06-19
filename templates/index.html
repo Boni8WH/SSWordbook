@@ -200,7 +200,7 @@ function debugRoomSetting(roomNumber) {
 </script>
 <script>
     // Flaskからのデータをグローバル変数として設定
-    window.appInfoFromFlask = {{ app_info | tojson | safe }};
+    window.appInfoFromFlask = {{ app_info_for_js | tojson | safe }};  <!-- 変数名を変更 -->
     window.chapterDataFromFlask = {{ chapter_data | tojson | safe }};
 </script>
 <!-- html2canvas ライブラリの読み込み -->
