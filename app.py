@@ -1121,7 +1121,7 @@ def index():
             flash('ユーザーが見つかりません。再ログインしてください。', 'danger')
             return redirect(url_for('logout'))
 
-        # 元のJavaScript用app_info生成（エラー回避のため元のまま）
+        # JavaScript用のapp_info（従来の形式）
         app_info_for_js = get_app_info_dict(
             user_id=session.get('user_id'),
             username=session.get('username'), 
@@ -1162,11 +1162,11 @@ def index():
         # フッター用のコンテキストを取得
         context = get_template_context()
         
-        # ★重要な修正：app_infoの名前を変更してコンフリクトを回避
+        # ★重要な修正：JavaScriptで使う変数名を変更
         return render_template('index.html',
-                                app_info=app_info_for_js,  # JavaScript用
+                                app_info_for_js=app_info_for_js,  # JavaScript用（名前変更）
                                 chapter_data=sorted_all_chapter_unit_status,
-                                app_info_for_footer=context['app_info'])  # フッター用（名前を変更）
+                                **context)  # これによりapp_infoが正しい値になる
     
     except Exception as e:
         print(f"Error in index route: {e}")
