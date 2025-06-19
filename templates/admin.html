@@ -170,7 +170,7 @@
                             </td>
                             <td>
                                 {% if user.username_changed_at %}
-                                <small>{{ user.username_changed_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                                <small>{{ user.username_changed_at or '-' }}</small>
                                 {% else %}
                                 <span class="text-muted">-</span>
                                 {% endif %}
