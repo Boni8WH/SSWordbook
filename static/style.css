@@ -2821,3 +2821,57 @@ body .auth-container .input-group input:hover {
     background-color: var(--auth-input-bg-color) !important;
     -webkit-text-fill-color: var(--auth-input-text-color) !important;
 }
+
+.badge {
+    font-size: 0.75em;
+    padding: 0.25em 0.5em;
+    border-radius: 0.25rem;
+}
+
+.bg-warning {
+    background-color: #ffc107 !important;
+}
+
+.text-dark {
+    color: #212529 !important;
+}
+
+.user-list-table th,
+.user-list-table td {
+    padding: 8px 6px;
+    font-size: 0.85em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 120px;
+    vertical-align: middle;
+}
+
+.user-list-table th:first-child,
+.user-list-table td:first-child {
+    max-width: 40px;
+}
+
+.user-list-table th:last-child,
+.user-list-table td:last-child {
+    max-width: 80px;
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 767px) {
+    .user-list-table {
+        min-width: 900px; /* 幅を少し広げる */
+    }
+    
+    .user-list-table th,
+    .user-list-table td {
+        padding: 4px 2px;
+        font-size: 0.7em;
+        max-width: 100px;
+    }
+    
+    .badge {
+        font-size: 0.65em;
+        padding: 0.2em 0.4em;
+    }
+}
