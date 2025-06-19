@@ -1836,6 +1836,52 @@ def debug_manual_test_save():
         db.session.rollback()
         return jsonify(error=str(e)), 500
 
+@app.route('/debug/app_info_comparison')
+def debug_app_info_comparison():
+    """デバッグ用: 両方の関数の返り値を比較"""
+    if not session.get('admin_logged_in'):
+        return "管理者ログインが必要です", 403
+    
+    try:
+        # get_template_context()の結果
+        context = get_template_context()
+        template_app_info = context.get('app_info')
+        
+        # get_app_info_dict()の結果
+        dict_app_info = get_app_info_dict(
+            user_id=session.get('user_id'),
+            username=session.get('username'),
+            room_number=session.get('room_number')
+        )
+        
+        result = {
+            'template_context_app_info': {
+                'type': str(type(template_app_info)),
+                'app_name': getattr(template_app_info, 'app_name', 'N/A') if template_app_info else None,
+                'footer_text': getattr(template_app_info, 'footer_text', 'N/A') if template_app_info else None,
+                'is_none': template_app_info is None
+            },
+            'dict_app_info': dict_app_info,
+            'database_direct_query': None
+        }
+        
+        # データベースから直接取得
+        try:
+            db_app_info = AppInfo.query.first()
+            if db_app_info:
+                result['database_direct_query'] = {
+                    'app_name': db_app_info.app_name,
+                    'footer_text': db_app_info.footer_text,
+                    'contact_email': db_app_info.contact_email
+                }
+        except Exception as e:
+            result['database_direct_query'] = f"エラー: {str(e)}"
+        
+        return f"<pre>{json.dumps(result, indent=2, ensure_ascii=False)}</pre>"
+        
+    except Exception as e:
+        return f"エラー: {str(e)}"
+
 @app.route('/api/clear_quiz_progress', methods=['POST'])
 def api_clear_quiz_progress():
     return jsonify(status='success', message='一時的なクイズ進捗クリア要求を受信しました（サーバー側は変更なし）。')
