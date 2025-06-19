@@ -2926,13 +2926,13 @@ body .auth-container .input-group input:hover {
 
 /* アカウント名変更ボタン */
 .change-username-button {
-    background-color: #ffffff !important;
+    background-color: #fbad24 !important;
     color: #000000 !important;
     border: none
 }
 
 .change-username-button:hover {
-    background-color: #f39c12 !important;
-    border-color: #f39c12 !important;
+    background-color: #dd8c09 !important;
+    border-color: #dd8c09 !important;
     color: #ffffff !important;
 }
