@@ -168,13 +168,7 @@
                                 <span class="text-muted">-</span>
                                 {% endif %}
                             </td>
-                            <td>
-                                {% if user.username_changed_at %}
-                                <small>{{ user.username_changed_at or '-' }}</small>
-                                {% else %}
-                                <span class="text-muted">-</span>
-                                {% endif %}
-                            </td>
+                            <td>{{ user.username_changed_at | to_jst if user.username_changed_at else '-' }}</td>
                             <td>{{ user.last_login | to_jst if user.last_login else '未ログイン' }}</td>
                             <td>
                                 <button class="btn btn-danger btn-sm delete-user-btn"
@@ -418,6 +412,18 @@ function loadCsvFilesList() {
         });
 }
 
+function addHoursToTimestamp(dateString, hours) {
+    const date = new Date(dateString);
+    date.setHours(date.getHours() + hours);
+    return date.toLocaleString('ja-JP', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+}
+
 // CSVファイル表示を更新する関数
 function updateCsvFilesDisplay(files) {
     console.log('🔄 ファイル表示更新:', files);
@@ -447,7 +453,7 @@ function updateCsvFilesDisplay(files) {
                 '<td><code>' + file.filename + '</code></td>' +
                 '<td><span class="badge bg-primary">' + wordCountDisplay + '</span></td>' +
                 '<td>' + sizeKB + ' KB</td>' +
-                '<td><small>' + file.modified + '</small></td>' +
+                '<td><small>' + addHoursToTimestamp(file.modified, 9) + '</small></td>' +
                 '<td><button class="btn btn-danger btn-sm" onclick="deleteCsvFile(\'' + file.filename + '\')">削除</button></td>' +
                 '</tr>';
     });
