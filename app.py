@@ -12,52 +12,19 @@ from flask_mail import Mail, Message
 import hashlib
 import logging
 
-# ===== ログ設定（環境に応じて調整） =====
-def setup_logging():
-    """環境に応じたログレベルの設定"""
-    # 環境判定
-    is_render = os.environ.get('RENDER') == 'true'
-    debug_mode = os.environ.get('DEBUG', 'false').lower() == 'true'
-    log_level = os.environ.get('LOG_LEVEL', '').upper()
-    
-    # ログレベルの決定
-    if log_level in ['DEBUG', 'INFO', 'WARNING', 'ERROR']:
-        level = getattr(logging, log_level)
-    elif debug_mode:
-        level = logging.DEBUG
-    elif is_render:
-        level = logging.INFO  # 本番環境では情報レベル
-    else:
-        level = logging.DEBUG  # ローカル開発では詳細ログ
-    
-    # ログフォーマットの設定
-    if is_render:
-        # 本番環境: シンプルなフォーマット
-        log_format = '%(asctime)s [%(levelname)s] %(message)s'
-    else:
-        # 開発環境: 詳細なフォーマット
-        log_format = '%(asctime)s [%(levelname)s] %(name)s:%(lineno)d - %(message)s'
-    
-    # ログ設定の適用
-    logging.basicConfig(
-        level=level,
-        format=log_format,
-        datefmt='%Y-%m-%d %H:%M:%S'
-    )
-    
-    # SQLAlchemyのログレベル調整（本番環境でのノイズ削減）
-    if is_render and level != logging.DEBUG:
-        logging.getLogger('sqlalchemy.engine').setLevel(logging.WARNING)
-        logging.getLogger('sqlalchemy.pool').setLevel(logging.WARNING)
-    
-    # 設定完了ログ
-    logger = logging.getLogger(__name__)
-    logger.info(f"ログレベル設定: {logging.getLevelName(level)} ({'本番' if is_render else 'ローカル'}環境)")
-    
-    return level
+log_level = logging.INFO if os.environ.get('RENDER') == 'true' else logging.DEBUG
+logging.basicConfig(
+    level=log_level,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
 
-# ログ設定を実行
-current_log_level = setup_logging()
+# SQLAlchemyのログを抑制（本番環境のみ）
+if os.environ.get('RENDER') == 'true':
+    logging.getLogger('sqlalchemy.engine').setLevel(logging.WARNING)
+
+logger = logging.getLogger(__name__)
+logger.info(f"ログレベル設定: {logging.getLevelName(log_level)} ({'本番' if os.environ.get('RENDER') == 'true' else 'ローカル'}環境)")
 
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, Response
 from flask_sqlalchemy import SQLAlchemy
@@ -102,6 +69,14 @@ def configure_production_database():
         print("📄 ローカル環境用SQLite設定")
         app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'quiz_data.db')
         return False
+    # デバッグ情報を追加
+    print(f"🔍 DATABASE_URL設定値: {os.environ.get('DATABASE_URL', '未設定')}")
+    print(f"🔍 SQLALCHEMY_DATABASE_URI: {app.config.get('SQLALCHEMY_DATABASE_URI', '未設定')}")
+    
+    return is_postgres
+
+# db.init_app(app) の直前に追加
+print(f"🔍 db.init_app実行前のSQLALCHEMY_DATABASE_URI: {app.config.get('SQLALCHEMY_DATABASE_URI', '未設定')}")
 
 def verify_database_connection():
     """データベース接続を確認"""
@@ -130,6 +105,37 @@ app.config['SECRET_KEY'] = 'your_secret_key_here_please_change_this_in_productio
 basedir = os.path.abspath(os.path.dirname(__file__))
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['PERMANENT_SESSION_LIFETIME'] = 3600 * 24 * 7
+
+def configure_database():
+    """データベース設定を行う"""
+    database_url = os.environ.get('DATABASE_URL')
+    
+    if database_url:
+        logger.info("🐘 PostgreSQL設定を適用中...")
+        
+        # PostgreSQL用のURLフォーマット修正
+        if database_url.startswith('postgres://'):
+            database_url = database_url.replace('postgres://', 'postgresql://', 1)
+        
+        app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+        app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+            'pool_timeout': 20,
+            'pool_recycle': -1,
+            'pool_pre_ping': True,
+            'connect_args': {
+                'connect_timeout': 10,
+            }
+        }
+        logger.info("✅ PostgreSQL接続設定完了")
+        return True
+    else:
+        logger.warning("📄 DATABASE_URLが未設定 - SQLiteを使用")
+        app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'quiz_data.db')
+        return False
+
+is_postgres = configure_database()
+
+# ===== メール設定 =====
 app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
 app.config['MAIL_PORT'] = int(os.environ.get('MAIL_PORT', '587'))
 app.config['MAIL_USE_TLS'] = os.environ.get('MAIL_USE_TLS', 'true').lower() in ['true', 'on', '1']
@@ -139,9 +145,7 @@ app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_DEFAULT_SENDER', app.co
 
 mail = Mail(app)
 
-# dbオブジェクトを初期化
 db = SQLAlchemy()
-db.init_app(app)
 
 # CSV一時保存用フォルダ
 UPLOAD_FOLDER = 'uploads'
