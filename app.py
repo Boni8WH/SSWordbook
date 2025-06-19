@@ -114,6 +114,23 @@ def get_app_info_dict(user_id=None, username=None, room_number=None):
             'roomNumber': room_number
         }
 
+def convert_to_jst(dt):
+    """UTCからJSTに変換"""
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        # naive datetimeの場合、UTCとして扱ってJSTに変換
+        dt = pytz.UTC.localize(dt)
+    return dt.astimezone(JST)
+
+# テンプレートで使用できるようにフィルターとして登録
+@app.template_filter('to_jst')
+def to_jst_filter(dt):
+    if dt is None:
+        return None
+    converted = convert_to_jst(dt)
+    return converted.strftime('%Y-%m-%d %H:%M')
+
 # ====================================================================
 # データベースモデル定義
 # ====================================================================
