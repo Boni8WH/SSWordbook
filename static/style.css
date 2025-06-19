@@ -2936,3 +2936,31 @@ body .auth-container .input-group input:hover {
     border-color: #dd8c09 !important;
     color: #ffffff !important;
 }
+
+/* アカウント名変更ボタン - より強力なセレクター */
+.navbar-nav .nav-link.btn.change-username-button,
+a.nav-link.btn.change-username-button,
+.change-username-button {
+    background-color: #fbad24 !important;
+    color: #ffffff !important;
+    border: none !important;
+    -webkit-text-fill-color: #ffffff !important;  /* Safari対応 */
+}
+
+.navbar-nav .nav-link.btn.change-username-button:hover,
+a.nav-link.btn.change-username-button:hover,
+.change-username-button:hover {
+    background-color: #dd8c09 !important;
+    border-color: #dd8c09 !important;
+    color: #ffffff !important;
+    -webkit-text-fill-color: #ffffff !important;  /* Safari対応 */
+}
+
+/* 追加：リンクの文字色を強制的に白に */
+.change-username-button,
+.change-username-button:link,
+.change-username-button:visited,
+.change-username-button:active {
+    color: #ffffff !important;
+    text-decoration: none !important;
+}
