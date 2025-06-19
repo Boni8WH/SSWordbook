@@ -20,9 +20,14 @@ from sqlalchemy import inspect, text
 # 日本時間のタイムゾーンオブジェクトを作成
 JST = pytz.timezone('Asia/Tokyo')
 
-# ===== PostgreSQL設定（Render用） =====
+# ===== Flask アプリケーション初期化 =====
+app = Flask(__name__)
+app.config['SECRET_KEY'] = 'your_secret_key_here_please_change_this_in_production'
+basedir = os.path.abspath(os.path.dirname(__file__))
+
+# ===== PostgreSQL設定（修正版） =====
 def configure_production_database():
-    """本番環境用のデータベース設定"""
+    """本番環境用のデータベース設定（修正版）"""
     database_url = os.environ.get('DATABASE_URL')
     
     if database_url:
@@ -41,19 +46,17 @@ def configure_production_database():
                 'connect_timeout': 10,
             }
         }
-        print(f"✅ PostgreSQL接続設定完了: {database_url[:50]}...")
+        print(f"✅ PostgreSQL接続設定完了")
         return True
     else:
         print("📄 ローカル環境用SQLite設定")
         app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'quiz_data.db')
         return False
 
-# PostgreSQL設定（該当する場合）
+# PostgreSQL設定の適用
 is_postgres = configure_production_database()
 
-app = Flask(__name__)
-app.config['SECRET_KEY'] = 'your_secret_key_here_please_change_this_in_production'
-basedir = os.path.abspath(os.path.dirname(__file__))
+# ===== その他の設定 =====
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['PERMANENT_SESSION_LIFETIME'] = 3600 * 24 * 7
 app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
@@ -63,9 +66,10 @@ app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME')
 app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
 app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_DEFAULT_SENDER', app.config['MAIL_USERNAME'])
 
+# Mail初期化
 mail = Mail(app)
 
-# dbオブジェクトを初期化
+# データベース初期化
 db = SQLAlchemy()
 db.init_app(app)
 
@@ -75,9 +79,6 @@ if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
-
-# 部屋ごとのCSVファイルを保存するフォルダ
-ROOM_CSV_FOLDER = 'room_csv'
 
 # ====================================================================
 # アプリ情報を取得するヘルパー関数
@@ -108,20 +109,17 @@ def get_app_info_dict(user_id=None, username=None, room_number=None):
 # データベースモデル定義
 # ====================================================================
 
-# app.py の User モデルの定義を以下に置き換え
-
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(80), nullable=False)  # unique=True を削除
+    username = db.Column(db.String(80), nullable=False)
     room_number = db.Column(db.String(50), nullable=False)
     _room_password_hash = db.Column(db.String(128))
-    student_id = db.Column(db.String(50), nullable=False)  # unique=True を削除
+    student_id = db.Column(db.String(50), nullable=False)
     _individual_password_hash = db.Column(db.String(128))
     problem_history = db.Column(db.Text)
     incorrect_words = db.Column(db.Text)
     last_login = db.Column(db.DateTime, default=lambda: datetime.now(JST))
 
-    # 複合ユニーク制約を追加：部屋番号 + 出席番号 + ユーザー名の組み合わせでユニーク
     __table_args__ = (
         db.UniqueConstraint('room_number', 'student_id', 'username', 
                           name='unique_room_student_username'),
@@ -162,14 +160,13 @@ class RoomSetting(db.Model):
     csv_filename = db.Column(db.String(100), default="words.csv", nullable=False)
 
 class RoomCsvFile(db.Model):
-    """部屋ごとのカスタムCSVファイル情報を管理するモデル"""
     id = db.Column(db.Integer, primary_key=True)
     filename = db.Column(db.String(100), unique=True, nullable=False)
-    original_filename = db.Column(db.String(100), nullable=False)  # アップロード時の元のファイル名
-    file_size = db.Column(db.Integer, nullable=False)  # バイト単位
-    word_count = db.Column(db.Integer, default=0)  # 単語数
+    original_filename = db.Column(db.String(100), nullable=False)
+    file_size = db.Column(db.Integer, nullable=False)
+    word_count = db.Column(db.Integer, default=0)
     upload_date = db.Column(db.DateTime, default=lambda: datetime.now(JST))
-    description = db.Column(db.Text)  # ファイルの説明（オプション）
+    description = db.Column(db.Text)
     
     def __repr__(self):
         return f'<RoomCsvFile {self.filename} ({self.word_count} words)>'
@@ -217,48 +214,35 @@ class PasswordResetToken(db.Model):
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))
     expires_at = db.Column(db.DateTime, nullable=False)
     used = db.Column(db.Boolean, default=False)
-    used_at = db.Column(db.DateTime)  # 使用された日時
+    used_at = db.Column(db.DateTime)
     
     user = db.relationship('User', backref=db.backref('reset_tokens', lazy=True))
     
     def is_expired(self):
-        """トークンが期限切れかどうかを確認（タイムゾーン対応版）"""
         now = datetime.now(JST)
-        
-        # expires_atがタイムゾーン情報を持っているかチェック
         if self.expires_at.tzinfo is None:
-            # expires_atがnaiveな場合、JSTタイムゾーンを設定
             expires_at_aware = JST.localize(self.expires_at)
         else:
-            # 既にawareな場合はそのまま使用
             expires_at_aware = self.expires_at
-        
         return now > expires_at_aware
     
     def is_valid(self):
-        """トークンが有効かどうかを確認（未使用かつ期限内）"""
         return not self.used and not self.is_expired()
     
     def mark_as_used(self):
-        """トークンを使用済みにマーク"""
         self.used = True
         self.used_at = datetime.now(JST)
-        
-    def __repr__(self):
-        return f'<PasswordResetToken {self.token[:10]}... for user {self.user_id}>'
 
 class CsvFileContent(db.Model):
-    """CSVファイルの内容をデータベースに保存"""
     id = db.Column(db.Integer, primary_key=True)
     filename = db.Column(db.String(100), unique=True, nullable=False)
     original_filename = db.Column(db.String(100), nullable=False)
-    content = db.Column(db.Text, nullable=False)  # CSV内容をテキストとして保存
+    content = db.Column(db.Text, nullable=False)
     file_size = db.Column(db.Integer, nullable=False)
     word_count = db.Column(db.Integer, default=0)
     upload_date = db.Column(db.DateTime, default=lambda: datetime.now(JST))
     
     def get_csv_data(self):
-        """CSV内容を辞書リストとして返す"""
         try:
             reader = csv.DictReader(StringIO(self.content))
             return list(reader)
@@ -270,11 +254,9 @@ class CsvFileContent(db.Model):
 # ヘルパー関数
 # ====================================================================
 
-# 部屋ごとの単語データを読み込む関数
 def load_word_data_for_room(room_number):
     """指定された部屋の単語データを読み込む（完全DB対応版）"""
     try:
-        # データベースから部屋設定を取得
         room_setting = RoomSetting.query.filter_by(room_number=room_number).first()
         
         if room_setting and room_setting.csv_filename:
@@ -284,7 +266,6 @@ def load_word_data_for_room(room_number):
         
         print(f"🔍 部屋{room_number}のCSVファイル: {csv_filename}")
         
-        # デフォルトファイルの場合
         if csv_filename == "words.csv":
             word_data = []
             try:
@@ -300,11 +281,9 @@ def load_word_data_for_room(room_number):
                 print(f"❌ デフォルトファイルが見つかりません: words.csv")
                 return []
         else:
-            # ★重要：データベースからカスタムCSVの内容を取得
             csv_file = CsvFileContent.query.filter_by(filename=csv_filename).first()
             if csv_file:
                 try:
-                    # CSV内容をパース
                     content = csv_file.content
                     reader = csv.DictReader(StringIO(content))
                     word_data = []
@@ -319,7 +298,6 @@ def load_word_data_for_room(room_number):
                     return []
             else:
                 print(f"❌ データベースにCSVが見つかりません: {csv_filename}")
-                # フォールバック: デフォルトファイル使用
                 print("🔄 デフォルトファイルにフォールバック")
                 return load_word_data_for_room("default")
         
@@ -331,7 +309,6 @@ def load_word_data_for_room(room_number):
         traceback.print_exc()
         return []
 
-# 管理者用：全体のデフォルト単語データを読み込む関数
 def load_default_word_data():
     """デフォルトのwords.csvを読み込む（管理者用）"""
     word_data = []
@@ -353,7 +330,6 @@ def load_default_word_data():
     
     return word_data
 
-# 単元番号の比較を数値で行うためのヘルパー関数
 def parse_unit_number(unit_str):
     if not isinstance(unit_str, str):
         return float('inf')
@@ -365,10 +341,6 @@ def parse_unit_number(unit_str):
         return int(unit_str) * 1000000 
     return float('inf')
 
-# 問題IDを生成するヘルパー関数
-# app.py の get_problem_id 関数を以下に置き換え
-# app.py の get_problem_id 関数を以下に置き換え
-
 def get_problem_id(word):
     """統一された問題ID生成（JavaScript側と完全一致）"""
     try:
@@ -377,12 +349,10 @@ def get_problem_id(word):
         question = str(word.get('question', ''))
         answer = str(word.get('answer', ''))
         
-        # 問題文と答えから英数字と日本語文字のみ抽出（JavaScript側と同じ処理）
         import re
         question_clean = re.sub(r'[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]', '', question[:15])
         answer_clean = re.sub(r'[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]', '', answer[:10])
         
-        # 統一フォーマット
         problem_id = f"{chapter}-{number}-{question_clean}-{answer_clean}"
         
         return problem_id
@@ -395,14 +365,11 @@ def get_problem_id(word):
 
 def fix_all_user_data():
     """全ユーザーの学習履歴を新しいID形式に統一"""
-    
-    # デフォルトの単語データを取得
     default_word_data = load_default_word_data()
     if not default_word_data:
         print("❌ 単語データが見つかりません")
         return False
     
-    # 新しいID生成方式でマッピングを作成
     word_mapping = {}
     for word in default_word_data:
         new_id = get_problem_id(word)
@@ -427,24 +394,18 @@ def fix_all_user_data():
         new_incorrect = []
         user_fixed_count = 0
         
-        # 各履歴エントリを新しいIDで再構築
         for old_id, history_data in old_history.items():
-            
-            # まず新しいID形式かチェック
             best_match_word = None
             best_score = 0
             
-            # 完全一致を探す
             for word in default_word_data:
                 new_id = get_problem_id(word)
                 if new_id == old_id:
                     best_match_word = word
-                    best_score = 1000  # 完全一致は最高スコア
+                    best_score = 1000
                     break
             
-            # 完全一致しない場合は推測マッチング
             if best_score < 1000:
-                # 古いIDからの情報抽出を試行
                 parts = old_id.split('-')
                 if len(parts) >= 2:
                     try:
@@ -456,11 +417,9 @@ def fix_all_user_data():
                             word_chapter = int(str(word['chapter']))
                             word_number = int(str(word['number']))
                             
-                            # 章と単元の完全一致は高スコア
                             if word_chapter == old_chapter and word_number == old_number:
                                 score = 500
                                 
-                                # 問題文の類似性もチェック
                                 if len(parts) > 2:
                                     old_text = ''.join(parts[2:]).lower()
                                     question_clean = str(word['question']).lower()
@@ -476,13 +435,11 @@ def fix_all_user_data():
                     except ValueError:
                         continue
             
-            # マッチした場合は新しいIDで保存
-            if best_match_word and best_score >= 500:  # 章・単元一致が最低条件
+            if best_match_word and best_score >= 500:
                 new_id = get_problem_id(best_match_word)
                 new_history[new_id] = history_data
                 user_fixed_count += 1
                 
-                # 苦手問題の判定
                 incorrect_attempts = history_data.get('incorrect_attempts', 0)
                 correct_streak = history_data.get('correct_streak', 0)
                 
@@ -511,26 +468,6 @@ def fix_all_user_data():
         print(f"❌ 修正エラー: {e}")
         return False
 
-@app.route('/admin/fix_all_data', methods=['POST'])
-def admin_fix_all_data():
-    if not session.get('admin_logged_in'):
-        flash('管理者権限がありません。', 'danger')
-        return redirect(url_for('login_page'))
-    
-    try:
-        success = fix_all_user_data()
-        if success:
-            flash('全ユーザーデータの修正が完了しました。', 'success')
-        else:
-            flash('データ修正中にエラーが発生しました。', 'danger')
-    except Exception as e:
-        flash(f'データ修正エラー: {str(e)}', 'danger')
-    
-    return redirect(url_for('admin_page'))
-
-# データベースマイグレーション関数
-# app.py の migrate_database 関数を以下に置き換え
-
 def migrate_database():
     """データベーススキーマの変更を処理する（PostgreSQL専用版）"""
     with app.app_context():
@@ -539,7 +476,6 @@ def migrate_database():
         try:
             inspector = inspect(db.engine)
             
-            # 1. Userテーブルの確認
             if inspector.has_table('user'):
                 columns = [col['name'] for col in inspector.get_columns('user')]
                 print(f"📋 既存のUserテーブルカラム: {columns}")
@@ -553,7 +489,6 @@ def migrate_database():
                 else:
                     print("last_loginカラムは既に存在します。")
             
-            # 2. RoomSettingテーブルの確認
             if inspector.has_table('room_setting'):
                 columns = [col['name'] for col in inspector.get_columns('room_setting')]
                 print(f"📋 既存のRoomSettingテーブルカラム: {columns}")
@@ -578,7 +513,6 @@ def migrate_database():
                             print(f"✅ {col_name}カラムを追加しました。")
                         conn.commit()
             
-            # 3. その他のテーブル確認（password_reset_token, app_info等）
             if inspector.has_table('password_reset_token'):
                 columns = [col['name'] for col in inspector.get_columns('password_reset_token')]
                 if 'used_at' not in columns:
@@ -592,7 +526,6 @@ def migrate_database():
                 db.create_all()
                 print("✅ password_reset_tokenテーブルを作成しました。")
             
-            # 4. CsvFileContentテーブルの確認
             if not inspector.has_table('csv_file_content'):
                 print("🔧 csv_file_contentテーブルを作成します...")
                 db.create_all()
@@ -607,14 +540,12 @@ def migrate_database():
             import traceback
             traceback.print_exc()
 
-# データベース初期化関数（完全リセット対応版）
 def create_tables_and_admin_user():
     """データベース初期化関数（PostgreSQLスキーマ対応版）"""
     with app.app_context():
-        print("🔧 PostgreSQL専用データベース初期化を開始...")
+        print("🔧 データベース初期化を開始...")
         
         try:
-            # PostgreSQL接続確認
             db_url = app.config.get('SQLALCHEMY_DATABASE_URI', '')
             is_postgres = 'postgresql' in db_url.lower()
             
@@ -622,15 +553,11 @@ def create_tables_and_admin_user():
                 print("⚠️ 警告: PostgreSQL以外のデータベースが検出されました")
                 print(f"DB URL: {db_url[:50]}...")
             
-            # 既存のテーブル確認（PostgreSQLスキーマ対応）
             inspector = inspect(db.engine)
             
-            # PostgreSQLの場合、publicスキーマとschema=Noneの両方をチェック
             existing_tables = []
             if is_postgres:
-                # publicスキーマのテーブルを取得
                 public_tables = inspector.get_table_names(schema='public')
-                # デフォルトスキーマのテーブルを取得
                 default_tables = inspector.get_table_names()
                 existing_tables = list(set(public_tables + default_tables))
                 print(f"📋 PostgreSQL接続: publicスキーマ={len(public_tables)}テーブル, デフォルト={len(default_tables)}テーブル")
@@ -639,16 +566,13 @@ def create_tables_and_admin_user():
             
             if existing_tables:
                 print(f"📋 既存のテーブル: {existing_tables}")
-                # マイグレーション実行（必要に応じてスキーマ更新）
                 migrate_database()
             else:
                 print("📋 新しいデータベースを検出しました")
             
-            # テーブル作成（既存テーブルには影響しない）
             db.create_all()
             print("✅ テーブルを確認/作成しました。")
             
-            # ===== 管理者ユーザー確認/作成 =====
             try:
                 admin_user = User.query.filter_by(username='admin', room_number='ADMIN').first()
                 
@@ -674,7 +598,6 @@ def create_tables_and_admin_user():
                 print(f"⚠️ 管理者ユーザー処理エラー: {e}")
                 db.session.rollback()
                 
-            # ===== アプリ情報確認/作成 =====
             try:
                 app_info = AppInfo.get_current_info()
                 print("✅ アプリ情報を確認/作成しました")
@@ -682,77 +605,13 @@ def create_tables_and_admin_user():
             except Exception as e:
                 print(f"⚠️ アプリ情報処理エラー: {e}")
                 
-            print("🎉 PostgreSQL専用データベース初期化が完了しました！")
+            print("🎉 データベース初期化が完了しました！")
                 
         except Exception as e:
             print(f"❌ データベース初期化エラー: {e}")
             db.session.rollback()
-            # 例外を再発生させてアプリケーションの起動を停止
             raise
-    
-# ===== データ永続化チェック機能 =====
-def check_data_persistence():
-    """データの永続化状況をチェック"""
-    try:
-        with app.app_context():  # ★ アプリケーションコンテキストを追加
-            user_count = User.query.count()
-            admin_count = User.query.filter_by(room_number='ADMIN').count()
-            room_settings_count = RoomSetting.query.count()
-            
-            print(f"📊 データ永続化状況:")
-            print(f"   総ユーザー数: {user_count}")
-            print(f"   管理者ユーザー: {admin_count}")
-            print(f"   部屋設定数: {room_settings_count}")
-            
-            if admin_count == 0:
-                print("⚠️ 管理者ユーザーが見つかりません！")
-                return False
-            
-            return True
-        
-    except Exception as e:
-        print(f"❌ データ永続化チェックエラー: {e}")
-        return False
 
-# ===== 環境変数設定推奨機能 =====
-def print_render_recommendations():
-    """Render環境での推奨設定を表示"""
-    is_render = os.environ.get('RENDER') == 'true'
-    reset_db = os.environ.get('RESET_DATABASE', 'false').lower() == 'true'
-    has_postgres = bool(os.environ.get('DATABASE_URL'))
-    
-    print("\n" + "="*60)
-    print("🚀 RENDER環境設定推奨事項")
-    print("="*60)
-    
-    if is_render:
-        print("✅ Render環境を検出")
-        
-        if reset_db:
-            print("⚠️ RESET_DATABASE=true が設定されています")
-            print("💡 本番運用時は以下を設定してください:")
-            print("   Environment Variable: RESET_DATABASE = false")
-        else:
-            print("✅ RESET_DATABASE=false (推奨)")
-        
-        if has_postgres:
-            print("✅ PostgreSQLデータベースが設定されています")
-        else:
-            print("⚠️ PostgreSQLデータベースが推奨されます")
-            print("💡 Render Dashboardで PostgreSQL Add-on を追加してください")
-        
-        print("\n📋 推奨環境変数設定:")
-        print("   RESET_DATABASE = false")
-        print("   PYTHON_VERSION = 3.11.9")
-        if not has_postgres:
-            print("   DATABASE_URL = <PostgreSQL接続URL>")
-        
-    else:
-        print("🏠 ローカル環境で実行中")
-    
-    print("="*60 + "\n")
-
-# ヘルパー関数
 def generate_reset_token():
     """セキュアなリセットトークンを生成"""
     return secrets.token_urlsafe(32)
@@ -762,14 +621,11 @@ def generate_temp_password():
     characters = string.ascii_letters + string.digits
     return ''.join(secrets.choice(characters) for _ in range(8))
 
-# app.py のメール送信関数を以下に置き換え
-
 def send_password_reset_email(user, email, token):
     """パスワード再発行メールを送信（エラーハンドリング強化版）"""
     try:
         print(f"🔍 メール送信開始: {email}")
         
-        # メール設定の再確認
         mail_server = app.config.get('MAIL_SERVER')
         mail_username = app.config.get('MAIL_USERNAME')
         mail_password = app.config.get('MAIL_PASSWORD')
@@ -789,10 +645,8 @@ def send_password_reset_email(user, email, token):
             if not mail_sender: missing.append('MAIL_DEFAULT_SENDER')
             raise Exception(f"メール設定が不完全です。不足: {', '.join(missing)}")
         
-        # AppInfo取得
         app_info = AppInfo.get_current_info()
         
-        # リセットURL生成
         reset_url = url_for('password_reset', token=token, _external=True)
         print(f"🔍 リセットURL: {reset_url}")
         
@@ -882,7 +736,6 @@ def send_password_reset_email(user, email, token):
 {app_info.contact_email if app_info.contact_email else ''}
         '''
         
-        # メッセージ作成
         print(f"🔍 メッセージ作成中...")
         msg = Message(
             subject=subject,
@@ -897,7 +750,6 @@ def send_password_reset_email(user, email, token):
         print(f"  送信者: {mail_sender}")
         print(f"  受信者: {email}")
         
-        # メール送信
         print(f"🔍 メール送信実行中...")
         mail.send(msg)
         print(f"✅ パスワード再発行メール送信成功: {email}")
@@ -910,7 +762,6 @@ def send_password_reset_email(user, email, token):
         import traceback
         traceback.print_exc()
         
-        # 具体的なエラー情報
         if 'authentication' in str(e).lower():
             print("❌ Gmail認証エラー: アプリパスワードを確認してください")
         elif 'connection' in str(e).lower():
@@ -920,6 +771,30 @@ def send_password_reset_email(user, email, token):
         
         raise e
 
+def is_mail_configured():
+    """メール設定が完了しているかをチェック"""
+    required_settings = [
+        'MAIL_SERVER',
+        'MAIL_USERNAME', 
+        'MAIL_PASSWORD',
+        'MAIL_DEFAULT_SENDER'
+    ]
+    
+    for setting in required_settings:
+        value = app.config.get(setting)
+        if not value or (isinstance(value, str) and not value.strip()):
+            return False
+    
+    return True
+
+def get_template_context():
+    """全テンプレートで共通に使用するコンテキストを取得"""
+    try:
+        app_info = AppInfo.get_current_info()
+        return {'app_info': app_info}
+    except Exception as e:
+        print(f"Error getting app_info: {e}")
+        return {'app_info': None}
 
 # ====================================================================
 # ルーティング
@@ -945,7 +820,6 @@ def index():
             flash('ユーザーが見つかりません。再ログインしてください。', 'danger')
             return redirect(url_for('logout'))
 
-        # JavaScript用のapp_info（従来の形式）
         app_info_for_js = get_app_info_dict(
             user_id=session.get('user_id'),
             username=session.get('username'), 
@@ -983,17 +857,14 @@ def index():
         sorted_all_chapter_unit_status = dict(sorted(all_chapter_unit_status.items(), 
                                                     key=lambda item: int(item[0]) if item[0].isdigit() else float('inf')))
 
-        # フッター用のコンテキストを取得
         context = get_template_context()
-        
-        # ★ 修正: app_infoの重複を避けるため、contextからapp_infoを削除してから結合
         footer_app_info = context.pop('app_info', None)
         
         return render_template('index.html', 
-                               app_info=app_info_for_js,  # JavaScript用（従来形式）
+                               app_info=app_info_for_js,
                                chapter_data=sorted_all_chapter_unit_status,
-                               footer_app_info=footer_app_info,  # フッター用（新しい名前）
-                               **context)  # その他のコンテキスト
+                               footer_app_info=footer_app_info,
+                               **context)
     
     except Exception as e:
         print(f"Error in index route: {e}")
@@ -1051,7 +922,6 @@ def login_page():
                 else:
                     flash('部屋番号、出席番号、またはパスワードが間違っています。', 'danger')
         
-        # フッター用のコンテキストを取得
         context = get_template_context()
         return render_template('login.html', **context)
         
@@ -1074,7 +944,6 @@ def logout():
         print(f"Error in logout: {e}")
         return redirect(url_for('login_page'))
 
-# パスワード変更ページ
 @app.route('/password_change', methods=['GET', 'POST'])
 def password_change_page():
     try:
@@ -1116,12 +985,9 @@ def password_change_page():
         traceback.print_exc()
         return f"Password Change Error: {e}", 500
 
-# app.py のパスワード再発行リクエストルートを修正
-
 @app.route('/password_reset_request', methods=['GET', 'POST'])
 def password_reset_request():
     try:
-        # メール設定の確認（関数を使用）
         mail_configured = is_mail_configured()
         
         if request.method == 'POST':
@@ -1136,14 +1002,12 @@ def password_reset_request():
                 context['mail_configured'] = mail_configured
                 return render_template('password_reset_request.html', **context)
             
-            # メール設定がない場合はエラー
             if not mail_configured:
                 flash('メール送信機能が設定されていないため、パスワード再発行を実行できません。管理者にお問い合わせください。', 'danger')
                 context = get_template_context()
                 context['mail_configured'] = mail_configured
                 return render_template('password_reset_request.html', **context)
             
-            # ユーザー検索
             user = User.query.filter_by(
                 room_number=room_number, 
                 student_id=student_id,
@@ -1151,33 +1015,29 @@ def password_reset_request():
             ).first()
             
             if not user:
-                # セキュリティのため、ユーザーが見つからない場合も成功メッセージを表示
                 flash('入力された情報に一致するアカウントが見つかった場合、パスワード再発行のご案内をメールで送信しました。メールをご確認ください。', 'success')
                 return redirect(url_for('login_page'))
             
-            # 既存の未使用トークンがあれば無効化
             existing_tokens = PasswordResetToken.query.filter_by(
                 user_id=user.id, 
                 used=False
             ).all()
             for token in existing_tokens:
                 token.used = True
-                token.used_at = datetime.now(JST)  # タイムゾーン情報付きで設定
+                token.used_at = datetime.now(JST)
             
-            # 新しいトークンを生成（タイムゾーン対応版）
             reset_token = generate_reset_token()
-            expires_at = datetime.now(JST) + timedelta(hours=1)  # JSTタイムゾーン付きで作成
+            expires_at = datetime.now(JST) + timedelta(hours=1)
             
             password_reset_token = PasswordResetToken(
                 user_id=user.id,
                 token=reset_token,
-                expires_at=expires_at  # タイムゾーン情報付きのdatetimeを保存
+                expires_at=expires_at
             )
             
             db.session.add(password_reset_token)
             db.session.commit()
             
-            # メール送信
             try:
                 print(f"🔍 メール送信処理開始...")
                 success = send_password_reset_email(user, email, reset_token)
@@ -1186,7 +1046,6 @@ def password_reset_request():
                     print(f"✅ メール送信完了")
                 else:
                     flash('メール送信に失敗しました。しばらく後に再度お試しください。', 'danger')
-                    # トークンを無効化
                     password_reset_token.used = True
                     db.session.commit()
             except Exception as email_error:
@@ -1194,7 +1053,6 @@ def password_reset_request():
                 import traceback
                 traceback.print_exc()
                 
-                # ユーザーフレンドリーなエラーメッセージ
                 error_msg = str(email_error).lower()
                 if 'authentication' in error_msg:
                     flash('メール送信の認証に失敗しました。システム管理者にお問い合わせください。', 'danger')
@@ -1203,13 +1061,11 @@ def password_reset_request():
                 else:
                     flash('メール送信中にエラーが発生しました。システム管理者にお問い合わせください。', 'danger')
                 
-                # トークンを無効化
                 password_reset_token.used = True
                 db.session.commit()
             
             return redirect(url_for('login_page'))
         
-        # GET リクエスト時
         context = get_template_context()
         context['mail_configured'] = mail_configured
         return render_template('password_reset_request.html', **context)
@@ -1221,60 +1077,13 @@ def password_reset_request():
         flash('システムエラーが発生しました。管理者にお問い合わせください。', 'danger')
         return redirect(url_for('login_page'))
 
-
-# 管理者用：期限切れトークンの自動削除（定期実行推奨）
-@app.route('/admin/cleanup_expired_tokens', methods=['POST'])
-def admin_cleanup_expired_tokens():
-    if not session.get('admin_logged_in'):
-        return jsonify({'status': 'error', 'message': '管理者権限がありません。'}), 403
-    
-    try:
-        # 期限切れまたは使用済みトークンを削除
-        expired_tokens = PasswordResetToken.query.filter(
-            (PasswordResetToken.expires_at < datetime.now(JST)) |
-            (PasswordResetToken.used == True)
-        ).all()
-        
-        deleted_count = len(expired_tokens)
-        
-        for token in expired_tokens:
-            db.session.delete(token)
-        
-        db.session.commit()
-        
-        return jsonify({
-            'status': 'success',
-            'message': f'{deleted_count}個の期限切れトークンを削除しました。',
-            'deleted_count': deleted_count
-        })
-        
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'status': 'error', 'message': str(e)}), 500
-
-# パスワードリセット実行
-# app.py に追加するパスワードリセット実行ルート
-
-# app.py に追加するパスワードリセット実行ルート（既存のpassword_reset_requestルートの後に追加）
-
-# app.py に追加するパスワードリセット実行ルート（既存のpassword_reset_requestルートの後に追加）
-
-# app.py の password_reset 関数を以下に置き換える（約1067行目付近）
-
-# app.py の password_reset 関数を完全に置き換える
-# 3268行目付近の問題のあるprint文も削除し、以下のコードに置き換える
-
-# app.py の password_reset 関数を以下に置き換える（重複する関数定義を削除し、1つに統一）
-
 @app.route('/password_reset/<token>', methods=['GET', 'POST'])
 def password_reset(token):
     """パスワード再設定の実行"""
     try:
-        # デバッグ用ログ
         print(f"🔍 Password reset requested for token: {token}")
         print(f"🔍 Request method: {request.method}")
         
-        # トークンの検証
         reset_token = PasswordResetToken.query.filter_by(token=token).first()
         print(f"🔍 Token found in database: {reset_token is not None}")
         
@@ -1327,11 +1136,9 @@ def password_reset(token):
                 })
                 return render_template('password_reset.html', **context)
             
-            # パスワード更新
             user = reset_token.user
             user.set_individual_password(new_password)
             
-            # トークンを使用済みにする
             reset_token.mark_as_used()
             
             db.session.commit()
@@ -1341,15 +1148,11 @@ def password_reset(token):
         
         now = datetime.now(JST)
         
-        # expires_atがタイムゾーン情報を持っているかチェック
         if reset_token.expires_at.tzinfo is None:
-            # expires_atがnaiveな場合、JSTタイムゾーンを設定
             expires_at_aware = JST.localize(reset_token.expires_at)
         else:
-            # 既にawareな場合はそのまま使用
             expires_at_aware = reset_token.expires_at
 
-        # GET リクエスト時 - フォーム表示
         time_remaining = expires_at_aware - now
         minutes_remaining = max(0, int(time_remaining.total_seconds() / 60))
         
@@ -1369,22 +1172,6 @@ def password_reset(token):
         
         flash('システムエラーが発生しました。管理者にお問い合わせください。', 'danger')
         return redirect(url_for('login_page'))
-
-def is_mail_configured():
-    """メール設定が完了しているかをチェック"""
-    required_settings = [
-        'MAIL_SERVER',
-        'MAIL_USERNAME', 
-        'MAIL_PASSWORD',
-        'MAIL_DEFAULT_SENDER'
-    ]
-    
-    for setting in required_settings:
-        value = app.config.get(setting)
-        if not value or (isinstance(value, str) and not value.strip()):
-            return False
-    
-    return True
 
 # ====================================================================
 # APIエンドポイント
@@ -1466,8 +1253,6 @@ def save_quiz_progress():
         db.session.rollback()
         return jsonify(status='error', message=f'進捗の保存中にエラーが発生しました: {str(e)}'), 500
 
-# app.pyに追加する詳細な保存・読み込みデバッグルート
-
 @app.route('/api/save_progress_debug', methods=['POST'])
 def save_quiz_progress_debug():
     """デバッグ情報付きの進捗保存"""
@@ -1483,7 +1268,6 @@ def save_quiz_progress_debug():
         if not current_user:
             return jsonify(status='error', message='ユーザーが見つかりません。'), 404
 
-        # 保存前の状態を記録
         old_history = current_user.get_problem_history()
         old_incorrect = current_user.get_incorrect_words()
         
@@ -1493,7 +1277,6 @@ def save_quiz_progress_debug():
         print(f"保存前の苦手問題数: {len(old_incorrect)}")
         print(f"受信した苦手問題数: {len(received_incorrect_words)}")
         
-        # 新しく追加された履歴を特定
         new_entries = {}
         for problem_id, history in received_problem_history.items():
             if problem_id not in old_history:
@@ -1506,12 +1289,10 @@ def save_quiz_progress_debug():
         
         print(f"新規追加される履歴数: {len(new_entries)}")
 
-        # 実際に保存
         current_user.set_problem_history(received_problem_history)
         current_user.set_incorrect_words(received_incorrect_words)
         db.session.commit()
 
-        # 保存後の確認
         saved_history = current_user.get_problem_history()
         saved_incorrect = current_user.get_incorrect_words()
         
@@ -1540,129 +1321,6 @@ def save_quiz_progress_debug():
         db.session.rollback()
         return jsonify(status='error', message=f'進捗の保存中にエラーが発生しました: {str(e)}'), 500
 
-@app.route('/debug/trace_answer_flow')
-def debug_trace_answer_flow():
-    """回答フローの詳細なトレース"""
-    if 'user_id' not in session:
-        return jsonify(error='ログインが必要です'), 401
-    
-    current_user = User.query.get(session['user_id'])
-    if not current_user:
-        return jsonify(error='ユーザーが見つかりません'), 404
-    
-    word_data = load_word_data_for_room(current_user.room_number)
-    user_history = current_user.get_problem_history()
-    
-    # 最近の5問の詳細分析
-    sample_words = word_data[:5]
-    trace_results = []
-    
-    for word in sample_words:
-        # 1. 問題IDの生成
-        python_id = get_problem_id(word)
-        
-        # 2. 履歴の確認
-        history_entry = user_history.get(python_id, {})
-        
-        # 3. 進捗ページでの処理をシミュレート
-        room_setting = RoomSetting.query.filter_by(room_number=current_user.room_number).first()
-        max_enabled_unit_num_str = room_setting.max_enabled_unit_number if room_setting else "9999"
-        parsed_max_enabled_unit_num = parse_unit_number(max_enabled_unit_num_str)
-        
-        is_word_enabled_in_csv = word['enabled']
-        is_unit_enabled_by_room_setting = parse_unit_number(word['number']) <= parsed_max_enabled_unit_num
-        is_counted_in_progress = is_word_enabled_in_csv and is_unit_enabled_by_room_setting
-        
-        correct_attempts = history_entry.get('correct_attempts', 0)
-        incorrect_attempts = history_entry.get('incorrect_attempts', 0)
-        total_attempts = correct_attempts + incorrect_attempts
-        
-        trace_results.append({
-            'question': word['question'][:50] + '...' if len(word['question']) > 50 else word['question'],
-            'answer': word['answer'],
-            'chapter': word['chapter'],
-            'number': word['number'],
-            'category': word['category'],
-            'enabled_in_csv': is_word_enabled_in_csv,
-            'enabled_by_room_setting': is_unit_enabled_by_room_setting,
-            'counted_in_progress': is_counted_in_progress,
-            'generated_id': python_id,
-            'has_history': python_id in user_history,
-            'history_entry': history_entry,
-            'total_attempts': total_attempts,
-            'correct_attempts': correct_attempts,
-            'incorrect_attempts': incorrect_attempts,
-            'accuracy_rate': (correct_attempts / total_attempts * 100) if total_attempts > 0 else 0
-        })
-    
-    return jsonify({
-        'user_info': {
-            'username': current_user.username,
-            'room_number': current_user.room_number
-        },
-        'room_settings': {
-            'max_enabled_unit_number': max_enabled_unit_num_str,
-            'parsed_max_enabled_unit_num': parsed_max_enabled_unit_num
-        },
-        'total_history_entries': len(user_history),
-        'total_word_data': len(word_data),
-        'trace_results': trace_results
-    })
-
-@app.route('/debug/manual_test_save', methods=['POST'])
-def debug_manual_test_save():
-    """手動でテスト用の学習履歴を作成"""
-    if 'user_id' not in session:
-        return jsonify(error='ログインが必要です'), 401
-    
-    current_user = User.query.get(session['user_id'])
-    if not current_user:
-        return jsonify(error='ユーザーが見つかりません'), 404
-    
-    word_data = load_word_data_for_room(current_user.room_number)
-    if not word_data:
-        return jsonify(error='単語データが見つかりません'), 404
-    
-    # 最初の3問に対してテスト履歴を作成
-    current_history = current_user.get_problem_history()
-    test_words = word_data[:3]
-    
-    for word in test_words:
-        problem_id = get_problem_id(word)
-        
-        # テスト用の履歴データを追加
-        if problem_id not in current_history:
-            current_history[problem_id] = {
-                'correct_attempts': 2,
-                'incorrect_attempts': 1,
-                'correct_streak': 1,
-                'last_answered': datetime.now().isoformat()
-            }
-            print(f"テスト履歴追加: {word['question']} -> {problem_id}")
-    
-    # 保存
-    current_user.set_problem_history(current_history)
-    
-    try:
-        db.session.commit()
-        print(f"テスト履歴保存完了: {len(test_words)}問")
-        
-        return jsonify({
-            'status': 'success',
-            'message': f'{len(test_words)}問のテスト履歴を追加しました',
-            'test_words': [
-                {
-                    'question': word['question'],
-                    'generated_id': get_problem_id(word)
-                }
-                for word in test_words
-            ],
-            'total_history_count': len(current_history)
-        })
-    except Exception as e:
-        db.session.rollback()
-        return jsonify(error=str(e)), 500
-
 @app.route('/api/clear_quiz_progress', methods=['POST'])
 def api_clear_quiz_progress():
     return jsonify(status='success', message='一時的なクイズ進捗クリア要求を受信しました（サーバー側は変更なし）。')
@@ -1670,8 +1328,6 @@ def api_clear_quiz_progress():
 # ====================================================================
 # 進捗ページ
 # ====================================================================
-
-# app.pyの進捗ページルートを以下に置き換え
 
 @app.route('/progress')
 def progress_page():
@@ -1691,7 +1347,6 @@ def progress_page():
         user_problem_history = current_user.get_problem_history()
         print(f"学習履歴数: {len(user_problem_history)}")
         
-        # 部屋ごとの単語データを取得
         word_data = load_word_data_for_room(current_user.room_number)
         print(f"部屋の単語データ数: {len(word_data)}")
         
@@ -1702,7 +1357,6 @@ def progress_page():
 
         unit_progress_summary = {}
 
-        # 有効な単語データで単元進捗を初期化
         for word in word_data:
             chapter_num = word['chapter']
             unit_num = word['number']
@@ -1724,12 +1378,10 @@ def progress_page():
 
         print(f"有効な単元数: {len(unit_progress_summary)}")
 
-        # 学習履歴を処理
         matched_problems = 0
         unmatched_problems = 0
         
         for problem_id, history in user_problem_history.items():
-            # 問題IDに対応する単語を検索
             matched_word = None
             for word in word_data:
                 generated_id = get_problem_id(word)
@@ -1755,7 +1407,6 @@ def progress_page():
                         if total_problem_attempts > 0:
                             unit_progress_summary[unit_number_of_word]['attempted_problems'].add(problem_id)
                             
-                            # マスター判定：正答率80%以上
                             accuracy_rate = (correct_attempts / total_problem_attempts) * 100
                             if accuracy_rate >= 80.0:
                                 unit_progress_summary[unit_number_of_word]['mastered_problems'].add(problem_id)
@@ -1766,7 +1417,6 @@ def progress_page():
         
         print(f"マッチした問題: {matched_problems}, マッチしない問題: {unmatched_problems}")
         
-        # 単元別進捗をソート
         sorted_user_progress_by_unit = []
         for unit_num in sorted(unit_progress_summary.keys(), key=lambda x: parse_unit_number(x)):
             data = unit_progress_summary[unit_num]
@@ -1780,7 +1430,6 @@ def progress_page():
 
         print(f"進捗のある単元数: {len(sorted_user_progress_by_unit)}")
 
-        # ランキング計算（部屋ごとの単語データを使用）
         current_room_number = current_user.room_number
         
         all_users_for_ranking = User.query.filter_by(room_number=current_room_number).all()
@@ -1837,7 +1486,6 @@ def progress_page():
             user_mastered_count = len(mastered_problem_ids)
             coverage_rate = (user_mastered_count / total_questions_for_room_ranking * 100) if total_questions_for_room_ranking > 0 else 0
             
-            # バランス型スコア計算: 総回答数 × 正答率 / 100
             balance_score = (total_attempts * (total_correct / total_attempts)) if total_attempts > 0 else 0
 
             ranking_data.append({
@@ -1851,15 +1499,11 @@ def progress_page():
                 'balance_score': balance_score
             })
 
-        # バランススコアで降順ソート
         ranking_data.sort(key=lambda x: (x['balance_score'], x['total_attempts']), reverse=True)
         top_10_ranking = ranking_data[:10]
 
         print(f"ランキング対象ユーザー数: {len(ranking_data)}")
         print("=== 進捗ページ処理完了 ===\n")
-
-        # フッター表示のためにapp_infoを取得
-        app_info = AppInfo.get_current_info()
 
         context = get_template_context()
         
@@ -1878,8 +1522,6 @@ def progress_page():
 # 管理者ページ
 # ====================================================================
 
-# app.pyのadmin_pageルートを以下に置き換え
-
 @app.route('/admin')
 def admin_page():
     try:
@@ -1892,7 +1534,6 @@ def admin_page():
         users = User.query.all()
         room_settings = RoomSetting.query.all()
         
-        # 部屋設定のマッピングを作成
         room_max_unit_settings = {rs.room_number: rs.max_enabled_unit_number for rs in room_settings}
         room_csv_settings = {rs.room_number: rs.csv_filename for rs in room_settings}
         
@@ -1900,7 +1541,6 @@ def admin_page():
         for room_num, csv_file in room_csv_settings.items():
             print(f"  部屋{room_num}: {csv_file}")
         
-        # 部屋番号のリストを取得（ユーザーがいる部屋と設定のある部屋を統合）
         unique_room_numbers = set()
         for user in users:
             if user.room_number != 'ADMIN':
@@ -1912,11 +1552,9 @@ def admin_page():
         
         print(f"📋 管理対象部屋: {sorted(unique_room_numbers)}")
         
-        # 各部屋の設定が正しく存在するかチェック
         for room_num in unique_room_numbers:
             if room_num not in room_csv_settings:
                 print(f"⚠️ 部屋{room_num}のCSV設定が見つかりません - デフォルト設定を作成")
-                # デフォルト設定を作成
                 default_room_setting = RoomSetting(
                     room_number=room_num,
                     max_enabled_unit_number="9999",
@@ -1951,11 +1589,6 @@ def admin_page():
         traceback.print_exc()
         return f"Admin Error: {e}", 500
 
-# アプリ情報管理
-# app.py の admin_app_info 関数を以下に置き換え
-
-# 緊急デバッグ用（問題が続く場合のみ使用）
-
 @app.route('/admin/app_info', methods=['GET', 'POST'])
 def admin_app_info():
     try:
@@ -1965,7 +1598,6 @@ def admin_app_info():
 
         print("=== admin_app_info デバッグ開始 ===")
         
-        # データベース接続テスト
         try:
             app_info = AppInfo.query.first()
             print(f"app_info取得結果: {app_info}")
@@ -1979,7 +1611,6 @@ def admin_app_info():
                 
         except Exception as db_error:
             print(f"データベースエラー: {db_error}")
-            # フェイルセーフ：デフォルト値でapp_infoオブジェクトを作成
             class MockAppInfo:
                 def __init__(self):
                     self.app_name = "世界史単語帳"
@@ -2041,7 +1672,6 @@ def admin_app_info_reset():
 
         app_info = AppInfo.get_current_info()
         
-        # デフォルト値にリセット
         app_info.app_name = "世界史単語帳"
         app_info.version = "1.0.0"
         app_info.last_updated_date = "2025年6月15日"
@@ -2061,12 +1691,6 @@ def admin_app_info_reset():
         flash(f'アプリ情報のリセット中にエラーが発生しました: {str(e)}', 'danger')
         return redirect(url_for('admin_app_info'))
 
-# ユーザー管理
-# app.py の該当部分を以下に置き換え
-
-# ユーザー管理 - 同一アカウント名登録対応版
-# app.py の admin_add_user 関数を以下に置き換え
-
 @app.route('/admin/add_user', methods=['POST'])
 def admin_add_user():
     try:
@@ -2084,7 +1708,6 @@ def admin_add_user():
             flash('すべての項目を入力してください。', 'danger')
             return redirect(url_for('admin_page'))
 
-        # 部屋番号 + ユーザー名の組み合わせでの重複チェック（出席番号の重複は許可）
         existing_user = User.query.filter_by(
             room_number=room_number, 
             username=username
@@ -2103,7 +1726,6 @@ def admin_add_user():
         db.session.add(new_user)
         db.session.commit()
         
-        # 部屋設定の自動作成
         if not RoomSetting.query.filter_by(room_number=room_number).first():
             default_room_setting = RoomSetting(room_number=room_number, max_enabled_unit_number="9999", csv_filename="words.csv")
             db.session.add(default_room_setting)
@@ -2140,7 +1762,6 @@ def admin_delete_user(user_id):
         flash(f'ユーザー削除中にエラーが発生しました: {e}', 'danger')
         return redirect(url_for('admin_page'))
 
-# 部屋設定管理
 @app.route('/admin/get_room_setting', methods=['POST'])
 def admin_get_room_setting():
     """部屋設定を取得するAPI"""
@@ -2156,7 +1777,6 @@ def admin_get_room_setting():
 
         print(f"🔍 部屋設定取得: {room_number}")
 
-        # 部屋設定を取得
         room_setting = RoomSetting.query.filter_by(room_number=room_number).first()
 
         if room_setting:
@@ -2168,7 +1788,6 @@ def admin_get_room_setting():
             }
             print(f"✅ 部屋設定取得成功: {room_setting.csv_filename}")
         else:
-            # デフォルト設定を返す
             result = {
                 'status': 'success',
                 'room_number': room_number,
@@ -2233,17 +1852,13 @@ def admin_update_room_csv_setting():
         if not csv_filename:
             csv_filename = "words.csv"
 
-        # 部屋設定を取得または作成
         room_setting = RoomSetting.query.filter_by(room_number=room_number).first()
 
         if room_setting:
-            # 既存設定を更新
             old_filename = room_setting.csv_filename
             room_setting.csv_filename = csv_filename
-            room_setting.updated_at = datetime.now(JST)
             print(f"📝 既存設定更新: {old_filename} -> {csv_filename}")
         else:
-            # 新規設定を作成
             room_setting = RoomSetting(
                 room_number=room_number,
                 max_enabled_unit_number="9999",
@@ -2252,10 +1867,8 @@ def admin_update_room_csv_setting():
             db.session.add(room_setting)
             print(f"➕ 新規設定作成: 部屋{room_number} with {csv_filename}")
         
-        # データベースにコミット
         db.session.commit()
         
-        # 保存後の確認
         saved_setting = RoomSetting.query.filter_by(room_number=room_number).first()
         if saved_setting:
             actual_filename = saved_setting.csv_filename
@@ -2284,60 +1897,6 @@ def admin_update_room_csv_setting():
         traceback.print_exc()
         db.session.rollback()
         return jsonify(status='error', message=str(e)), 500
-    
-def verify_room_settings():
-    """起動時に部屋設定の整合性をチェック（DB版）"""
-    print("\n🔍 部屋設定の整合性確認中（DB版）...")
-    
-    try:
-        with app.app_context():
-            settings = RoomSetting.query.all()
-            print(f"📋 登録済み部屋設定: {len(settings)}件")
-            
-            for setting in settings:
-                csv_filename = setting.csv_filename
-                if csv_filename != "words.csv":
-                    # ★重要：ファイルシステムではなくデータベースで確認
-                    csv_record = CsvFileContent.query.filter_by(filename=csv_filename).first()
-                    if not csv_record:
-                        print(f"⚠️ 部屋{setting.room_number}: {csv_filename} がデータベースに見つからない -> デフォルトに変更")
-                        setting.csv_filename = "words.csv"
-                    else:
-                        print(f"✅ 部屋{setting.room_number}: {csv_filename} 確認OK（DB内）")
-                else:
-                    print(f"📄 部屋{setting.room_number}: デフォルト使用")
-            
-            db.session.commit()
-            print("✅ 部屋設定確認完了（DB版）\n")
-        
-    except Exception as e:
-        print(f"❌ 部屋設定確認エラー: {e}\n")
-
-@app.route('/admin/delete_room_setting/<string:room_number>', methods=['POST'])
-def admin_delete_room_setting(room_number):
-    try:
-        if not session.get('admin_logged_in'):
-            flash('管理者権限がありません。', 'danger')
-            return redirect(url_for('login_page'))
-
-        room_setting_to_delete = RoomSetting.query.filter_by(room_number=room_number).first()
-        if not room_setting_to_delete:
-            flash(f'部屋 "{room_number}" の設定が見つかりません。', 'danger')
-            return redirect(url_for('admin_page'))
-
-        db.session.delete(room_setting_to_delete)
-        db.session.commit()
-        flash(f'部屋 "{room_number}" の設定を削除しました。この部屋のユーザーはデフォルト設定になります。', 'success')
-        
-        return redirect(url_for('admin_page'))
-    except Exception as e:
-        print(f"Error in admin_delete_room_setting: {e}")
-        db.session.rollback()
-        flash(f'部屋設定削除中にエラーが発生しました: {e}', 'danger')
-        return redirect(url_for('admin_page'))
-
-# CSV管理
-# app.pyのadmin_upload_room_csvルートをデバッグ版に置き換え
 
 @app.route('/admin/upload_room_csv', methods=['POST'])
 def admin_upload_room_csv():
@@ -2357,7 +1916,6 @@ def admin_upload_room_csv():
             flash('CSVファイルを選択してください。', 'danger')
             return redirect(url_for('admin_page'))
 
-        # ★重要：ファイル内容を読み取り（ファイルシステムには保存しない）
         content = file.read().decode('utf-8')
         filename = secure_filename(file.filename)
         original_filename = file.filename
@@ -2365,7 +1923,6 @@ def admin_upload_room_csv():
         
         print(f"📁 ファイル情報: {filename}, サイズ: {file_size}bytes")
         
-        # CSVファイルの形式を検証
         word_count = 0
         try:
             reader = csv.DictReader(StringIO(content))
@@ -2447,7 +2004,6 @@ def admin_upload_room_csv():
         flash(f'ファイルアップロード中にエラーが発生しました: {e}', 'danger')
         return redirect(url_for('admin_page'))
 
-# admin_list_room_csv_filesルートもデバッグ版に修正
 @app.route('/admin/list_room_csv_files')
 def admin_list_room_csv_files():
     try:
@@ -2725,78 +2281,96 @@ def download_room_settings_template_csv():
     return response
 
 # ====================================================================
-# デバッグ・管理機能
+# データベース管理・修正機能
 # ====================================================================
-@app.route('/admin/debug_progress')
-def admin_debug_progress():
-    """進捗データの整合性を確認するデバッグページ"""
+
+@app.route('/admin/check_data_status')
+def admin_check_data_status():
+    """データベースの現在状態を確認"""
     try:
         if not session.get('admin_logged_in'):
-            flash('管理者権限がありません。', 'danger')
-            return redirect(url_for('login_page'))
-        
-        debug_info = []
+            return jsonify(status='error', message='管理者権限がありません。'), 403
+
+        # 全ユーザーデータをチェック
         users = User.query.all()
+        default_word_data = load_default_word_data()
+        
+        user_status = []
+        total_history_entries = 0
+        total_matched = 0
+        total_unmatched = 0
         
         for user in users:
             if user.username == 'admin':
                 continue
                 
-            # 部屋ごとの単語データを取得
-            word_data = load_word_data_for_room(user.room_number)
             user_history = user.get_problem_history()
-            user_incorrect = user.get_incorrect_words()
-            
-            matched_problems = 0
-            unmatched_problems = []
+            matched_count = 0
+            unmatched_ids = []
             
             for problem_id in user_history.keys():
-                matched_word = next((word for word in word_data if get_problem_id(word) == problem_id), None)
-                if matched_word:
-                    matched_problems += 1
+                # 新しい方式で照合
+                found_match = False
+                for word in default_word_data:
+                    if get_problem_id(word) == problem_id:
+                        found_match = True
+                        break
+                
+                if found_match:
+                    matched_count += 1
                 else:
-                    unmatched_problems.append(problem_id)
+                    unmatched_ids.append(problem_id)
             
-            debug_info.append({
+            user_status.append({
                 'username': user.username,
                 'room_number': user.room_number,
-                'total_history_entries': len(user_history),
-                'matched_problems': matched_problems,
-                'unmatched_problems': len(unmatched_problems),
-                'unmatched_list': unmatched_problems[:5],
-                'incorrect_words_count': len(user_incorrect)
+                'total_history': len(user_history),
+                'matched': matched_count,
+                'unmatched': len(unmatched_ids),
+                'sample_unmatched': unmatched_ids[:3]
             })
+            
+            total_history_entries += len(user_history)
+            total_matched += matched_count
+            total_unmatched += len(unmatched_ids)
         
-        # デフォルトの単語データを使用してテスト
-        default_word_data = load_default_word_data()
-        test_words = default_word_data[:3]
-        id_test_results = []
+        return jsonify({
+            'status': 'success',
+            'summary': {
+                'total_users': len(user_status),
+                'total_history_entries': total_history_entries,
+                'total_matched': total_matched,
+                'total_unmatched': total_unmatched,
+                'match_rate': round((total_matched / total_history_entries * 100) if total_history_entries > 0 else 0, 1)
+            },
+            'user_details': user_status
+        })
         
-        for word in test_words:
-            generated_id = get_problem_id(word)
-            id_test_results.append({
-                'question': word['question'][:50] + '...' if len(word['question']) > 50 else word['question'],
-                'chapter': word['chapter'],
-                'number': word['number'],
-                'generated_id': generated_id
-            })
-        
-        # ★ 修正: 共通コンテキストを取得（app_infoも含む）
-        context = get_template_context()
-        
-        return render_template('admin_debug.html', 
-                             debug_info=debug_info, 
-                             id_test_results=id_test_results,
-                             **context)  # app_infoは既にcontextに含まれている
     except Exception as e:
-        print(f"Error in admin_debug_progress: {e}")
-        import traceback
-        traceback.print_exc()
-        return f"Debug Error: {e}", 500
+        print(f"Error in admin_check_data_status: {e}")
+        return jsonify(status='error', message=str(e)), 500
 
+@app.route('/admin/fix_all_data', methods=['POST'])
+def admin_fix_all_data():
+    if not session.get('admin_logged_in'):
+        flash('管理者権限がありません。', 'danger')
+        return redirect(url_for('login_page'))
+    
+    try:
+        success = fix_all_user_data()
+        if success:
+            flash('全ユーザーデータの修正が完了しました。', 'success')
+        else:
+            flash('データ修正中にエラーが発生しました。', 'danger')
+    except Exception as e:
+        flash(f'データ修正エラー: {str(e)}', 'danger')
+    
+    return redirect(url_for('admin_page'))
 
+# ====================================================================
+# テンプレート用コンテキスト関数
+# ====================================================================
 
-# 1. 共通のapp_info取得関数を定義
 def get_template_context():
     """全テンプレートで共通に使用するコンテキストを取得"""
     try:
@@ -2805,8 +2379,6 @@ def get_template_context():
     except Exception as e:
         print(f"Error getting app_info: {e}")
         return {'app_info': None}
-
-
 
 # ====================================================================
 # エラーハンドラー
@@ -2822,406 +2394,91 @@ def internal_error(error):
 def not_found_error(error):
     return "Page Not Found", 404
 
-# app.pyに以下のデバッグ用ルートを追加
+# ====================================================================
+# 起動時処理・チェック機能
+# ====================================================================
 
-@app.route('/debug/user_data')
-def debug_user_data():
-    """ユーザーの学習データをデバッグ表示"""
-    if 'user_id' not in session:
-        return jsonify(error='ログインが必要です'), 401
+def verify_room_settings():
+    """起動時に部屋設定の整合性をチェック（DB版）"""
+    print("\n🔍 部屋設定の整合性確認中（DB版）...")
     
-    current_user = User.query.get(session['user_id'])
-    if not current_user:
-        return jsonify(error='ユーザーが見つかりません'), 404
-    
-    # ユーザーの生データを取得
-    user_problem_history = current_user.get_problem_history()
-    user_incorrect_words = current_user.get_incorrect_words()
-    
-    # 部屋ごとの単語データを取得
-    word_data = load_word_data_for_room(current_user.room_number)
-    
-    # 問題IDのマッピングをチェック
-    id_mapping = {}
-    unmatched_ids = []
-    
-    for problem_id in user_problem_history.keys():
-        matched_word = None
-        for word in word_data:
-            generated_id = get_problem_id(word)
-            if generated_id == problem_id:
-                matched_word = word
-                break
+    try:
+        with app.app_context():
+            settings = RoomSetting.query.all()
+            print(f"📋 登録済み部屋設定: {len(settings)}件")
+            
+            for setting in settings:
+                csv_filename = setting.csv_filename
+                if csv_filename != "words.csv":
+                    # ★重要：ファイルシステムではなくデータベースで確認
+                    csv_record = CsvFileContent.query.filter_by(filename=csv_filename).first()
+                    if not csv_record:
+                        print(f"⚠️ 部屋{setting.room_number}: {csv_filename} がデータベースに見つからない -> デフォルトに変更")
+                        setting.csv_filename = "words.csv"
+                    else:
+                        print(f"✅ 部屋{setting.room_number}: {csv_filename} 確認OK（DB内）")
+                else:
+                    print(f"📄 部屋{setting.room_number}: デフォルト使用")
+            
+            db.session.commit()
+            print("✅ 部屋設定確認完了（DB版）\n")
         
-        if matched_word:
-            id_mapping[problem_id] = {
-                'question': matched_word['question'],
-                'answer': matched_word['answer'],
-                'chapter': matched_word['chapter'],
-                'number': matched_word['number']
-            }
+    except Exception as e:
+        print(f"❌ 部屋設定確認エラー: {e}\n")
+
+def check_data_persistence():
+    """データの永続化状況をチェック"""
+    try:
+        with app.app_context():
+            user_count = User.query.count()
+            admin_count = User.query.filter_by(room_number='ADMIN').count()
+            room_settings_count = RoomSetting.query.count()
+            csv_files_count = CsvFileContent.query.count()
+            
+            print(f"📊 データ永続化状況:")
+            print(f"   総ユーザー数: {user_count}")
+            print(f"   管理者ユーザー: {admin_count}")
+            print(f"   部屋設定数: {room_settings_count}")
+            print(f"   保存CSVファイル数: {csv_files_count}")
+            
+            if admin_count == 0:
+                print("⚠️ 管理者ユーザーが見つかりません！")
+                return False
+            
+            return True
+        
+    except Exception as e:
+        print(f"❌ データ永続化チェックエラー: {e}")
+        return False
+
+def print_render_recommendations():
+    """Render環境での推奨設定を表示"""
+    is_render = os.environ.get('RENDER') == 'true'
+    has_postgres = bool(os.environ.get('DATABASE_URL'))
+    
+    print("\n" + "="*60)
+    print("🚀 RENDER環境設定推奨事項")
+    print("="*60)
+    
+    if is_render:
+        print("✅ Render環境を検出")
+        
+        if has_postgres:
+            print("✅ PostgreSQLデータベースが設定されています")
         else:
-            unmatched_ids.append(problem_id)
+            print("⚠️ PostgreSQLデータベースが推奨されます")
+            print("💡 Render Dashboardで PostgreSQL Add-on を追加してください")
+        
+        print("\n📋 推奨環境変数設定:")
+        print("   PYTHON_VERSION = 3.11.9")
+        if not has_postgres:
+            print("   DATABASE_URL = <PostgreSQL接続URL>")
+        
+    else:
+        print("🏠 ローカル環境で実行中")
     
-    debug_info = {
-        'user_info': {
-            'username': current_user.username,
-            'room_number': current_user.room_number,
-            'student_id': current_user.student_id
-        },
-        'raw_problem_history': user_problem_history,
-        'raw_incorrect_words': user_incorrect_words,
-        'total_word_data_count': len(word_data),
-        'problem_history_count': len(user_problem_history),
-        'incorrect_words_count': len(user_incorrect_words),
-        'matched_problems': len(id_mapping),
-        'unmatched_problems': len(unmatched_ids),
-        'id_mapping': id_mapping,
-        'unmatched_ids': unmatched_ids[:10],  # 最初の10件のみ表示
-        'sample_word_ids': [
-            {
-                'word': word,
-                'generated_id': get_problem_id(word)
-            }
-            for word in word_data[:5]  # 最初の5件のサンプル
-        ]
-    }
-    
-    return jsonify(debug_info)
+    print("="*60 + "\n")
 
-@app.route('/debug/fix_problem_ids', methods=['POST'])
-def debug_fix_problem_ids():
-    """問題IDの不整合を修正"""
-    if 'user_id' not in session:
-        return jsonify(error='ログインが必要です'), 401
-    
-    current_user = User.query.get(session['user_id'])
-    if not current_user:
-        return jsonify(error='ユーザーが見つかりません'), 404
-    
-    # 古い形式のIDから新しい形式のIDに変換
-    def generate_old_problem_id(word):
-        """推測される古いID生成方法"""
-        question_for_id = str(word['question']).strip()
-        cleaned_question = re.sub(r'[^a-zA-Z0-9]', '', question_for_id).lower()
-        chapter_str = str(word['chapter'])
-        number_str = str(word['number'])
-        return f"{chapter_str}-{number_str}-{cleaned_question}"
-    
-    word_data = load_word_data_for_room(current_user.room_number)
-    user_problem_history = current_user.get_problem_history()
-    user_incorrect_words = current_user.get_incorrect_words()
-    
-    # IDマッピングを作成
-    old_to_new_mapping = {}
-    for word in word_data:
-        old_id = generate_old_problem_id(word)
-        new_id = get_problem_id(word)
-        old_to_new_mapping[old_id] = new_id
-    
-    # 学習履歴を変換
-    new_problem_history = {}
-    converted_count = 0
-    
-    for old_id, history in user_problem_history.items():
-        if old_id in old_to_new_mapping:
-            new_id = old_to_new_mapping[old_id]
-            new_problem_history[new_id] = history
-            converted_count += 1
-        else:
-            # 既に新しい形式の場合はそのまま保持
-            new_problem_history[old_id] = history
-    
-    # 苦手問題リストを変換
-    new_incorrect_words = []
-    converted_incorrect_count = 0
-    
-    for old_id in user_incorrect_words:
-        if old_id in old_to_new_mapping:
-            new_id = old_to_new_mapping[old_id]
-            if new_id not in new_incorrect_words:
-                new_incorrect_words.append(new_id)
-                converted_incorrect_count += 1
-        else:
-            # 既に新しい形式の場合はそのまま保持
-            if old_id not in new_incorrect_words:
-                new_incorrect_words.append(old_id)
-    
-    # データベースを更新
-    current_user.set_problem_history(new_problem_history)
-    current_user.set_incorrect_words(new_incorrect_words)
-    
-    try:
-        db.session.commit()
-        return jsonify({
-            'status': 'success',
-            'converted_history_count': converted_count,
-            'converted_incorrect_count': converted_incorrect_count,
-            'total_history_count': len(new_problem_history),
-            'total_incorrect_count': len(new_incorrect_words)
-        })
-    except Exception as e:
-        db.session.rollback()
-        return jsonify(error=str(e)), 500
-
-# app.py に追加する構文エラー修正版
-
-@app.route('/debug/smart_id_fix', methods=['POST'])
-def debug_smart_id_fix():
-    """既存の学習履歴IDを分析して、問題との照合を行う"""
-    if 'user_id' not in session:
-        return jsonify({'error': 'ログインが必要です'}), 401
-    
-    current_user = User.query.get(session['user_id'])
-    if not current_user:
-        return jsonify({'error': 'ユーザーが見つかりません'}), 404
-    
-    try:
-        word_data = load_word_data_for_room(current_user.room_number)
-        old_history = current_user.get_problem_history()
-        old_incorrect = current_user.get_incorrect_words()
-        
-        print(f"\n=== スマートID修正開始 ({current_user.username}) ===")
-        print(f"既存履歴: {len(old_history)}個")
-        print(f"単語データ: {len(word_data)}個")
-        
-        # 既存のIDを分析
-        existing_ids = list(old_history.keys())
-        if existing_ids:
-            print(f"既存IDサンプル: {existing_ids[:3]}")
-        
-        new_history = {}
-        matched_count = 0
-        
-        # 各既存IDに対して最適な問題を見つける
-        for existing_id, history_data in old_history.items():
-            best_match = None
-            best_score = 0
-            
-            # IDから情報を抽出
-            parts = existing_id.split('-')
-            if len(parts) >= 3:
-                try:
-                    id_chapter = int(parts[0])
-                    id_number = int(parts[1]) 
-                    id_text = '-'.join(parts[2:])  # 残りの部分
-                    
-                    # 対応する問題を探す
-                    for word in word_data:
-                        score = 0
-                        
-                        # 章と単元が一致するか
-                        word_chapter = int(str(word['chapter']))
-                        word_number = int(str(word['number']))
-                        
-                        if word_chapter == id_chapter and word_number == id_number:
-                            score += 100  # 完全一致は高スコア
-                        elif word_chapter == id_chapter:
-                            score += 50   # 章のみ一致
-                        
-                        # 問題文の類似度チェック
-                        question_text = str(word['question'])
-                        question_clean = ''.join(c for c in question_text if c.isalnum())
-                        id_text_clean = ''.join(c for c in id_text if c.isalnum())
-                        
-                        # 問題文の最初の部分が含まれているかチェック
-                        if len(question_clean) > 0 and len(id_text_clean) > 0:
-                            if id_text_clean in question_clean or question_clean[:20] in id_text_clean:
-                                score += 30
-                        
-                        if score > best_score:
-                            best_score = score
-                            best_match = word
-                
-                    # f-stringを使わない修正版（該当部分のみ）
-
-                    # 章と単元が一致する場合のみマッチとして採用
-                    if best_match and best_score >= 100:
-                        # 新しいIDを統一方式で生成
-                        chapter_str = str(best_match['chapter']).zfill(3)
-                        number_str = str(best_match['number']).zfill(3)
-                        question_text = str(best_match['question'])
-                        answer_text = str(best_match['answer'])
-                        
-                        # 問題文と答えから英数字のみ抽出
-                        question_clean = ''.join(c for c in question_text[:15] if c.isalnum())
-                        answer_clean = ''.join(c for c in answer_text[:10] if c.isalnum())
-                        
-                        # 統一フォーマット（f-stringを使わない）
-                        new_id = chapter_str + '-' + number_str + '-' + question_clean + '-' + answer_clean
-                        new_history[new_id] = history_data
-                        matched_count += 1
-                        
-                        match_info = '章' + str(best_match['chapter']) + '単元' + str(best_match['number'])
-                        existing_id_short = existing_id[:30] if len(existing_id) > 30 else existing_id
-                        print('  マッチ: ' + existing_id_short + '... -> ' + match_info)
-                
-                except (ValueError, KeyError) as e:
-                    print(f"  ID解析エラー: {existing_id} - {str(e)}")
-                    continue
-        
-        # 苦手問題リストも更新
-        new_incorrect = []
-        for new_id, history in new_history.items():
-            incorrect_attempts = history.get('incorrect_attempts', 0)
-            correct_streak = history.get('correct_streak', 0)
-            
-            if incorrect_attempts > 0 and correct_streak < 2:
-                new_incorrect.append(new_id)
-        
-        # 結果をデータベースに保存
-        current_user.set_problem_history(new_history)
-        current_user.set_incorrect_words(new_incorrect)
-        db.session.commit()
-        
-        print(f"マッチした履歴: {matched_count}個")
-        print(f"新しい苦手問題: {len(new_incorrect)}個")
-        print("=== スマートID修正完了 ===\n")
-        
-        return jsonify({
-            'status': 'success',
-            'old_history_count': len(old_history),
-            'matched_count': matched_count,
-            'new_history_count': len(new_history),
-            'new_incorrect_count': len(new_incorrect),
-            'message': f'{matched_count}個の履歴をマッチングしました'
-        })
-        
-    except Exception as e:
-        db.session.rollback()
-        print(f"スマート修正エラー: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
-
-# app.py に追加する修正用ルート
-
-@app.route('/debug/force_fix_user_data', methods=['POST'])
-def debug_force_fix_user_data():
-    """強制的にユーザーデータを修正"""
-    if 'user_id' not in session:
-        return jsonify(error='ログインが必要です'), 401
-    
-    current_user = User.query.get(session['user_id'])
-    if not current_user:
-        return jsonify(error='ユーザーが見つかりません'), 404
-    
-    try:
-        # 部屋の単語データを取得
-        word_data = load_word_data_for_room(current_user.room_number)
-        user_history = current_user.get_problem_history()
-        
-        print(f"\n=== 強制修正開始 ({current_user.username}) ===")
-        print(f"現在の履歴数: {len(user_history)}")
-        
-        # 新しい問題ID形式で履歴を再構築
-        new_history = {}
-        fixed_count = 0
-        
-        for word in word_data:
-            # 新しいID生成
-            new_id = get_problem_id(word)
-            
-            # 既存の履歴から対応する項目を探す
-            found_history = None
-            
-            # 1. 完全一致を探す
-            if new_id in user_history:
-                found_history = user_history[new_id]
-            else:
-                # 2. 古い形式のIDを推測して探す
-                old_id_patterns = [
-                    f"{word['chapter']}-{word['number']}-{word['question'][:10].replace(' ', '').lower()}",
-                    f"{word['chapter']}-{word['number']}-{word['answer'][:10].replace(' ', '').lower()}",
-                ]
-                
-                for old_pattern in old_id_patterns:
-                    if old_pattern in user_history:
-                        found_history = user_history[old_pattern]
-                        print(f"履歴発見: {old_pattern} -> {new_id}")
-                        break
-            
-            if found_history:
-                new_history[new_id] = found_history
-                fixed_count += 1
-        
-        print(f"修正された履歴数: {fixed_count}")
-        
-        # 苦手問題リストも同様に修正
-        user_incorrect = current_user.get_incorrect_words()
-        new_incorrect = []
-        
-        for word in word_data:
-            new_id = get_problem_id(word)
-            if new_id in new_history:
-                history = new_history[new_id]
-                # 苦手問題の条件をチェック
-                if (history.get('incorrect_attempts', 0) > 0 and 
-                    history.get('correct_streak', 0) < 2):
-                    if new_id not in new_incorrect:
-                        new_incorrect.append(new_id)
-        
-        print(f"修正された苦手問題数: {len(new_incorrect)}")
-        
-        # データベースに保存
-        current_user.set_problem_history(new_history)
-        current_user.set_incorrect_words(new_incorrect)
-        db.session.commit()
-        
-        print("=== 強制修正完了 ===\n")
-        
-        return jsonify({
-            'status': 'success',
-            'fixed_history_count': fixed_count,
-            'total_history_count': len(new_history),
-            'fixed_incorrect_count': len(new_incorrect),
-            'message': 'ユーザーデータを強制修正しました'
-        })
-        
-    except Exception as e:
-        db.session.rollback()
-        print(f"強制修正エラー: {e}")
-        return jsonify(error=str(e)), 500
-
-@app.route('/admin/check_all_users')
-def admin_check_all_users():
-    """すべてのユーザーデータを詳細確認"""
-    if not session.get('admin_logged_in'):
-        return jsonify(error='管理者権限が必要です'), 403
-    
-    try:
-        # 全ユーザーを取得
-        all_users = User.query.all()
-        
-        user_details = []
-        for user in all_users:
-            user_details.append({
-                'id': user.id,
-                'username': user.username,
-                'room_number': user.room_number,
-                'student_id': user.student_id,
-                'last_login': user.last_login.strftime('%Y-%m-%d %H:%M:%S') if user.last_login else 'なし',
-                'problem_history_count': len(json.loads(user.problem_history or '{}')),
-                'incorrect_words_count': len(json.loads(user.incorrect_words or '[]'))
-            })
-        
-        # 部屋別集計
-        room_stats = {}
-        for user in all_users:
-            if user.room_number not in room_stats:
-                room_stats[user.room_number] = 0
-            room_stats[user.room_number] += 1
-        
-        return jsonify({
-            'total_users': len(all_users),
-            'room_stats': room_stats,
-            'user_details': user_details
-        })
-        
-    except Exception as e:
-        return jsonify(error=str(e)), 500
-
-# 起動時ログを改善
 def enhanced_startup_check():
     """起動時の詳細チェック"""
     try:
@@ -3267,11 +2524,6 @@ def enhanced_startup_check():
     except Exception as e:
         print(f"❌ 起動チェックエラー: {e}")
 
-# app.py の先頭付近に追加
-import logging
-logging.basicConfig(level=logging.DEBUG)
-
-# app.pyに追加する診断関数
 def diagnose_mail_config():
     """メール設定を診断"""
     print("\n=== メール設定診断 ===")
@@ -3292,12 +2544,11 @@ def diagnose_mail_config():
 # アプリ起動時に診断実行
 diagnose_mail_config()
 
-# ===== メイン起動処理の修正 =====
+# ===== メイン起動処理 =====
 if __name__ == '__main__':
     try:
-        # 環境設定
+        # 環境設定の表示
         print_render_recommendations()
-        
         
         # データベース初期化
         create_tables_and_admin_user()
@@ -3321,3 +2572,5 @@ if __name__ == '__main__':
         
     except Exception as e:
         print(f"💥 起動失敗: {e}")
+        import traceback
+        traceback.print_exc()
