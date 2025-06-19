@@ -139,7 +139,9 @@
                             <th>ID</th>
                             <th>部屋 <i class="fas fa-sort sort-icon" data-column="room" style="cursor: pointer;"></i></th>
                             <th>出席番号</th>
-                            <th>名前 <i class="fas fa-sort sort-icon" data-column="name" style="cursor: pointer;"></i></th>
+                            <th>現在のアカウント名 <i class="fas fa-sort sort-icon" data-column="name" style="cursor: pointer;"></i></th>
+                            <th>最初のアカウント名</th>
+                            <th>変更日時</th>
                             <th>最終ログイン <i class="fas fa-sort sort-icon" data-column="login" style="cursor: pointer;"></i></th>
                             <th>操作</th>
                         </tr>
@@ -151,11 +153,32 @@
                             <td>{{ user.id }}</td>
                             <td><span class="badge bg-secondary">{{ user.room_number }}</span></td>
                             <td>{{ user.student_id }}</td>
-                            <td>{{ user.username }}</td>
+                            <td>
+                                {{ user.username }}
+                                {% if user.original_username and user.original_username != user.username %}
+                                <span class="badge bg-warning text-dark ms-1">
+                                    <i class="fas fa-edit"></i> 変更済み
+                                </span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if user.original_username and user.original_username != user.username %}
+                                <span class="text-muted">{{ user.original_username }}</span>
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if user.username_changed_at %}
+                                <small>{{ user.username_changed_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
                             <td>{{ user.last_login.strftime('%Y-%m-%d %H:%M') if user.last_login else '未ログイン' }}</td>
                             <td>
-                                <button class="btn btn-danger btn-sm delete-user-btn" 
-                                        data-user-id="{{ user.id }}" 
+                                <button class="btn btn-danger btn-sm delete-user-btn"
+                                        data-user-id="{{ user.id }}"
                                         data-username="{{ user.username }}"
                                         data-room="{{ user.room_number }}">削除</button>
                             </td>
@@ -737,6 +760,30 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 console.log('🎉 admin.html スクリプト読み込み完了');
+
+function confirmDeleteUser(userId, username, roomNumber, studentId) {
+    const message = `以下のユーザーを削除しますか？\n\nアカウント名: ${username}\n部屋番号: ${roomNumber}\n出席番号: ${studentId}\n\n※この操作は元に戻せません。`;
+    
+    if (confirm(message)) {
+        // 削除フォームを作成して送信
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = `/admin/delete_user/${userId}`;
+        
+        // CSRFトークンがある場合は追加
+        // const csrfToken = document.querySelector('meta[name=csrf-token]');
+        // if (csrfToken) {
+        //     const csrfInput = document.createElement('input');
+        //     csrfInput.type = 'hidden';
+        //     csrfInput.name = 'csrf_token';
+        //     csrfInput.value = csrfToken.getAttribute('content');
+        //     form.appendChild(csrfInput);
+        // }
+        
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
 </script>
 
 <style>
