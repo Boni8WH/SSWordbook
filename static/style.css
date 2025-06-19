@@ -2893,9 +2893,9 @@ body .auth-container .input-group input:hover {
 }
 
 .change-username-button {
-    background-color: #f39c12 !important;
-    color: white !important;
-    border: 1px solid #f39c12 !important;
+    background-color: #ffffff !important;
+    color: rgb(0, 0, 0) !important;
+    border: 1px solid #ffffff !important;
     transition: background-color 0.3s ease;
 }
 
