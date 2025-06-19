@@ -2927,7 +2927,7 @@ body .auth-container .input-group input:hover {
 /* アカウント名変更ボタン */
 .change-username-button {
     background-color: #fbad24 !important;
-    color: #000000 !important;
+    color: #ffffff !important;
     border: none
 }
 
