@@ -175,7 +175,17 @@
                                 <span class="text-muted">-</span>
                                 {% endif %}
                             </td>
-                            <td>{{ user.last_login or '未ログイン' }}</td>
+                            <td>
+                                {% if user.last_login %}
+                                    {% if user.last_login is string %}
+                                        {{ user.last_login }}
+                                    {% else %}
+                                        {{ user.last_login.strftime('%Y-%m-%d %H:%M') }}
+                                    {% endif %}
+                                {% else %}
+                                    未ログイン
+                                {% endif %}
+                            </td>
                             <td>
                                 <button class="btn btn-danger btn-sm delete-user-btn"
                                         data-user-id="{{ user.id }}"
