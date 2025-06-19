@@ -834,7 +834,8 @@ def create_tables_and_admin_user():
             # データベース接続確認
             try:
                 # ★修正: app_context内でdb.engineを使用
-                db.engine.execute(text('SELECT 1'))
+                with db.engine.connect() as conn:
+                    conn.execute(text('SELECT 1'))
                 logger.info("✅ データベース接続確認")
             except Exception as e:
                 logger.error(f"❌ データベース接続失敗: {e}")
