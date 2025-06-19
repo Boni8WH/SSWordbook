@@ -462,7 +462,7 @@ function updateIncorrectOnlySelection() {
             chaptersContainer.style.pointerEvents = 'none';
         }
         if (rangeSelectionTitle) {
-            rangeSelectionTitle.textContent = '出題範囲を選択（苦手問題モードでは無効）';
+            rangeSelectionTitle.textContent = '出題数を選択（苦手問題モードでは無効）';
             rangeSelectionTitle.style.color = '#95a5a6';
         }
     } else {
@@ -472,7 +472,7 @@ function updateIncorrectOnlySelection() {
             chaptersContainer.style.pointerEvents = 'auto';
         }
         if (rangeSelectionTitle) {
-            rangeSelectionTitle.textContent = '出題範囲を選択';
+            rangeSelectionTitle.textContent = '出題数を選択';
             rangeSelectionTitle.style.color = '#34495e';
         }
     }
