@@ -1121,53 +1121,12 @@ def index():
             flash('ユーザーが見つかりません。再ログインしてください。', 'danger')
             return redirect(url_for('logout'))
 
-        # 共通コンテキストを最初に取得
-        context = get_template_context()
-        app_info_obj = context['app_info']
-        
-        # JavaScript用のapp_info（データベースの値を使用）
-        if app_info_obj:
-            app_info_for_js = {
-                'appName': app_info_obj.app_name,
-                'version': app_info_obj.version,
-                'lastUpdatedDate': app_info_obj.last_updated_date,
-                'updateContent': app_info_obj.update_content,
-                'footerText': app_info_obj.footer_text,
-                'contactEmail': app_info_obj.contact_email,
-                'isLoggedIn': True,
-                'username': session.get('username'),
-                'roomNumber': session.get('room_number')
-            }
-        else:
-            # フォールバック（この場合でもDBから取得を試行）
-            try:
-                fallback_info = AppInfo.query.first()
-                if fallback_info:
-                    app_info_for_js = {
-                        'appName': fallback_info.app_name,
-                        'version': fallback_info.version,
-                        'lastUpdatedDate': fallback_info.last_updated_date,
-                        'updateContent': fallback_info.update_content,
-                        'footerText': fallback_info.footer_text,
-                        'contactEmail': fallback_info.contact_email,
-                        'isLoggedIn': True,
-                        'username': session.get('username'),
-                        'roomNumber': session.get('room_number')
-                    }
-                else:
-                    raise Exception("No app_info found")
-            except:
-                app_info_for_js = {
-                    'appName': '世界史単語帳',
-                    'version': '1.0.0',
-                    'lastUpdatedDate': '2025年6月15日',
-                    'updateContent': 'アプリケーションが開始されました。',
-                    'footerText': '',
-                    'contactEmail': '',
-                    'isLoggedIn': True,
-                    'username': session.get('username'),
-                    'roomNumber': session.get('room_number')
-                }
+        # 元のJavaScript用app_info生成（エラー回避のため元のまま）
+        app_info_for_js = get_app_info_dict(
+            user_id=session.get('user_id'),
+            username=session.get('username'), 
+            room_number=session.get('room_number')
+        )
         
         word_data = load_word_data_for_room(current_user.room_number)
         
@@ -1200,11 +1159,14 @@ def index():
         sorted_all_chapter_unit_status = dict(sorted(all_chapter_unit_status.items(), 
                                                     key=lambda item: int(item[0]) if item[0].isdigit() else float('inf')))
 
-        # 他のページと同じ形式で渡す
+        # フッター用のコンテキストを取得
+        context = get_template_context()
+        
+        # ★重要な修正：app_infoの名前を変更してコンフリクトを回避
         return render_template('index.html',
-                                app_info=app_info_for_js,  # JavaScript用（DB値使用）
+                                app_info=app_info_for_js,  # JavaScript用
                                 chapter_data=sorted_all_chapter_unit_status,
-                                **context)  # フッター用app_infoも含む
+                                app_info_for_footer=context['app_info'])  # フッター用（名前を変更）
     
     except Exception as e:
         print(f"Error in index route: {e}")
