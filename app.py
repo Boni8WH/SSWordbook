@@ -128,8 +128,15 @@ def convert_to_jst(dt):
 def to_jst_filter(dt):
     if dt is None:
         return None
-    converted = convert_to_jst(dt)
-    return converted.strftime('%Y-%m-%d %H:%M')
+    
+    # PostgreSQLからの時刻はUTCなので、9時間足してJSTにする
+    if dt.tzinfo is None:
+        # naive datetimeの場合、UTCとして扱ってJSTに変換
+        dt = pytz.UTC.localize(dt)
+    
+    # JSTに変換（UTC+9時間）
+    jst_dt = dt.astimezone(JST)
+    return jst_dt.strftime('%Y-%m-%d %H:%M')
 
 # ====================================================================
 # データベースモデル定義
