@@ -126,28 +126,31 @@ def convert_to_jst(dt):
 # テンプレートで使用できるようにフィルターとして登録
 @app.template_filter('to_jst')
 def to_jst_filter(dt):
+    print(f"🔍 フィルター呼び出し: {dt} (型: {type(dt)})")
+    
     if dt is None:
+        print("🔍 None が渡されました")
         return None
     
-    # 文字列の場合はそのまま返す
+    # 文字列の場合
     if isinstance(dt, str):
+        print(f"🔍 文字列として処理: {dt}")
         return dt
     
-    # datetime の場合、9時間加算
+    # datetime の場合
     if hasattr(dt, 'year'):
+        print(f"🔍 datetime として処理: {dt}")
         from datetime import timedelta
-        
-        # デバッグ用の出力
-        print(f"🔍 元の時刻: {dt}")
         
         # 9時間加算
         jst_dt = dt + timedelta(hours=9)
         result = jst_dt.strftime('%Y-%m-%d %H:%M')
         
-        print(f"🔍 変換後: {result}")
+        print(f"🔍 変換完了: {dt} → {result}")
         return result
     
-    # その他はそのまま
+    # その他
+    print(f"🔍 その他の型として処理: {type(dt)}")
     return str(dt)
 
 # ====================================================================
