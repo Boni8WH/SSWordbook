@@ -99,37 +99,26 @@
             <div class="row">
                 <div class="col-md-6">
                     <div class="footer-text">
-                        {% if footer_app_info and footer_app_info.footer_text %}
-                            {{ footer_app_info.footer_text }}
-                        {% elif app_info and app_info.footerText %}
-                            {{ app_info.footerText }}
+                        {% if app_info and app_info.footer_text %}
+                            {{ app_info.footer_text }}
                         {% else %}
                             © 2025 世界史単語帳. All rights reserved.
                         {% endif %}
                     </div>
                 </div>
                 <div class="col-md-6 text-md-end">
-                    {% if footer_app_info and footer_app_info.contact_email %}
+                    {% if app_info and app_info.contact_email %}
                     <div class="contact-info">
                         <i class="fas fa-envelope me-1"></i>
-                        <a href="mailto:{{ footer_app_info.contact_email }}" class="text-decoration-none">
-                            {{ footer_app_info.contact_email }}
-                        </a>
-                    </div>
-                    {% elif app_info and app_info.contactEmail %}
-                    <div class="contact-info">
-                        <i class="fas fa-envelope me-1"></i>
-                        <a href="mailto:{{ app_info.contactEmail }}" class="text-decoration-none">
-                            {{ app_info.contactEmail }}
+                        <a href="mailto:{{ app_info.contact_email }}" class="text-decoration-none">
+                            {{ app_info.contact_email }}
                         </a>
                     </div>
                     {% endif %}
                     <div class="app-version mt-1">
                         <small class="text-muted">
-                            {% if footer_app_info %}
-                                {{ footer_app_info.app_name }} v{{ footer_app_info.version }}
-                            {% elif app_info %}
-                                {{ app_info.appName }} v{{ app_info.version }}
+                            {% if app_info %}
+                                {{ app_info.app_name }} v{{ app_info.version }}
                             {% else %}
                                 世界史単語帳 v1.0.0
                             {% endif %}
