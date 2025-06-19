@@ -1143,14 +1143,10 @@ def index():
         # フッター用のコンテキストを取得
         context = get_template_context()
         
-        # ★ 修正: app_infoの重複を避けるため、contextからapp_infoを削除してから結合
-        footer_app_info = context.pop('app_info', None)
-        
         return render_template('index.html', 
                                app_info=app_info_for_js,  # JavaScript用（従来形式）
                                chapter_data=sorted_all_chapter_unit_status,
-                               footer_app_info=footer_app_info,  # フッター用（新しい名前）
-                               **context)  # その他のコンテキスト
+                               **context)  # app_infoが含まれる統一されたコンテキスト
     
     except Exception as e:
         print(f"Error in index route: {e}")
