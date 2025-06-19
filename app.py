@@ -1094,7 +1094,7 @@ def favicon():
 def index():
     try:
         if 'user_id' not in session:
-            flash('学習を開始するにはログインしてください。', 'info')
+            flash('学習を始めるにはログインしてください。', 'info')
             return redirect(url_for('login_page'))
         
         current_user = User.query.get(session['user_id'])
@@ -1142,8 +1142,11 @@ def index():
 
         # フッター用のコンテキストを取得
         context = get_template_context()
-        context['app_info'] = app_info_for_js  # 上書き
-        return render_template('index.html', **context)
+        context['app_info'] = app_info_for_js
+        
+        return render_template('index.html', 
+                               chapter_data=sorted_all_chapter_unit_status,
+                               **context)
     
     except Exception as e:
         print(f"Error in index route: {e}")
