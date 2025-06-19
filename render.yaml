@@ -1,45 +1,38 @@
-# render.yaml - データ永続化対応版（修正版）
+# render.yaml - データ永続化対応版
 services:
-  # Webサービス（メインアプリケーション）
   - type: web
     name: sekaishi-app
     env: python
     plan: free
     region: singapore
     
-    # ビルドコマンド
     buildCommand: |
       pip install --upgrade pip &&
-      pip install -r requirements.txt &&
-      python -c "
-      import os
-      print('📊 環境変数確認:')
-      print(f'RESET_DATABASE: {os.environ.get(\"RESET_DATABASE\", \"未設定\")}')
-      print(f'DATABASE_URL: {\"設定済み\" if os.environ.get(\"DATABASE_URL\") else \"未設定\"}')
-      print(f'RENDER: {os.environ.get(\"RENDER\", \"未設定\")}')
-      "
+      pip install -r requirements.txt
     
-    # 本番環境用：Gunicornを使用
     startCommand: gunicorn --bind 0.0.0.0:$PORT --workers 2 --timeout 120 app:app
     
-    # 環境変数
     envVars:
+      # データベース設定（重要）
+      - key: DATABASE_URL
+        fromDatabase:
+          name: world_history_postgres
+          property: connectionString
+      
+      # アプリケーション設定
       - key: RESET_DATABASE
-        value: "false"  # 重要：本番環境では絶対にtrueにしない
+        value: "false"
       - key: RENDER
         value: "true"
       - key: PYTHON_VERSION
         value: "3.11.9"
-      - key: FLASK_ENV
-        value: "production"
-      - key: DATABASE_URL
-        fromDatabase:
-          name: world_history_postgres  # ←修正：実際のサービス名に変更
-          property: connectionString
+      
+      # セキュリティ設定
+      - key: SECRET_KEY
+        generateValue: true
 
-    # 自動デプロイ設定
-    autoDeploy: true
-
-# データベースサービス（PostgreSQL）
-# 注意: 既存のPostgreSQLサービスを使用するため、databases セクションは削除
-# 既存の world_history_postgres サービスが fromDatabase で参照されます
+# データベース設定
+databases:
+  - name: world_history_postgres
+    databaseName: world_history_db
+    user: world_history_user
