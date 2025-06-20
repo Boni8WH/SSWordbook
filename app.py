@@ -288,10 +288,10 @@ class PasswordResetToken(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     token = db.Column(db.String(100), unique=True, nullable=False)
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))  # ★ JST指定
     expires_at = db.Column(db.DateTime, nullable=False)
     used = db.Column(db.Boolean, default=False)
-    used_at = db.Column(db.DateTime)  # 使用された日時
+    used_at = db.Column(db.DateTime)
     
     user = db.relationship('User', backref=db.backref('reset_tokens', lazy=True))
     
@@ -1329,27 +1329,29 @@ def password_reset_request():
                 return redirect(url_for('login_page'))
             
             # 既存の未使用トークンがあれば無効化
-            existing_tokens = PasswordResetToken.query.filter_by(
-                user_id=user.id, 
-                used=False
-            ).all()
+            existing_tokens = PasswordResetToken.query.filter_by(user_id=user.id, used=False).all()
             for token in existing_tokens:
                 token.used = True
-                token.used_at = datetime.now(JST)  # タイムゾーン情報付きで設定
+                token.used_at = datetime.now(JST)
             
             # 新しいトークンを生成（タイムゾーン対応版）
             reset_token = generate_reset_token()
-            expires_at = datetime.now(JST) + timedelta(hours=1)  # JSTタイムゾーン付きで作成
+            now_jst = datetime.now(JST)
+            expires_at_jst = now_jst + timedelta(hours=1)
             
             password_reset_token = PasswordResetToken(
                 user_id=user.id,
                 token=reset_token,
-                expires_at=expires_at  # タイムゾーン情報付きのdatetimeを保存
+                expires_at=expires_at_jst  # ★ JST時刻で保存
             )
+            password_reset_token.created_at = now_jst
             
             db.session.add(password_reset_token)
             db.session.commit()
             
+            print(f"🔍 トークン作成時刻（JST）: {now_jst}")
+            print(f"🔍 有効期限（JST）: {expires_at_jst}")
+
             # メール送信
             try:
                 print(f"🔍 メール送信処理開始...")
