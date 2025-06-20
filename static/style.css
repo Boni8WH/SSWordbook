@@ -2964,3 +2964,8 @@ a.nav-link.btn.change-username-button:hover,
     color: #ffffff !important;
     text-decoration: none !important;
 }
+
+.favicon-fallback {
+    background-image: url("{{ url_for('static', filename='NapoleonIcon.png') }}");
+    background-size: 16px 16px;
+}
