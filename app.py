@@ -3029,31 +3029,45 @@ def debug_timezone_check():
         return "管理者権限が必要です", 403
     
     try:
-        # PostgreSQLのタイムゾーン設定を確認
-        result = db.engine.execute(text("SELECT current_setting('TIMEZONE')")).fetchone()
-        pg_timezone = result[0] if result else 'Unknown'
+        # PostgreSQLのタイムゾーン設定を確認（新しいSQLAlchemy形式）
+        with db.engine.connect() as conn:
+            result = conn.execute(text("SELECT current_setting('TIMEZONE')")).fetchone()
+            pg_timezone = result[0] if result else 'Unknown'
+            
+            # PostgreSQLで現在時刻を取得
+            pg_now_result = conn.execute(text("SELECT NOW()")).fetchone()
+            pg_now = pg_now_result[0] if pg_now_result else 'Unknown'
+            
+            pg_now_jst_result = conn.execute(text("SELECT NOW() AT TIME ZONE 'Asia/Tokyo'")).fetchone()
+            pg_now_jst = pg_now_jst_result[0] if pg_now_jst_result else 'Unknown'
         
         # 現在時刻の各パターンを確認
         now_python = datetime.now()
         now_python_jst = datetime.now(JST)
         now_utc = datetime.utcnow()
         
-        # PostgreSQLで現在時刻を取得
-        pg_now = db.engine.execute(text("SELECT NOW()")).fetchone()[0]
-        pg_now_at_timezone = db.engine.execute(text("SELECT NOW() AT TIME ZONE 'Asia/Tokyo'")).fetchone()[0]
-        
         return f"""
         <h2>タイムゾーン診断</h2>
-        <p>PostgreSQLタイムゾーン: {pg_timezone}</p>
-        <p>Python datetime.now(): {now_python}</p>
-        <p>Python datetime.now(JST): {now_python_jst}</p>
-        <p>Python datetime.utcnow(): {now_utc}</p>
-        <p>PostgreSQL NOW(): {pg_now}</p>
-        <p>PostgreSQL NOW() AT TIME ZONE 'Asia/Tokyo': {pg_now_at_timezone}</p>
+        <p><strong>PostgreSQLタイムゾーン:</strong> {pg_timezone}</p>
+        <p><strong>Python datetime.now():</strong> {now_python}</p>
+        <p><strong>Python datetime.now(JST):</strong> {now_python_jst}</p>
+        <p><strong>Python datetime.utcnow():</strong> {now_utc}</p>
+        <p><strong>PostgreSQL NOW():</strong> {pg_now}</p>
+        <p><strong>PostgreSQL NOW() AT TIME ZONE 'Asia/Tokyo':</strong> {pg_now_jst}</p>
+        <hr>
+        <h3>問題の分析</h3>
+        <p>PostgreSQLが UTC なら、Pythonの datetime.utcnow() と PostgreSQL NOW() が一致するはずです。</p>
+        <p>JST設定なら、Python datetime.now(JST) と PostgreSQL NOW() が一致するはずです。</p>
         """
         
     except Exception as e:
-        return f"エラー: {str(e)}"
+        import traceback
+        error_detail = traceback.format_exc()
+        return f"""
+        <h2>エラー詳細</h2>
+        <p><strong>エラー:</strong> {str(e)}</p>
+        <pre>{error_detail}</pre>
+        """
 
 # ====================================================================
 # エラーハンドラー
