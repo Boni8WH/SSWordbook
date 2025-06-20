@@ -288,7 +288,7 @@ class PasswordResetToken(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     token = db.Column(db.String(100), unique=True, nullable=False)
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))  # ★ JST指定
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)  # ★ UTCに変更
     expires_at = db.Column(db.DateTime, nullable=False)
     used = db.Column(db.Boolean, default=False)
     used_at = db.Column(db.DateTime)
@@ -296,30 +296,12 @@ class PasswordResetToken(db.Model):
     user = db.relationship('User', backref=db.backref('reset_tokens', lazy=True))
     
     def is_expired(self):
-        """トークンが期限切れかどうかを確認（タイムゾーン対応版）"""
-        now = datetime.now(JST)
-        
-        # expires_atがタイムゾーン情報を持っているかチェック
-        if self.expires_at.tzinfo is None:
-            # expires_atがnaiveな場合、JSTタイムゾーンを設定
-            expires_at_aware = JST.localize(self.expires_at)
-        else:
-            # 既にawareな場合はJSTに変換
-            expires_at_aware = self.expires_at.astimezone(JST)
-        
-        return now > expires_at_aware
+        """UTCベースで期限チェック"""
+        return datetime.utcnow() > self.expires_at
     
     def is_valid(self):
-        """トークンが有効かどうかを確認（未使用かつ期限内）"""
+        """UTCベースで有効性チェック"""
         return not self.used and not self.is_expired()
-    
-    def mark_as_used(self):
-        """トークンを使用済みにマーク"""
-        self.used = True
-        self.used_at = datetime.now(JST)
-        
-    def __repr__(self):
-        return f'<PasswordResetToken {self.token[:10]}... for user {self.user_id}>'
 
 class CsvFileContent(db.Model):
     """CSVファイルの内容をデータベースに保存"""
@@ -1294,7 +1276,6 @@ def password_change_page():
 @app.route('/password_reset_request', methods=['GET', 'POST'])
 def password_reset_request():
     try:
-        # メール設定の確認（関数を使用）
         mail_configured = is_mail_configured()
         
         if request.method == 'POST':
@@ -1309,14 +1290,12 @@ def password_reset_request():
                 context['mail_configured'] = mail_configured
                 return render_template('password_reset_request.html', **context)
             
-            # メール設定がない場合はエラー
             if not mail_configured:
-                flash('メール送信機能が設定されていないため、パスワード再発行を実行できません。管理者にお問い合わせください。', 'danger')
+                flash('メール送信機能が設定されていないため、パスワード再発行を実行できません。', 'danger')
                 context = get_template_context()
                 context['mail_configured'] = mail_configured
                 return render_template('password_reset_request.html', **context)
             
-            # ユーザー検索
             user = User.query.filter_by(
                 room_number=room_number, 
                 student_id=student_id,
@@ -1324,76 +1303,56 @@ def password_reset_request():
             ).first()
             
             if not user:
-                # セキュリティのため、ユーザーが見つからない場合も成功メッセージを表示
-                flash('入力された情報に一致するアカウントが見つかった場合、パスワード再発行のご案内をメールで送信しました。メールをご確認ください。', 'success')
+                flash('入力された情報に一致するアカウントが見つかった場合、パスワード再発行のご案内をメールで送信しました。', 'success')
                 return redirect(url_for('login_page'))
             
             # 既存の未使用トークンがあれば無効化
             existing_tokens = PasswordResetToken.query.filter_by(user_id=user.id, used=False).all()
             for token in existing_tokens:
                 token.used = True
-                token.used_at = datetime.now(JST)
+                token.used_at = datetime.utcnow()  # ★ UTCで保存
             
-            # 新しいトークンを生成（タイムゾーン対応版）
+            # ★修正：すべてUTCで統一
             reset_token = generate_reset_token()
-            now_jst = datetime.now(JST)
-            expires_at_jst = now_jst + timedelta(hours=1)
+            now_utc = datetime.utcnow()
+            expires_at_utc = now_utc + timedelta(hours=1)
             
             password_reset_token = PasswordResetToken(
                 user_id=user.id,
                 token=reset_token,
-                expires_at=expires_at_jst  # ★ JST時刻で保存
+                expires_at=expires_at_utc  # ★ UTC時刻で保存
             )
-            password_reset_token.created_at = now_jst
             
             db.session.add(password_reset_token)
             db.session.commit()
             
-            print(f"🔍 トークン作成時刻（JST）: {now_jst}")
-            print(f"🔍 有効期限（JST）: {expires_at_jst}")
-
+            print(f"🔍 トークン作成時刻（UTC）: {now_utc}")
+            print(f"🔍 有効期限（UTC）: {expires_at_utc}")
+            
             # メール送信
             try:
-                print(f"🔍 メール送信処理開始...")
                 success = send_password_reset_email(user, email, reset_token)
                 if success:
-                    flash('入力された情報に一致するアカウントが見つかりました。パスワード再発行のご案内をメールで送信しました。メールをご確認ください。', 'success')
-                    print(f"✅ メール送信完了")
+                    flash('パスワード再発行のご案内をメールで送信しました。', 'success')
                 else:
-                    flash('メール送信に失敗しました。しばらく後に再度お試しください。', 'danger')
-                    # トークンを無効化
+                    flash('メール送信に失敗しました。', 'danger')
                     password_reset_token.used = True
                     db.session.commit()
             except Exception as email_error:
                 print(f"❌ メール送信例外: {email_error}")
-                import traceback
-                traceback.print_exc()
-                
-                # ユーザーフレンドリーなエラーメッセージ
-                error_msg = str(email_error).lower()
-                if 'authentication' in error_msg:
-                    flash('メール送信の認証に失敗しました。システム管理者にお問い合わせください。', 'danger')
-                elif 'connection' in error_msg or 'timeout' in error_msg:
-                    flash('メールサーバーへの接続に失敗しました。しばらく後に再度お試しください。', 'danger')
-                else:
-                    flash('メール送信中にエラーが発生しました。システム管理者にお問い合わせください。', 'danger')
-                
-                # トークンを無効化
+                flash('メール送信中にエラーが発生しました。', 'danger')
                 password_reset_token.used = True
                 db.session.commit()
             
             return redirect(url_for('login_page'))
         
-        # GET リクエスト時
         context = get_template_context()
         context['mail_configured'] = mail_configured
         return render_template('password_reset_request.html', **context)
         
     except Exception as e:
         print(f"Error in password_reset_request: {e}")
-        import traceback
-        traceback.print_exc()
-        flash('システムエラーが発生しました。管理者にお問い合わせください。', 'danger')
+        flash('システムエラーが発生しました。', 'danger')
         return redirect(url_for('login_page'))
 
 
@@ -1436,20 +1395,20 @@ def password_reset(token):
         reset_token = PasswordResetToken.query.filter_by(token=token).first()
         
         if not reset_token:
+            print("❌ トークンがデータベースに見つかりません")
             flash('無効なリンクです。', 'danger')
             return redirect(url_for('password_reset_request'))
         
-        # ★修正：JST時刻をnaiveに変換して比較
-        now_jst = datetime.now(JST)
-        now_naive = now_jst.replace(tzinfo=None)  # タイムゾーン情報を削除
-        expires_at_naive = reset_token.expires_at
+        # ★修正：すべてUTCで比較
+        now_utc = datetime.utcnow()
+        expires_at_utc = reset_token.expires_at
         
-        print(f"🔍 現在時刻（naive）: {now_naive}")
-        print(f"🔍 有効期限（naive）: {expires_at_naive}")
+        print(f"🔍 現在時刻（UTC）: {now_utc}")
+        print(f"🔍 有効期限（UTC）: {expires_at_utc}")
         print(f"🔍 使用済みフラグ: {reset_token.used}")
         
-        # naive同士で比較
-        is_expired = now_naive > expires_at_naive
+        # UTC同士で比較
+        is_expired = now_utc > expires_at_utc
         is_used = reset_token.used
         
         print(f"🔍 期限切れ: {is_expired}")
@@ -1480,16 +1439,19 @@ def password_reset(token):
                 
                 # トークンを使用済みにする
                 reset_token.used = True
-                reset_token.used_at = now_naive  # ★ naiveで保存
+                reset_token.used_at = datetime.utcnow()  # ★ UTCで保存
                 
                 db.session.commit()
                 
+                print(f"✅ パスワード更新完了: ユーザー {user.username}")
                 flash('パスワードが正常に更新されました。', 'success')
                 return redirect(url_for('login_page'))
         
-        # GET リクエスト時
-        time_remaining = expires_at_naive - now_naive
+        # GET リクエスト時 - 残り時間をJST表示用に変換
+        time_remaining = expires_at_utc - now_utc
         minutes_remaining = max(0, int(time_remaining.total_seconds() / 60))
+        
+        print(f"🔍 残り時間: {minutes_remaining}分")
         
         context = get_template_context()
         context.update({
