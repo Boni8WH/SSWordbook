@@ -3023,7 +3023,37 @@ def get_template_context():
         print(f"Error getting app_info: {e}")
         return {'app_info': None}
 
-
+@app.route('/debug/timezone_check')
+def debug_timezone_check():
+    if not session.get('admin_logged_in'):
+        return "管理者権限が必要です", 403
+    
+    try:
+        # PostgreSQLのタイムゾーン設定を確認
+        result = db.engine.execute(text("SELECT current_setting('TIMEZONE')")).fetchone()
+        pg_timezone = result[0] if result else 'Unknown'
+        
+        # 現在時刻の各パターンを確認
+        now_python = datetime.now()
+        now_python_jst = datetime.now(JST)
+        now_utc = datetime.utcnow()
+        
+        # PostgreSQLで現在時刻を取得
+        pg_now = db.engine.execute(text("SELECT NOW()")).fetchone()[0]
+        pg_now_at_timezone = db.engine.execute(text("SELECT NOW() AT TIME ZONE 'Asia/Tokyo'")).fetchone()[0]
+        
+        return f"""
+        <h2>タイムゾーン診断</h2>
+        <p>PostgreSQLタイムゾーン: {pg_timezone}</p>
+        <p>Python datetime.now(): {now_python}</p>
+        <p>Python datetime.now(JST): {now_python_jst}</p>
+        <p>Python datetime.utcnow(): {now_utc}</p>
+        <p>PostgreSQL NOW(): {pg_now}</p>
+        <p>PostgreSQL NOW() AT TIME ZONE 'Asia/Tokyo': {pg_now_at_timezone}</p>
+        """
+        
+    except Exception as e:
+        return f"エラー: {str(e)}"
 
 # ====================================================================
 # エラーハンドラー
