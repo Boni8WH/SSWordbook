@@ -2966,6 +2966,6 @@ a.nav-link.btn.change-username-button:hover,
 }
 
 .favicon-fallback {
-    background-image: url("{{ url_for('static', filename='NapoleonIcon.png') }}");
+    background-image: url("/static/NapoleonIcon.png");
     background-size: 16px 16px;
 }
