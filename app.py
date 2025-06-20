@@ -1868,6 +1868,28 @@ def debug_app_info_comparison():
 def api_clear_quiz_progress():
     return jsonify(status='success', message='一時的なクイズ進捗クリア要求を受信しました（サーバー側は変更なし）。')
 
+@app.route('/debug/check_token/<token>')
+def debug_check_token(token):
+    """デバッグ用：トークンの状態確認"""
+    if not session.get('admin_logged_in'):
+        return "管理者権限が必要です", 403
+    
+    reset_token = PasswordResetToken.query.filter_by(token=token).first()
+    if not reset_token:
+        return "トークンが見つかりません", 404
+    
+    now_jst = datetime.now(JST)
+    
+    return f"""
+    <h2>トークン診断結果</h2>
+    <p>現在時刻（JST）: {now_jst}</p>
+    <p>トークン作成時刻: {reset_token.created_at}</p>
+    <p>有効期限: {reset_token.expires_at}</p>
+    <p>使用済みフラグ: {reset_token.used}</p>
+    <p>使用時刻: {reset_token.used_at}</p>
+    <p>有効性: {'有効' if reset_token.is_valid() else '無効'}</p>
+    """
+
 # ====================================================================
 # 進捗ページ
 # ====================================================================
