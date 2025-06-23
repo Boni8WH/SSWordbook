@@ -1,6 +1,5 @@
 {% extends "base.html" %}
-
-{% block title %}学習モード - 世界史単語帳{% endblock %}
+{% block title %}学習モード - {{ app_name }}{% endblock %}
 
 {% block content %}
 <section class="selection-area">
@@ -200,7 +199,7 @@ function debugRoomSetting(roomNumber) {
 </script>
 <script>
     // Flaskからのデータをグローバル変数として設定
-    window.appInfoFromFlask = {{ app_info_for_js | tojson | safe }};  <!-- 変数名を変更 -->
+    window.appInfoFromFlask = {{ app_info_for_js | tojson | safe }};  <!-- この行を修正 -->
     window.chapterDataFromFlask = {{ chapter_data | tojson | safe }};
 </script>
 <!-- html2canvas ライブラリの読み込み -->
