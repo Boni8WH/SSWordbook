@@ -1146,9 +1146,8 @@ def index():
         
         # ★重要な修正：JavaScriptで使う変数名を変更
         return render_template('index.html',
-                                app_info_for_js=app_info_for_js,  # JavaScript用（名前変更）
-                                chapter_data=sorted_all_chapter_unit_status,
-                                **context)  # これによりapp_infoが正しい値になる
+                                app_info_for_js=app_info_for_js,
+                                chapter_data=sorted_all_chapter_unit_status)
     
     except Exception as e:
         print(f"Error in index route: {e}")
@@ -1208,7 +1207,7 @@ def login_page():
         
         # フッター用のコンテキストを取得
         context = get_template_context()
-        return render_template('login.html', **context)
+        return render_template('login.html')
         
     except Exception as e:
         print(f"Error in login route: {e}")
@@ -2031,8 +2030,7 @@ def progress_page():
         return render_template('progress.html',
                                current_user=current_user,
                                user_progress_by_unit=sorted_user_progress_by_unit,
-                               top_10_ranking=top_10_ranking,
-                               **context)
+                               top_10_ranking=top_10_ranking)
     except Exception as e:
         print(f"Error in progress_page: {e}")
         import traceback
@@ -2110,10 +2108,9 @@ def admin_page():
         context = get_template_context()
         
         template_context = {
-            'users': user_list_with_details,  # 拡張されたユーザー情報
+            'users': user_list_with_details,
             'room_max_unit_settings': room_max_unit_settings,
-            'room_csv_settings': room_csv_settings,
-            **context
+            'room_csv_settings': room_csv_settings
         }
         
         return render_template('admin.html', **template_context)
@@ -2976,6 +2973,52 @@ def admin_debug_progress():
 
 
 # 1. 共通のapp_info取得関数を定義
+@app.context_processor
+def inject_app_info():
+    """
+    全テンプレートでアプリ情報を使用できるようにするcontext processor
+    """
+    try:
+        app_info = AppInfo.get_current_info()
+        
+        # セッション情報を取得
+        user_id = session.get('user_id')
+        username = session.get('username')
+        room_number = session.get('room_number')
+        is_admin = session.get('admin_logged_in', False)
+        
+        return {
+            'app_info': app_info,
+            'app_name': app_info.app_name,  # {{ app_name }} で直接使用可能
+            'app_version': app_info.version,
+            'app_last_updated': app_info.last_updated_date,
+            'app_update_content': app_info.update_content,
+            'app_footer_text': app_info.footer_text,
+            'app_contact_email': app_info.contact_email,
+            'current_user_id': user_id,
+            'current_username': username,
+            'current_room_number': room_number,
+            'is_logged_in': user_id is not None,
+            'is_admin_logged_in': is_admin
+        }
+    except Exception as e:
+        logger.error(f"Context processor error: {e}")
+        # エラー時はデフォルト値を返す
+        return {
+            'app_info': None,
+            'app_name': '世界史単語帳',
+            'app_version': '1.0.0',
+            'app_last_updated': '2025年6月15日',
+            'app_update_content': 'アプリケーションが開始されました。',
+            'app_footer_text': '',
+            'app_contact_email': '',
+            'current_user_id': session.get('user_id'),
+            'current_username': session.get('username'),
+            'current_room_number': session.get('room_number'),
+            'is_logged_in': session.get('user_id') is not None,
+            'is_admin_logged_in': session.get('admin_logged_in', False)
+        }
+
 def get_template_context():
     """全テンプレートで共通に使用するコンテキストを取得"""
     try:
