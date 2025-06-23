@@ -1205,7 +1205,10 @@ function shareOnX() {
     const accuracy = accuracyRateSpan ? accuracyRateSpan.textContent : '0';
     const selectedRangeTotal = selectedRangeTotalQuestionsSpan ? selectedRangeTotalQuestionsSpan.textContent : '0';
 
-    const text = `世界史単語帳で学習しました！\n出題範囲：${selectedRangeTotal}問\n出題数：${total}問\n正解数：${correct}問\n正答率：${accuracy}%\n\n#世界史単語帳`;
+    // ★ 修正：動的にアプリ名を取得
+    const appName = window.appInfoFromFlask ? window.appInfoFromFlask.appName : '世界史単語帳';
+    
+    const text = `${appName}で学習しました！\n出題範囲：${selectedRangeTotal}問\n出題数：${total}問\n正解数：${correct}問\n正答率：${accuracy}%\n\n#${appName.replace(/\s/g, '')}`;
     const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
     window.open(url, '_blank');
 }
@@ -1222,7 +1225,8 @@ function downloadQuizResultImage() {
     }
 
     // ハッシュタグをクリップボードにコピー
-    const hashtagText = '#世界史単語帳';
+    const appName = window.appInfoFromFlask ? window.appInfoFromFlask.appName : '世界史単語帳';
+    const hashtagText = `#${appName.replace(/\s/g, '')}`;
     if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(hashtagText).then(() => {
             console.log('ハッシュタグがクリップボードにコピーされました');
