@@ -100,6 +100,7 @@ def get_app_info_dict(user_id=None, username=None, room_number=None):
         info_dict['isLoggedIn'] = user_id is not None
         info_dict['username'] = username
         info_dict['roomNumber'] = room_number
+        info_dict['schoolName'] = getattr(app_info, 'school_name', '朋優学院')
         
         return info_dict
     except Exception as e:
@@ -115,6 +116,7 @@ def get_app_info_dict(user_id=None, username=None, room_number=None):
                     'updateContent': app_info.update_content,
                     'footerText': app_info.footer_text,
                     'contactEmail': app_info.contact_email,
+                    'schoolName': getattr(app_info, 'school_name', '朋優学院'),
                     'isLoggedIn': user_id is not None,
                     'username': username,
                     'roomNumber': room_number
@@ -127,6 +129,7 @@ def get_app_info_dict(user_id=None, username=None, room_number=None):
             'appName': '世界史単語帳',
             'version': '1.0.0', 
             'lastUpdatedDate': '2025年6月15日',
+            'schoolName': '朋優学院', 
             'updateContent': 'アプリケーションが開始されました。',
             'isLoggedIn': user_id is not None,
             'username': username,
@@ -282,7 +285,8 @@ class AppInfo(db.Model):
             'lastUpdatedDate': self.last_updated_date,
             'updateContent': self.update_content,
             'footerText': self.footer_text,
-            'contactEmail': self.contact_email
+            'contactEmail': self.contact_email,
+            'schoolName': getattr(self, 'school_name', '朋優学院')  # ★ 追加
         }
 
 class PasswordResetToken(db.Model):
