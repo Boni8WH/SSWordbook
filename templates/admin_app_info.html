@@ -103,6 +103,20 @@
                             <div class="form-text">問い合わせ先として表示（任意）</div>
                         </div>
                     </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="school_name" class="form-label">学校名:</label>
+                            <input type="text" 
+                                id="school_name" 
+                                name="school_name" 
+                                class="form-control" 
+                                value="{{ app_info.school_name }}" 
+                                required 
+                                maxlength="100"
+                                placeholder="例: 朋優学院">
+                            <div class="form-text">X（Twitter）シェア時のハッシュタグに使用されます</div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="row">
