@@ -108,6 +108,7 @@ class AppInfo(db.Model):
     update_content = db.Column(db.Text, default="アプリケーションが開始されました。", nullable=False)
     footer_text = db.Column(db.String(200), default="", nullable=True)
     contact_email = db.Column(db.String(100), default="", nullable=True)
+    school_name = db.Column(db.String(100), default="朋優学院", nullable=False)
     # アプリの設定を保存するJSON
     app_settings = db.Column(JSONEncodedDict, default={})
     # 作成・更新日時
@@ -129,15 +130,16 @@ class AppInfo(db.Model):
     def to_dict(self):
         """フロントエンド用の辞書形式で返す"""
         return {
-            'appName': self.app_name,
-            'version': self.version,
-            'lastUpdatedDate': self.last_updated_date,
-            'updateContent': self.update_content,
-            'footerText': self.footer_text,
-            'contactEmail': self.contact_email,
-            'isLoggedIn': True,  # これは別途設定される
-            'username': None,    # これは別途設定される
-            'roomNumber': None   # これは別途設定される
+        'appName': self.app_name,
+        'version': self.version,
+        'lastUpdatedDate': self.last_updated_date,
+        'updateContent': self.update_content,
+        'footerText': self.footer_text,
+        'contactEmail': self.contact_email,
+        'schoolName': self.school_name,  # ← 追加
+        'isLoggedIn': True,
+        'username': None,
+        'roomNumber': None
         }
 
     def __repr__(self):

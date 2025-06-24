@@ -256,6 +256,7 @@ class AppInfo(db.Model):
     update_content = db.Column(db.Text, default="アプリケーションが開始されました。", nullable=False)
     footer_text = db.Column(db.String(200), default="", nullable=True)
     contact_email = db.Column(db.String(100), default="", nullable=True)
+    school_name = db.Column(db.String(100), default="朋優学院", nullable=False)
     app_settings = db.Column(db.Text, default='{}')
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))
@@ -769,6 +770,17 @@ def migrate_database():
                 print("csv_file_contentテーブルは既に存在します。")
             
             print("✅ データベースマイグレーションが完了しました。")
+
+            if inspector.has_table('app_info'):
+                columns = [col['name'] for col in inspector.get_columns('app_info')]
+                print(f"📋 既存のAppInfoテーブルカラム: {columns}")
+                
+                if 'school_name' not in columns:
+                    print("🔧 school_nameカラムを追加します...")
+                    with db.engine.connect() as conn:
+                        conn.execute(text('ALTER TABLE app_info ADD COLUMN school_name VARCHAR(100) DEFAULT \'朋優学院\''))
+                        conn.commit()
+                    print("✅ school_nameカラムを追加しました。")
             
         except Exception as e:
             print(f"⚠️ マイグレーション中にエラーが発生しました: {e}")
@@ -2173,6 +2185,7 @@ def admin_app_info():
                 app_info.update_content = request.form.get('update_content', '').strip()
                 app_info.footer_text = request.form.get('footer_text', '').strip()
                 app_info.contact_email = request.form.get('contact_email', '').strip()
+                app_info.school_name = request.form.get('school_name', '朋優学院').strip()
                 
                 if hasattr(app_info, 'updated_by'):
                     app_info.updated_by = session.get('username', 'admin')
@@ -2995,6 +3008,7 @@ def inject_app_info():
             'app_update_content': app_info.update_content,
             'app_footer_text': app_info.footer_text,
             'app_contact_email': app_info.contact_email,
+            'app_school_name': app_info.school_name,
             'current_user_id': user_id,
             'current_username': username,
             'current_room_number': room_number,
@@ -3012,6 +3026,7 @@ def inject_app_info():
             'app_update_content': 'アプリケーションが開始されました。',
             'app_footer_text': '',
             'app_contact_email': '',
+            'app_school_name': '朋優学院',
             'current_user_id': session.get('user_id'),
             'current_username': session.get('username'),
             'current_room_number': session.get('room_number'),
@@ -3025,7 +3040,7 @@ def get_template_context():
         app_info = AppInfo.get_current_info()
         return {'app_info': app_info}
     except Exception as e:
-        print(f"Error getting app_info: {e}")
+        logger.error(f"Error getting app_info: {e}")
         return {'app_info': None}
 
 @app.route('/debug/timezone_check')
