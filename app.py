@@ -864,15 +864,16 @@ def diagnose_database_environment():
     print("========================\n")
 
 # データベース初期化関数（完全リセット対応版）
+# app.py の create_tables_and_admin_user() 関数を以下に置き換えてください
+
 def create_tables_and_admin_user():
-    """データベース初期化関数（app_context付き）"""
+    """データベース初期化関数（マイグレーション付き）"""
     try:
         with app.app_context():
             logger.info("🔧 データベース初期化を開始...")
             
             # データベース接続確認
             try:
-                # ★修正: app_context内でdb.engineを使用
                 with db.engine.connect() as conn:
                     conn.execute(text('SELECT 1'))
                 logger.info("✅ データベース接続確認")
@@ -884,6 +885,15 @@ def create_tables_and_admin_user():
             db.create_all()
             logger.info("✅ テーブルを確認/作成しました。")
             
+            # ★ 重要：マイグレーションを強制実行
+            try:
+                logger.info("🔄 データベースマイグレーションを実行中...")
+                migrate_database()
+                logger.info("✅ マイグレーション完了")
+            except Exception as migration_error:
+                logger.error(f"⚠️ マイグレーションエラー: {migration_error}")
+                # マイグレーションが失敗してもアプリは起動を続行
+            
             # 管理者ユーザー確認/作成
             try:
                 admin_user = User.query.filter_by(username='admin', room_number='ADMIN').first()
@@ -892,6 +902,7 @@ def create_tables_and_admin_user():
                     logger.info("👤 管理者ユーザーを作成します...")
                     admin_user = User(
                         username='admin',
+                        original_username='admin',  # ★ 追加
                         room_number='ADMIN',
                         student_id='000',
                         problem_history='{}',
@@ -1307,6 +1318,82 @@ def password_change_page():
         import traceback
         traceback.print_exc()
         return f"Password Change Error: {e}", 500
+
+# app.py に以下のルートを追加してください
+
+@app.route('/emergency_fix_db')
+def emergency_fix_db():
+    """緊急データベース修復"""
+    try:
+        print("🆘 緊急データベース修復開始...")
+        
+        # 既存のトランザクションをクリア
+        try:
+            db.session.rollback()
+        except:
+            pass
+        
+        # school_nameカラムが存在しないエラーを修正
+        with db.engine.connect() as conn:
+            # 現在のapp_infoテーブルの構造を確認
+            try:
+                result = conn.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name = 'app_info'"))
+                existing_columns = [row[0] for row in result.fetchall()]
+                print(f"既存カラム: {existing_columns}")
+                
+                # school_nameカラムが存在しない場合は追加
+                if 'school_name' not in existing_columns:
+                    print("🔧 school_nameカラムを追加中...")
+                    conn.execute(text("ALTER TABLE app_info ADD COLUMN school_name VARCHAR(100) DEFAULT '朋優学院'"))
+                    print("✅ school_nameカラムを追加しました")
+                
+                # その他の必要なカラムも追加
+                missing_columns = {
+                    'app_settings': "TEXT DEFAULT '{}'",
+                    'created_at': "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+                    'updated_at': "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+                    'updated_by': "VARCHAR(80) DEFAULT 'system'"
+                }
+                
+                for col_name, col_def in missing_columns.items():
+                    if col_name not in existing_columns:
+                        print(f"🔧 {col_name}カラムを追加中...")
+                        conn.execute(text(f"ALTER TABLE app_info ADD COLUMN {col_name} {col_def}"))
+                        print(f"✅ {col_name}カラムを追加しました")
+                
+                conn.commit()
+                
+                # 修復後の状態確認
+                result = conn.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name = 'app_info'"))
+                final_columns = [row[0] for row in result.fetchall()]
+                print(f"修復後のカラム: {final_columns}")
+                
+                return f"""
+                <h1>✅ 緊急修復完了</h1>
+                <p>app_infoテーブルの修復が完了しました。</p>
+                <h3>修復前のカラム:</h3>
+                <p>{existing_columns}</p>
+                <h3>修復後のカラム:</h3>
+                <p>{final_columns}</p>
+                <p><a href="/admin">管理者ページに戻る</a></p>
+                """
+                
+            except Exception as fix_error:
+                print(f"修復エラー: {fix_error}")
+                return f"""
+                <h1>❌ 修復エラー</h1>
+                <p>エラー: {str(fix_error)}</p>
+                <p><a href="/admin">管理者ページに戻る</a></p>
+                """
+                
+    except Exception as e:
+        print(f"緊急修復失敗: {e}")
+        return f"""
+        <h1>💥 緊急修復失敗</h1>
+        <p>エラー: {str(e)}</p>
+        <p>手動でPostgreSQLにアクセスして以下のSQLを実行してください：</p>
+        <pre>ALTER TABLE app_info ADD COLUMN school_name VARCHAR(100) DEFAULT '朋優学院';</pre>
+        """
 
 # app.py のパスワード再発行リクエストルートを修正
 
