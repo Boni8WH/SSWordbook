@@ -1204,10 +1204,21 @@ function shareOnX() {
     const correct = correctCountSpan ? correctCountSpan.textContent : '0';
     const accuracy = accuracyRateSpan ? accuracyRateSpan.textContent : '0';
     const selectedRangeTotal = selectedRangeTotalQuestionsSpan ? selectedRangeTotalQuestionsSpan.textContent : '0';
-
-    // ★ 修正：動的にアプリ名と学校名を取得
-    const appName = window.appInfoFromFlask ? window.appInfoFromFlask.appName : '世界史単語帳';
-    const schoolName = window.appInfoFromFlask ? window.appInfoFromFlask.schoolName : '朋優学院';
+    let appName = '世界史単語帳';  // デフォルト値
+    let schoolName = '朋優学院';   // デフォルト値
+    
+    if (window.appInfoFromFlask) {
+        appName = window.appInfoFromFlask.appName || appName;
+        // school_name の取得（複数のプロパティ名をチェック）
+        schoolName = window.appInfoFromFlask.schoolName || 
+                    window.appInfoFromFlask.school_name || 
+                    schoolName;
+    }
+    console.log('シェア情報:', {
+        appName: appName,
+        schoolName: schoolName,
+        appInfoFromFlask: window.appInfoFromFlask
+    });
     
     const text = `${appName}で学習しました！\n出題範囲：${selectedRangeTotal}問\n出題数：${total}問\n正解数：${correct}問\n正答率：${accuracy}%\n\n#${appName.replace(/\s/g, '')} #${schoolName}`;
     const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
