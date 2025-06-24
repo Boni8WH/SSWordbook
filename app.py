@@ -669,6 +669,8 @@ def change_username_page():
         return redirect(url_for('index'))
 
 # データベースマイグレーション関数
+# app.py の migrate_database() 関数を以下に置き換えてください
+
 def migrate_database():
     """データベーススキーマの変更を処理する（PostgreSQL専用版）"""
     with app.app_context():
@@ -702,7 +704,6 @@ def migrate_database():
                         conn.commit()
                     print("✅ username_changed_atカラムを追加しました。")
                 
-                # 既存のマイグレーション処理...
                 # パスワードハッシュフィールドの文字数制限を拡張
                 print("🔧 パスワードハッシュフィールドの文字数制限を拡張します...")
                 with db.engine.connect() as conn:
@@ -747,7 +748,36 @@ def migrate_database():
                             print(f"✅ {col_name}カラムを追加しました。")
                         conn.commit()
             
-            # 3. その他のテーブル確認（password_reset_token, app_info等）
+            # 3. App_infoテーブルの確認（★重要な修正箇所）
+            if inspector.has_table('app_info'):
+                columns = [col['name'] for col in inspector.get_columns('app_info')]
+                print(f"📋 既存のAppInfoテーブルカラム: {columns}")
+                
+                # school_nameカラムの追加
+                if 'school_name' not in columns:
+                    print("🔧 school_nameカラムを追加します...")
+                    with db.engine.connect() as conn:
+                        conn.execute(text('ALTER TABLE app_info ADD COLUMN school_name VARCHAR(100) DEFAULT \'朋優学院\''))
+                        conn.commit()
+                    print("✅ school_nameカラムを追加しました。")
+                
+                # 他の不足カラムもチェック
+                required_columns = {
+                    'app_settings': 'TEXT DEFAULT \'{}\'',
+                    'created_at': 'TIMESTAMP',
+                    'updated_at': 'TIMESTAMP',
+                    'updated_by': 'VARCHAR(80) DEFAULT \'system\''
+                }
+                
+                for col_name, col_definition in required_columns.items():
+                    if col_name not in columns:
+                        print(f"🔧 {col_name}カラムを追加します...")
+                        with db.engine.connect() as conn:
+                            conn.execute(text(f'ALTER TABLE app_info ADD COLUMN {col_name} {col_definition}'))
+                            conn.commit()
+                        print(f"✅ {col_name}カラムを追加しました。")
+            
+            # 4. その他のテーブル確認（password_reset_token, csv_file_content等）
             if inspector.has_table('password_reset_token'):
                 columns = [col['name'] for col in inspector.get_columns('password_reset_token')]
                 if 'used_at' not in columns:
@@ -761,31 +791,27 @@ def migrate_database():
                 db.create_all()
                 print("✅ password_reset_tokenテーブルを作成しました。")
             
-            # 4. CsvFileContentテーブルの確認
+            # 5. CsvFileContentテーブルの確認
             if not inspector.has_table('csv_file_content'):
                 print("🔧 csv_file_contentテーブルを作成します...")
                 db.create_all()
                 print("✅ csv_file_contentテーブルを作成しました。")
             else:
-                print("csv_file_contentテーブルは既に存在します。")
+                print("✅ csv_file_contentテーブルは既に存在します。")
             
             print("✅ データベースマイグレーションが完了しました。")
-
-            if inspector.has_table('app_info'):
-                columns = [col['name'] for col in inspector.get_columns('app_info')]
-                print(f"📋 既存のAppInfoテーブルカラム: {columns}")
-                
-                if 'school_name' not in columns:
-                    print("🔧 school_nameカラムを追加します...")
-                    with db.engine.connect() as conn:
-                        conn.execute(text('ALTER TABLE app_info ADD COLUMN school_name VARCHAR(100) DEFAULT \'朋優学院\''))
-                        conn.commit()
-                    print("✅ school_nameカラムを追加しました。")
             
         except Exception as e:
             print(f"⚠️ マイグレーション中にエラーが発生しました: {e}")
             import traceback
             traceback.print_exc()
+            
+            # エラーが発生した場合のフォールバック処理
+            try:
+                db.session.rollback()
+                print("🔄 トランザクションをロールバックしました")
+            except:
+                pass
 
 def verify_database_connection():
     """データベース接続確認関数"""
@@ -1396,6 +1422,98 @@ def admin_cleanup_expired_tokens():
     except Exception as e:
         db.session.rollback()
         return jsonify({'status': 'error', 'message': str(e)}), 500
+
+# app.py に以下のルートを追加してください
+
+@app.route('/admin/force_migration', methods=['POST'])
+def admin_force_migration():
+    """手動でデータベースマイグレーションを実行"""
+    if not session.get('admin_logged_in'):
+        return jsonify({'status': 'error', 'message': '管理者権限が必要です'}), 403
+    
+    try:
+        print("🔧 手動マイグレーション開始...")
+        
+        # 既存のトランザクションを終了
+        try:
+            db.session.rollback()
+        except:
+            pass
+        
+        # マイグレーション実行
+        migrate_database()
+        
+        # 成功時のレスポンス
+        return jsonify({
+            'status': 'success',
+            'message': 'データベースマイグレーションが完了しました'
+        })
+        
+    except Exception as e:
+        print(f"❌ 手動マイグレーションエラー: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        return jsonify({
+            'status': 'error',
+            'message': f'マイグレーションエラー: {str(e)}'
+        }), 500
+
+@app.route('/admin/check_database_status')
+def admin_check_database_status():
+    """データベースの状態をチェック"""
+    if not session.get('admin_logged_in'):
+        return jsonify({'status': 'error', 'message': '管理者権限が必要です'}), 403
+    
+    try:
+        inspector = inspect(db.engine)
+        
+        status = {
+            'tables': {},
+            'missing_columns': []
+        }
+        
+        # 各テーブルのカラム状況をチェック
+        expected_tables = {
+            'user': ['original_username', 'username_changed_at', 'last_login'],
+            'app_info': ['school_name', 'app_settings', 'created_at', 'updated_at', 'updated_by'],
+            'room_setting': ['csv_filename', 'created_at', 'updated_at'],
+            'password_reset_token': ['used_at'],
+            'csv_file_content': []
+        }
+        
+        for table_name, expected_columns in expected_tables.items():
+            if inspector.has_table(table_name):
+                existing_columns = [col['name'] for col in inspector.get_columns(table_name)]
+                missing = [col for col in expected_columns if col not in existing_columns]
+                
+                status['tables'][table_name] = {
+                    'exists': True,
+                    'columns': existing_columns,
+                    'missing_columns': missing
+                }
+                
+                if missing:
+                    status['missing_columns'].extend([f"{table_name}.{col}" for col in missing])
+            else:
+                status['tables'][table_name] = {
+                    'exists': False,
+                    'columns': [],
+                    'missing_columns': expected_columns
+                }
+                status['missing_columns'].extend([f"{table_name}.{col}" for col in expected_columns])
+        
+        return jsonify({
+            'status': 'success',
+            'database_status': status,
+            'needs_migration': len(status['missing_columns']) > 0
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': f'データベース状態チェックエラー: {str(e)}'
+        }), 500
 
 # パスワードリセット実行
 @app.route('/password_reset/<token>', methods=['GET', 'POST'])
