@@ -2689,42 +2689,6 @@ body .auth-container .input-group input:hover {
     cursor: not-allowed;
 }
 
-/* ダークモード環境での対応 */
-@media (prefers-color-scheme: dark) {
-    .auth-container {
-        background: rgba(44, 62, 80, 0.95) !important;
-        border: 1px solid rgba(255, 255, 255, 0.1);
-    }
-    
-    .auth-container .input-group input[type="text"],
-    .auth-container .input-group input[type="password"],
-    .auth-container .input-group input[type="email"] {
-        background-color: #34495e !important;
-        color: #ecf0f1 !important;
-        border-color: #5d6d7e;
-        -webkit-text-fill-color: #ecf0f1 !important;
-    }
-    
-    .auth-container .input-group input::placeholder {
-        color: #95a5a6 !important;
-    }
-    
-    .auth-container .input-group input:focus {
-        background-color: #34495e !important;
-        color: #ecf0f1 !important;
-        border-color: #3498db;
-    }
-    
-    .auth-container .input-group input:-webkit-autofill,
-    .auth-container .input-group input:-webkit-autofill:hover,
-    .auth-container .input-group input:-webkit-autofill:focus {
-        -webkit-box-shadow: 0 0 0 30px #34495e inset !important;
-        -webkit-text-fill-color: #ecf0f1 !important;
-        background-color: #34495e !important;
-        color: #ecf0f1 !important;
-    }
-}
-
 /* レスポンシブ対応 */
 @media (max-width: 767px) {
     .auth-container .input-group input[type="text"],
@@ -2767,17 +2731,6 @@ body .auth-container .input-group input:hover {
     width: 16px;
     text-align: center;
     font-size: 0.9rem;
-}
-
-/* ダークモード時のラベル */
-@media (prefers-color-scheme: dark) {
-    .auth-container .input-group label {
-        color: #ecf0f1;
-    }
-    
-    .auth-container .input-group label i {
-        color: #3498db;
-    }
 }
 
 /* 追加: 特定のブラウザでの問題対応 */
