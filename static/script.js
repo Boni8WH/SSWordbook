@@ -1239,7 +1239,7 @@ function downloadQuizResultImage() {
     // ハッシュタグをクリップボードにコピー
     const appName = window.appInfoFromFlask ? window.appInfoFromFlask.appName : '世界史単語帳';
     const schoolName = window.appInfoFromFlask ? window.appInfoFromFlask.schoolName : '朋優学院';
-    const hashtagText = `#${appName.replace(/\s/g, '')} #${schoolName}`;
+    const hashtagText = `#${appName.replace(/\s/g, '')} ${schoolName}`;
     
     if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(hashtagText).then(() => {
