@@ -2219,12 +2219,25 @@ def progress_page():
             user_mastered_count = len(mastered_problem_ids)
             coverage_rate = (user_mastered_count / total_questions_for_room_ranking * 100) if total_questions_for_room_ranking > 0 else 0
             
-            # バランス型スコア計算: 総回答数 × 正答率 / 100
-            accuracy_decimal = (total_correct / total_attempts) if total_attempts > 0 else 0
+            # --- ベイズ統計による正答率補正の設定値 ---
+            EXPECTED_AVG_ACCURACY = 0.7  # アプリ全体の平均正答率（70%）
+            CONFIDENCE_ATTEMPTS = 10     # 信頼できる最低試行回数
+            # --- 設定値ここまで ---
+
+            PRIOR_CORRECT = EXPECTED_AVG_ACCURACY * CONFIDENCE_ATTEMPTS
+            PRIOR_ATTEMPTS = CONFIDENCE_ATTEMPTS
+
+            # ベイズ統計による総合評価型スコア計算
+            if total_attempts > 0:
+                # ベイズ平均正答率を計算
+                bayesian_accuracy = (PRIOR_CORRECT + total_correct) / (PRIOR_ATTEMPTS + total_attempts)
+            else:
+                bayesian_accuracy = EXPECTED_AVG_ACCURACY
+
             comprehensive_score = (
-                (user_mastered_count ** 1.3) * 10 +                    # マスター数重視
-                (accuracy_decimal ** 2) * 500 +                        # 正答率重視
-                math.log(total_attempts + 1) * 20                      # 対数による回答量評価
+                (user_mastered_count ** 1.3) * 10 +          # マスター数重視
+                (bayesian_accuracy ** 2) * 500 +             # 信頼性のある正答率を重視
+                math.log(total_attempts + 1) * 20            # 対数による回答量評価
             ) / 100  # 100で割って見やすいスコアに
 
             ranking_data.append({
