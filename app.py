@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 from flask_mail import Mail, Message
 import hashlib
 import logging
+import math
 
 log_level = logging.INFO if os.environ.get('RENDER') == 'true' else logging.DEBUG
 logging.basicConfig(
@@ -2223,8 +2224,8 @@ def progress_page():
             comprehensive_score = (
                 (user_mastered_count ** 1.3) * 10 +                    # マスター数重視
                 (accuracy_decimal ** 2) * 500 +                        # 正答率重視
-                min(total_attempts / 10, 100)                          # 回答量評価（上限付き）
-            ) / 10  # 10で割って見やすいスコアに
+                math.log(total_attempts + 1) * 20                      # 対数による回答量評価
+            ) / 100  # 100で割って見やすいスコアに
 
             ranking_data.append({
                 'username': user_obj.username,
