@@ -216,7 +216,22 @@
     <section id="admin-csv-management">
         <h3>📁 部屋ごとCSVファイル管理</h3>
         <p>各部屋で使用する単語帳CSVファイルを個別に設定できます。アップロードしない場合はデフォルトのwords.csvが使用されます。</p>
-
+        
+        <!-- ★ ここに追加 -->
+        <div class="csv-template-section" style="margin-bottom: 25px; padding: 15px; background-color: #f0f8ff; border: 1px solid #87ceeb; border-radius: 6px; border-left: 4px solid #17a2b8;">
+            <h4 style="margin-top: 0; color: #17a2b8; display: flex; align-items: center; gap: 8px;">
+                <i class="fas fa-download"></i> CSVテンプレートダウンロード
+            </h4>
+            <p style="color: #666; font-size: 0.9em; margin-bottom: 15px;">
+                正しい形式の単語帳CSVファイルを作成するためのテンプレートです。サンプルデータ付きですぐに編集を開始できます。
+            </p>
+            <a href="{{ url_for('download_csv_template') }}" class="btn btn-outline-info btn-sm">
+                <i class="fas fa-file-csv"></i> 単語帳CSVテンプレートをダウンロード
+            </a>
+            <small class="text-muted d-block mt-2">
+                ※ ファイル形式：chapter, number, category, question, answer, enabled
+            </small>
+        </div>
         <h4>CSVファイルアップロード</h4>
         <div style="background-color: #e8f4fd; border: 1px solid #b3d7ff; border-radius: 5px; padding: 15px; margin-bottom: 20px;">
             <p><strong>CSVファイル形式要件:</strong></p>
