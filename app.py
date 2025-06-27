@@ -3110,10 +3110,17 @@ def download_users_template_csv():
 
     si = StringIO()
     cw = csv.writer(si)
+    
+    # ★ Excel用にBOM付きUTF-8のヘッダーを追加
+    output = '\ufeff'  # BOM (Byte Order Mark)
+    
+    # CSVデータを作成
     cw.writerow(['部屋番号', '入室パスワード', '出席番号', '個別パスワード', 'アカウント名'])
     
-    output = si.getvalue()
-    response = Response(output, mimetype="text/csv")
+    # BOMとCSVデータを結合
+    output += si.getvalue()
+    
+    response = Response(output, mimetype="text/csv; charset=utf-8")
     response.headers["Content-Disposition"] = "attachment; filename=users_template.csv"
     return response
 
