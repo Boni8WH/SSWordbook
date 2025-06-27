@@ -10,8 +10,9 @@
         <h3>ランキング (部屋：{{ current_user.room_number }})</h3>
         <p>同じ部屋のユーザー内での上位10名を表示しています。</p>
         <div class="ranking-criteria">
-            <p><strong>📊 ランキング基準:</strong> バランススコア（総回答数 × 正答率）の高い順</p>
-            <p><small>※ 学習量と正確性の両方を評価します。同スコアの場合は総回答数の多い順</small></p>
+            <p><strong>📊 ランキング基準:</strong> スコアの高い順</p>
+            <p><strong>🔢 スコア算出:</strong> マスター数重視 + 正答率重視 + 適度な学習量評価</p>
+            <p><small>※ 正答率が低いままでは、いくら大量に解いても高スコアになりません。質の高い学習を重視した評価方式です。</small></p>
         </div>
         {% if top_10_ranking %}
         <div class="table-responsive">
@@ -35,7 +36,7 @@
                         <td>{{ entry.total_attempts }}</td>
                         <td>{{ entry.total_correct }}</td>
                         <td>{{ entry.accuracy_rate|round(1) }}%</td>
-                        <td>{{ entry.balance_score|round(1) }}</td>
+                        <td><strong>{{ entry.balance_score|round(1) }}</strong></td>
                         <td>{{ entry.coverage_rate|round(1) }}%</td>
                     </tr>
                     {% endfor %}
