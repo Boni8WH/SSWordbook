@@ -18,6 +18,11 @@
                 <li>大量回答でも低正答率では高スコアになりません</li>
                 <li>80%以上正解した問題数（マスター数）を最重視</li>
             </ul>
+            <p style="margin-top: 15px;">
+                <a href="{{ url_for('score_details') }}" class="btn btn-outline-info btn-sm">
+                    <i class="fas fa-calculator"></i> 詳細な算出方法を見る
+                </a>
+            </p>
             <p><small style="color: #6c757d;">※ 質の高い学習（理解+定着）と統計的に信頼できる成績を評価する方式です</small></p>
         </div>
         {% if top_10_ranking %}
@@ -30,7 +35,7 @@
                         <th>回答数</th>
                         <th>正解数</th>
                         <th>正答率</th>
-                        <th>スコア</th>
+                        <th>総合スコア</th>
                         <th>網羅率</th>
                     </tr>
                 </thead>
