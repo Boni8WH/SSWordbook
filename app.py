@@ -2220,7 +2220,7 @@ def progress_page():
             coverage_rate = (user_mastered_count / total_questions_for_room_ranking * 100) if total_questions_for_room_ranking > 0 else 0
             
             # --- ベイズ統計による正答率補正の設定値 ---
-            EXPECTED_AVG_ACCURACY = 0.7  # アプリ全体の平均正答率（70%）
+            EXPECTED_AVG_ACCURACY = 0.7  # 想定正答率（70%）
             CONFIDENCE_ATTEMPTS = 10     # 信頼できる最低試行回数
             # --- 設定値ここまで ---
 
@@ -2228,17 +2228,17 @@ def progress_page():
             PRIOR_ATTEMPTS = CONFIDENCE_ATTEMPTS
 
             # ベイズ統計による総合評価型スコア計算
-            if total_attempts > 0:
+            if total_attempts == 0:
+                comprehensive_score = 0  # 何もやっていない場合は0点
+            else:
                 # ベイズ平均正答率を計算
                 bayesian_accuracy = (PRIOR_CORRECT + total_correct) / (PRIOR_ATTEMPTS + total_attempts)
-            else:
-                bayesian_accuracy = EXPECTED_AVG_ACCURACY
-
-            comprehensive_score = (
-                (user_mastered_count ** 1.3) * 10 +          # マスター数重視
-                (bayesian_accuracy ** 2) * 500 +             # 信頼性のある正答率を重視
-                math.log(total_attempts + 1) * 20            # 対数による回答量評価
-            ) / 100  # 100で割って見やすいスコアに
+                
+                comprehensive_score = (
+                    (user_mastered_count ** 1.3) * 10 +          # マスター数重視
+                    (bayesian_accuracy ** 2) * 500 +             # 信頼性のある正答率を重視
+                    math.log(total_attempts + 1) * 20            # 対数による回答量評価
+                ) / 100  # 100で割って見やすいスコアに
 
             ranking_data.append({
                 'username': user_obj.username,
@@ -2468,12 +2468,6 @@ def admin_app_info_reset():
         db.session.rollback()
         flash(f'アプリ情報のリセット中にエラーが発生しました: {str(e)}', 'danger')
         return redirect(url_for('admin_app_info'))
-
-# ユーザー管理
-# app.py の該当部分を以下に置き換え
-
-# ユーザー管理 - 同一アカウント名登録対応版
-# app.py の admin_add_user 関数を以下に置き換え
 
 @app.route('/admin/add_user', methods=['POST'])
 def admin_add_user():
@@ -3726,6 +3720,12 @@ def admin_check_all_users():
         
     except Exception as e:
         return jsonify(error=str(e)), 500
+
+@app.route('/score_details')
+def score_details():
+    """スコア算出方法の詳細ページ"""
+    context = get_template_context()
+    return render_template('score_details.html', **context)
 
 # 起動時ログを改善
 def enhanced_startup_check():
