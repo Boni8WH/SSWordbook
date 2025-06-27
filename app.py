@@ -2055,9 +2055,6 @@ def debug_check_token(token):
 # ====================================================================
 # 進捗ページ
 # ====================================================================
-
-# app.pyの進捗ページルートを以下に置き換え
-
 @app.route('/progress')
 def progress_page():
     try:
@@ -2223,7 +2220,12 @@ def progress_page():
             coverage_rate = (user_mastered_count / total_questions_for_room_ranking * 100) if total_questions_for_room_ranking > 0 else 0
             
             # バランス型スコア計算: 総回答数 × 正答率 / 100
-            balance_score = (total_attempts * (total_correct / total_attempts)) if total_attempts > 0 else 0
+            accuracy_decimal = (total_correct / total_attempts) if total_attempts > 0 else 0
+            comprehensive_score = (
+                (user_mastered_count ** 1.3) * 10 +                    # マスター数重視
+                (accuracy_decimal ** 2) * 500 +                        # 正答率重視
+                min(total_attempts / 10, 100)                          # 回答量評価（上限付き）
+            ) / 10  # 10で割って見やすいスコアに
 
             ranking_data.append({
                 'username': user_obj.username,
@@ -2233,10 +2235,11 @@ def progress_page():
                 'coverage_rate': coverage_rate,
                 'mastered_count': user_mastered_count,
                 'total_questions_for_room': total_questions_for_room_ranking,
-                'balance_score': balance_score
+                'balance_score': comprehensive_score 
             })
 
         # バランススコアで降順ソート
+        # 総合スコアで降順ソート
         ranking_data.sort(key=lambda x: (x['balance_score'], x['total_attempts']), reverse=True)
         top_10_ranking = ranking_data[:10]
 
