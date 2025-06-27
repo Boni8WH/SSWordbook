@@ -3066,6 +3066,7 @@ def download_users_csv():
     si = StringIO()
     cw = csv.writer(si)
 
+    # ヘッダー行
     cw.writerow(['部屋番号', '入室パスワードハッシュ', '出席番号', 'アカウント名', '個別パスワードハッシュ'])
 
     for user in users:
@@ -3077,8 +3078,16 @@ def download_users_csv():
             user._individual_password_hash
         ])
     
-    output = si.getvalue()
-    response = Response(output, mimetype="text/csv")
+    # ★ Shift_JISエンコーディングで文字化け対策
+    try:
+        output = si.getvalue().encode('shift_jis')
+        mimetype = "text/csv; charset=shift_jis"
+    except UnicodeEncodeError:
+        output = '\ufeff' + si.getvalue()
+        output = output.encode('utf-8')
+        mimetype = "text/csv; charset=utf-8"
+    
+    response = Response(output, mimetype=mimetype)
     response.headers["Content-Disposition"] = "attachment; filename=users_data.csv"
     return response
 
@@ -3092,13 +3101,22 @@ def download_room_settings_csv():
     si = StringIO()
     cw = csv.writer(si)
 
+    # ヘッダー行
     cw.writerow(['部屋番号', '有効な最大単元番号', 'CSVファイル名'])
 
     for setting in room_settings:
         cw.writerow([setting.room_number, setting.max_enabled_unit_number, setting.csv_filename])
     
-    output = si.getvalue()
-    response = Response(output, mimetype="text/csv")
+    # ★ Shift_JISエンコーディングで文字化け対策
+    try:
+        output = si.getvalue().encode('shift_jis')
+        mimetype = "text/csv; charset=shift_jis"
+    except UnicodeEncodeError:
+        output = '\ufeff' + si.getvalue()
+        output = output.encode('utf-8')
+        mimetype = "text/csv; charset=utf-8"
+    
+    response = Response(output, mimetype=mimetype)
     response.headers["Content-Disposition"] = "attachment; filename=room_settings_data.csv"
     return response
 
@@ -3111,17 +3129,58 @@ def download_users_template_csv():
     si = StringIO()
     cw = csv.writer(si)
     
-    # ★ Excel用にBOM付きUTF-8のヘッダーを追加
-    output = '\ufeff'  # BOM (Byte Order Mark)
-    
-    # CSVデータを作成
+    # ヘッダー行
     cw.writerow(['部屋番号', '入室パスワード', '出席番号', '個別パスワード', 'アカウント名'])
     
-    # BOMとCSVデータを結合
-    output += si.getvalue()
+    # サンプルデータを追加
+    cw.writerow(['101', '2024101', '1', 'tanaka123', '田中太郎'])
+    cw.writerow(['101', '2024101', '2', 'suzuki456', '鈴木花子'])
+    cw.writerow(['102', '2024102', '1', 'yamada789', '山田次郎'])
     
-    response = Response(output, mimetype="text/csv; charset=utf-8")
+    # ★ Shift_JISエンコーディングで文字化け対策
+    try:
+        output = si.getvalue().encode('shift_jis')
+        mimetype = "text/csv; charset=shift_jis"
+    except UnicodeEncodeError:
+        output = '\ufeff' + si.getvalue()
+        output = output.encode('utf-8')
+        mimetype = "text/csv; charset=utf-8"
+    
+    response = Response(output, mimetype=mimetype)
     response.headers["Content-Disposition"] = "attachment; filename=users_template.csv"
+    return response
+
+@app.route('/admin/download_csv_template')
+def download_csv_template():
+    """部屋用CSVテンプレートダウンロード"""
+    if not session.get('admin_logged_in'):
+        flash('管理者権限がありません。', 'danger')
+        return redirect(url_for('login_page'))
+
+    si = StringIO()
+    cw = csv.writer(si)
+    
+    # ヘッダー行
+    cw.writerow(['chapter', 'number', 'category', 'question', 'answer', 'enabled'])
+    
+    # サンプルデータを追加
+    cw.writerow(['1', '1', '古代エジプト', 'ファラオの墓とされる巨大な建造物は？', 'ピラミッド', '1'])
+    cw.writerow(['1', '2', '古代エジプト２', '古代エジプトの象形文字を何という？', 'ヒエログリフ', '1'])
+    cw.writerow(['1', '3', '古代メソポタミア', 'シュメール人が発明した文字は？', '楔形文字', '1'])
+    cw.writerow(['2', '1', 'فارسی', 'هویو', 'Hōyū', '1'])
+    cw.writerow(['2', '2', '古代ローマ', 'ローマ帝国初代皇帝に与えられた称号は？', 'アウグストゥス', '1'])
+    
+    # ★ Shift_JISエンコーディングで文字化け対策
+    try:
+        output = si.getvalue().encode('shift_jis')
+        mimetype = "text/csv; charset=shift_jis"
+    except UnicodeEncodeError:
+        output = '\ufeff' + si.getvalue()
+        output = output.encode('utf-8')
+        mimetype = "text/csv; charset=utf-8"
+    
+    response = Response(output, mimetype=mimetype)
+    response.headers["Content-Disposition"] = "attachment; filename=words_template.csv"
     return response
 
 @app.route('/admin/download_room_settings_template_csv')
