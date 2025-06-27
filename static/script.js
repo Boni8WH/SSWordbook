@@ -923,18 +923,40 @@ function restartQuiz() {
 }
 
 function resetSelections() {
+    // 1. 全てのチェックボックスをリセット
     document.querySelectorAll('.unit-item input[type="checkbox"]').forEach(checkbox => {
         if (!checkbox.disabled) {
             checkbox.checked = false;
         }
     });
 
+    // 2. デフォルトのラジオボタンを選択
     const defaultRadio = document.querySelector('input[name="questionCount"][value="10"]');
     if (defaultRadio) defaultRadio.checked = true;
     
+    // 3. 「全て選択」ボタンのテキストをリセット
     document.querySelectorAll('.select-all-chapter-btn').forEach(button => {
         updateSelectAllButtonText(button, false);
     });
+
+    // 4. ★新機能：展開されている章を全て閉じる
+    document.querySelectorAll('.chapter-item.expanded').forEach(chapterItem => {
+        // 章の展開状態を削除
+        chapterItem.classList.remove('expanded');
+        
+        // トグルアイコンを閉じた状態に戻す
+        const toggleIcon = chapterItem.querySelector('.toggle-icon');
+        if (toggleIcon) {
+            toggleIcon.textContent = '▶';
+        }
+    });
+
+    // 5. 選択状態を保存（リセット状態）
+    try {
+        localStorage.removeItem('quiz_selection_state');
+    } catch (e) {
+        window.savedSelectionState = null;
+    }
 }
 
 // =========================================================
