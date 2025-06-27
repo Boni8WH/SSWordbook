@@ -2141,7 +2141,6 @@ def progress_page():
                             accuracy_rate = (correct_attempts / total_problem_attempts) * 100
                             if accuracy_rate >= 80.0:
                                 unit_progress_summary[unit_number_of_word]['mastered_problems'].add(problem_id)
-                                print(f"マスター問題: {matched_word['question']} (正答率: {accuracy_rate:.1f}%)")
             else:
                 unmatched_problems += 1
                 print(f"マッチしない問題ID: {problem_id}")
