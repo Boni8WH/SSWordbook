@@ -2083,7 +2083,8 @@ def progress_page():
         parsed_max_enabled_unit_num = parse_unit_number(max_enabled_unit_num_str)
         print(f"最大単元番号: {max_enabled_unit_num_str}")
 
-        unit_progress_summary = {}
+        # ★修正：章ごとに進捗をまとめる
+        chapter_progress_summary = {}
 
         # 有効な単語データで単元進捗を初期化
         for word in word_data:
@@ -2095,17 +2096,27 @@ def progress_page():
             is_unit_enabled_by_room_setting = parse_unit_number(unit_num) <= parsed_max_enabled_unit_num
 
             if is_word_enabled_in_csv and is_unit_enabled_by_room_setting:
-                if unit_num not in unit_progress_summary:
-                    unit_progress_summary[unit_num] = {
+                # 章の初期化
+                if chapter_num not in chapter_progress_summary:
+                    chapter_progress_summary[chapter_num] = {
+                        'chapter_name': f'第{chapter_num}章',
+                        'units': {},
+                        'total_questions': 0,
+                        'total_mastered': 0
+                    }
+                
+                # 単元の初期化
+                if unit_num not in chapter_progress_summary[chapter_num]['units']:
+                    chapter_progress_summary[chapter_num]['units'][unit_num] = {
                         'categoryName': category_name,
                         'attempted_problems': set(),
                         'mastered_problems': set(),
                         'total_questions_in_unit': 0,
                         'total_attempts': 0
                     }
-                unit_progress_summary[unit_num]['total_questions_in_unit'] += 1
-
-        print(f"有効な単元数: {len(unit_progress_summary)}")
+                
+                chapter_progress_summary[chapter_num]['units'][unit_num]['total_questions_in_unit'] += 1
+                chapter_progress_summary[chapter_num]['total_questions'] += 1
 
         # 学習履歴を処理
         matched_problems = 0
@@ -2122,47 +2133,62 @@ def progress_page():
 
             if matched_word:
                 matched_problems += 1
-                unit_number_of_word = matched_word['number']
+                chapter_number = matched_word['chapter']
+                unit_number = matched_word['number']
                 
                 is_word_enabled_in_csv = matched_word['enabled']
-                is_unit_enabled_by_room_setting = parse_unit_number(unit_number_of_word) <= parsed_max_enabled_unit_num
+                is_unit_enabled_by_room_setting = parse_unit_number(unit_number) <= parsed_max_enabled_unit_num
 
-                if is_word_enabled_in_csv and is_unit_enabled_by_room_setting:
-                    if unit_number_of_word in unit_progress_summary:
-                        correct_attempts = history.get('correct_attempts', 0)
-                        incorrect_attempts = history.get('incorrect_attempts', 0)
-                        total_problem_attempts = correct_attempts + incorrect_attempts
+                if (is_word_enabled_in_csv and is_unit_enabled_by_room_setting and 
+                    chapter_number in chapter_progress_summary and
+                    unit_number in chapter_progress_summary[chapter_number]['units']):
+                    
+                    correct_attempts = history.get('correct_attempts', 0)
+                    incorrect_attempts = history.get('incorrect_attempts', 0)
+                    total_problem_attempts = correct_attempts + incorrect_attempts
+                    
+                    unit_data = chapter_progress_summary[chapter_number]['units'][unit_number]
+                    unit_data['total_attempts'] += total_problem_attempts
+                    
+                    if total_problem_attempts > 0:
+                        unit_data['attempted_problems'].add(problem_id)
                         
-                        unit_progress_summary[unit_number_of_word]['total_attempts'] += total_problem_attempts
-                        
-                        if total_problem_attempts > 0:
-                            unit_progress_summary[unit_number_of_word]['attempted_problems'].add(problem_id)
-                            
-                            # マスター判定：正答率80%以上
-                            accuracy_rate = (correct_attempts / total_problem_attempts) * 100
-                            if accuracy_rate >= 80.0:
-                                unit_progress_summary[unit_number_of_word]['mastered_problems'].add(problem_id)
+                        # マスター判定：正答率80%以上
+                        accuracy_rate = (correct_attempts / total_problem_attempts) * 100
+                        if accuracy_rate >= 80.0:
+                            unit_data['mastered_problems'].add(problem_id)
+                            chapter_progress_summary[chapter_number]['total_mastered'] += 1
             else:
                 unmatched_problems += 1
-                print(f"マッチしない問題ID: {problem_id}")
-        
-        print(f"マッチした問題: {matched_problems}, マッチしない問題: {unmatched_problems}")
-        
-        # 単元別進捗をソート
-        sorted_user_progress_by_unit = []
-        for unit_num in sorted(unit_progress_summary.keys(), key=lambda x: parse_unit_number(x)):
-            data = unit_progress_summary[unit_num]
-            sorted_user_progress_by_unit.append((unit_num, {
-                'categoryName': data['categoryName'],
-                'attempted_problems': list(data['attempted_problems']),
-                'mastered_problems': list(data['mastered_problems']),
-                'total_questions_in_unit': data['total_questions_in_unit'],
-                'total_attempts': data['total_attempts']
-            }))
 
-        print(f"進捗のある単元数: {len(sorted_user_progress_by_unit)}")
+        # データを整理してテンプレートに渡す形式に変換
+        sorted_chapter_progress = {}
+        for chapter_num in sorted(chapter_progress_summary.keys(), key=lambda x: int(x) if x.isdigit() else float('inf')):
+            chapter_data = chapter_progress_summary[chapter_num]
+            
+            # 単元データをソートして配列に変換
+            sorted_units = []
+            for unit_num in sorted(chapter_data['units'].keys(), key=lambda x: parse_unit_number(x)):
+                unit_data = chapter_data['units'][unit_num]
+                sorted_units.append({
+                    'unit_num': unit_num,
+                    'category_name': unit_data['categoryName'],
+                    'attempted_problems': list(unit_data['attempted_problems']),
+                    'mastered_problems': list(unit_data['mastered_problems']),
+                    'total_questions_in_unit': unit_data['total_questions_in_unit'],
+                    'total_attempts': unit_data['total_attempts']
+                })
+            
+            sorted_chapter_progress[chapter_num] = {
+                'chapter_name': chapter_data['chapter_name'],
+                'units': sorted_units,
+                'total_questions': chapter_data['total_questions'],
+                'total_mastered': chapter_data['total_mastered']
+            }
 
-        # ランキング計算（部屋ごとの単語データを使用）
+        print(f"章別進捗: {len(sorted_chapter_progress)}章")
+
+        # ランキング計算（既存のコード）
         current_room_number = current_user.room_number
         
         all_users_for_ranking = User.query.filter_by(room_number=current_room_number).all()
@@ -2219,26 +2245,23 @@ def progress_page():
             user_mastered_count = len(mastered_problem_ids)
             coverage_rate = (user_mastered_count / total_questions_for_room_ranking * 100) if total_questions_for_room_ranking > 0 else 0
             
-            # --- ベイズ統計による正答率補正の設定値 ---
-            EXPECTED_AVG_ACCURACY = 0.7  # 想定正答率（70%）
-            CONFIDENCE_ATTEMPTS = 10     # 信頼できる最低試行回数
-            # --- 設定値ここまで ---
-
+            # ベイズ統計による正答率補正の設定値
+            EXPECTED_AVG_ACCURACY = 0.7
+            CONFIDENCE_ATTEMPTS = 10
             PRIOR_CORRECT = EXPECTED_AVG_ACCURACY * CONFIDENCE_ATTEMPTS
             PRIOR_ATTEMPTS = CONFIDENCE_ATTEMPTS
 
             # ベイズ統計による総合評価型スコア計算
             if total_attempts == 0:
-                comprehensive_score = 0  # 何もやっていない場合は0点
+                comprehensive_score = 0
             else:
-                # ベイズ平均正答率を計算
                 bayesian_accuracy = (PRIOR_CORRECT + total_correct) / (PRIOR_ATTEMPTS + total_attempts)
                 
                 comprehensive_score = (
-                    (user_mastered_count ** 1.3) * 10 +          # マスター数重視
-                    (bayesian_accuracy ** 2) * 500 +             # 信頼性のある正答率を重視
-                    math.log(total_attempts + 1) * 20            # 対数による回答量評価
-                ) / 100  # 100で割って見やすいスコアに
+                    (user_mastered_count ** 1.3) * 10 +
+                    (bayesian_accuracy ** 2) * 500 +
+                    math.log(total_attempts + 1) * 20
+                ) / 100
 
             ranking_data.append({
                 'username': user_obj.username,
@@ -2252,22 +2275,19 @@ def progress_page():
             })
 
         # バランススコアで降順ソート
-        # 総合スコアで降順ソート
         ranking_data.sort(key=lambda x: (x['balance_score'], x['total_attempts']), reverse=True)
         top_10_ranking = ranking_data[:10]
 
         print(f"ランキング対象ユーザー数: {len(ranking_data)}")
         print("=== 進捗ページ処理完了 ===\n")
 
-        # フッター表示のためにapp_infoを取得
-        app_info = AppInfo.get_current_info()
-
         context = get_template_context()
         
         return render_template('progress.html',
                                current_user=current_user,
-                               user_progress_by_unit=sorted_user_progress_by_unit,
-                               top_10_ranking=top_10_ranking)
+                               user_progress_by_chapter=sorted_chapter_progress,  # ★変更
+                               top_10_ranking=top_10_ranking,
+                               **context)
     except Exception as e:
         print(f"Error in progress_page: {e}")
         import traceback
