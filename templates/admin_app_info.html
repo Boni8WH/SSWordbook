@@ -164,33 +164,7 @@
             </form>
         </div>
     </div>
-
-    <!-- プレビューセクション -->
-    <div class="row mb-4">
-        <div class="col-md-12">
-            <h3>👁️ プレビュー</h3>
-            <div class="card">
-                <div class="card-header">
-                    <strong>ユーザーに表示される情報</strong>
-                </div>
-                <div class="card-body">
-                    <div id="preview-area">
-                        <h4 id="preview-app-name">{{ app_info.app_name }}</h4>
-                        <p><strong>バージョン:</strong> <span id="preview-version">{{ app_info.version }}</span></p>
-                        <p><strong>最終更新日:</strong> <span id="preview-date">{{ app_info.last_updated_date }}</span></p>
-                        <div class="alert alert-info">
-                            <strong>更新内容:</strong><br>
-                            <span id="preview-content">{{ app_info.update_content }}</span>
-                        </div>
-                        <div id="preview-footer" class="text-muted small">
-                            {{ app_info.footer_text }}
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
+    
     <!-- アクションボタン -->
     <div class="d-flex gap-2 mb-4">
         <a href="{{ url_for('admin_page') }}" class="btn btn-secondary">
