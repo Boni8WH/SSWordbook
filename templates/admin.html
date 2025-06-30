@@ -186,32 +186,6 @@
 
     <hr>
 
-    <section id="admin-data-migration">
-        <h3>🔧 データベース管理</h3>
-        <p>学習履歴データの整合性確認とデータ移行を行います。</p>
-
-        <div class="admin-panel" style="background-color: #e8f5e8; border-left: 5px solid #28a745; margin-top: 20px;">
-            <h4>🔧データ修正</h4>
-            <p>全ユーザーの学習履歴を新しいID形式に統一し、マッチしない問題を解決します。<br>
-            <strong>⚠️ 注意：</strong>この操作は全ユーザーの学習履歴に影響し、元に戻せません。</p>
-            
-            <div style="margin-top: 15px;">
-                <form action="{{ url_for('admin_fix_all_data') }}" method="POST" style="display: inline;" 
-                    onsubmit="return confirm('全ユーザーデータを修正しますか？\n\n⚠️ この操作は元に戻せません。\n⚠️ すべての学習履歴が新しい形式に変換されます。\n⚠️ 処理に時間がかかる場合があります。')">
-                    <button type="submit" class="btn btn-success">
-                        <i class="fas fa-wrench"></i> 🔧 全データ完全修正
-                    </button>
-                </form>
-                
-                <a href="{{ url_for('admin_debug_progress') }}" class="btn btn-info" target="_blank" style="margin-left: 10px;">
-                    <i class="fas fa-chart-line"></i> 📊 修正前の状態確認
-                </a>
-            </div>
-        </div>
-    </section>
-
-    <hr>
-
     <!-- 部屋ごとCSVファイル管理セクション -->
     <section id="admin-csv-management">
         <h3>📁 部屋ごとCSVファイル管理</h3>
@@ -339,7 +313,35 @@
             </div>
         </div>
     </section>
+
+    <hr>
+
+    <section id="admin-data-migration">
+        <h3>🔧 データベース管理</h3>
+        <p>学習履歴データの整合性確認とデータ移行を行います。</p>
+
+        <div class="admin-panel" style="background-color: #e8f5e8; border-left: 5px solid #28a745; margin-top: 20px;">
+            <h4>🔧データ修正</h4>
+            <p>全ユーザーの学習履歴を新しいID形式に統一し、マッチしない問題を解決します。<br>
+            <strong>⚠️ 注意：</strong>この操作は全ユーザーの学習履歴に影響し、元に戻せません。</p>
+            
+            <div style="margin-top: 15px;">
+                <form action="{{ url_for('admin_fix_all_data') }}" method="POST" style="display: inline;" 
+                    onsubmit="return confirm('全ユーザーデータを修正しますか？\n\n⚠️ この操作は元に戻せません。\n⚠️ すべての学習履歴が新しい形式に変換されます。\n⚠️ 処理に時間がかかる場合があります。')">
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-wrench"></i> 🔧 全データ完全修正
+                    </button>
+                </form>
+                
+                <a href="{{ url_for('admin_debug_progress') }}" class="btn btn-info" target="_blank" style="margin-left: 10px;">
+                    <i class="fas fa-chart-line"></i> 📊 修正前の状態確認
+                </a>
+            </div>
+        </div>
+    </section>
 </div>
+
+
 
 <!-- リセット確認フォーム（非表示） -->
 <form id="resetForm" action="{{ url_for('admin_app_info_reset') }}" method="POST" style="display: none;">
