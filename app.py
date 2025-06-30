@@ -3133,9 +3133,9 @@ def download_users_template_csv():
     cw.writerow(['部屋番号', '入室パスワード', '出席番号', '個別パスワード', 'アカウント名'])
     
     # サンプルデータを追加
-    cw.writerow(['101', '2024101', '1', 'tanaka123', '田中太郎'])
-    cw.writerow(['101', '2024101', '2', 'suzuki456', '鈴木花子'])
-    cw.writerow(['102', '2024102', '1', 'yamada789', '山田次郎'])
+    cw.writerow(['101', '2024101', '1', 'TemplarsGoldIsMine', 'フィリップ4世'])
+    cw.writerow(['101', '2024101', '2', 'RomeIsEternal', 'ボニファティウス8世'])
+    cw.writerow(['102', '2024102', '1', 'LetsGoAvignon', 'クレメンス5世'])
     
     # ★ Shift_JISエンコーディングで文字化け対策
     try:
