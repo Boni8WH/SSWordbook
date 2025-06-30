@@ -5,7 +5,7 @@
 <section class="progress-section">
     <h2>進捗確認 - {{ current_user.username }} (部屋: {{ current_user.room_number }})</h2>
 
-    <!-- ランキングセクションを上に移動 -->
+    <!-- ランキングセクション -->
     <div class="ranking-container">
         <h3>ランキング (部屋：{{ current_user.room_number }})</h3>
         <p>同じ部屋のユーザー内での上位10名を表示しています。</p>
@@ -62,29 +62,51 @@
     <!-- セクション間の仕切り -->
     <hr style="margin: 40px 0; border: none; border-top: 2px solid #e0e0e0; border-radius: 1px;">
 
-    <!-- あなたの単元別進捗セクション -->
+    <!-- あなたの章別進捗セクション -->
     <div class="progress-container">
-        <h3>あなたの単元別進捗</h3>
-        {% if user_progress_by_unit %}
-        <div class="progress-list">
-            {% for unit_num, progress in user_progress_by_unit %}
-                <div class="progress-item">
-                    <h4>{{ unit_num }}. {{ progress.categoryName }}</h4>
-                    {% set total_attempts = progress.total_attempts %}
-                    {% set mastered_count = progress.mastered_problems|length %}
-                    {% set total_questions = progress.total_questions_in_unit %}
-                    
-                    <p>
-                        問題を解いた数: {{ total_attempts }}回
-                    </p>
-                    <p>
-                        マスターした問題数: {{ mastered_count }} / {{ total_questions }}
-                        （{% if total_questions > 0 %}{{ (mastered_count / total_questions * 100)|round(1) }}%{% else %}0%{% endif %}）
-                    </p>
-                    <div class="progress-bar-container">
-                        <div class="progress-bar" style="width: {% if total_questions > 0 %}{{ (mastered_count / total_questions * 100)|round(1) }}%{% else %}0%{% endif %};"></div>
+        <h3>あなたの章別進捗</h3>
+        {% if user_progress_by_chapter %}
+        <div class="progress-accordion">
+            {% for chapter_num, chapter_data in user_progress_by_chapter.items() %}
+            <div class="chapter-progress-item" data-chapter="{{ chapter_num }}">
+                <!-- 章ヘッダー（クリック可能） -->
+                <div class="chapter-progress-header" onclick="toggleChapterProgress('{{ chapter_num }}')">
+                    <div class="chapter-progress-info">
+                        <span class="chapter-toggle-icon" id="icon-{{ chapter_num }}">▶</span>
+                        <span class="chapter-title">第{{ chapter_num }}章: {{ chapter_data.chapter_name }}</span>
+                    </div>
+                    <div class="chapter-summary">
+                        <span class="mastered-count">{{ chapter_data.total_mastered }}/{{ chapter_data.total_questions }}問マスター</span>
+                        <span class="chapter-percentage">({{ ((chapter_data.total_mastered / chapter_data.total_questions * 100) if chapter_data.total_questions > 0 else 0)|round(1) }}%)</span>
                     </div>
                 </div>
+                
+                <!-- 章の進捗バー -->
+                <div class="chapter-progress-bar-container">
+                    <div class="chapter-progress-bar" style="width: {{ ((chapter_data.total_mastered / chapter_data.total_questions * 100) if chapter_data.total_questions > 0 else 0)|round(1) }}%;"></div>
+                </div>
+
+                <!-- 単元詳細（初期状態は非表示） -->
+                <div class="unit-details" id="units-{{ chapter_num }}" style="display: none;">
+                    {% for unit_data in chapter_data.units %}
+                    <div class="unit-progress-item">
+                        <h5>{{ unit_data.unit_num }}. {{ unit_data.category_name }}</h5>
+                        {% set total_attempts = unit_data.total_attempts %}
+                        {% set mastered_count = unit_data.mastered_problems|length %}
+                        {% set total_questions = unit_data.total_questions_in_unit %}
+                        
+                        <p>問題を解いた数: {{ total_attempts }}回</p>
+                        <p>
+                            マスターした問題数: {{ mastered_count }} / {{ total_questions }}
+                            （{% if total_questions > 0 %}{{ (mastered_count / total_questions * 100)|round(1) }}%{% else %}0%{% endif %}）
+                        </p>
+                        <div class="unit-progress-bar-container">
+                            <div class="unit-progress-bar" style="width: {% if total_questions > 0 %}{{ (mastered_count / total_questions * 100)|round(1) }}%{% else %}0%{% endif %};"></div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
             {% endfor %}
         </div>
         {% else %}
@@ -92,4 +114,19 @@
         {% endif %}
     </div>
 </section>
+
+<script>
+function toggleChapterProgress(chapterNum) {
+    const unitsDiv = document.getElementById('units-' + chapterNum);
+    const icon = document.getElementById('icon-' + chapterNum);
+    
+    if (unitsDiv.style.display === 'none' || unitsDiv.style.display === '') {
+        unitsDiv.style.display = 'block';
+        icon.textContent = '▼';
+    } else {
+        unitsDiv.style.display = 'none';
+        icon.textContent = '▶';
+    }
+}
+</script>
 {% endblock %}
