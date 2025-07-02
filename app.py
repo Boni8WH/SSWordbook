@@ -2135,6 +2135,270 @@ def debug_check_token(token):
     <p>有効性: {'有効' if reset_token.is_valid() else '無効'}</p>
     """
 
+# app.py に以下の関数を追加してください
+
+def analyze_unmatched_problems():
+    """ID不一致問題を分析する（修正前の状態確認）"""
+    
+    # デフォルトの単語データを取得
+    default_word_data = load_default_word_data()
+    if not default_word_data:
+        return {
+            'status': 'error',
+            'message': '単語データが見つかりません'
+        }
+    
+    # 新しいID生成方式でマッピングを作成
+    word_mapping = {}
+    for word in default_word_data:
+        new_id = get_problem_id(word)
+        word_mapping[new_id] = word
+    
+    print(f"📋 問題データ: {len(word_mapping)}個")
+    
+    users = User.query.all()
+    analysis_results = {
+        'total_users': 0,
+        'users_with_unmatched': 0,
+        'total_unmatched_entries': 0,
+        'fixable_entries': 0,
+        'user_details': []
+    }
+    
+    for user in users:
+        if user.username == 'admin':
+            continue
+            
+        analysis_results['total_users'] += 1
+        
+        user_history = user.get_problem_history()
+        user_incorrect = user.get_incorrect_words()
+        
+        matched_ids = []
+        unmatched_ids = []
+        fixable_ids = []
+        
+        # 履歴の各IDをチェック
+        for problem_id in user_history.keys():
+            if problem_id in word_mapping:
+                matched_ids.append(problem_id)
+            else:
+                unmatched_ids.append(problem_id)
+                
+                # 修正可能かチェック
+                if can_fix_problem_id(problem_id, default_word_data):
+                    fixable_ids.append(problem_id)
+        
+        user_unmatched_count = len(unmatched_ids)
+        user_fixable_count = len(fixable_ids)
+        
+        if user_unmatched_count > 0:
+            analysis_results['users_with_unmatched'] += 1
+            analysis_results['total_unmatched_entries'] += user_unmatched_count
+            analysis_results['fixable_entries'] += user_fixable_count
+            
+            analysis_results['user_details'].append({
+                'username': user.username,
+                'room_number': user.room_number,
+                'total_history': len(user_history),
+                'matched_count': len(matched_ids),
+                'unmatched_count': user_unmatched_count,
+                'fixable_count': user_fixable_count,
+                'unmatched_ids': unmatched_ids[:5],  # 最初の5件のみ
+                'fixable_ids': fixable_ids[:5]
+            })
+    
+    return analysis_results
+
+def can_fix_problem_id(old_id, word_data):
+    """問題IDが修正可能かチェック"""
+    try:
+        parts = old_id.split('-')
+        if len(parts) >= 2:
+            old_chapter = int(parts[0].lstrip('0') or '0')
+            old_number = int(parts[1].lstrip('0') or '0')
+            
+            # 章と単元が一致する問題があるかチェック
+            for word in word_data:
+                word_chapter = int(str(word['chapter']))
+                word_number = int(str(word['number']))
+                
+                if word_chapter == old_chapter and word_number == old_number:
+                    return True
+        return False
+    except (ValueError, IndexError):
+        return False
+
+def fix_unmatched_problems_only():
+    """ID不一致問題のみを修正"""
+    
+    # デフォルトの単語データを取得
+    default_word_data = load_default_word_data()
+    if not default_word_data:
+        print("❌ 単語データが見つかりません")
+        return False
+    
+    users = User.query.all()
+    fixed_users = 0
+    total_fixed_entries = 0
+    total_unfixable_entries = 0
+    
+    for user in users:
+        if user.username == 'admin':
+            continue
+            
+        print(f"\n🔧 ID修正開始: {user.username}")
+        
+        old_history = user.get_problem_history()
+        old_incorrect = user.get_incorrect_words()
+        
+        new_history = {}
+        new_incorrect = []
+        user_fixed_count = 0
+        user_unfixable_count = 0
+        
+        # 各履歴エントリをチェック
+        for old_id, history_data in old_history.items():
+            
+            # まず新しいID形式かチェック（既に正しい場合はそのまま保持）
+            is_valid_new_id = any(get_problem_id(word) == old_id for word in default_word_data)
+            
+            if is_valid_new_id:
+                # 既に正しいIDの場合はそのまま保持
+                new_history[old_id] = history_data
+                continue
+            
+            # 修正が必要な場合
+            best_match_word = None
+            best_score = 0
+            
+            # 古いIDからの情報抽出を試行
+            parts = old_id.split('-')
+            if len(parts) >= 2:
+                try:
+                    old_chapter = int(parts[0].lstrip('0') or '0')
+                    old_number = int(parts[1].lstrip('0') or '0')
+                    
+                    # 対応する問題を探す
+                    for word in default_word_data:
+                        score = 0
+                        word_chapter = int(str(word['chapter']))
+                        word_number = int(str(word['number']))
+                        
+                        # 章と単元が完全一致するか
+                        if word_chapter == old_chapter and word_number == old_number:
+                            score = 100  # 完全一致は高スコア
+                            
+                            # 問題文の類似性もチェック
+                            if len(parts) > 2:
+                                old_text = ''.join(parts[2:]).lower()
+                                question_clean = str(word['question']).lower()
+                                question_clean = ''.join(c for c in question_clean if c.isalnum())
+                                
+                                if old_text and question_clean and old_text[:10] in question_clean:
+                                    score += 20
+                            
+                            if score > best_score:
+                                best_score = score
+                                best_match_word = word
+                                break  # 章・単元一致なら即採用
+                            
+                except ValueError:
+                    continue
+            
+            # マッチした場合は新しいIDで保存
+            if best_match_word and best_score >= 100:  # 章・単元一致が必須
+                new_id = get_problem_id(best_match_word)
+                new_history[new_id] = history_data
+                user_fixed_count += 1
+                
+                # 苦手問題の判定
+                incorrect_attempts = history_data.get('incorrect_attempts', 0)
+                correct_streak = history_data.get('correct_streak', 0)
+                
+                if incorrect_attempts > 0 and correct_streak < 2:
+                    if new_id not in new_incorrect:
+                        new_incorrect.append(new_id)
+                        
+                print(f"  ✓ 修正: {old_id[:40]}... -> 第{best_match_word['chapter']}章単元{best_match_word['number']}")
+            else:
+                # 修正できない場合は削除（ログに記録）
+                user_unfixable_count += 1
+                print(f"  ❌ 修正不可: {old_id[:40]}... (一致する問題なし)")
+        
+        # 変更があった場合のみ保存
+        if user_fixed_count > 0 or user_unfixable_count > 0:
+            user.set_problem_history(new_history)
+            user.set_incorrect_words(new_incorrect)
+            fixed_users += 1
+            total_fixed_entries += user_fixed_count
+            total_unfixable_entries += user_unfixable_count
+            
+            print(f"  📊 結果: {user_fixed_count}個修正, {user_unfixable_count}個削除, {len(new_incorrect)}個苦手問題")
+    
+    try:
+        db.session.commit()
+        print(f"\n✅ ID修正完了")
+        print(f"   修正対象ユーザー数: {fixed_users}")
+        print(f"   修正されたエントリ数: {total_fixed_entries}")
+        print(f"   削除されたエントリ数: {total_unfixable_entries}")
+        return True
+    except Exception as e:
+        db.session.rollback()
+        print(f"❌ 修正エラー: {e}")
+        return False
+
+@app.route('/admin/analyze_unmatched_data', methods=['POST'])
+def admin_analyze_unmatched_data():
+    """ID不一致問題の分析"""
+    if not session.get('admin_logged_in'):
+        return jsonify({'status': 'error', 'message': '管理者権限がありません。'}), 403
+    
+    try:
+        analysis = analyze_unmatched_problems()
+        return jsonify({
+            'status': 'success',
+            'analysis': analysis
+        })
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/admin/fix_unmatched_data', methods=['POST'])
+def admin_fix_unmatched_data():
+    """ID不一致問題のみを修正"""
+    if not session.get('admin_logged_in'):
+        flash('管理者権限がありません。', 'danger')
+        return redirect(url_for('login_page'))
+    
+    try:
+        success = fix_unmatched_problems_only()
+        if success:
+            flash('ID不一致問題の修正が完了しました。', 'success')
+        else:
+            flash('ID不一致問題の修正中にエラーが発生しました。', 'danger')
+    except Exception as e:
+        flash(f'修正エラー: {str(e)}', 'danger')
+    
+    return redirect(url_for('admin_page'))
+
+# 既存の fix_all_user_data 関数はバックアップとして残す
+@app.route('/admin/fix_all_data_legacy', methods=['POST'])
+def admin_fix_all_data_legacy():
+    """従来の全データ修正（バックアップ用）"""
+    if not session.get('admin_logged_in'):
+        flash('管理者権限がありません。', 'danger')
+        return redirect(url_for('login_page'))
+    
+    try:
+        success = fix_all_user_data()
+        if success:
+            flash('全ユーザーデータの修正が完了しました。', 'success')
+        else:
+            flash('データ修正中にエラーが発生しました。', 'danger')
+    except Exception as e:
+        flash(f'データ修正エラー: {str(e)}', 'danger')
+    
+    return redirect(url_for('admin_page'))
 
 # ====================================================================
 # 進捗ページ
