@@ -619,8 +619,15 @@ function flashMessage(message, category) {
 }
 
 // =========================================================
-// クイズロジック（修正版）
+// クイズロジック
 // =========================================================
+
+let lastQuizSettings = {
+    questionCount: null,
+    selectedUnits: [],
+    isIncorrectOnly: false,
+    availableQuestions: [] // 選択範囲の全問題
+};
 
 function startQuiz() {
     const selectedQuestions = getSelectedQuestions();
@@ -632,9 +639,22 @@ function startQuiz() {
         return;
     }
 
+    // ★最後のクイズ設定を保存
+    lastQuizSettings.questionCount = selectedQuestionCount;
+    lastQuizSettings.isIncorrectOnly = (selectedQuestionCount === 'incorrectOnly');
+    
     // 選択状態を保存（苦手問題モード以外の場合のみ）
     if (selectedQuestionCount !== 'incorrectOnly') {
         saveSelectionState();
+        
+        // ★選択された単元情報を保存
+        lastQuizSettings.selectedUnits = [];
+        document.querySelectorAll('.unit-item input[type="checkbox"]:checked').forEach(checkbox => {
+            lastQuizSettings.selectedUnits.push({
+                chapter: checkbox.dataset.chapter,
+                unit: checkbox.value
+            });
+        });
     }
 
     let quizQuestions = [];
@@ -661,9 +681,16 @@ function startQuiz() {
             flashMessage('苦手問題がありません。まずは通常の学習で問題に取り組んでください。', 'info');
             return;
         }
+        
+        // ★苦手問題の場合は利用可能な全問題として保存
+        lastQuizSettings.availableQuestions = [...quizQuestions];
+        
     } else {
         // 通常モード：選択された範囲から出題
         quizQuestions = selectedQuestions;
+        
+        // ★選択範囲の全問題を保存
+        lastQuizSettings.availableQuestions = [...selectedQuestions];
     }
 
     // 問題数の制限（苦手問題モード以外）
@@ -695,6 +722,85 @@ function startQuiz() {
 
     updateProgressBar();
     showNextQuestion();
+}
+
+function restartWeakProblemsQuiz() {
+    console.log('\n🎯 苦手問題モード専用再学習');
+    
+    // 最新の苦手問題リストを取得
+    const currentWeakProblems = word_data.filter(word => {
+        const wordIdentifier = generateProblemId(word);
+        return incorrectWords.includes(wordIdentifier);
+    });
+    
+    console.log(`現在の苦手問題数: ${currentWeakProblems.length}`);
+    console.log(`前回の問題数: ${currentQuizData.length}`);
+    
+    if (currentWeakProblems.length === 0) {
+        // 苦手問題がなくなった場合
+        showNoWeakProblemsMessage();
+        return;
+    }
+    
+    // 前回解いた問題のうち、まだ苦手問題として残っているものをチェック
+    const stillWeakFromLastQuiz = currentQuizData.filter(word => {
+        const wordIdentifier = generateProblemId(word);
+        return incorrectWords.includes(wordIdentifier);
+    });
+    
+    console.log(`前回の問題で依然苦手: ${stillWeakFromLastQuiz.length}問`);
+    
+    let messageText = '';
+    if (stillWeakFromLastQuiz.length < currentQuizData.length) {
+        const improvedCount = currentQuizData.length - stillWeakFromLastQuiz.length;
+        messageText = `🎉 ${improvedCount}問の苦手問題を克服しました！`;
+    }
+    
+    // 新しい苦手問題セットでクイズを開始
+    currentQuizData = shuffleArray(currentWeakProblems);
+    currentQuestionIndex = 0;
+    correctCount = 0;
+    incorrectCount = 0;
+    totalQuestions = currentQuizData.length;
+    quizStartTime = Date.now();
+    
+    console.log(`✅ 新しい苦手問題セット: ${totalQuestions}問`);
+    
+    // 改善メッセージがある場合は表示
+    if (messageText) {
+        flashMessage(messageText, 'success');
+    }
+    
+    // UIの切り替え
+    if (quizResultArea) quizResultArea.classList.add('hidden');
+    if (cardArea) cardArea.classList.remove('hidden');
+    
+    updateProgressBar();
+    showNextQuestion();
+}
+
+function showNoWeakProblemsMessage() {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'no-weak-problems-celebration';
+    messageDiv.innerHTML = `
+        <div style="text-align: center; padding: 30px; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; border-radius: 15px; margin: 20px 0;">
+            <h2 style="margin: 0 0 15px 0; font-size: 2em;">🎉 おめでとうございます！</h2>
+            <p style="font-size: 1.2em; margin: 10px 0;">苦手問題を全て克服しました！</p>
+            <p style="margin: 15px 0;">新しい問題に挑戦して、さらに学習を進めましょう。</p>
+            <button onclick="backToSelectionScreen()" class="btn btn-light" style="margin-top: 15px; padding: 10px 30px; font-weight: bold;">
+                新しい範囲を選択する
+            </button>
+        </div>
+    `;
+    
+    if (quizResultArea) {
+        quizResultArea.appendChild(messageDiv);
+    }
+    
+    // 数秒後に自動的に選択画面に戻る
+    setTimeout(() => {
+        backToSelectionScreen();
+    }, 5000);
 }
 
 function showNextQuestion() {
@@ -841,6 +947,7 @@ function showQuizResult() {
     }
 
     displayIncorrectWordsForCurrentQuiz();
+    updateRestartButtonText();
 }
 
 // 不正解問題表示関数の修正版
@@ -910,16 +1017,90 @@ function backToSelectionScreen() {
 }
 
 function restartQuiz() {
+    console.log('\n🔄 同じ条件で再学習開始');
+    
+    // 苦手問題モードの場合は専用処理
+    if (lastQuizSettings.isIncorrectOnly) {
+        restartWeakProblemsQuiz();
+        return;
+    }
+    
+    // 以下は通常モードの処理（既存のコード）
+    console.log('前回の設定:', lastQuizSettings);
+    
+    if (!lastQuizSettings.availableQuestions || lastQuizSettings.availableQuestions.length === 0) {
+        console.warn('⚠️ 前回の設定が見つかりません。現在の問題セットで再開始します。');
+        currentQuestionIndex = 0;
+        correctCount = 0;
+        incorrectCount = 0;
+        currentQuizData = shuffleArray(currentQuizData);
+        quizStartTime = Date.now();
+
+        if (quizResultArea) quizResultArea.classList.add('hidden');
+        if (cardArea) cardArea.classList.remove('hidden');
+        updateProgressBar();
+        showNextQuestion();
+        return;
+    }
+    
+    console.log('📚 通常モードで再学習');
+    console.log(`利用可能な問題数: ${lastQuizSettings.availableQuestions.length}`);
+    
+    // 前回と同じ範囲の全問題を取得
+    let newQuizQuestions = [...lastQuizSettings.availableQuestions];
+    
+    // 問題数制限を適用
+    if (lastQuizSettings.questionCount !== 'all') {
+        const count = parseInt(lastQuizSettings.questionCount);
+        if (newQuizQuestions.length > count) {
+            // 前回とは異なる問題セットを選択
+            newQuizQuestions = shuffleArray(newQuizQuestions).slice(0, count);
+            console.log(`${count}問を新しく選択しました`);
+        }
+    }
+    
+    if (newQuizQuestions.length === 0) {
+        flashMessage('出題可能な問題がありません。', 'danger');
+        backToSelectionScreen();
+        return;
+    }
+    
+    // 新しい問題セットでクイズを再開始
+    currentQuizData = shuffleArray(newQuizQuestions);
     currentQuestionIndex = 0;
     correctCount = 0;
     incorrectCount = 0;
-    currentQuizData = shuffleArray(currentQuizData);
+    totalQuestions = currentQuizData.length;
     quizStartTime = Date.now();
-
+    
+    console.log(`✅ 新しい問題セット: ${totalQuestions}問`);
+    
+    // UIの切り替え
     if (quizResultArea) quizResultArea.classList.add('hidden');
     if (cardArea) cardArea.classList.remove('hidden');
+    
     updateProgressBar();
     showNextQuestion();
+}
+
+function updateRestartButtonText() {
+    const restartButton = document.getElementById('restartQuizButton');
+    const explanationDiv = document.querySelector('.restart-explanation');
+    
+    if (restartButton && lastQuizSettings.isIncorrectOnly) {
+        restartButton.innerHTML = '<i class="fas fa-redo"></i> 最新の苦手問題で再学習';
+        
+        if (explanationDiv) {
+            explanationDiv.innerHTML = `
+                <small>
+                    <i class="fas fa-info-circle" style="color: #e74c3c;"></i>
+                    <strong>「最新の苦手問題で再学習」</strong>：学習の進捗に応じて、現在の苦手問題から出題されます。
+                </small>
+            `;
+            explanationDiv.style.borderLeftColor = '#e74c3c';
+            explanationDiv.style.backgroundColor = '#fdf2f2';
+        }
+    }
 }
 
 function resetSelections() {
@@ -1136,6 +1317,35 @@ function saveQuizProgressToServer() {
         console.log('=== 進捗保存終了（エラー） ===\n');
     });
 }
+
+function debugLastQuizSettings() {
+    console.log('\n=== 前回のクイズ設定 ===');
+    console.log('問題数設定:', lastQuizSettings.questionCount);
+    console.log('苦手問題モード:', lastQuizSettings.isIncorrectOnly);
+    console.log('選択された単元数:', lastQuizSettings.selectedUnits.length);
+    console.log('利用可能な問題数:', lastQuizSettings.availableQuestions.length);
+    
+    if (lastQuizSettings.selectedUnits.length > 0) {
+        console.log('選択された単元:');
+        lastQuizSettings.selectedUnits.forEach(unit => {
+            console.log(`  第${unit.chapter}章 単元${unit.unit}`);
+        });
+    }
+    
+    if (lastQuizSettings.availableQuestions.length > 0) {
+        console.log('利用可能な問題（最初の3問）:');
+        lastQuizSettings.availableQuestions.slice(0, 3).forEach((word, index) => {
+            console.log(`  ${index + 1}. "${word.question}"`);
+        });
+    }
+    console.log('========================\n');
+    
+    return lastQuizSettings;
+}
+
+// グローバル関数として公開
+window.debugLastQuizSettings = debugLastQuizSettings;
+
 
 // デバッグ用：現在の学習状況を表示する関数
 function debugCurrentProgress() {
