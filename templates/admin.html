@@ -337,17 +337,43 @@
         </div>
     </div>
 
-    <!-- 学習履歴修正セクション -->
-    <div class="admin-panel" style="background-color: #e8f5e8; border-left: 5px solid #28a745; margin-top: 20px;">
-        <h4>🔧 データ修正</h4>
-        <p>全ユーザーの学習履歴を新しいID形式に統一し、マッチしない問題を解決します。<br>
-        <strong>⚠️ 注意：</strong>この操作は全ユーザーの学習履歴に影響し、元に戻せません。</p>
+    <!-- ID不一致問題の修正（新機能） -->
+    <div class="admin-panel" style="background-color: #e3f2fd; border-left: 5px solid #2196f3; margin-bottom: 20px;">
+        <h4>🔧 ID不一致問題の修正（推奨）</h4>
+        <p>新しいID形式と一致しない問題履歴のみを効率的に修正します。<br>
+        <strong>安全：</strong>正しいIDの履歴はそのまま保持されます。</p>
         
         <div style="margin-top: 15px;">
-            <form action="{{ url_for('admin_fix_all_data') }}" method="POST" style="display: inline;" 
-                onsubmit="return confirm('全ユーザーデータを修正しますか？\n\n⚠️ この操作は元に戻せません。\n⚠️ すべての学習履歴が新しい形式に変換されます。\n⚠️ 処理に時間がかかる場合があります。')">
-                <button type="submit" class="btn btn-success">
-                    <i class="fas fa-wrench"></i> 🔧 全データ完全修正
+            <button type="button" class="btn btn-info" onclick="analyzeUnmatchedData()">
+                <i class="fas fa-search"></i> 📊 ID不一致問題を分析
+            </button>
+            
+            <button type="button" class="btn btn-primary" onclick="fixUnmatchedData()" style="margin-left: 10px;">
+                <i class="fas fa-wrench"></i> 🔧 ID不一致問題のみ修正
+            </button>
+        </div>
+        
+        <!-- 分析結果表示エリア -->
+        <div id="unmatchedAnalysisResult" style="margin-top: 15px; display: none;">
+            <h5>📊 分析結果</h5>
+            <div id="analysisContent" style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; border: 1px solid #dee2e6;">
+                <!-- 分析結果がここに表示されます -->
+            </div>
+        </div>
+    </div>
+
+    <!-- 全データ修正（従来機能・バックアップ用） -->
+    <div class="admin-panel" style="background-color: #ffebee; border-left: 5px solid #f44336; margin-top: 20px;">
+        <h4>⚠️ 全データ修正（バックアップ用）</h4>
+        <p>全ユーザーの学習履歴を強制的に新しいID形式に統一します。<br>
+        <strong>⚠️ 注意：</strong>この操作は全ユーザーの学習履歴に影響し、元に戻せません。<br>
+        <strong>推奨：</strong>通常は上記の「ID不一致問題のみ修正」を使用してください。</p>
+        
+        <div style="margin-top: 15px;">
+            <form action="{{ url_for('admin_fix_all_data_legacy') }}" method="POST" style="display: inline;" 
+                onsubmit="return confirm('全ユーザーデータを修正しますか？\n\n⚠️ この操作は元に戻せません。\n⚠️ すべての学習履歴が新しい形式に変換されます。\n⚠️ 通常は「ID不一致問題のみ修正」で十分です。\n\n本当に実行しますか？')">
+                <button type="submit" class="btn btn-danger">
+                    <i class="fas fa-exclamation-triangle"></i> ⚠️ 全データ強制修正（非推奨）
                 </button>
             </form>
             
@@ -359,7 +385,103 @@
 </section>
 
 <script>
-// 孤立したトークンをクリーンアップする関数
+// ID不一致問題の分析
+function analyzeUnmatchedData() {
+    const button = event.target;
+    const originalText = button.textContent;
+    button.disabled = true;
+    button.textContent = '分析中...';
+    
+    fetch('/admin/analyze_unmatched_data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            displayAnalysisResult(data.analysis);
+        } else {
+            alert(`❌ エラー: ${data.message}`);
+        }
+    })
+    .catch(error => {
+        console.error('分析エラー:', error);
+        alert('❌ 分析中にエラーが発生しました。');
+    })
+    .finally(() => {
+        button.disabled = false;
+        button.textContent = originalText;
+    });
+}
+
+// 分析結果の表示
+function displayAnalysisResult(analysis) {
+    const resultDiv = document.getElementById('unmatchedAnalysisResult');
+    const contentDiv = document.getElementById('analysisContent');
+    
+    let html = `
+        <div class="row">
+            <div class="col-md-6">
+                <h6>📊 全体統計</h6>
+                <ul>
+                    <li>総ユーザー数: ${analysis.total_users}人</li>
+                    <li>ID不一致があるユーザー: ${analysis.users_with_unmatched}人</li>
+                    <li>ID不一致エントリ総数: ${analysis.total_unmatched_entries}個</li>
+                    <li>修正可能エントリ数: ${analysis.fixable_entries}個</li>
+                    <li>修正不可エントリ数: ${analysis.total_unmatched_entries - analysis.fixable_entries}個</li>
+                </ul>
+            </div>
+            <div class="col-md-6">
+                <h6>💡 推奨アクション</h6>
+                ${analysis.users_with_unmatched === 0 ? 
+                    '<p class="text-success">✅ すべてのIDが正しい形式です。修正は不要です。</p>' :
+                    `<p class="text-warning">⚠️ ${analysis.fixable_entries}個のエントリが修正できます。<br>「ID不一致問題のみ修正」の実行を推奨します。</p>`
+                }
+            </div>
+        </div>
+    `;
+    
+    if (analysis.user_details.length > 0) {
+        html += '<h6>👥 影響を受けるユーザー（上位5名）</h6>';
+        html += '<div class="table-responsive"><table class="table table-sm table-striped">';
+        html += '<thead><tr><th>ユーザー名</th><th>部屋</th><th>履歴総数</th><th>不一致数</th><th>修正可能数</th></tr></thead><tbody>';
+        
+        analysis.user_details.slice(0, 5).forEach(user => {
+            html += `<tr>
+                <td>${user.username}</td>
+                <td>${user.room_number}</td>
+                <td>${user.total_history}</td>
+                <td class="text-warning">${user.unmatched_count}</td>
+                <td class="text-success">${user.fixable_count}</td>
+            </tr>`;
+        });
+        
+        html += '</tbody></table></div>';
+    }
+    
+    contentDiv.innerHTML = html;
+    resultDiv.style.display = 'block';
+}
+
+// ID不一致問題の修正
+function fixUnmatchedData() {
+    if (confirm('ID不一致問題を修正しますか？\n\n✅ 正しいIDの履歴はそのまま保持されます\n✅ 修正可能な不一致IDのみが新形式に変換されます\n✅ 修正不可能なエントリは削除されます\n\nこの操作は元に戻せませんが、正しいデータには影響しません。')) {
+        const button = event.target;
+        const originalText = button.textContent;
+        button.disabled = true;
+        button.textContent = '修正中...';
+        
+        // フォームを作成して送信
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '/admin/fix_unmatched_data';
+        
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+
+// 既存の関数（変更なし）
 function cleanupOrphanedTokens() {
     if (confirm('孤立したパスワードリセットトークンを削除しますか？\n\n※削除されたユーザーに関連する古いトークンが対象です。')) {
         const button = event.target;
@@ -390,7 +512,6 @@ function cleanupOrphanedTokens() {
     }
 }
 
-// データベース状態確認関数
 function checkDatabaseStatus() {
     fetch('/admin/check_database_status')
         .then(response => response.json())
@@ -399,7 +520,6 @@ function checkDatabaseStatus() {
                 const status = data.database_status;
                 let message = '📊 データベース状態確認結果:\n\n';
                 
-                // テーブル状況
                 for (const [tableName, tableInfo] of Object.entries(status.tables)) {
                     message += `📋 ${tableName}: ${tableInfo.exists ? '存在' : '不在'}\n`;
                     if (tableInfo.missing_columns.length > 0) {
@@ -424,6 +544,52 @@ function checkDatabaseStatus() {
         });
 }
 </script>
+
+<style>
+.admin-panel {
+    background-color: #f9f9f9;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    border: 1px solid #eee;
+}
+
+.admin-panel h4 {
+    margin-top: 0;
+    margin-bottom: 10px;
+}
+
+.admin-panel p {
+    margin-bottom: 15px;
+    line-height: 1.5;
+}
+
+#unmatchedAnalysisResult {
+    margin-top: 15px;
+    animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.table-responsive {
+    margin-top: 10px;
+}
+
+.text-success {
+    color: #28a745 !important;
+}
+
+.text-warning {
+    color: #ffc107 !important;
+}
+
+.text-danger {
+    color: #dc3545 !important;
+}
+</style>
 </div>
 
 
