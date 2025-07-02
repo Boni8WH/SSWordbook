@@ -314,32 +314,116 @@
         </div>
     </section>
 
-    <!-- 
     <hr>
-    <section id="admin-data-migration">
-        <h3>🔧 データベース管理</h3>
-        <p>学習履歴データの整合性確認とデータ移行を行います。</p>
 
-        <div class="admin-panel" style="background-color: #e8f5e8; border-left: 5px solid #28a745; margin-top: 20px;">
-            <h4>🔧データ修正</h4>
-            <p>全ユーザーの学習履歴を新しいID形式に統一し、マッチしない問題を解決します。<br>
-            <strong>⚠️ 注意：</strong>この操作は全ユーザーの学習履歴に影響し、元に戻せません。</p>
+<section id="admin-database-management">
+    <h3>🔧 データベース管理</h3>
+    <p>学習履歴データの整合性確認とデータクリーンアップを行います。</p>
+
+    <!-- 孤立したトークンのクリーンアップ -->
+    <div class="admin-panel" style="background-color: #fff3cd; border-left: 5px solid #ffc107; margin-bottom: 20px;">
+        <h4>🧹 孤立データのクリーンアップ</h4>
+        <p>削除されたユーザーに関連する古いパスワードリセットトークンを削除します。<br>
+        <strong>推奨：</strong>ユーザー削除後やメンテナンス時に実行してください。</p>
+        
+        <div style="margin-top: 15px;">
+            <button type="button" class="btn btn-warning" onclick="cleanupOrphanedTokens()">
+                <i class="fas fa-broom"></i> 🧹 孤立したトークンを削除
+            </button>
             
-            <div style="margin-top: 15px;">
-                <form action="{{ url_for('admin_fix_all_data') }}" method="POST" style="display: inline;" 
-                    onsubmit="return confirm('全ユーザーデータを修正しますか？\n\n⚠️ この操作は元に戻せません。\n⚠️ すべての学習履歴が新しい形式に変換されます。\n⚠️ 処理に時間がかかる場合があります。')">
-                    <button type="submit" class="btn btn-success">
-                        <i class="fas fa-wrench"></i> 🔧 全データ完全修正
-                    </button>
-                </form>
-                
-                <a href="{{ url_for('admin_debug_progress') }}" class="btn btn-info" target="_blank" style="margin-left: 10px;">
-                    <i class="fas fa-chart-line"></i> 📊 修正前の状態確認
-                </a>
-            </div>
+            <button type="button" class="btn btn-info" onclick="checkDatabaseStatus()" style="margin-left: 10px;">
+                <i class="fas fa-search"></i> 📊 データベース状態確認
+            </button>
         </div>
-    </section> 
-    -->
+    </div>
+
+    <!-- 学習履歴修正セクション -->
+    <div class="admin-panel" style="background-color: #e8f5e8; border-left: 5px solid #28a745; margin-top: 20px;">
+        <h4>🔧 データ修正</h4>
+        <p>全ユーザーの学習履歴を新しいID形式に統一し、マッチしない問題を解決します。<br>
+        <strong>⚠️ 注意：</strong>この操作は全ユーザーの学習履歴に影響し、元に戻せません。</p>
+        
+        <div style="margin-top: 15px;">
+            <form action="{{ url_for('admin_fix_all_data') }}" method="POST" style="display: inline;" 
+                onsubmit="return confirm('全ユーザーデータを修正しますか？\n\n⚠️ この操作は元に戻せません。\n⚠️ すべての学習履歴が新しい形式に変換されます。\n⚠️ 処理に時間がかかる場合があります。')">
+                <button type="submit" class="btn btn-success">
+                    <i class="fas fa-wrench"></i> 🔧 全データ完全修正
+                </button>
+            </form>
+            
+            <a href="{{ url_for('admin_debug_progress') }}" class="btn btn-info" target="_blank" style="margin-left: 10px;">
+                <i class="fas fa-chart-line"></i> 📊 修正前の状態確認
+            </a>
+        </div>
+    </div>
+</section>
+
+<script>
+// 孤立したトークンをクリーンアップする関数
+function cleanupOrphanedTokens() {
+    if (confirm('孤立したパスワードリセットトークンを削除しますか？\n\n※削除されたユーザーに関連する古いトークンが対象です。')) {
+        const button = event.target;
+        const originalText = button.textContent;
+        button.disabled = true;
+        button.textContent = 'クリーンアップ中...';
+        
+        fetch('/admin/cleanup_orphaned_tokens', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                alert(`✅ ${data.message}`);
+            } else {
+                alert(`❌ エラー: ${data.message}`);
+            }
+        })
+        .catch(error => {
+            console.error('クリーンアップエラー:', error);
+            alert('❌ クリーンアップ中にエラーが発生しました。');
+        })
+        .finally(() => {
+            button.disabled = false;
+            button.textContent = originalText;
+        });
+    }
+}
+
+// データベース状態確認関数
+function checkDatabaseStatus() {
+    fetch('/admin/check_database_status')
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                const status = data.database_status;
+                let message = '📊 データベース状態確認結果:\n\n';
+                
+                // テーブル状況
+                for (const [tableName, tableInfo] of Object.entries(status.tables)) {
+                    message += `📋 ${tableName}: ${tableInfo.exists ? '存在' : '不在'}\n`;
+                    if (tableInfo.missing_columns.length > 0) {
+                        message += `   不足カラム: ${tableInfo.missing_columns.join(', ')}\n`;
+                    }
+                }
+                
+                if (status.needs_migration) {
+                    message += '\n⚠️ マイグレーションが必要です。';
+                } else {
+                    message += '\n✅ データベースは正常です。';
+                }
+                
+                alert(message);
+            } else {
+                alert(`❌ エラー: ${data.message}`);
+            }
+        })
+        .catch(error => {
+            console.error('状態確認エラー:', error);
+            alert('❌ データベース状態確認中にエラーが発生しました。');
+        });
+}
+</script>
 </div>
 
 
