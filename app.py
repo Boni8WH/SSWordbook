@@ -3311,11 +3311,12 @@ def admin_add_user():
             flash(f'部屋{room_number}にユーザー名{username}は既に存在します。', 'danger')
             return redirect(url_for('admin_page'))
 
+        # ★ 修正: User作成時にoriginal_usernameを明示的に設定
         new_user = User(
-        room_number=room_number,
-        student_id=student_id,
-        username=username,
-        original_username=username  # ★ 追加：初回登録時は同じ名前を設定
+            room_number=room_number,
+            student_id=student_id,
+            username=username,
+            original_username=username  # ★ この行を追加
         )
         new_user.set_room_password(room_password)
         new_user.set_individual_password(individual_password)
@@ -3830,7 +3831,8 @@ def admin_upload_users():
                 new_user = User(
                     room_number=room_number,
                     student_id=student_id,
-                    username=username
+                    username=username,
+                    original_username=username  # ★ この行を追加
                 )
                 new_user.set_room_password(room_password)
                 new_user.set_individual_password(individual_password)
