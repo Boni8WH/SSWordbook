@@ -362,6 +362,60 @@
         </div>
     </div>
 
+    <div class="admin-panel" style="background-color: #fff8e1; border-left: 5px solid #ff9800; margin-bottom: 20px;">
+        <h4>🗑️ ID不一致履歴の削除</h4>
+        <p>現在の問題データと一致しない古い学習履歴を削除します。<br>
+        <strong>用途：</strong>問題文修正後に古いIDの履歴を削除する場合に使用。<br>
+        <strong>⚠️ 注意：</strong>削除された履歴は復元できません。</p>
+        
+        <div style="margin-top: 15px;">
+            <button type="button" class="btn btn-info" onclick="analyzeInvalidHistoryDetailed()">
+                <i class="fas fa-search"></i> 📊 詳細分析（デバッグ版）
+            </button>
+            
+            <button type="button" class="btn btn-warning" onclick="cleanInvalidHistory()" style="margin-left: 10px;">
+                <i class="fas fa-trash-alt"></i> 🗑️ 無効履歴を削除
+            </button>
+        </div>
+        
+        <!-- 特定ユーザーのデバッグ -->
+        <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #ddd;">
+            <h5>🔍 特定ユーザーのデバッグ</h5>
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="input-group">
+                        <input type="text" id="debugUsername" class="form-control" placeholder="ユーザー名を入力">
+                        <button class="btn btn-outline-secondary" onclick="debugSpecificUser()">
+                            <i class="fas fa-bug"></i> デバッグ
+                        </button>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <button type="button" class="btn btn-danger btn-sm" onclick="forceCleanSpecificUser()">
+                        <i class="fas fa-exclamation-triangle"></i> 強制削除
+                    </button>
+                    <small class="text-muted d-block">※上記でユーザー名を入力後に使用</small>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 無効履歴分析結果表示エリア -->
+        <div id="invalidHistoryAnalysisResult" style="margin-top: 15px; display: none;">
+            <h5>📊 無効履歴分析結果</h5>
+            <div id="invalidAnalysisContent" style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; border: 1px solid #dee2e6;">
+                <!-- 分析結果がここに表示されます -->
+            </div>
+        </div>
+        
+        <!-- デバッグ結果表示エリア -->
+        <div id="userDebugResult" style="margin-top: 15px; display: none;">
+            <h5>🔍 ユーザーデバッグ結果</h5>
+            <div id="debugContent" style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; border: 1px solid #dee2e6;">
+                <!-- デバッグ結果がここに表示されます -->
+            </div>
+        </div>
+    </div>
+
     <div class="admin-panel" style="background-color: #e3f2fd; border-left: 5px solid #2196f3; margin-bottom: 20px;">
         <h4>🔧 ID不一致問題の修正（推奨）</h4>
         <p>新しいID形式と一致しない問題履歴のみを効率的に修正します。<br>
@@ -668,6 +722,198 @@ function checkDatabaseStatus() {
             console.error('状態確認エラー:', error);
             alert('❌ データベース状態確認中にエラーが発生しました。');
         });
+}
+
+function analyzeInvalidHistoryDetailed() {
+    const button = event.target;
+    const originalText = button.textContent;
+    button.disabled = true;
+    button.textContent = '詳細分析中...';
+    
+    fetch('/admin/analyze_invalid_history_detailed', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            displayInvalidHistoryAnalysisDetailed(data.analysis);
+        } else {
+            alert(`❌ エラー: ${data.message}`);
+        }
+    })
+    .catch(error => {
+        console.error('分析エラー:', error);
+        alert('❌ 分析中にエラーが発生しました。');
+    })
+    .finally(() => {
+        button.disabled = false;
+        button.textContent = originalText;
+    });
+}
+
+// 詳細分析結果の表示
+function displayInvalidHistoryAnalysisDetailed(analysis) {
+    const resultDiv = document.getElementById('invalidHistoryAnalysisResult');
+    const contentDiv = document.getElementById('invalidAnalysisContent');
+    
+    let html = `
+        <div class="row">
+            <div class="col-md-6">
+                <h6>📊 削除対象統計</h6>
+                <ul>
+                    <li>総ユーザー数: ${analysis.total_users}人</li>
+                    <li>無効履歴があるユーザー: ${analysis.users_with_invalid}人</li>
+                    <li>無効な学習履歴: ${analysis.total_invalid_entries}個</li>
+                    <li>無効な苦手問題: ${analysis.total_invalid_incorrect}個</li>
+                </ul>
+            </div>
+            <div class="col-md-6">
+                <h6>💡 推奨アクション</h6>
+                ${analysis.users_with_invalid === 0 ? 
+                    '<p class="text-success">✅ 無効な履歴はありません。削除は不要です。</p>' :
+                    `<p class="text-warning">⚠️ ${analysis.total_invalid_entries}個の無効履歴があります。<br>「無効履歴を削除」の実行を推奨します。</p>`
+                }
+            </div>
+        </div>
+    `;
+    
+    if (analysis.user_details.length > 0) {
+        html += '<h6>👥 影響を受けるユーザー</h6>';
+        html += '<div class="table-responsive"><table class="table table-sm table-striped">';
+        html += '<thead><tr><th>ユーザー名</th><th>部屋</th><th>有効履歴</th><th>無効履歴</th><th>無効苦手問題</th><th>サンプル無効ID</th></tr></thead><tbody>';
+        
+        analysis.user_details.forEach(user => {
+            const sampleId = user.invalid_history_ids.length > 0 ? 
+                user.invalid_history_ids[0].substring(0, 40) + '...' : 
+                (user.invalid_incorrect_ids.length > 0 ? user.invalid_incorrect_ids[0].substring(0, 40) + '...' : '-');
+            
+            html += `<tr>
+                <td>${user.username}</td>
+                <td>${user.room_number}</td>
+                <td class="text-success">${user.valid_history}</td>
+                <td class="text-warning">${user.invalid_history}</td>
+                <td class="text-warning">${user.invalid_incorrect}</td>
+                <td><small class="text-muted">${sampleId}</small></td>
+            </tr>`;
+        });
+        
+        html += '</tbody></table></div>';
+    }
+    
+    // デバッグ情報も表示
+    if (analysis.debug_info && analysis.debug_info.length > 0) {
+        html += '<h6>🔧 デバッグ情報</h6>';
+        html += '<div class="table-responsive"><table class="table table-sm table-striped">';
+        html += '<thead><tr><th>ユーザー名</th><th>部屋</th><th>単語データ数</th><th>有効ID数</th><th>履歴数</th><th>無効ID例</th></tr></thead><tbody>';
+        
+        analysis.debug_info.slice(0, 10).forEach(debug => {
+            const invalidExample = debug.invalid_history_ids.length > 0 ? 
+                debug.invalid_history_ids[0].substring(0, 30) + '...' : '-';
+            
+            html += `<tr>
+                <td>${debug.username}</td>
+                <td>${debug.room_number}</td>
+                <td>${debug.word_data_count}</td>
+                <td>${debug.valid_ids_count}</td>
+                <td>${debug.total_history}</td>
+                <td><small class="text-muted">${invalidExample}</small></td>
+            </tr>`;
+        });
+        
+        html += '</tbody></table></div>';
+    }
+    
+    contentDiv.innerHTML = html;
+    resultDiv.style.display = 'block';
+}
+
+// 特定ユーザーのデバッグ
+function debugSpecificUser() {
+    const username = document.getElementById('debugUsername').value.trim();
+    if (!username) {
+        alert('ユーザー名を入力してください。');
+        return;
+    }
+    
+    fetch(`/admin/debug_user/${encodeURIComponent(username)}`)
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            displayUserDebugResult(data.debug_data);
+        } else {
+            alert(`❌ エラー: ${data.message}`);
+        }
+    })
+    .catch(error => {
+        console.error('デバッグエラー:', error);
+        alert('❌ デバッグ中にエラーが発生しました。');
+    });
+}
+
+// ユーザーデバッグ結果の表示
+function displayUserDebugResult(debugData) {
+    const resultDiv = document.getElementById('userDebugResult');
+    const contentDiv = document.getElementById('debugContent');
+    
+    let html = `
+        <h6>👤 ${debugData.user} のデバッグ結果</h6>
+        <div class="row">
+            <div class="col-md-6">
+                <ul>
+                    <li>部屋番号: ${debugData.room_number}</li>
+                    <li>総履歴数: ${debugData.total_history}</li>
+                    <li>一致する履歴: ${debugData.matched_history}</li>
+                    <li>不一致な履歴: ${debugData.unmatched_history}</li>
+                </ul>
+            </div>
+            <div class="col-md-6">
+                <ul>
+                    <li>有効ID数: ${debugData.valid_ids_count}</li>
+                    <li>不一致苦手問題: ${debugData.unmatched_incorrect.length}</li>
+                </ul>
+            </div>
+        </div>
+    `;
+    
+    if (debugData.unmatched_details.length > 0) {
+        html += '<h6>❌ 不一致な履歴の詳細</h6>';
+        html += '<div class="table-responsive"><table class="table table-sm table-striped">';
+        html += '<thead><tr><th>問題ID</th><th>正解回数</th><th>不正解回数</th><th>最終回答日</th></tr></thead><tbody>';
+        
+        debugData.unmatched_details.forEach(detail => {
+            html += `<tr>
+                <td><small>${detail.id}</small></td>
+                <td>${detail.correct_attempts}</td>
+                <td>${detail.incorrect_attempts}</td>
+                <td><small>${detail.last_answered}</small></td>
+            </tr>`;
+        });
+        
+        html += '</tbody></table></div>';
+    }
+    
+    contentDiv.innerHTML = html;
+    resultDiv.style.display = 'block';
+}
+
+// 特定ユーザーの強制削除
+function forceCleanSpecificUser() {
+    const username = document.getElementById('debugUsername').value.trim();
+    if (!username) {
+        alert('ユーザー名を入力してください。');
+        return;
+    }
+    
+    if (confirm(`ユーザー「${username}」の不一致履歴を強制削除しますか？\n\n⚠️ この操作は元に戻せません\n⚠️ 無効なIDの履歴のみが削除されます`)) {
+        // フォームを作成して送信
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = `/admin/force_clean_user/${encodeURIComponent(username)}`;
+        
+        document.body.appendChild(form);
+        form.submit();
+    }
 }
 </script>
 
