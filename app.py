@@ -4698,9 +4698,6 @@ def diagnose_mail_config():
     
     print("===================\n")
 
-# アプリ起動時に診断実行
-diagnose_mail_config()
-
 # ===== メイン起動処理の修正 =====
 if __name__ == '__main__':
     try:
