@@ -644,23 +644,11 @@ function startQuiz() {
         questionCount: selectedQuestionCount,
         isIncorrectOnly: (selectedQuestionCount === 'incorrectOnly'),
         selectedUnits: [],
-        availableQuestions: []
+        availableQuestions: [],
+        totalSelectedRangeQuestions: 0  // ★新規追加：選択範囲の正確な問題数
     };
     
     console.log('🔄 クイズ設定初期化:', lastQuizSettings);
-
-    // 選択状態を保存（苦手問題モード以外の場合のみ）
-    if (selectedQuestionCount !== 'incorrectOnly') {
-        saveSelectionState();
-        
-        // 選択された単元情報を保存
-        document.querySelectorAll('.unit-item input[type="checkbox"]:checked').forEach(checkbox => {
-            lastQuizSettings.selectedUnits.push({
-                chapter: checkbox.dataset.chapter,
-                unit: checkbox.value
-            });
-        });
-    }
 
     let quizQuestions = [];
     
@@ -689,14 +677,45 @@ function startQuiz() {
         
         // 苦手問題の場合は利用可能な全問題として保存
         lastQuizSettings.availableQuestions = [...quizQuestions];
+        lastQuizSettings.totalSelectedRangeQuestions = quizQuestions.length;  // ★苦手問題の総数
         
     } else {
         // 通常モード：選択された範囲から出題
         console.log('\n📚 通常モード開始');
+        
+        // ★重要：選択された単元情報を保存（getSelectedQuestions実行前に）
+        document.querySelectorAll('.unit-item input[type="checkbox"]:checked').forEach(checkbox => {
+            lastQuizSettings.selectedUnits.push({
+                chapter: checkbox.dataset.chapter,
+                unit: checkbox.value
+            });
+        });
+        
         quizQuestions = selectedQuestions;
         
-        // 選択範囲の全問題を保存
-        lastQuizSettings.availableQuestions = [...selectedQuestions];
+        // ★重要：選択範囲の全問題数を正確に計算
+        const selectedUnitIds = new Set();
+        lastQuizSettings.selectedUnits.forEach(unit => {
+            selectedUnitIds.add(`${unit.chapter}-${unit.unit}`);
+        });
+        
+        // 選択された単元に含まれる全問題をカウント
+        const allQuestionsInSelectedRange = word_data.filter(word => {
+            return selectedUnitIds.has(`${word.chapter}-${word.number}`);
+        });
+        
+        lastQuizSettings.availableQuestions = [...allQuestionsInSelectedRange];
+        lastQuizSettings.totalSelectedRangeQuestions = allQuestionsInSelectedRange.length;  // ★正確な選択範囲数
+        
+        console.log(`📊 選択範囲詳細:`);
+        console.log(`  選択単元数: ${lastQuizSettings.selectedUnits.length}`);
+        console.log(`  選択範囲の全問題数: ${lastQuizSettings.totalSelectedRangeQuestions}問`);
+        console.log(`  実際の出題対象: ${quizQuestions.length}問`);
+    }
+
+    // 選択状態を保存（苦手問題モード以外の場合のみ）
+    if (selectedQuestionCount !== 'incorrectOnly') {
+        saveSelectionState();
     }
 
     // 問題数の制限（苦手問題モード以外）
@@ -722,6 +741,7 @@ function startQuiz() {
     console.log('✅ クイズ開始設定完了:', {
         mode: lastQuizSettings.isIncorrectOnly ? '苦手問題' : '通常',
         totalQuestions: totalQuestions,
+        totalSelectedRangeQuestions: lastQuizSettings.totalSelectedRangeQuestions,
         availableQuestions: lastQuizSettings.availableQuestions.length
     });
 
@@ -969,34 +989,81 @@ function showQuizResult() {
     const accuracy = totalQuestions === 0 ? 0 : (correctCount / totalQuestions) * 100;
     if (accuracyRateSpan) accuracyRateSpan.textContent = accuracy.toFixed(1);
 
-    // 選択範囲の全問題数を表示
-    const selectedUnitsInQuiz = new Set();
-    currentQuizData.forEach(word => {
-        selectedUnitsInQuiz.add(`${word.chapter}-${word.number}`);
-    });
-    let totalWordsInSelectedUnits = 0;
-    word_data.forEach(word => {
-        if (selectedUnitsInQuiz.has(`${word.chapter}-${word.number}`)) {
-            totalWordsInSelectedUnits++;
-        }
-    });
+    // ★修正：正確な選択範囲の全問題数を表示
+    let displayedRangeTotal = 0;
+    
+    if (lastQuizSettings.totalSelectedRangeQuestions > 0) {
+        // 保存された正確な選択範囲数を使用
+        displayedRangeTotal = lastQuizSettings.totalSelectedRangeQuestions;
+        console.log(`📊 保存された選択範囲を使用: ${displayedRangeTotal}問`);
+    } else {
+        // フォールバック：計算で求める
+        displayedRangeTotal = calculateAccurateRangeTotal();
+        console.log(`📊 フォールバック計算: ${displayedRangeTotal}問`);
+    }
+    
     if (selectedRangeTotalQuestionsSpan) {
-        selectedRangeTotalQuestionsSpan.textContent = totalWordsInSelectedUnits;
+        selectedRangeTotalQuestionsSpan.textContent = displayedRangeTotal;
     }
 
     displayIncorrectWordsForCurrentQuiz();
     
-    // ★lastQuizSettingsが適切に設定されているかチェック
-    console.log('🔍 結果画面表示時の設定確認:', {
-        isIncorrectOnly: lastQuizSettings.isIncorrectOnly,
-        questionCount: lastQuizSettings.questionCount,
-        availableQuestions: lastQuizSettings.availableQuestions.length
+    // 詳細なログ出力
+    console.log('🔍 結果画面表示時の詳細情報:', {
+        mode: lastQuizSettings.isIncorrectOnly ? '苦手問題モード' : '通常モード',
+        出題数: totalQuestions,
+        選択範囲の全問題数: displayedRangeTotal,
+        正解数: correctCount,
+        正答率: accuracy.toFixed(1) + '%',
+        設定保存状況: {
+            selectedUnits: lastQuizSettings.selectedUnits?.length || 0,
+            availableQuestions: lastQuizSettings.availableQuestions?.length || 0,
+            totalSelectedRangeQuestions: lastQuizSettings.totalSelectedRangeQuestions
+        }
     });
     
-    // ★少し遅延させてボタンテキストを更新（DOM更新後に実行）
+    // 少し遅延させてボタンテキストを更新
     setTimeout(() => {
         updateRestartButtonText();
     }, 100);
+}
+
+function calculateAccurateRangeTotal() {
+    if (lastQuizSettings.isIncorrectOnly) {
+        // 苦手問題モード：苦手問題の総数
+        return incorrectWords.length;
+    }
+    
+    // 通常モード：選択された単元の全問題数を計算
+    if (lastQuizSettings.selectedUnits && lastQuizSettings.selectedUnits.length > 0) {
+        const selectedUnitIds = new Set();
+        lastQuizSettings.selectedUnits.forEach(unit => {
+            selectedUnitIds.add(`${unit.chapter}-${unit.unit}`);
+        });
+        
+        const rangeTotal = word_data.filter(word => {
+            return selectedUnitIds.has(`${word.chapter}-${word.number}`);
+        }).length;
+        
+        console.log(`🔍 再計算結果: ${rangeTotal}問 (選択単元: ${lastQuizSettings.selectedUnits.length}個)`);
+        return rangeTotal;
+    }
+    
+    // lastQuizSettingsが利用できる場合
+    if (lastQuizSettings.availableQuestions && lastQuizSettings.availableQuestions.length > 0) {
+        return lastQuizSettings.availableQuestions.length;
+    }
+    
+    // 最後の手段：現在のクイズデータから推測（これは不正確）
+    console.warn('⚠️ 正確な選択範囲が取得できないため、推測値を使用');
+    const selectedUnitsInQuiz = new Set();
+    currentQuizData.forEach(word => {
+        selectedUnitsInQuiz.add(`${word.chapter}-${word.number}`);
+    });
+    
+    return word_data.filter(word => {
+        return selectedUnitsInQuiz.has(`${word.chapter}-${word.number}`);
+    }).length;
 }
 
 // 不正解問題表示関数の修正版
@@ -1459,6 +1526,48 @@ function debugLastQuizSettings() {
 // グローバル関数として公開
 window.debugLastQuizSettings = debugLastQuizSettings;
 
+function debugSelectionDetails() {
+    console.log('\n=== 選択範囲詳細確認 ===');
+    
+    // 現在チェックされているチェックボックス
+    const checkedBoxes = document.querySelectorAll('.unit-item input[type="checkbox"]:checked');
+    console.log(`現在チェック済み: ${checkedBoxes.length}個`);
+    
+    const currentlySelected = [];
+    checkedBoxes.forEach(checkbox => {
+        currentlySelected.push(`${checkbox.dataset.chapter}-${checkbox.value}`);
+    });
+    
+    // 現在の選択に基づく問題数
+    const currentSelectionCount = word_data.filter(word => {
+        return currentlySelected.includes(`${word.chapter}-${word.number}`);
+    }).length;
+    
+    console.log(`現在の選択による問題数: ${currentSelectionCount}問`);
+    
+    // 保存された設定
+    console.log(`保存された選択範囲: ${lastQuizSettings.totalSelectedRangeQuestions}問`);
+    console.log(`保存された単元数: ${lastQuizSettings.selectedUnits?.length || 0}個`);
+    
+    if (lastQuizSettings.selectedUnits) {
+        console.log('保存された単元一覧:');
+        lastQuizSettings.selectedUnits.forEach(unit => {
+            console.log(`  第${unit.chapter}章-単元${unit.unit}`);
+        });
+    }
+    
+    console.log('============================\n');
+    
+    return {
+        currentlyChecked: checkedBoxes.length,
+        currentSelectionCount: currentSelectionCount,
+        savedRangeTotal: lastQuizSettings.totalSelectedRangeQuestions,
+        savedUnitsCount: lastQuizSettings.selectedUnits?.length || 0
+    };
+}
+
+// グローバル関数として公開
+window.debugSelectionDetails = debugSelectionDetails;
 
 // デバッグ用：現在の学習状況を表示する関数
 function debugCurrentProgress() {
