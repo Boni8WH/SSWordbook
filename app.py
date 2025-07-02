@@ -2582,6 +2582,272 @@ def admin_clean_invalid_history():
     
     return redirect(url_for('admin_page'))
 
+# app.py に以下のデバッグ機能を追加してください
+
+def debug_specific_user_data(username):
+    """特定ユーザーのデータを詳細デバッグ"""
+    
+    user = User.query.filter_by(username=username).first()
+    if not user:
+        print(f"❌ ユーザー '{username}' が見つかりません")
+        return
+    
+    print(f"\n🔍 ユーザー詳細デバッグ: {username}")
+    print(f"部屋番号: {user.room_number}")
+    
+    # 部屋ごとの単語データを取得
+    word_data = load_word_data_for_room(user.room_number)
+    print(f"部屋の単語データ数: {len(word_data)}")
+    
+    # ユーザーの学習履歴を取得
+    user_history = user.get_problem_history()
+    user_incorrect = user.get_incorrect_words()
+    
+    print(f"学習履歴数: {len(user_history)}")
+    print(f"苦手問題数: {len(user_incorrect)}")
+    
+    # 新しいID生成方式で有効なIDのセットを作成
+    valid_ids = set()
+    for word in word_data:
+        new_id = get_problem_id(word)
+        valid_ids.add(new_id)
+    
+    print(f"有効ID数: {len(valid_ids)}")
+    
+    # 各履歴IDを詳細チェック
+    matched_count = 0
+    unmatched_count = 0
+    unmatched_details = []
+    
+    for problem_id, history_data in user_history.items():
+        if problem_id in valid_ids:
+            matched_count += 1
+        else:
+            unmatched_count += 1
+            unmatched_details.append({
+                'id': problem_id,
+                'correct_attempts': history_data.get('correct_attempts', 0),
+                'incorrect_attempts': history_data.get('incorrect_attempts', 0),
+                'last_answered': history_data.get('last_answered', '')
+            })
+            print(f"❌ 不一致ID: {problem_id}")
+            print(f"   履歴: 正解{history_data.get('correct_attempts', 0)}回, 不正解{history_data.get('incorrect_attempts', 0)}回")
+    
+    print(f"\n📊 集計結果:")
+    print(f"一致する履歴: {matched_count}個")
+    print(f"不一致な履歴: {unmatched_count}個")
+    
+    # 苦手問題もチェック
+    unmatched_incorrect = []
+    for problem_id in user_incorrect:
+        if problem_id not in valid_ids:
+            unmatched_incorrect.append(problem_id)
+            print(f"❌ 不一致苦手問題: {problem_id}")
+    
+    print(f"不一致苦手問題: {len(unmatched_incorrect)}個")
+    
+    return {
+        'user': username,
+        'room_number': user.room_number,
+        'total_history': len(user_history),
+        'matched_history': matched_count,
+        'unmatched_history': unmatched_count,
+        'unmatched_details': unmatched_details,
+        'unmatched_incorrect': unmatched_incorrect,
+        'valid_ids_count': len(valid_ids)
+    }
+
+def force_clean_specific_user(username):
+    """特定ユーザーの不一致IDを強制削除"""
+    
+    user = User.query.filter_by(username=username).first()
+    if not user:
+        print(f"❌ ユーザー '{username}' が見つかりません")
+        return False
+    
+    # 部屋ごとの単語データを取得
+    word_data = load_word_data_for_room(user.room_number)
+    
+    # 有効なIDのセットを作成
+    valid_ids = set()
+    for word in word_data:
+        new_id = get_problem_id(word)
+        valid_ids.add(new_id)
+    
+    print(f"\n🧹 {username} の不一致履歴強制削除開始")
+    
+    old_history = user.get_problem_history()
+    old_incorrect = user.get_incorrect_words()
+    
+    # 有効なIDのみを保持
+    new_history = {}
+    removed_count = 0
+    
+    for problem_id, history_data in old_history.items():
+        if problem_id in valid_ids:
+            new_history[problem_id] = history_data
+        else:
+            removed_count += 1
+            print(f"🗑️ 削除: {problem_id}")
+    
+    # 苦手問題も有効なIDのみ保持
+    new_incorrect = []
+    removed_incorrect_count = 0
+    
+    for problem_id in old_incorrect:
+        if problem_id in valid_ids:
+            new_incorrect.append(problem_id)
+        else:
+            removed_incorrect_count += 1
+            print(f"🗑️ 苦手問題から削除: {problem_id}")
+    
+    # 保存
+    user.set_problem_history(new_history)
+    user.set_incorrect_words(new_incorrect)
+    
+    try:
+        db.session.commit()
+        print(f"✅ {username} のクリーニング完了")
+        print(f"   削除された履歴: {removed_count}個")
+        print(f"   削除された苦手問題: {removed_incorrect_count}個")
+        print(f"   残存履歴: {len(new_history)}個")
+        return True
+    except Exception as e:
+        db.session.rollback()
+        print(f"❌ 保存エラー: {e}")
+        return False
+
+@app.route('/admin/debug_user/<username>')
+def admin_debug_user(username):
+    """特定ユーザーのデバッグ情報を表示"""
+    if not session.get('admin_logged_in'):
+        return jsonify({'status': 'error', 'message': '管理者権限がありません。'}), 403
+    
+    try:
+        debug_result = debug_specific_user_data(username)
+        if debug_result:
+            return jsonify({
+                'status': 'success',
+                'debug_data': debug_result
+            })
+        else:
+            return jsonify({
+                'status': 'error',
+                'message': f'ユーザー {username} が見つかりません'
+            })
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/admin/force_clean_user/<username>', methods=['POST'])
+def admin_force_clean_user(username):
+    """特定ユーザーの不一致データを強制削除"""
+    if not session.get('admin_logged_in'):
+        flash('管理者権限がありません。', 'danger')
+        return redirect(url_for('admin_page'))
+    
+    try:
+        success = force_clean_specific_user(username)
+        if success:
+            flash(f'ユーザー {username} の不一致データを削除しました。', 'success')
+        else:
+            flash(f'ユーザー {username} のデータ削除に失敗しました。', 'danger')
+    except Exception as e:
+        flash(f'削除エラー: {str(e)}', 'danger')
+    
+    return redirect(url_for('admin_page'))
+
+# 修正版：analyze_unmatched_history関数（より詳細な分析）
+def analyze_unmatched_history_detailed():
+    """ID不一致の学習履歴を詳細分析"""
+    
+    users = User.query.all()
+    analysis_results = {
+        'total_users': 0,
+        'users_with_invalid': 0,
+        'total_invalid_entries': 0,
+        'total_invalid_incorrect': 0,
+        'user_details': [],
+        'debug_info': []
+    }
+    
+    for user in users:
+        if user.username == 'admin':
+            continue
+            
+        analysis_results['total_users'] += 1
+        
+        # 部屋ごとの単語データを取得
+        word_data = load_word_data_for_room(user.room_number)
+        
+        # 有効なIDのセットを作成
+        valid_ids = set()
+        for word in word_data:
+            new_id = get_problem_id(word)
+            valid_ids.add(new_id)
+        
+        user_history = user.get_problem_history()
+        user_incorrect = user.get_incorrect_words()
+        
+        invalid_history_ids = []
+        invalid_incorrect_ids = []
+        
+        # 履歴の各IDをチェック
+        for problem_id in user_history.keys():
+            if problem_id not in valid_ids:
+                invalid_history_ids.append(problem_id)
+        
+        # 苦手問題の各IDをチェック
+        for problem_id in user_incorrect:
+            if problem_id not in valid_ids:
+                invalid_incorrect_ids.append(problem_id)
+        
+        user_invalid_count = len(invalid_history_ids)
+        user_invalid_incorrect_count = len(invalid_incorrect_ids)
+        
+        # デバッグ情報を追加
+        analysis_results['debug_info'].append({
+            'username': user.username,
+            'room_number': user.room_number,
+            'word_data_count': len(word_data),
+            'valid_ids_count': len(valid_ids),
+            'total_history': len(user_history),
+            'invalid_history_ids': invalid_history_ids,
+            'invalid_incorrect_ids': invalid_incorrect_ids
+        })
+        
+        if user_invalid_count > 0 or user_invalid_incorrect_count > 0:
+            analysis_results['users_with_invalid'] += 1
+            analysis_results['total_invalid_entries'] += user_invalid_count
+            analysis_results['total_invalid_incorrect'] += user_invalid_incorrect_count
+            
+            analysis_results['user_details'].append({
+                'username': user.username,
+                'room_number': user.room_number,
+                'total_history': len(user_history),
+                'valid_history': len(user_history) - user_invalid_count,
+                'invalid_history': user_invalid_count,
+                'invalid_incorrect': user_invalid_incorrect_count,
+                'invalid_history_ids': invalid_history_ids[:5],  # 最初の5件のみ
+                'invalid_incorrect_ids': invalid_incorrect_ids[:5]
+            })
+    
+    return analysis_results
+
+@app.route('/admin/analyze_invalid_history_detailed', methods=['POST'])
+def admin_analyze_invalid_history_detailed():
+    """詳細な無効履歴分析"""
+    if not session.get('admin_logged_in'):
+        return jsonify({'status': 'error', 'message': '管理者権限がありません。'}), 403
+    
+    try:
+        analysis = analyze_unmatched_history_detailed()
+        return jsonify({
+            'status': 'success',
+            'analysis': analysis
+        })
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
 # ====================================================================
 # 進捗ページ
 # ====================================================================
