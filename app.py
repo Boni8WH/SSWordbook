@@ -2400,6 +2400,188 @@ def admin_fix_all_data_legacy():
     
     return redirect(url_for('admin_page'))
 
+# app.py に以下の関数を追加してください
+
+def clean_unmatched_history():
+    """ID不一致の学習履歴を削除する"""
+    
+    # デフォルトの単語データを取得
+    default_word_data = load_default_word_data()
+    if not default_word_data:
+        print("❌ 単語データが見つかりません")
+        return False
+    
+    # 新しいID生成方式で有効なIDのセットを作成
+    valid_ids = set()
+    for word in default_word_data:
+        new_id = get_problem_id(word)
+        valid_ids.add(new_id)
+    
+    print(f"📋 有効な問題ID数: {len(valid_ids)}個")
+    
+    users = User.query.all()
+    cleaned_users = 0
+    total_removed_entries = 0
+    total_removed_incorrect = 0
+    
+    for user in users:
+        if user.username == 'admin':
+            continue
+            
+        print(f"\n🧹 履歴クリーニング: {user.username}")
+        
+        old_history = user.get_problem_history()
+        old_incorrect = user.get_incorrect_words()
+        
+        # 有効なIDのみを保持
+        new_history = {}
+        removed_count = 0
+        
+        for problem_id, history_data in old_history.items():
+            if problem_id in valid_ids:
+                # 有効なIDは保持
+                new_history[problem_id] = history_data
+            else:
+                # 無効なIDは削除
+                removed_count += 1
+                print(f"  🗑️ 削除: {problem_id}")
+        
+        # 苦手問題リストも有効なIDのみ保持
+        new_incorrect = []
+        removed_incorrect_count = 0
+        
+        for problem_id in old_incorrect:
+            if problem_id in valid_ids:
+                new_incorrect.append(problem_id)
+            else:
+                removed_incorrect_count += 1
+                print(f"  🗑️ 苦手問題から削除: {problem_id}")
+        
+        # 変更があった場合のみ保存
+        if removed_count > 0 or removed_incorrect_count > 0:
+            user.set_problem_history(new_history)
+            user.set_incorrect_words(new_incorrect)
+            cleaned_users += 1
+            total_removed_entries += removed_count
+            total_removed_incorrect += removed_incorrect_count
+            
+            print(f"  📊 結果: {removed_count}個の履歴を削除, {removed_incorrect_count}個の苦手問題を削除")
+            print(f"  ✅ 残存: {len(new_history)}個の履歴, {len(new_incorrect)}個の苦手問題")
+    
+    try:
+        db.session.commit()
+        print(f"\n✅ 履歴クリーニング完了")
+        print(f"   対象ユーザー数: {cleaned_users}")
+        print(f"   削除された学習履歴: {total_removed_entries}個")
+        print(f"   削除された苦手問題: {total_removed_incorrect}個")
+        return True
+    except Exception as e:
+        db.session.rollback()
+        print(f"❌ クリーニングエラー: {e}")
+        return False
+
+def analyze_unmatched_history():
+    """ID不一致の学習履歴を分析（削除前の確認用）"""
+    
+    # デフォルトの単語データを取得
+    default_word_data = load_default_word_data()
+    if not default_word_data:
+        return {
+            'status': 'error',
+            'message': '単語データが見つかりません'
+        }
+    
+    # 有効なIDのセットを作成
+    valid_ids = set()
+    for word in default_word_data:
+        new_id = get_problem_id(word)
+        valid_ids.add(new_id)
+    
+    users = User.query.all()
+    analysis_results = {
+        'total_users': 0,
+        'users_with_invalid': 0,
+        'total_invalid_entries': 0,
+        'total_invalid_incorrect': 0,
+        'user_details': []
+    }
+    
+    for user in users:
+        if user.username == 'admin':
+            continue
+            
+        analysis_results['total_users'] += 1
+        
+        user_history = user.get_problem_history()
+        user_incorrect = user.get_incorrect_words()
+        
+        invalid_history_ids = []
+        invalid_incorrect_ids = []
+        
+        # 履歴の各IDをチェック
+        for problem_id in user_history.keys():
+            if problem_id not in valid_ids:
+                invalid_history_ids.append(problem_id)
+        
+        # 苦手問題の各IDをチェック
+        for problem_id in user_incorrect:
+            if problem_id not in valid_ids:
+                invalid_incorrect_ids.append(problem_id)
+        
+        user_invalid_count = len(invalid_history_ids)
+        user_invalid_incorrect_count = len(invalid_incorrect_ids)
+        
+        if user_invalid_count > 0 or user_invalid_incorrect_count > 0:
+            analysis_results['users_with_invalid'] += 1
+            analysis_results['total_invalid_entries'] += user_invalid_count
+            analysis_results['total_invalid_incorrect'] += user_invalid_incorrect_count
+            
+            analysis_results['user_details'].append({
+                'username': user.username,
+                'room_number': user.room_number,
+                'total_history': len(user_history),
+                'valid_history': len(user_history) - user_invalid_count,
+                'invalid_history': user_invalid_count,
+                'invalid_incorrect': user_invalid_incorrect_count,
+                'invalid_history_ids': invalid_history_ids[:3],  # 最初の3件のみ
+                'invalid_incorrect_ids': invalid_incorrect_ids[:3]
+            })
+    
+    return analysis_results
+
+@app.route('/admin/analyze_invalid_history', methods=['POST'])
+def admin_analyze_invalid_history():
+    """ID不一致履歴の分析"""
+    if not session.get('admin_logged_in'):
+        return jsonify({'status': 'error', 'message': '管理者権限がありません。'}), 403
+    
+    try:
+        analysis = analyze_unmatched_history()
+        return jsonify({
+            'status': 'success',
+            'analysis': analysis
+        })
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/admin/clean_invalid_history', methods=['POST'])
+def admin_clean_invalid_history():
+    """ID不一致履歴の削除"""
+    if not session.get('admin_logged_in'):
+        flash('管理者権限がありません。', 'danger')
+        return redirect(url_for('login_page'))
+    
+    try:
+        success = clean_unmatched_history()
+        if success:
+            flash('ID不一致の学習履歴を削除しました。', 'success')
+        else:
+            flash('履歴削除中にエラーが発生しました。', 'danger')
+    except Exception as e:
+        flash(f'削除エラー: {str(e)}', 'danger')
+    
+    return redirect(url_for('admin_page'))
+
 # ====================================================================
 # 進捗ページ
 # ====================================================================
