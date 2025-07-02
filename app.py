@@ -3795,95 +3795,131 @@ def admin_upload_users():
         return redirect(url_for('admin_page'))
 
     try:
-        print("🔍 デバッグ用超シンプル処理開始...")
+        print("🔍 全ユーザーCSV処理開始...")
         start_time = time.time()
         
-        # ステップ1: ファイル読み込みテスト
-        print("📂 ステップ1: ファイル読み込み中...")
+        # ファイル読み込み
         content = file.read()
-        print(f"✅ ファイル読み込み完了: {len(content)}bytes ({time.time() - start_time:.2f}秒)")
         
-        # ステップ2: デコードテスト
-        print("📝 ステップ2: デコード中...")
+        # ファイルサイズチェック
+        if len(content) > 10240:  # 10KB制限
+            flash('CSVファイルが大きすぎます（10KB以下にしてください）。', 'danger')
+            return redirect(url_for('admin_page'))
+        
         content_str = content.decode('utf-8')
         lines = content_str.strip().split('\n')
-        print(f"✅ デコード完了: {len(lines)}行 ({time.time() - start_time:.2f}秒)")
         
-        # ステップ3: 最初の1行だけ処理してみる
-        print("🧪 ステップ3: 1行テスト処理...")
+        # 行数制限
+        if len(lines) > 50:  # 50行制限
+            flash('CSVファイルの行数が多すぎます（50行以下にしてください）。', 'danger')
+            return redirect(url_for('admin_page'))
+        
+        print(f"📊 ファイルサイズ: {len(content)}bytes, 行数: {len(lines)}")
+        
         if len(lines) < 2:
             flash('CSVファイルにデータがありません。', 'danger')
             return redirect(url_for('admin_page'))
         
-        # ヘッダー確認
+        # ヘッダー行をスキップして、すべてのデータ行を処理
         header_line = lines[0]
-        data_line = lines[1] if len(lines) > 1 else ""
+        data_lines = lines[1:]  # 2行目以降すべて
         
         print(f"📋 ヘッダー: {header_line}")
-        print(f"📋 データ例: {data_line}")
+        print(f"📋 処理対象データ行数: {len(data_lines)}")
         
-        # ステップ4: データベース接続テスト
-        print("🗃️ ステップ4: データベース接続テスト...")
-        user_count = User.query.count()
-        print(f"✅ DB接続OK: 現在{user_count}ユーザー ({time.time() - start_time:.2f}秒)")
+        users_added_count = 0
+        errors = []
+        skipped_count = 0
         
-        # ステップ5: 1ユーザーだけ作成テスト
-        print("👤 ステップ5: 1ユーザー作成テスト...")
-        
-        values = [v.strip() for v in data_line.split(',')]
-        if len(values) >= 5:
-            room_number, room_password, student_id, individual_password, username = values[:5]
-            
-            # 重複チェック（時間測定）
-            check_start = time.time()
-            existing_user = User.query.filter_by(room_number=room_number, username=username).first()
-            print(f"🔍 重複チェック完了: {time.time() - check_start:.2f}秒")
-            
-            if existing_user:
-                flash(f'テスト結果: ユーザー {username} は既に存在します（{time.time() - start_time:.2f}秒で処理完了）', 'warning')
-            else:
-                # パスワードハッシュ化テスト（時間測定）
-                hash_start = time.time()
-                print("🔐 パスワードハッシュ化テスト...")
+        # ★修正: すべてのデータ行を処理
+        for line_num, data_line in enumerate(data_lines, start=2):
+            try:
+                if not data_line.strip():
+                    continue
+                    
+                values = [v.strip() for v in data_line.split(',')]
+                if len(values) < 5:
+                    errors.append(f"行{line_num}: データが不完全です")
+                    continue
                 
-                test_user = User(
+                room_number, room_password, student_id, individual_password, username = values[:5]
+                
+                # 必須項目チェック
+                if not all([room_number, room_password, student_id, individual_password, username]):
+                    errors.append(f"行{line_num}: 必須項目が不足しています")
+                    continue
+
+                # 重複チェック
+                existing_user = User.query.filter_by(room_number=room_number, username=username).first()
+                if existing_user:
+                    errors.append(f"行{line_num}: ユーザー {username} は既に存在します")
+                    skipped_count += 1
+                    continue
+
+                # 新規ユーザー作成（軽量パスワードハッシュ化）
+                new_user = User(
                     room_number=room_number,
                     student_id=student_id,
                     username=username,
                     original_username=username
                 )
                 
-                test_user.set_room_password(room_password)
-                print(f"🔐 room_password ハッシュ化: {time.time() - hash_start:.2f}秒")
+                # ★修正: 軽量パスワードハッシュ化
+                new_user._room_password_hash = generate_password_hash(room_password, method='pbkdf2:sha256', salt_length=8)
+                new_user._individual_password_hash = generate_password_hash(individual_password, method='pbkdf2:sha256', salt_length=8)
                 
-                test_user.set_individual_password(individual_password)
-                print(f"🔐 individual_password ハッシュ化: {time.time() - hash_start:.2f}秒")
+                new_user.problem_history = "{}"
+                new_user.incorrect_words = "[]"
+                new_user.last_login = datetime.now(JST)
+
+                db.session.add(new_user)
+                users_added_count += 1
+                print(f"✅ ユーザー準備: {username} ({users_added_count}/{len(data_lines)})")
                 
-                test_user.problem_history = "{}"
-                test_user.incorrect_words = "[]"
-                test_user.last_login = datetime.now(JST)
-                
-                # データベース保存テスト
-                save_start = time.time()
-                db.session.add(test_user)
-                db.session.commit()
-                print(f"💾 DB保存完了: {time.time() - save_start:.2f}秒")
-                
-                total_time = time.time() - start_time
-                flash(f'テスト成功: ユーザー {username} を作成（総処理時間: {total_time:.2f}秒）', 'success')
-        else:
-            flash('CSVデータの形式が正しくありません', 'danger')
-        
+                # 5件ごとにコミット（効率化）
+                if users_added_count % 5 == 0:
+                    db.session.commit()
+                    print(f"💾 バッチコミット: {users_added_count}件完了")
+                    
+                    # メモリ解放
+                    import gc
+                    gc.collect()
+
+            except Exception as e:
+                db.session.rollback()
+                errors.append(f"行{line_num}: エラー - {str(e)[:50]}")
+                print(f"❌ 行{line_num}エラー: {e}")
+                continue
+
+        # 最終コミット（余りがある場合）
+        if users_added_count % 5 != 0:
+            db.session.commit()
+            print(f"💾 最終コミット: {users_added_count}件完了")
+
         total_time = time.time() - start_time
-        print(f"🏁 全体処理時間: {total_time:.2f}秒")
+        print(f"🏁 全体処理完了: {users_added_count}ユーザー追加, 処理時間: {total_time:.2f}秒")
+
+        # 結果メッセージ
+        if users_added_count > 0:
+            flash(f'✅ {users_added_count}人のユーザーを追加しました（処理時間: {total_time:.1f}秒）', 'success')
         
+        if skipped_count > 0:
+            flash(f'⚠️ {skipped_count}人のユーザーは重複のためスキップしました', 'warning')
+            
+        if errors:
+            error_count = len(errors)
+            if error_count <= 3:
+                flash(f'❌ エラー: {", ".join(errors)}', 'danger')
+            else:
+                flash(f'❌ {error_count}件のエラーが発生しました。最初の3件: {", ".join(errors[:3])}', 'danger')
+                
     except Exception as e:
-        error_time = time.time() - start_time
-        print(f"❌ エラー発生: {e} (処理時間: {error_time:.2f}秒)")
+        error_time = time.time() - start_time if 'start_time' in locals() else 0
+        print(f"❌ 致命的エラー: {e} (処理時間: {error_time:.2f}秒)")
         import traceback
         traceback.print_exc()
         db.session.rollback()
-        flash(f'テストエラー: {str(e)} (処理時間: {error_time:.2f}秒)', 'danger')
+        flash(f'CSV処理エラー: {str(e)} (処理時間: {error_time:.1f}秒)', 'danger')
 
     return redirect(url_for('admin_page'))
 
