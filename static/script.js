@@ -727,6 +727,12 @@ function startQuiz() {
 function restartWeakProblemsQuiz() {
     console.log('\n🎯 苦手問題モード専用再学習');
     
+    // ★既存のお祝いメッセージがあれば削除
+    const existingCelebration = document.querySelector('.no-weak-problems-celebration');
+    if (existingCelebration) {
+        existingCelebration.remove();
+    }
+    
     // 最新の苦手問題リストを取得
     const currentWeakProblems = word_data.filter(word => {
         const wordIdentifier = generateProblemId(word);
@@ -750,10 +756,10 @@ function restartWeakProblemsQuiz() {
     
     console.log(`前回の問題で依然苦手: ${stillWeakFromLastQuiz.length}問`);
     
-    let messageText = '';
+    // ★改善メッセージを控えめに表示
     if (stillWeakFromLastQuiz.length < currentQuizData.length) {
         const improvedCount = currentQuizData.length - stillWeakFromLastQuiz.length;
-        messageText = `🎉 ${improvedCount}問の苦手問題を克服しました！`;
+        flashMessage(`✨ ${improvedCount}問の苦手問題を克服しました！`, 'success');
     }
     
     // 新しい苦手問題セットでクイズを開始
@@ -766,11 +772,6 @@ function restartWeakProblemsQuiz() {
     
     console.log(`✅ 新しい苦手問題セット: ${totalQuestions}問`);
     
-    // 改善メッセージがある場合は表示
-    if (messageText) {
-        flashMessage(messageText, 'success');
-    }
-    
     // UIの切り替え
     if (quizResultArea) quizResultArea.classList.add('hidden');
     if (cardArea) cardArea.classList.remove('hidden');
@@ -779,28 +780,50 @@ function restartWeakProblemsQuiz() {
     showNextQuestion();
 }
 
+function clearPreviousCelebrationMessages() {
+    const existingCelebrations = document.querySelectorAll('.no-weak-problems-celebration');
+    existingCelebrations.forEach(element => {
+        element.remove();
+    });
+}
+
 function showNoWeakProblemsMessage() {
+    // ★重要：既存のお祝いメッセージを削除
+    const existingCelebration = document.querySelector('.no-weak-problems-celebration');
+    if (existingCelebration) {
+        existingCelebration.remove();
+        console.log('🧹 既存のお祝いメッセージを削除しました');
+    }
+    
+    // ★シンプルなデザインのメッセージを作成
     const messageDiv = document.createElement('div');
     messageDiv.className = 'no-weak-problems-celebration';
     messageDiv.innerHTML = `
-        <div style="text-align: center; padding: 30px; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; border-radius: 15px; margin: 20px 0;">
-            <h2 style="margin: 0 0 15px 0; font-size: 2em;">🎉 おめでとうございます！</h2>
-            <p style="font-size: 1.2em; margin: 10px 0;">苦手問題を全て克服しました！</p>
-            <p style="margin: 15px 0;">新しい問題に挑戦して、さらに学習を進めましょう。</p>
-            <button onclick="backToSelectionScreen()" class="btn btn-light" style="margin-top: 15px; padding: 10px 30px; font-weight: bold;">
-                新しい範囲を選択する
+        <div style="text-align: center; padding: 25px; background-color: #f8f9fa; border: 2px solid #28a745; border-radius: 8px; margin: 20px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+            <div style="font-size: 3em; margin-bottom: 15px;">🎉</div>
+            <h3 style="margin: 0 0 10px 0; color: #28a745; font-size: 1.4em;">おめでとうございます！</h3>
+            <p style="color: #495057; margin: 10px 0; font-size: 1.1em;">苦手問題を全て克服しました</p>
+            <p style="color: #6c757d; margin: 15px 0; font-size: 0.95em;">新しい問題に挑戦して、さらに学習を進めましょう。</p>
+            <button onclick="backToSelectionScreen()" class="btn btn-success" style="margin-top: 15px; padding: 10px 25px; font-weight: 600;">
+                <i class="fas fa-arrow-left"></i> 新しい範囲を選択する
             </button>
         </div>
     `;
     
+    // ★quizResultAreaの先頭に挿入（既存コンテンツの前に）
     if (quizResultArea) {
-        quizResultArea.appendChild(messageDiv);
+        const firstChild = quizResultArea.firstChild;
+        if (firstChild) {
+            quizResultArea.insertBefore(messageDiv, firstChild);
+        } else {
+            quizResultArea.appendChild(messageDiv);
+        }
     }
     
-    // 数秒後に自動的に選択画面に戻る
-    setTimeout(() => {
-        backToSelectionScreen();
-    }, 5000);
+    console.log('🎉 苦手問題完全克服のメッセージを表示しました');
+    
+    // ★フラッシュメッセージも表示
+    flashMessage('🎉 すべての苦手問題を克服しました！', 'success');
 }
 
 function showNextQuestion() {
@@ -921,6 +944,9 @@ function updateProgressBar() {
 }
 
 function showQuizResult() {
+    // ★最初に既存のお祝いメッセージを削除
+    clearPreviousCelebrationMessages();
+    
     if (cardArea) cardArea.classList.add('hidden');
     if (quizResultArea) quizResultArea.classList.remove('hidden');
 
@@ -947,6 +973,8 @@ function showQuizResult() {
     }
 
     displayIncorrectWordsForCurrentQuiz();
+    
+    // ボタンテキストの動的更新
     updateRestartButtonText();
 }
 
@@ -1009,12 +1037,26 @@ function toggleIncorrectAnswer(index) {
 }
 
 function backToSelectionScreen() {
+    // ★お祝いメッセージをクリア
+    clearPreviousCelebrationMessages();
+    
     if (selectionArea) selectionArea.classList.remove('hidden');
     if (cardArea) cardArea.classList.add('hidden');
     if (quizResultArea) quizResultArea.classList.add('hidden');
     if (weakWordsListSection) weakWordsListSection.classList.add('hidden');
     if (noWeakWordsMessage) noWeakWordsMessage.classList.add('hidden');
 }
+
+function debugCelebrationMessages() {
+    const celebrations = document.querySelectorAll('.no-weak-problems-celebration');
+    console.log(`現在のお祝いメッセージ数: ${celebrations.length}`);
+    celebrations.forEach((element, index) => {
+        console.log(`${index + 1}. ${element.outerHTML.substring(0, 100)}...`);
+    });
+    return celebrations;
+}
+
+window.debugCelebrationMessages = debugCelebrationMessages;
 
 function restartQuiz() {
     console.log('\n🔄 同じ条件で再学習開始');
