@@ -639,16 +639,21 @@ function startQuiz() {
         return;
     }
 
-    // ★最後のクイズ設定を保存
-    lastQuizSettings.questionCount = selectedQuestionCount;
-    lastQuizSettings.isIncorrectOnly = (selectedQuestionCount === 'incorrectOnly');
+    // ★最後のクイズ設定を確実に初期化
+    lastQuizSettings = {
+        questionCount: selectedQuestionCount,
+        isIncorrectOnly: (selectedQuestionCount === 'incorrectOnly'),
+        selectedUnits: [],
+        availableQuestions: []
+    };
     
+    console.log('🔄 クイズ設定初期化:', lastQuizSettings);
+
     // 選択状態を保存（苦手問題モード以外の場合のみ）
     if (selectedQuestionCount !== 'incorrectOnly') {
         saveSelectionState();
         
-        // ★選択された単元情報を保存
-        lastQuizSettings.selectedUnits = [];
+        // 選択された単元情報を保存
         document.querySelectorAll('.unit-item input[type="checkbox"]:checked').forEach(checkbox => {
             lastQuizSettings.selectedUnits.push({
                 chapter: checkbox.dataset.chapter,
@@ -682,14 +687,15 @@ function startQuiz() {
             return;
         }
         
-        // ★苦手問題の場合は利用可能な全問題として保存
+        // 苦手問題の場合は利用可能な全問題として保存
         lastQuizSettings.availableQuestions = [...quizQuestions];
         
     } else {
         // 通常モード：選択された範囲から出題
+        console.log('\n📚 通常モード開始');
         quizQuestions = selectedQuestions;
         
-        // ★選択範囲の全問題を保存
+        // 選択範囲の全問題を保存
         lastQuizSettings.availableQuestions = [...selectedQuestions];
     }
 
@@ -712,6 +718,12 @@ function startQuiz() {
     incorrectCount = 0;
     totalQuestions = currentQuizData.length;
     quizStartTime = Date.now();
+    
+    console.log('✅ クイズ開始設定完了:', {
+        mode: lastQuizSettings.isIncorrectOnly ? '苦手問題' : '通常',
+        totalQuestions: totalQuestions,
+        availableQuestions: lastQuizSettings.availableQuestions.length
+    });
 
     // UIの切り替え
     if (selectionArea) selectionArea.classList.add('hidden');
@@ -944,7 +956,7 @@ function updateProgressBar() {
 }
 
 function showQuizResult() {
-    // ★最初に既存のお祝いメッセージを削除
+    // 最初に既存のお祝いメッセージを削除
     clearPreviousCelebrationMessages();
     
     if (cardArea) cardArea.classList.add('hidden');
@@ -974,8 +986,17 @@ function showQuizResult() {
 
     displayIncorrectWordsForCurrentQuiz();
     
-    // ボタンテキストの動的更新
-    updateRestartButtonText();
+    // ★lastQuizSettingsが適切に設定されているかチェック
+    console.log('🔍 結果画面表示時の設定確認:', {
+        isIncorrectOnly: lastQuizSettings.isIncorrectOnly,
+        questionCount: lastQuizSettings.questionCount,
+        availableQuestions: lastQuizSettings.availableQuestions.length
+    });
+    
+    // ★少し遅延させてボタンテキストを更新（DOM更新後に実行）
+    setTimeout(() => {
+        updateRestartButtonText();
+    }, 100);
 }
 
 // 不正解問題表示関数の修正版
@@ -1037,8 +1058,11 @@ function toggleIncorrectAnswer(index) {
 }
 
 function backToSelectionScreen() {
-    // ★お祝いメッセージをクリア
+    // お祝いメッセージをクリア
     clearPreviousCelebrationMessages();
+    
+    // ★ボタンテキストをデフォルトにリセット
+    resetRestartButtonToDefault();
     
     if (selectionArea) selectionArea.classList.remove('hidden');
     if (cardArea) cardArea.classList.add('hidden');
@@ -1129,7 +1153,14 @@ function updateRestartButtonText() {
     const restartButton = document.getElementById('restartQuizButton');
     const explanationDiv = document.querySelector('.restart-explanation');
     
-    if (restartButton && lastQuizSettings.isIncorrectOnly) {
+    if (!restartButton) {
+        console.warn('restartQuizButton が見つかりません');
+        return;
+    }
+    
+    // ★苦手問題モードかどうかを確認
+    if (lastQuizSettings.isIncorrectOnly) {
+        // 苦手問題モードの場合
         restartButton.innerHTML = '<i class="fas fa-redo"></i> 最新の苦手問題で再学習';
         
         if (explanationDiv) {
@@ -1142,7 +1173,47 @@ function updateRestartButtonText() {
             explanationDiv.style.borderLeftColor = '#e74c3c';
             explanationDiv.style.backgroundColor = '#fdf2f2';
         }
+        
+        console.log('🎯 苦手問題モード用のボタンテキストに更新');
+    } else {
+        // ★通常モードの場合
+        restartButton.innerHTML = '<i class="fas fa-redo"></i> 同じ範囲から新しい問題で再学習';
+        
+        if (explanationDiv) {
+            explanationDiv.innerHTML = `
+                <small>
+                    <i class="fas fa-info-circle" style="color: #3498db;"></i>
+                    <strong>「新しい問題で再学習」</strong>：前回と同じ出題範囲・同じ問題数で、異なる問題セットから出題されます。
+                </small>
+            `;
+            explanationDiv.style.borderLeftColor = '#3498db';
+            explanationDiv.style.backgroundColor = '#e8f4fd';
+        }
+        
+        console.log('📚 通常モード用のボタンテキストに更新');
     }
+}
+
+function resetRestartButtonToDefault() {
+    const restartButton = document.getElementById('restartQuizButton');
+    const explanationDiv = document.querySelector('.restart-explanation');
+    
+    if (restartButton) {
+        restartButton.innerHTML = '<i class="fas fa-redo"></i> 同じ範囲から新しい問題で再学習';
+    }
+    
+    if (explanationDiv) {
+        explanationDiv.innerHTML = `
+            <small>
+                <i class="fas fa-info-circle" style="color: #3498db;"></i>
+                <strong>「新しい問題で再学習」</strong>：前回と同じ出題範囲・同じ問題数で、異なる問題セットから出題されます。
+            </small>
+        `;
+        explanationDiv.style.borderLeftColor = '#3498db';
+        explanationDiv.style.backgroundColor = '#e8f4fd';
+    }
+    
+    console.log('🔄 ボタンテキストをデフォルトにリセット');
 }
 
 function resetSelections() {
