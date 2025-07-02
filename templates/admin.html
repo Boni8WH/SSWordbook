@@ -337,7 +337,31 @@
         </div>
     </div>
 
-    <!-- ID不一致問題の修正（新機能） -->
+    <div class="admin-panel" style="background-color: #fff8e1; border-left: 5px solid #ff9800; margin-bottom: 20px;">
+        <h4>🗑️ ID不一致履歴の削除</h4>
+        <p>現在の問題データと一致しない古い学習履歴を削除します。<br>
+        <strong>用途：</strong>問題文修正後に古いIDの履歴を削除する場合に使用。<br>
+        <strong>⚠️ 注意：</strong>削除された履歴は復元できません。</p>
+        
+        <div style="margin-top: 15px;">
+            <button type="button" class="btn btn-info" onclick="analyzeInvalidHistory()">
+                <i class="fas fa-search"></i> 📊 無効履歴を分析
+            </button>
+            
+            <button type="button" class="btn btn-warning" onclick="cleanInvalidHistory()" style="margin-left: 10px;">
+                <i class="fas fa-trash-alt"></i> 🗑️ 無効履歴を削除
+            </button>
+        </div>
+        
+        <!-- 無効履歴分析結果表示エリア -->
+        <div id="invalidHistoryAnalysisResult" style="margin-top: 15px; display: none;">
+            <h5>📊 無効履歴分析結果</h5>
+            <div id="invalidAnalysisContent" style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; border: 1px solid #dee2e6;">
+                <!-- 分析結果がここに表示されます -->
+            </div>
+        </div>
+    </div>
+
     <div class="admin-panel" style="background-color: #e3f2fd; border-left: 5px solid #2196f3; margin-bottom: 20px;">
         <h4>🔧 ID不一致問題の修正（推奨）</h4>
         <p>新しいID形式と一致しない問題履歴のみを効率的に修正します。<br>
@@ -475,6 +499,108 @@ function fixUnmatchedData() {
         const form = document.createElement('form');
         form.method = 'POST';
         form.action = '/admin/fix_unmatched_data';
+        
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+
+function analyzeInvalidHistory() {
+    const button = event.target;
+    const originalText = button.textContent;
+    button.disabled = true;
+    button.textContent = '分析中...';
+    
+    fetch('/admin/analyze_invalid_history', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            displayInvalidHistoryAnalysis(data.analysis);
+        } else {
+            alert(`❌ エラー: ${data.message}`);
+        }
+    })
+    .catch(error => {
+        console.error('分析エラー:', error);
+        alert('❌ 分析中にエラーが発生しました。');
+    })
+    .finally(() => {
+        button.disabled = false;
+        button.textContent = originalText;
+    });
+}
+
+function displayInvalidHistoryAnalysis(analysis) {
+    const resultDiv = document.getElementById('invalidHistoryAnalysisResult');
+    const contentDiv = document.getElementById('invalidAnalysisContent');
+    
+    let html = `
+        <div class="row">
+            <div class="col-md-6">
+                <h6>📊 削除対象統計</h6>
+                <ul>
+                    <li>総ユーザー数: ${analysis.total_users}人</li>
+                    <li>無効履歴があるユーザー: ${analysis.users_with_invalid}人</li>
+                    <li>無効な学習履歴: ${analysis.total_invalid_entries}個</li>
+                    <li>無効な苦手問題: ${analysis.total_invalid_incorrect}個</li>
+                </ul>
+            </div>
+            <div class="col-md-6">
+                <h6>💡 推奨アクション</h6>
+                ${analysis.users_with_invalid === 0 ? 
+                    '<p class="text-success">✅ 無効な履歴はありません。削除は不要です。</p>' :
+                    `<p class="text-warning">⚠️ ${analysis.total_invalid_entries}個の無効履歴があります。<br>「無効履歴を削除」の実行を推奨します。</p>`
+                }
+            </div>
+        </div>
+    `;
+    
+    if (analysis.user_details.length > 0) {
+        html += '<h6>👥 影響を受けるユーザー</h6>';
+        html += '<div class="table-responsive"><table class="table table-sm table-striped">';
+        html += '<thead><tr><th>ユーザー名</th><th>部屋</th><th>有効履歴</th><th>無効履歴</th><th>無効苦手問題</th><th>サンプル無効ID</th></tr></thead><tbody>';
+        
+        analysis.user_details.forEach(user => {
+            const sampleId = user.invalid_history_ids.length > 0 ? 
+                user.invalid_history_ids[0].substring(0, 30) + '...' : 
+                (user.invalid_incorrect_ids.length > 0 ? user.invalid_incorrect_ids[0].substring(0, 30) + '...' : '-');
+            
+            html += `<tr>
+                <td>${user.username}</td>
+                <td>${user.room_number}</td>
+                <td class="text-success">${user.valid_history}</td>
+                <td class="text-warning">${user.invalid_history}</td>
+                <td class="text-warning">${user.invalid_incorrect}</td>
+                <td><small class="text-muted">${sampleId}</small></td>
+            </tr>`;
+        });
+        
+        html += '</tbody></table></div>';
+        
+        if (analysis.user_details.length > 5) {
+            html += `<p class="text-muted"><small>※ 上位${Math.min(analysis.user_details.length, 10)}ユーザーを表示</small></p>`;
+        }
+    }
+    
+    contentDiv.innerHTML = html;
+    resultDiv.style.display = 'block';
+}
+
+// 無効履歴の削除
+function cleanInvalidHistory() {
+    if (confirm('無効な学習履歴を削除しますか？\n\n⚠️ この操作は元に戻せません\n⚠️ 現在の問題データと一致しない履歴が完全に削除されます\n⚠️ 有効な履歴は保持されます\n\n削除を実行しますか？')) {
+        const button = event.target;
+        const originalText = button.textContent;
+        button.disabled = true;
+        button.textContent = '削除中...';
+        
+        // フォームを作成して送信
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '/admin/clean_invalid_history';
         
         document.body.appendChild(form);
         form.submit();
