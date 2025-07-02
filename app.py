@@ -3794,70 +3794,67 @@ def admin_upload_users():
         return redirect(url_for('admin_page'))
 
     try:
-        print("🔍 CSV処理開始（メモリ効率版）...")
+        print("🔍 超軽量CSV処理開始...")
         
-        # ★修正1: ファイルサイズチェック（1MB制限）
-        file.seek(0, 2)  # ファイル末尾に移動
-        file_size = file.tell()
-        file.seek(0)  # ファイル先頭に戻る
+        # ★緊急修正: 極限まで制限を厳しくする
+        content = file.read()
         
-        if file_size > 1024 * 1024:  # 1MB制限
-            flash('CSVファイルが大きすぎます（1MB以下にしてください）。', 'danger')
+        # ファイルサイズを厳格にチェック
+        if len(content) > 10240:  # 10KB制限
+            flash('CSVファイルが大きすぎます（10KB以下にしてください）。', 'danger')
             return redirect(url_for('admin_page'))
         
-        # ★修正2: ストリーミング読み込み（メモリ効率）
-        content = file.read().decode('utf-8')
-        lines = content.split('\n')
+        content_str = content.decode('utf-8')
+        lines = content_str.strip().split('\n')
         
-        if len(lines) > 1000:  # 1000行制限
-            flash('CSVファイルの行数が多すぎます（1000行以下にしてください）。', 'danger')
+        # 行数を厳格に制限
+        if len(lines) > 50:  # 50行制限
+            flash('CSVファイルの行数が多すぎます（50行以下にしてください）。', 'danger')
             return redirect(url_for('admin_page'))
         
-        print(f"📊 ファイルサイズ: {file_size}bytes, 行数: {len(lines)}")
+        print(f"📊 ファイルサイズ: {len(content)}bytes, 行数: {len(lines)}")
         
-        # ★修正3: バッチ処理（50件ずつ）
-        stream = StringIO(content)
-        reader = csv.DictReader(stream)
+        # ★緊急修正: 1件ずつ処理（バッチ処理なし）
+        if len(lines) < 2:
+            flash('CSVファイルにデータがありません。', 'danger')
+            return redirect(url_for('admin_page'))
+        
+        # ヘッダー行をチェック
+        header = lines[0].split(',')
+        required_headers = ['部屋番号', '入室パスワード', '出席番号', '個別パスワード', 'アカウント名']
         
         users_added_count = 0
         errors = []
-        skipped_existing = 0
-        batch_size = 50
-        batch_count = 0
-
-        users_to_add = []
         
-        for row_num, row in enumerate(reader, start=2):
+        # ★修正: 一度に1行ずつ、即座にコミット
+        for i, line in enumerate(lines[1:], start=2):
             try:
-                # データの取得と検証
-                room_number = row.get('部屋番号', '').strip()
-                room_password = row.get('入室パスワード', '').strip()
-                student_id = row.get('出席番号', '').strip()
-                individual_password = row.get('個別パスワード', '').strip()
-                username = row.get('アカウント名', '').strip()
-
+                if not line.strip():
+                    continue
+                    
+                values = [v.strip() for v in line.split(',')]
+                if len(values) < 5:
+                    errors.append(f"行{i}: データが不完全です")
+                    continue
+                
+                room_number, room_password, student_id, individual_password, username = values[:5]
+                
                 # 必須項目チェック
                 if not all([room_number, room_password, student_id, individual_password, username]):
-                    errors.append(f"行{row_num}: 必須項目が不足しています")
+                    errors.append(f"行{i}: 必須項目が不足しています")
                     continue
 
-                # 重複チェック
-                existing_user = User.query.filter_by(
-                    room_number=room_number, 
-                    username=username
-                ).first()
-                
-                if existing_user:
-                    errors.append(f"行{row_num}: 部屋{room_number}にユーザー名{username}は既に存在します")
-                    skipped_existing += 1
+                # 重複チェック（簡易版）
+                if User.query.filter_by(room_number=room_number, username=username).first():
+                    errors.append(f"行{i}: 重複ユーザー {username}")
                     continue
 
-                # ★修正4: 新規ユーザー作成（original_username追加）
+                # ★修正: 新規ユーザー作成（minimal版）
                 new_user = User(
                     room_number=room_number,
                     student_id=student_id,
                     username=username,
-                    original_username=username  # ★重要: 追加
+                    original_username=username
                 )
                 new_user.set_room_password(room_password)
                 new_user.set_individual_password(individual_password)
@@ -3865,63 +3862,38 @@ def admin_upload_users():
                 new_user.incorrect_words = "[]"
                 new_user.last_login = datetime.now(JST)
 
-                users_to_add.append(new_user)
-                users_added_count += 1
+                # ★重要: 即座に1件ずつコミット
+                db.session.add(new_user)
+                db.session.commit()
                 
-                # ★修正5: バッチごとにコミット
-                if len(users_to_add) >= batch_size:
-                    batch_count += 1
-                    print(f"🔄 バッチ{batch_count}処理中: {len(users_to_add)}ユーザー")
-                    
-                    for user in users_to_add:
-                        db.session.add(user)
-                    
-                    db.session.commit()
-                    users_to_add = []  # バッチクリア
-                    
-                    # メモリ解放
+                users_added_count += 1
+                print(f"✅ ユーザー追加: {username}")
+                
+                # メモリ不足対策
+                if users_added_count % 10 == 0:
                     import gc
                     gc.collect()
 
             except Exception as e:
-                errors.append(f"行{row_num}: データ処理エラー - {str(e)}")
+                db.session.rollback()
+                errors.append(f"行{i}: エラー - {str(e)[:50]}")
                 continue
 
-        # ★修正6: 残りのユーザーを追加
-        if users_to_add:
-            batch_count += 1
-            print(f"🔄 最終バッチ処理中: {len(users_to_add)}ユーザー")
-            
-            for user in users_to_add:
-                db.session.add(user)
-            
-            db.session.commit()
+        print(f"✅ 処理完了: {users_added_count}ユーザー追加")
 
-        print(f"✅ CSV処理完了: {users_added_count}ユーザー追加")
-
-        # 結果メッセージ
+        # シンプルな結果メッセージ
         if users_added_count > 0:
-            flash(f'✅ {users_added_count}人のユーザーを追加しました。', 'success')
+            flash(f'✅ {users_added_count}人追加完了', 'success')
         
-        if skipped_existing > 0:
-            flash(f'⚠️ {skipped_existing}人のユーザーは重複するため、スキップされました。', 'warning')
-            
-        if errors:
-            error_summary = f"❌ {len(errors)}件のエラーが発生しました。"
-            if len(errors) <= 3:
-                error_summary += " " + " / ".join(errors)
-            else:
-                error_summary += f" 最初の3件: {' / '.join(errors[:3])}"
-            flash(error_summary, 'danger')
+        if errors and len(errors) <= 5:
+            flash(f'❌ エラー: {", ".join(errors)}', 'warning')
+        elif errors:
+            flash(f'❌ {len(errors)}件のエラーが発生', 'warning')
                 
-    except UnicodeDecodeError:
-        flash('CSVファイルの文字エンコーディングを確認してください（UTF-8である必要があります）。', 'danger')
     except Exception as e:
-        print(f"❌ CSV処理エラー: {e}")
-        import traceback
-        traceback.print_exc()
+        print(f"❌ 致命的エラー: {e}")
         db.session.rollback()
-        flash(f'CSVファイルの処理中にエラーが発生しました: {str(e)}', 'danger')
+        flash(f'処理エラー: {str(e)[:100]}', 'danger')
 
     return redirect(url_for('admin_page'))
 
