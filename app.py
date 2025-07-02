@@ -292,14 +292,15 @@ class AppInfo(db.Model):
 
 class PasswordResetToken(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False)  # ★CASCADE追加
     token = db.Column(db.String(100), unique=True, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)  # ★ UTCに変更
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
     expires_at = db.Column(db.DateTime, nullable=False)
     used = db.Column(db.Boolean, default=False)
     used_at = db.Column(db.DateTime)
     
-    user = db.relationship('User', backref=db.backref('reset_tokens', lazy=True))
+    # ★relationshipにpassiveキーワード追加
+    user = db.relationship('User', backref=db.backref('reset_tokens', lazy=True, passive_deletes=True))
     
     def is_expired(self):
         """UTCベースで期限チェック"""
@@ -677,7 +678,7 @@ def change_username_page():
 # app.py の migrate_database() 関数を以下に置き換えてください
 
 def migrate_database():
-    """データベーススキーマの変更を処理する（PostgreSQL専用版）"""
+    """データベーススキーマの変更を処理する（外部キー制約修正版）"""
     with app.app_context():
         print("🔄 データベースマイグレーションを開始...")
         
@@ -803,6 +804,8 @@ def migrate_database():
                 print("✅ csv_file_contentテーブルを作成しました。")
             else:
                 print("✅ csv_file_contentテーブルは既に存在します。")
+            
+            fix_foreign_key_constraints()
             
             print("✅ データベースマイグレーションが完了しました。")
             
@@ -1132,7 +1135,37 @@ def send_password_reset_email(user, email, token):
         
         raise e
 
-
+@app.route('/admin/cleanup_orphaned_tokens', methods=['POST'])
+def admin_cleanup_orphaned_tokens():
+    """存在しないユーザーを参照するトークンを削除"""
+    if not session.get('admin_logged_in'):
+        return jsonify({'status': 'error', 'message': '管理者権限がありません。'}), 403
+    
+    try:
+        # 孤立したトークンを検索
+        orphaned_tokens = db.session.query(PasswordResetToken).filter(
+            ~PasswordResetToken.user_id.in_(
+                db.session.query(User.id)
+            )
+        ).all()
+        
+        orphaned_count = len(orphaned_tokens)
+        
+        # 孤立したトークンを削除
+        for token in orphaned_tokens:
+            db.session.delete(token)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'status': 'success',
+            'message': f'{orphaned_count}個の孤立したトークンを削除しました。',
+            'deleted_count': orphaned_count
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 # ====================================================================
 # ルーティング
 # ====================================================================
@@ -1550,6 +1583,55 @@ def admin_force_migration():
             'status': 'error',
             'message': f'マイグレーションエラー: {str(e)}'
         }), 500
+
+def fix_foreign_key_constraints():
+    """外部キー制約を修正してCASCADEを追加"""
+    try:
+        with app.app_context():
+            print("🔧 外部キー制約の修正を開始...")
+            
+            # PostgreSQLの場合の制約確認・修正
+            if is_postgres:
+                with db.engine.connect() as conn:
+                    # 既存の外部キー制約を確認
+                    result = conn.execute(text("""
+                        SELECT constraint_name 
+                        FROM information_schema.table_constraints 
+                        WHERE table_name = 'password_reset_token' 
+                        AND constraint_type = 'FOREIGN KEY'
+                    """))
+                    
+                    existing_constraints = [row[0] for row in result.fetchall()]
+                    print(f"📋 既存の外部キー制約: {existing_constraints}")
+                    
+                    # 既存制約を削除してCASCADE付きで再作成
+                    for constraint_name in existing_constraints:
+                        try:
+                            # 制約削除
+                            conn.execute(text(f'ALTER TABLE password_reset_token DROP CONSTRAINT {constraint_name}'))
+                            print(f"🗑️ 制約削除: {constraint_name}")
+                        except Exception as e:
+                            print(f"⚠️ 制約削除エラー ({constraint_name}): {e}")
+                    
+                    # CASCADE付きの新しい外部キー制約を追加
+                    try:
+                        conn.execute(text("""
+                            ALTER TABLE password_reset_token 
+                            ADD CONSTRAINT fk_password_reset_token_user_id 
+                            FOREIGN KEY (user_id) REFERENCES "user" (id) ON DELETE CASCADE
+                        """))
+                        print("✅ CASCADE付き外部キー制約を追加しました")
+                    except Exception as e:
+                        print(f"⚠️ 新制約追加エラー: {e}")
+                    
+                    conn.commit()
+            
+            print("✅ 外部キー制約修正完了")
+            
+    except Exception as e:
+        print(f"❌ 外部キー制約修正エラー: {e}")
+        import traceback
+        traceback.print_exc()
 
 @app.route('/admin/check_database_status')
 def admin_check_database_status():
@@ -2052,6 +2134,7 @@ def debug_check_token(token):
     <p>使用時刻: {reset_token.used_at}</p>
     <p>有効性: {'有効' if reset_token.is_valid() else '無効'}</p>
     """
+
 
 # ====================================================================
 # 進捗ページ
@@ -2557,15 +2640,42 @@ def admin_delete_user(user_id):
             flash('指定されたユーザーが見つかりません。', 'danger')
             return redirect(url_for('admin_page'))
 
+        username = user_to_delete.username
+        room_number = user_to_delete.room_number
+        student_id = user_to_delete.student_id
+
+        # ★重要：関連するパスワードリセットトークンを先に削除
+        try:
+            reset_tokens = PasswordResetToken.query.filter_by(user_id=user_id).all()
+            token_count = len(reset_tokens)
+            
+            for token in reset_tokens:
+                db.session.delete(token)
+            
+            print(f"🗑️ 削除されたパスワードリセットトークン: {token_count}個")
+            
+        except Exception as token_error:
+            print(f"⚠️ トークン削除エラー: {token_error}")
+            # トークン削除エラーでも処理を続行
+
+        # ★ユーザー本体を削除
         db.session.delete(user_to_delete)
         db.session.commit()
-        flash(f'ユーザー "{user_to_delete.username}" (部屋番号: {user_to_delete.room_number}, 出席番号: {user_to_delete.student_id}) を削除しました。', 'success')
+        
+        flash(f'✅ ユーザー "{username}" (部屋番号: {room_number}, 出席番号: {student_id}) を削除しました。', 'success')
+        
+        if token_count > 0:
+            flash(f'📧 関連するパスワードリセットトークン {token_count}個も削除されました。', 'info')
         
         return redirect(url_for('admin_page'))
+        
     except Exception as e:
-        print(f"Error in admin_delete_user: {e}")
+        print(f"❌ ユーザー削除エラー: {e}")
+        import traceback
+        traceback.print_exc()
+        
         db.session.rollback()
-        flash(f'ユーザー削除中にエラーが発生しました: {e}', 'danger')
+        flash(f'ユーザー削除中にエラーが発生しました: {str(e)}', 'danger')
         return redirect(url_for('admin_page'))
 
 # 部屋設定管理
