@@ -3004,7 +3004,7 @@ def progress_page():
 
         # ランキング表示人数を取得（カラムが存在しない場合はデフォルト10人）
         ranking_display_count = 10  # デフォルト値
-        
+
         try:
             if room_setting_for_ranking and hasattr(room_setting_for_ranking, 'ranking_display_count'):
                 ranking_display_count = room_setting_for_ranking.ranking_display_count
@@ -3107,10 +3107,10 @@ def progress_page():
 
         # バランススコアで降順ソート
         ranking_data.sort(key=lambda x: (x['balance_score'], x['total_attempts']), reverse=True)
-        top_ranking = ranking_data[:ranking_display_count]
+        top_ranking = ranking_data[:10]  # ← この変数名を確認
 
         print(f"ランキング対象ユーザー数: {len(ranking_data)}")
-        print(f"表示人数設定: {ranking_display_count}")
+        print(f"表示ランキング数: {len(top_ranking)}")  # ← デバッグ用に追加
         print("=== 進捗ページ処理完了 ===\n")
 
         context = get_template_context()
@@ -3118,9 +3118,8 @@ def progress_page():
         return render_template('progress.html',
                                current_user=current_user,
                                user_progress_by_chapter=sorted_chapter_progress,
-                               top_ranking=top_ranking,  # 名前を変更
-                               current_user_stats=current_user_stats,  # 新規追加
-                               ranking_display_count=ranking_display_count,  # 新規追加
+                               top_ranking=top_ranking,  # ← この変数名が一致しているか確認
+                               ranking_display_count=10,  # ← 固定値で追加
                                **context)
     
     except Exception as e:
@@ -3129,6 +3128,15 @@ def progress_page():
         traceback.print_exc()
         return f"Progress Error: {e}", 500
 
+        print(f"🔍 デバッグ情報:")
+        print(f"   全ユーザー数: {len(all_users_for_ranking)}")
+        print(f"   ランキングデータ数: {len(ranking_data)}")
+        print(f"   部屋番号: {current_room_number}")
+
+        # 最初の数件を表示
+        for i, user_data in enumerate(ranking_data[:3]):
+            print(f"   {i+1}位: {user_data['username']} - スコア: {user_data['balance_score']}")
+            
 # ====================================================================
 # 管理者ページ
 # ====================================================================
@@ -3430,77 +3438,6 @@ def admin_delete_user(user_id):
         db.session.rollback()
         flash(f'ユーザー削除中にエラーが発生しました: {str(e)}', 'danger')
         return redirect(url_for('admin_page'))
-
-@app.route('/admin/update_room_ranking_setting', methods=['POST'])
-def admin_update_room_ranking_setting():
-    try:
-        if not session.get('admin_logged_in'):
-            return jsonify(status='error', message='管理者権限がありません。'), 403
-
-        data = request.get_json()
-        room_number = data.get('room_number')
-        ranking_count = data.get('ranking_count', 10)
-
-        print(f"🔧 ランキング表示人数設定更新リクエスト: 部屋{room_number} -> {ranking_count}人")
-
-        if not room_number:
-            return jsonify(status='error', message='部屋番号が指定されていません。'), 400
-
-        if not isinstance(ranking_count, int) or ranking_count < 1 or ranking_count > 50:
-            return jsonify(status='error', message='ランキング表示人数は1-50人の間で指定してください。'), 400
-
-        # 部屋設定を取得または作成
-        room_setting = RoomSetting.query.filter_by(room_number=room_number).first()
-
-        if room_setting:
-            # 既存設定を更新
-            old_count = room_setting.ranking_display_count
-            room_setting.ranking_display_count = ranking_count
-            room_setting.updated_at = datetime.now(JST)
-            print(f"📝 既存設定更新: {old_count}人 -> {ranking_count}人")
-        else:
-            # 新規設定を作成
-            room_setting = RoomSetting(
-                room_number=room_number,
-                max_enabled_unit_number="9999",
-                csv_filename="words.csv",
-                ranking_display_count=ranking_count
-            )
-            db.session.add(room_setting)
-            print(f"➕ 新規設定作成: 部屋{room_number} with {ranking_count}人表示")
-        
-        # データベースにコミット
-        db.session.commit()
-        
-        # 保存後の確認
-        saved_setting = RoomSetting.query.filter_by(room_number=room_number).first()
-        if saved_setting:
-            actual_count = saved_setting.ranking_display_count
-            print(f"✅ 保存確認成功: 部屋{room_number} = {actual_count}人")
-            
-            if actual_count != ranking_count:
-                print(f"⚠️ 保存値が異なります: 期待値={ranking_count}, 実際値={actual_count}")
-                return jsonify(
-                    status='error', 
-                    message=f'設定の保存に失敗しました。期待値と実際値が異なります。'
-                ), 500
-        else:
-            print(f"❌ 保存確認失敗: 部屋{room_number}の設定が見つかりません")
-            return jsonify(status='error', message='設定の保存確認に失敗しました。'), 500
-        
-        return jsonify(
-            status='success', 
-            message=f'部屋 {room_number} のランキング表示人数を {ranking_count}人に更新しました。',
-            room_number=room_number,
-            ranking_count=actual_count
-        )
-        
-    except Exception as e:
-        print(f"❌ ランキング設定更新エラー: {e}")
-        import traceback
-        traceback.print_exc()
-        db.session.rollback()
-        return jsonify(status='error', message=str(e)), 500
 
 # 部屋設定管理
 @app.route('/admin/get_room_setting', methods=['POST'])
