@@ -239,12 +239,6 @@ class RoomSetting(db.Model):
     room_number = db.Column(db.String(50), unique=True, nullable=False)
     max_enabled_unit_number = db.Column(db.String(50), default="9999", nullable=False)
     csv_filename = db.Column(db.String(100), default="words.csv", nullable=False)
-    ranking_display_count = db.Column(db.Integer, default=10, nullable=False)  # ★新規追加
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))
-    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))
-
-    def __repr__(self):
-        return f'<RoomSetting {self.room_number}>'
 
 class RoomCsvFile(db.Model):
     """部屋ごとのカスタムCSVファイル情報を管理するモデル"""
@@ -685,7 +679,7 @@ def change_username_page():
 # app.py の migrate_database() 関数を以下に置き換えてください
 
 def migrate_database():
-    """データベーススキーマの変更を処理する（ranking_display_count追加版）"""
+    """データベーススキーマの変更を処理する（外部キー制約修正版）"""
     with app.app_context():
         print("🔄 データベースマイグレーションを開始...")
         
@@ -760,16 +754,6 @@ def migrate_database():
                             conn.execute(text(f'ALTER TABLE room_setting ADD COLUMN {col_name} TIMESTAMP'))
                             print(f"✅ {col_name}カラムを追加しました。")
                         conn.commit()
-                if inspector.has_table('room_setting'):
-                    columns = [col['name'] for col in inspector.get_columns('room_setting')]
-                    print(f"📋 既存のRoomSettingテーブルカラム: {columns}")
-                    
-                    if 'ranking_display_count' not in columns:
-                        print("🔧 ranking_display_countカラムを追加します...")
-                        with db.engine.connect() as conn:
-                            conn.execute(text('ALTER TABLE room_setting ADD COLUMN ranking_display_count INTEGER DEFAULT 10'))
-                            conn.commit()
-                        print("✅ ranking_display_countカラムを追加しました。")
             
             # 3. App_infoテーブルの確認（★重要な修正箇所）
             if inspector.has_table('app_info'):
@@ -2883,12 +2867,6 @@ def progress_page():
         print(f"\n=== 進捗ページ処理開始 ===")
         print(f"ユーザー: {current_user.username} (部屋: {current_user.room_number})")
 
-        # ★重要：エラー時のトランザクション安全化
-        try:
-            db.session.rollback()  # 既存のエラートランザクションをクリア
-        except Exception as rollback_error:
-            print(f"⚠️ ロールバックエラー: {rollback_error}")
-
         user_problem_history = current_user.get_problem_history()
         print(f"学習履歴数: {len(user_problem_history)}")
         
@@ -2896,36 +2874,12 @@ def progress_page():
         word_data = load_word_data_for_room(current_user.room_number)
         print(f"部屋の単語データ数: {len(word_data)}")
         
-        # ★安全な部屋設定取得（分離して実行）
-        max_enabled_unit_num_str = "9999"
+        room_setting = RoomSetting.query.filter_by(room_number=current_user.room_number).first()
+        max_enabled_unit_num_str = room_setting.max_enabled_unit_number if room_setting else "9999"
         parsed_max_enabled_unit_num = parse_unit_number(max_enabled_unit_num_str)
-        ranking_display_count = 10
-        
-        try:
-            # 新しいコネクションで部屋設定を取得
-            with db.engine.connect() as conn:
-                result = conn.execute(text("""
-                    SELECT max_enabled_unit_number, ranking_display_count 
-                    FROM room_setting 
-                    WHERE room_number = :room_number
-                """), {"room_number": current_user.room_number})
-                
-                room_data = result.fetchone()
-                if room_data:
-                    max_enabled_unit_num_str = room_data[0] or "9999"
-                    ranking_display_count = room_data[1] or 10
-                    parsed_max_enabled_unit_num = parse_unit_number(max_enabled_unit_num_str)
-                    print(f"✅ 部屋設定取得成功: 最大単元={max_enabled_unit_num_str}, ランキング={ranking_display_count}")
-                else:
-                    print(f"⚠️ 部屋設定なし。デフォルト値使用")
-                    
-        except Exception as setting_error:
-            print(f"⚠️ 部屋設定取得エラー: {setting_error}")
-            # デフォルト値で続行
+        print(f"最大単元番号: {max_enabled_unit_num_str}")
 
-        print(f"最大単元番号: {max_enabled_unit_num_str}, ランキング表示人数: {ranking_display_count}")
-
-        # ★章ごとに進捗をまとめる（既存のコードを使用）
+        # ★修正：章ごとに進捗をまとめる
         chapter_progress_summary = {}
 
         # 有効な単語データで単元進捗を初期化
@@ -3003,77 +2957,6 @@ def progress_page():
             else:
                 unmatched_problems += 1
 
-        # ★現在のユーザーの個人スコア計算
-        current_user_total_attempts = 0
-        current_user_total_correct = 0
-        current_user_mastered_problem_ids = set()
-        
-        # 有効な問題数を計算
-        total_questions_for_room = 0
-        for word in word_data:
-            is_word_enabled_in_csv = word['enabled']
-            is_unit_enabled_by_room_setting = parse_unit_number(word['number']) <= parsed_max_enabled_unit_num
-            if is_word_enabled_in_csv and is_unit_enabled_by_room_setting:
-                total_questions_for_room += 1
-
-        # 現在のユーザーのスコア詳細計算
-        for problem_id, history in user_problem_history.items():
-            matched_word = None
-            for word in word_data:
-                generated_id = get_problem_id(word)
-                if generated_id == problem_id:
-                    matched_word = word
-                    break
-
-            if matched_word:
-                is_word_enabled_in_csv = matched_word['enabled']
-                is_unit_enabled_by_room_setting = parse_unit_number(matched_word['number']) <= parsed_max_enabled_unit_num
-
-                if is_word_enabled_in_csv and is_unit_enabled_by_room_setting:
-                    correct_attempts = history.get('correct_attempts', 0)
-                    incorrect_attempts = history.get('incorrect_attempts', 0)
-                    problem_total_attempts = correct_attempts + incorrect_attempts
-                    
-                    current_user_total_attempts += problem_total_attempts
-                    current_user_total_correct += correct_attempts
-                    
-                    if problem_total_attempts > 0:
-                        accuracy_rate = (correct_attempts / problem_total_attempts) * 100
-                        if accuracy_rate >= 80.0:
-                            current_user_mastered_problem_ids.add(problem_id)
-
-        current_user_mastered_count = len(current_user_mastered_problem_ids)
-        current_user_coverage_rate = (current_user_mastered_count / total_questions_for_room * 100) if total_questions_for_room > 0 else 0
-        current_user_accuracy_rate = (current_user_total_correct / current_user_total_attempts * 100) if current_user_total_attempts > 0 else 0
-
-        # ベイズ統計による総合評価型スコア計算
-        EXPECTED_AVG_ACCURACY = 0.7
-        CONFIDENCE_ATTEMPTS = 10
-        PRIOR_CORRECT = EXPECTED_AVG_ACCURACY * CONFIDENCE_ATTEMPTS
-        PRIOR_ATTEMPTS = CONFIDENCE_ATTEMPTS
-
-        if current_user_total_attempts == 0:
-            current_user_comprehensive_score = 0
-        else:
-            bayesian_accuracy = (PRIOR_CORRECT + current_user_total_correct) / (PRIOR_ATTEMPTS + current_user_total_attempts)
-            
-            current_user_comprehensive_score = (
-                (current_user_mastered_count ** 1.3) * 10 +
-                (bayesian_accuracy ** 2) * 500 +
-                math.log(current_user_total_attempts + 1) * 20
-            ) / 100
-
-        # 個人スコア情報をまとめる
-        current_user_score = {
-            'total_attempts': current_user_total_attempts,
-            'total_correct': current_user_total_correct,
-            'accuracy_rate': current_user_accuracy_rate,
-            'coverage_rate': current_user_coverage_rate,
-            'mastered_count': current_user_mastered_count,
-            'total_questions_for_room': total_questions_for_room,
-            'comprehensive_score': current_user_comprehensive_score
-        }
-
         # データを整理してテンプレートに渡す形式に変換
         sorted_chapter_progress = {}
         for chapter_num in sorted(chapter_progress_summary.keys(), key=lambda x: int(x) if x.isdigit() else float('inf')):
@@ -3101,38 +2984,36 @@ def progress_page():
 
         print(f"章別進捗: {len(sorted_chapter_progress)}章")
 
-        # ★ランキング計算（新しいコネクションで安全に実行）
+        # ランキング計算（既存のコード）
         current_room_number = current_user.room_number
-        ranking_data = []
         
-        try:
-            # 部屋内の全ユーザーを取得
-            with db.engine.connect() as conn:
-                result = conn.execute(text("""
-                    SELECT id, username, problem_history, incorrect_words 
-                    FROM "user" 
-                    WHERE room_number = :room_number 
-                    AND username != 'admin'
-                """), {"room_number": current_room_number})
-                
-                all_users_data = result.fetchall()
-                print(f"ランキング対象ユーザー数: {len(all_users_data)}")
+        all_users_for_ranking = User.query.filter_by(room_number=current_room_number).all()
+        ranking_data = []
 
-            total_questions_for_room_ranking = total_questions_for_room
+        room_setting_for_ranking = RoomSetting.query.filter_by(room_number=current_room_number).first()
+        max_enabled_unit_num_str_for_ranking = room_setting_for_ranking.max_enabled_unit_number if room_setting_for_ranking else "9999"
+        parsed_max_enabled_unit_num_for_ranking = parse_unit_number(max_enabled_unit_num_str_for_ranking)
+        
+        total_questions_for_room_ranking = 0
+        for word in word_data:
+            is_word_enabled_in_csv = word['enabled']
+            is_unit_enabled_by_room_setting = parse_unit_number(word['number']) <= parsed_max_enabled_unit_num_for_ranking
+            if is_word_enabled_in_csv and is_unit_enabled_by_room_setting:
+                total_questions_for_room_ranking += 1
 
-            for user_data in all_users_data:
-                user_id, username, problem_history_json, incorrect_words_json = user_data
+        for user_obj in all_users_for_ranking:
+            if user_obj.username == 'admin':
+                continue
                 
-                try:
-                    user_problem_history = json.loads(problem_history_json) if problem_history_json else {}
-                except (json.JSONDecodeError, TypeError):
-                    user_problem_history = {}
-                
-                total_attempts = 0
-                total_correct = 0
-                mastered_problem_ids = set()
+            total_attempts = 0
+            total_correct = 0
+            
+            mastered_problem_ids = set()
 
-                for problem_id, history in user_problem_history.items():
+            user_obj_problem_history = user_obj.get_problem_history()
+
+            if isinstance(user_obj_problem_history, dict):
+                for problem_id, history in user_obj_problem_history.items():
                     matched_word = None
                     for word in word_data:
                         generated_id = get_problem_id(word)
@@ -3142,7 +3023,7 @@ def progress_page():
 
                     if matched_word:
                         is_word_enabled_in_csv = matched_word['enabled']
-                        is_unit_enabled_by_room_setting = parse_unit_number(matched_word['number']) <= parsed_max_enabled_unit_num
+                        is_unit_enabled_by_room_setting = parse_unit_number(matched_word['number']) <= parsed_max_enabled_unit_num_for_ranking
 
                         if is_word_enabled_in_csv and is_unit_enabled_by_room_setting:
                             correct_attempts = history.get('correct_attempts', 0)
@@ -3156,132 +3037,65 @@ def progress_page():
                                 accuracy_rate = (correct_attempts / problem_total_attempts) * 100
                                 if accuracy_rate >= 80.0:
                                     mastered_problem_ids.add(problem_id)
-                
-                user_mastered_count = len(mastered_problem_ids)
-                coverage_rate = (user_mastered_count / total_questions_for_room_ranking * 100) if total_questions_for_room_ranking > 0 else 0
-                
-                # ベイズ統計による総合評価型スコア計算
-                if total_attempts == 0:
-                    comprehensive_score = 0
-                else:
-                    bayesian_accuracy = (PRIOR_CORRECT + total_correct) / (PRIOR_ATTEMPTS + total_attempts)
-                    
-                    comprehensive_score = (
-                        (user_mastered_count ** 1.3) * 10 +
-                        (bayesian_accuracy ** 2) * 500 +
-                        math.log(total_attempts + 1) * 20
-                    ) / 100
-
-                ranking_data.append({
-                    'username': username,
-                    'total_attempts': total_attempts,
-                    'total_correct': total_correct,
-                    'accuracy_rate': (total_correct / total_attempts * 100) if total_attempts > 0 else 0,
-                    'coverage_rate': coverage_rate,
-                    'mastered_count': user_mastered_count,
-                    'total_questions_for_room': total_questions_for_room_ranking,
-                    'balance_score': comprehensive_score 
-                })
-
-            # バランススコアで降順ソート
-            ranking_data.sort(key=lambda x: (x['balance_score'], x['total_attempts']), reverse=True)
             
-        except Exception as ranking_error:
-            print(f"⚠️ ランキング計算エラー: {ranking_error}")
-            ranking_data = []
-        
-        # ★ランキング表示人数で制限
-        top_ranking = ranking_data[:ranking_display_count]
+            user_mastered_count = len(mastered_problem_ids)
+            coverage_rate = (user_mastered_count / total_questions_for_room_ranking * 100) if total_questions_for_room_ranking > 0 else 0
+            
+            # ベイズ統計による正答率補正の設定値
+            EXPECTED_AVG_ACCURACY = 0.7
+            CONFIDENCE_ATTEMPTS = 10
+            PRIOR_CORRECT = EXPECTED_AVG_ACCURACY * CONFIDENCE_ATTEMPTS
+            PRIOR_ATTEMPTS = CONFIDENCE_ATTEMPTS
 
-        print(f"表示ランキング数: {len(top_ranking)}")
+            # ベイズ統計による総合評価型スコア計算
+            if total_attempts == 0:
+                comprehensive_score = 0
+            else:
+                bayesian_accuracy = (PRIOR_CORRECT + total_correct) / (PRIOR_ATTEMPTS + total_attempts)
+                
+                comprehensive_score = (
+                    (user_mastered_count ** 1.3) * 10 +
+                    (bayesian_accuracy ** 2) * 500 +
+                    math.log(total_attempts + 1) * 20
+                ) / 100
+
+            ranking_data.append({
+                'username': user_obj.username,
+                'total_attempts': total_attempts,
+                'total_correct': total_correct,
+                'accuracy_rate': (total_correct / total_attempts * 100) if total_attempts > 0 else 0,
+                'coverage_rate': coverage_rate,
+                'mastered_count': user_mastered_count,
+                'total_questions_for_room': total_questions_for_room_ranking,
+                'balance_score': comprehensive_score 
+            })
+
+        # バランススコアで降順ソート
+        ranking_data.sort(key=lambda x: (x['balance_score'], x['total_attempts']), reverse=True)
+        top_10_ranking = ranking_data[:10]
+
+        print(f"ランキング対象ユーザー数: {len(ranking_data)}")
         print("=== 進捗ページ処理完了 ===\n")
 
         context = get_template_context()
         
         return render_template('progress.html',
                                current_user=current_user,
-                               current_user_score=current_user_score,
-                               user_progress_by_chapter=sorted_chapter_progress,
-                               top_ranking=top_ranking,
-                               ranking_display_count=ranking_display_count,
+                               user_progress_by_chapter=sorted_chapter_progress,  # ★変更
+                               top_10_ranking=top_10_ranking,
                                **context)
-                               
     except Exception as e:
-        # ★重要：エラー時の最終トランザクションクリア
-        try:
-            db.session.rollback()
-        except:
-            pass
-            
         print(f"Error in progress_page: {e}")
         import traceback
         traceback.print_exc()
         return f"Progress Error: {e}", 500
-    
-@app.route('/admin/emergency_add_ranking_column', methods=['POST'])
-def admin_emergency_add_ranking_column():
-    """緊急：ranking_display_countカラムを追加"""
-    if not session.get('admin_logged_in'):
-        return jsonify({'status': 'error', 'message': '管理者権限が必要です'}), 403
-    
-    try:
-        print("🔧 ranking_display_countカラム追加開始...")
-        
-        # 既存のトランザクションを終了
-        try:
-            db.session.rollback()
-        except:
-            pass
-        
-        # カラムの存在確認
-        with db.engine.connect() as conn:
-            try:
-                # PostgreSQLの場合
-                result = conn.execute(text("""
-                    SELECT column_name 
-                    FROM information_schema.columns 
-                    WHERE table_name = 'room_setting' 
-                    AND column_name = 'ranking_display_count'
-                """))
-                
-                exists = result.fetchone()
-                
-                if not exists:
-                    print("🔧 ranking_display_countカラムを追加中...")
-                    conn.execute(text("""
-                        ALTER TABLE room_setting 
-                        ADD COLUMN ranking_display_count INTEGER DEFAULT 10
-                    """))
-                    conn.commit()
-                    print("✅ ranking_display_countカラムを追加しました")
-                    
-                    return jsonify({
-                        'status': 'success',
-                        'message': 'ranking_display_countカラムを追加しました'
-                    })
-                else:
-                    return jsonify({
-                        'status': 'success', 
-                        'message': 'ranking_display_countカラムは既に存在します'
-                    })
-                    
-            except Exception as e:
-                print(f"❌ カラム追加エラー: {e}")
-                return jsonify({
-                    'status': 'error',
-                    'message': f'カラム追加エラー: {str(e)}'
-                }), 500
-                
-    except Exception as e:
-        print(f"❌ 緊急修正エラー: {e}")
-        return jsonify({
-            'status': 'error',
-            'message': f'緊急修正エラー: {str(e)}'
-        }), 500
 
 # ====================================================================
 # 管理者ページ
 # ====================================================================
+
+# app.pyのadmin_pageルートを以下に置き換え
+
 @app.route('/admin')
 def admin_page():
     try:
@@ -3294,12 +3108,11 @@ def admin_page():
         users = User.query.all()
         room_settings = RoomSetting.query.all()
         
-        # 部屋設定のマッピングを作成（ランキング表示人数を追加）
+        # 部屋設定のマッピングを作成
         room_max_unit_settings = {rs.room_number: rs.max_enabled_unit_number for rs in room_settings}
         room_csv_settings = {rs.room_number: rs.csv_filename for rs in room_settings}
-        room_ranking_settings = {rs.room_number: rs.ranking_display_count for rs in room_settings}  # ★新規追加
         
-        # ユーザー情報を拡張（既存のコード）
+        # ユーザー情報を拡張（元のアカウント名と変更履歴を含む）
         user_list_with_details = []
         for user in users:
             if user.username == 'admin':
@@ -3327,19 +3140,17 @@ def admin_page():
             if setting.room_number != 'ADMIN':
                 unique_room_numbers.add(setting.room_number)
         
-        # デフォルト設定の作成処理
+        # デフォルト設定の作成処理...
         for room_num in unique_room_numbers:
             if room_num not in room_csv_settings:
                 default_room_setting = RoomSetting(
                     room_number=room_num,
                     max_enabled_unit_number="9999",
-                    csv_filename="words.csv",
-                    ranking_display_count=10  # ★新規追加
+                    csv_filename="words.csv"
                 )
                 db.session.add(default_room_setting)
                 room_max_unit_settings[room_num] = "9999"
                 room_csv_settings[room_num] = "words.csv"
-                room_ranking_settings[room_num] = 10  # ★新規追加
         
         try:
             db.session.commit()
@@ -3352,8 +3163,7 @@ def admin_page():
         template_context = {
             'users': user_list_with_details,
             'room_max_unit_settings': room_max_unit_settings,
-            'room_csv_settings': room_csv_settings,
-            'room_ranking_settings': room_ranking_settings  # ★新規追加
+            'room_csv_settings': room_csv_settings
         }
         
         return render_template('admin.html', **template_context)
@@ -3364,64 +3174,10 @@ def admin_page():
         traceback.print_exc()
         return f"Admin Error: {e}", 500
 
-@app.route('/admin/update_room_ranking_setting', methods=['POST'])
-def admin_update_room_ranking_setting():
-    try:
-        if not session.get('admin_logged_in'):
-            return jsonify(status='error', message='管理者権限がありません。'), 403
+# アプリ情報管理
+# app.py の admin_app_info 関数を以下に置き換え
 
-        data = request.get_json()
-        room_number = data.get('room_number')
-        ranking_count = data.get('ranking_count')
-
-        if not room_number:
-            return jsonify(status='error', message='部屋番号が指定されていません。'), 400
-
-        # 数値検証
-        try:
-            ranking_count = int(ranking_count)
-            if ranking_count < 1 or ranking_count > 50:
-                return jsonify(status='error', message='ランキング表示人数は1-50の範囲で指定してください。'), 400
-        except (ValueError, TypeError):
-            ranking_count = 10
-
-        print(f"🔧 ランキング設定更新リクエスト: 部屋{room_number} -> {ranking_count}人")
-
-        # 部屋設定を取得または作成
-        room_setting = RoomSetting.query.filter_by(room_number=room_number).first()
-
-        if room_setting:
-            # 既存設定を更新
-            old_count = room_setting.ranking_display_count
-            room_setting.ranking_display_count = ranking_count
-            room_setting.updated_at = datetime.now(JST)
-            print(f"📝 既存設定更新: {old_count}人 -> {ranking_count}人")
-        else:
-            # 新規設定を作成
-            room_setting = RoomSetting(
-                room_number=room_number,
-                max_enabled_unit_number="9999",
-                csv_filename="words.csv",
-                ranking_display_count=ranking_count
-            )
-            db.session.add(room_setting)
-            print(f"➕ 新規設定作成: 部屋{room_number} with {ranking_count}人表示")
-        
-        db.session.commit()
-        
-        return jsonify(
-            status='success', 
-            message=f'部屋 {room_number} のランキング表示人数を {ranking_count}人に更新しました。',
-            room_number=room_number,
-            ranking_count=ranking_count
-        )
-        
-    except Exception as e:
-        print(f"❌ ランキング設定更新エラー: {e}")
-        import traceback
-        traceback.print_exc()
-        db.session.rollback()
-        return jsonify(status='error', message=str(e)), 500
+# 緊急デバッグ用（問題が続く場合のみ使用）
 
 @app.route('/admin/app_info', methods=['GET', 'POST'])
 def admin_app_info():
