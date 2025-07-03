@@ -742,7 +742,7 @@ def migrate_database():
                         conn.commit()
                     print("✅ csv_filenameカラムを追加しました。")
                 
-                # 新規追加: ranking_display_count カラム
+                # ★重要：ranking_display_count カラムを追加
                 if 'ranking_display_count' not in columns:
                     print("🔧 ranking_display_countカラムを追加します...")
                     with db.engine.connect() as conn:
@@ -1143,6 +1143,105 @@ def send_password_reset_email(user, email, token):
             print("❌ タイムアウトエラー: ネットワーク接続を確認してください")
         
         raise e
+
+# app.py に以下のルートを追加してください
+
+@app.route('/admin/fix_progress_issue', methods=['POST'])
+def admin_fix_progress_issue():
+    """進捗ページの問題を修正"""
+    if not session.get('admin_logged_in'):
+        return jsonify({'status': 'error', 'message': '管理者権限が必要です'}), 403
+    
+    try:
+        print("🔧 進捗ページ問題の修正を開始...")
+        
+        # 1. ranking_display_count カラムを追加
+        with db.engine.connect() as conn:
+            # カラムの存在を確認
+            try:
+                result = conn.execute(text("""
+                    SELECT column_name 
+                    FROM information_schema.columns 
+                    WHERE table_name = 'room_setting' AND column_name = 'ranking_display_count'
+                """))
+                
+                if not result.fetchone():
+                    print("🔧 ranking_display_count カラムを追加中...")
+                    conn.execute(text('ALTER TABLE room_setting ADD COLUMN ranking_display_count INTEGER DEFAULT 10'))
+                    conn.commit()
+                    print("✅ ranking_display_count カラムを追加しました")
+                else:
+                    print("✅ ranking_display_count カラムは既に存在します")
+                    
+            except Exception as e:
+                print(f"⚠️ カラム追加エラー: {e}")
+        
+        # 2. 全ての部屋設定にデフォルト値を設定
+        room_settings = RoomSetting.query.all()
+        updated_count = 0
+        
+        for setting in room_settings:
+            if not hasattr(setting, 'ranking_display_count') or setting.ranking_display_count is None:
+                setting.ranking_display_count = 10
+                updated_count += 1
+        
+        if updated_count > 0:
+            db.session.commit()
+            print(f"✅ {updated_count}個の部屋設定を更新しました")
+        
+        return jsonify({
+            'status': 'success',
+            'message': '進捗ページの問題を修正しました',
+            'updated_settings': updated_count
+        })
+        
+    except Exception as e:
+        print(f"❌ 修正エラー: {e}")
+        db.session.rollback()
+        return jsonify({
+            'status': 'error',
+            'message': f'修正エラー: {str(e)}'
+        }), 500
+
+@app.route('/admin/test_progress_data')
+def admin_test_progress_data():
+    """進捗データをテスト"""
+    if not session.get('admin_logged_in'):
+        return jsonify({'status': 'error', 'message': '管理者権限が必要です'}), 403
+    
+    try:
+        # テストユーザーを取得
+        test_user = User.query.filter(User.username != 'admin').first()
+        if not test_user:
+            return jsonify({'status': 'error', 'message': 'テスト用ユーザーが見つかりません'}), 404
+        
+        # 単語データを取得
+        word_data = load_word_data_for_room(test_user.room_number)
+        user_history = test_user.get_problem_history()
+        
+        # 部屋設定を取得
+        room_setting = RoomSetting.query.filter_by(room_number=test_user.room_number).first()
+        
+        result = {
+            'test_user': test_user.username,
+            'room_number': test_user.room_number,
+            'word_data_count': len(word_data),
+            'user_history_count': len(user_history),
+            'room_setting_exists': room_setting is not None,
+            'ranking_display_count': getattr(room_setting, 'ranking_display_count', 'カラムなし') if room_setting else '設定なし',
+            'sample_history': dict(list(user_history.items())[:3]) if user_history else {}
+        }
+        
+        return jsonify({
+            'status': 'success',
+            'test_data': result
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': f'テストエラー: {str(e)}'
+        }), 500
 
 @app.route('/admin/cleanup_orphaned_tokens', methods=['POST'])
 def admin_cleanup_orphaned_tokens():
@@ -2860,6 +2959,8 @@ def admin_analyze_invalid_history_detailed():
 # ====================================================================
 # 進捗ページ
 # ====================================================================
+# app.py の progress_page ルートを以下に置き換えてください
+
 @app.route('/progress')
 def progress_page():
     try:
@@ -2887,7 +2988,7 @@ def progress_page():
         parsed_max_enabled_unit_num = parse_unit_number(max_enabled_unit_num_str)
         print(f"最大単元番号: {max_enabled_unit_num_str}")
 
-        # ★修正：章ごとに進捗をまとめる
+        # 章ごとに進捗をまとめる
         chapter_progress_summary = {}
 
         # 有効な単語データで単元進捗を初期化
@@ -2992,7 +3093,9 @@ def progress_page():
 
         print(f"章別進捗: {len(sorted_chapter_progress)}章")
 
-        # ランキング計算（既存のコード）
+        # =================
+        # ランキング計算
+        # =================
         current_room_number = current_user.room_number
         
         all_users_for_ranking = User.query.filter_by(room_number=current_room_number).all()
@@ -3002,15 +3105,20 @@ def progress_page():
         max_enabled_unit_num_str_for_ranking = room_setting_for_ranking.max_enabled_unit_number if room_setting_for_ranking else "9999"
         parsed_max_enabled_unit_num_for_ranking = parse_unit_number(max_enabled_unit_num_str_for_ranking)
 
-        # ランキング表示人数を取得（カラムが存在しない場合はデフォルト10人）
+        # ランキング表示人数を取得（エラーハンドリング強化）
         ranking_display_count = 10  # デフォルト値
 
         try:
-            if room_setting_for_ranking and hasattr(room_setting_for_ranking, 'ranking_display_count'):
-                ranking_display_count = room_setting_for_ranking.ranking_display_count
+            if room_setting_for_ranking:
+                # hasattr でカラムの存在を確認
+                if hasattr(room_setting_for_ranking, 'ranking_display_count'):
+                    ranking_display_count = room_setting_for_ranking.ranking_display_count or 10
+                else:
+                    print("⚠️ ranking_display_count カラムが存在しません。デフォルト値10を使用")
         except Exception as e:
-            print(f"⚠️ ranking_display_countカラムが見つかりません。デフォルト値10を使用: {e}")
+            print(f"⚠️ ranking_display_count 取得エラー: {e}")
         
+        # 部屋の総問題数を計算
         total_questions_for_room_ranking = 0
         for word in word_data:
             is_word_enabled_in_csv = word['enabled']
@@ -3021,13 +3129,13 @@ def progress_page():
         # 現在のユーザーのスコア計算用変数
         current_user_stats = None
 
+        # 全ユーザーのスコアを計算
         for user_obj in all_users_for_ranking:
             if user_obj.username == 'admin':
                 continue
                 
             total_attempts = 0
             total_correct = 0
-            
             mastered_problem_ids = set()
 
             user_obj_problem_history = user_obj.get_problem_history()
@@ -3081,9 +3189,9 @@ def progress_page():
                 ) / 100
 
             # 3種類のスコア計算
-            mastery_score = user_mastered_count * 10  # マスタリースコア
-            reliability_score = bayesian_accuracy * 100  # 信頼性スコア
-            activity_score = math.log(total_attempts + 1) * 20 / 100  # 活動スコア
+            mastery_score = (user_mastered_count ** 1.3) * 10 / 100
+            reliability_score = (bayesian_accuracy ** 2) * 500 / 100
+            activity_score = math.log(total_attempts + 1) * 20 / 100
 
             user_data = {
                 'username': user_obj.username,
@@ -3107,19 +3215,24 @@ def progress_page():
 
         # バランススコアで降順ソート
         ranking_data.sort(key=lambda x: (x['balance_score'], x['total_attempts']), reverse=True)
-        top_ranking = ranking_data[:10]  # ← この変数名を確認
+        
+        # ★修正：テンプレートで使用される変数名に統一
+        top_10_ranking = ranking_data[:ranking_display_count]
 
         print(f"ランキング対象ユーザー数: {len(ranking_data)}")
-        print(f"表示ランキング数: {len(top_ranking)}")  # ← デバッグ用に追加
+        print(f"表示ランキング数: {len(top_10_ranking)}")
+        print(f"現在のユーザーのスコア: {current_user_stats}")
         print("=== 進捗ページ処理完了 ===\n")
 
         context = get_template_context()
         
+        # ★修正：テンプレートで使用される変数名に統一
         return render_template('progress.html',
                                current_user=current_user,
                                user_progress_by_chapter=sorted_chapter_progress,
-                               top_ranking=top_ranking,  # ← この変数名が一致しているか確認
-                               ranking_display_count=10,  # ← 固定値で追加
+                               top_10_ranking=top_10_ranking,  # この変数名に統一
+                               current_user_stats=current_user_stats,  # ★追加
+                               ranking_display_count=ranking_display_count,
                                **context)
     
     except Exception as e:
@@ -3128,15 +3241,6 @@ def progress_page():
         traceback.print_exc()
         return f"Progress Error: {e}", 500
 
-        print(f"🔍 デバッグ情報:")
-        print(f"   全ユーザー数: {len(all_users_for_ranking)}")
-        print(f"   ランキングデータ数: {len(ranking_data)}")
-        print(f"   部屋番号: {current_room_number}")
-
-        # 最初の数件を表示
-        for i, user_data in enumerate(ranking_data[:3]):
-            print(f"   {i+1}位: {user_data['username']} - スコア: {user_data['balance_score']}")
-            
 # ====================================================================
 # 管理者ページ
 # ====================================================================
