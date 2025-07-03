@@ -239,8 +239,6 @@ class RoomSetting(db.Model):
     room_number = db.Column(db.String(50), unique=True, nullable=False)
     max_enabled_unit_number = db.Column(db.String(50), default="9999", nullable=False)
     csv_filename = db.Column(db.String(100), default="words.csv", nullable=False)
-    ranking_display_count = db.Column(db.Integer, default=10, nullable=False)  # 新規追加
-
 
 class RoomCsvFile(db.Model):
     """部屋ごとのカスタムCSVファイル情報を管理するモデル"""
@@ -3006,6 +3004,7 @@ def progress_page():
 
         # ランキング表示人数を取得（カラムが存在しない場合はデフォルト10人）
         ranking_display_count = 10  # デフォルト値
+        
         try:
             if room_setting_for_ranking and hasattr(room_setting_for_ranking, 'ranking_display_count'):
                 ranking_display_count = room_setting_for_ranking.ranking_display_count
