@@ -3148,3 +3148,168 @@ a.nav-link.btn.change-username-button:hover,
         font-size: 0.85em;
     }
 }
+
+/* 個人スコア表示用のスタイル */
+.personal-score-container {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 15px;
+    padding: 25px;
+    margin-bottom: 30px;
+    box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+    position: relative;
+    overflow: hidden;
+}
+
+.personal-score-container::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: linear-gradient(45deg, rgba(255,255,255,0.1) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.1) 75%);
+    background-size: 20px 20px;
+    pointer-events: none;
+}
+
+.personal-score-container h3 {
+    color: white;
+    margin-bottom: 20px;
+    font-weight: 600;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+
+.personal-score-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1fr;
+    gap: 20px;
+    position: relative;
+    z-index: 1;
+}
+
+.score-card {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+    backdrop-filter: blur(10px);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.score-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 15px 35px rgba(0,0,0,0.15);
+}
+
+.score-card.main-score {
+    background: rgba(255, 255, 255, 0.98);
+    border: 2px solid rgba(255,255,255,0.5);
+}
+
+.score-label {
+    font-size: 0.9rem;
+    color: #6c757d;
+    font-weight: 600;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.score-value {
+    font-size: 2.2rem;
+    font-weight: 700;
+    color: #2c3e50;
+    margin-bottom: 5px;
+    line-height: 1;
+}
+
+.score-value.primary {
+    font-size: 3rem;
+    color: #e74c3c;
+    text-shadow: 0 2px 4px rgba(231, 76, 60, 0.3);
+}
+
+.score-subtitle {
+    font-size: 0.8rem;
+    color: #95a5a6;
+    font-weight: 500;
+}
+
+.no-score-message {
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 1.1rem;
+    text-align: center;
+    font-style: italic;
+    margin: 0;
+}
+
+/* ランキングテーブルで現在のユーザーを強調 */
+.current-user-row {
+    background-color: #fff3cd !important;
+    border-left: 4px solid #ffc107;
+}
+
+.current-user-row:hover {
+    background-color: #ffeaa7 !important;
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 768px) {
+    .personal-score-grid {
+        grid-template-columns: 1fr;
+        gap: 15px;
+    }
+    
+    .score-card {
+        padding: 15px;
+    }
+    
+    .score-value {
+        font-size: 1.8rem;
+    }
+    
+    .score-value.primary {
+        font-size: 2.5rem;
+    }
+    
+    .personal-score-container {
+        padding: 20px;
+        margin-bottom: 25px;
+    }
+}
+
+@media (max-width: 480px) {
+    .score-value {
+        font-size: 1.5rem;
+    }
+    
+    .score-value.primary {
+        font-size: 2rem;
+    }
+    
+    .personal-score-container {
+        padding: 15px;
+    }
+}
+
+/* ランキングセクションのアイコン対応 */
+.ranking-container h3 i,
+.personal-score-container h3 i {
+    margin-right: 8px;
+}
+
+/* アニメーション効果 */
+@keyframes scoreCountUp {
+    from { opacity: 0; transform: scale(0.8); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+.score-value {
+    animation: scoreCountUp 0.6s ease-out;
+}
+
+.score-card:nth-child(1) { animation-delay: 0.1s; }
+.score-card:nth-child(2) { animation-delay: 0.2s; }
+.score-card:nth-child(3) { animation-delay: 0.3s; }
+.score-card:nth-child(4) { animation-delay: 0.4s; }
