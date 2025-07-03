@@ -3148,3 +3148,203 @@ a.nav-link.btn.change-username-button:hover,
         font-size: 0.85em;
     }
 }
+
+/* style.css の末尾に以下を追加 */
+
+/* =======================================
+  個別スコア表示のスタイル
+  ======================================= */
+
+.current-user-stats {
+   background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%);
+   border: 2px solid #2196f3;
+   border-radius: 12px;
+   padding: 20px;
+   margin-bottom: 25px;
+   box-shadow: 0 4px 12px rgba(33, 150, 243, 0.15);
+}
+
+.current-user-stats h4 {
+   color: #1565c0;
+   font-size: 1.2em;
+   margin-bottom: 15px;
+   text-align: center;
+   border-bottom: 2px solid #90caf9;
+   padding-bottom: 8px;
+}
+
+.stats-grid {
+   display: grid;
+   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+   gap: 15px;
+   margin-bottom: 20px;
+}
+
+.stat-item {
+   background-color: #ffffff;
+   border: 1px solid #e3f2fd;
+   border-radius: 8px;
+   padding: 15px;
+   text-align: center;
+   box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+   transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.stat-item:hover {
+   transform: translateY(-2px);
+   box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.stat-label {
+   display: block;
+   font-size: 0.9em;
+   color: #666;
+   margin-bottom: 5px;
+   font-weight: 500;
+}
+
+.stat-value {
+   display: block;
+   font-size: 1.6em;
+   font-weight: bold;
+   color: #1976d2;
+   margin-bottom: 3px;
+}
+
+.stat-value.main-score {
+   font-size: 2em;
+   color: #d32f2f;
+   text-shadow: 1px 1px 2px rgba(211, 47, 47, 0.2);
+}
+
+.stat-description {
+   display: block;
+   font-size: 0.75em;
+   color: #999;
+   font-style: italic;
+   line-height: 1.2;
+}
+
+.basic-stats {
+   background-color: rgba(255, 255, 255, 0.8);
+   border-radius: 6px;
+   padding: 12px;
+   margin-top: 15px;
+   border-left: 4px solid #4caf50;
+}
+
+.basic-stats p {
+   margin: 0;
+   font-size: 0.9em;
+   color: #333;
+   line-height: 1.4;
+}
+
+/* ランキングテーブルで現在のユーザー行をハイライト */
+.current-user-row {
+   background-color: #fff3e0 !important;
+   border-left: 4px solid #ff9800 !important;
+   font-weight: 600;
+}
+
+.current-user-row:hover {
+   background-color: #ffe0b2 !important;
+}
+
+/* バッジスタイル */
+.badge.bg-primary {
+   background-color: #2196f3 !important;
+   color: white;
+   font-size: 0.7em;
+   padding: 0.2em 0.5em;
+   border-radius: 0.25rem;
+   margin-left: 5px;
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 767px) {
+   .current-user-stats {
+       padding: 15px;
+       margin-bottom: 20px;
+   }
+   
+   .current-user-stats h4 {
+       font-size: 1.1em;
+       margin-bottom: 12px;
+   }
+   
+   .stats-grid {
+       grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+       gap: 10px;
+       margin-bottom: 15px;
+   }
+   
+   .stat-item {
+       padding: 10px;
+   }
+   
+   .stat-label {
+       font-size: 0.8em;
+   }
+   
+   .stat-value {
+       font-size: 1.3em;
+   }
+   
+   .stat-value.main-score {
+       font-size: 1.6em;
+   }
+   
+   .stat-description {
+       font-size: 0.7em;
+   }
+   
+   .basic-stats {
+       padding: 10px;
+   }
+   
+   .basic-stats p {
+       font-size: 0.8em;
+   }
+}
+
+@media (max-width: 480px) {
+   .stats-grid {
+       grid-template-columns: 1fr;
+       gap: 8px;
+   }
+   
+   .stat-item {
+       padding: 8px;
+   }
+   
+   .stat-value {
+       font-size: 1.2em;
+   }
+   
+   .stat-value.main-score {
+       font-size: 1.4em;
+   }
+   
+   /* 基本統計を縦並びに */
+   .basic-stats p {
+       font-size: 0.75em;
+       line-height: 1.6;
+   }
+}
+
+/* 印刷時は個別スコアも表示 */
+@media print {
+   .current-user-stats {
+       background: #f5f5f5 !important;
+       border: 1px solid #000 !important;
+       box-shadow: none !important;
+       page-break-inside: avoid;
+   }
+   
+   .stat-value,
+   .stat-value.main-score {
+       color: #000 !important;
+       text-shadow: none !important;
+   }
+}
