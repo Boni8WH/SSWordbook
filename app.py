@@ -3106,15 +3106,15 @@ def progress_page():
         parsed_max_enabled_unit_num_for_ranking = parse_unit_number(max_enabled_unit_num_str_for_ranking)
 
         # ランキング表示人数を取得（エラーハンドリング強化）
-        ranking_display_count = 10  # デフォルト値
+        ranking_display_count = 5  # デフォルト値
 
         try:
             if room_setting_for_ranking:
                 # hasattr でカラムの存在を確認
                 if hasattr(room_setting_for_ranking, 'ranking_display_count'):
-                    ranking_display_count = room_setting_for_ranking.ranking_display_count or 10
+                    ranking_display_count = room_setting_for_ranking.ranking_display_count or 5  # デフォルト値を5に変更
                 else:
-                    print("⚠️ ranking_display_count カラムが存在しません。デフォルト値10を使用")
+                    print("⚠️ ranking_display_count カラムが存在しません。デフォルト値5を使用")
         except Exception as e:
             print(f"⚠️ ranking_display_count 取得エラー: {e}")
         
@@ -3740,6 +3740,44 @@ def admin_delete_room_setting(room_number):
         db.session.rollback()
         flash(f'部屋設定削除中にエラーが発生しました: {e}', 'danger')
         return redirect(url_for('admin_page'))
+
+@app.route('/admin/update_all_rankings_to_5', methods=['POST'])
+def admin_update_all_rankings_to_5():
+    """全ての部屋のランキング表示人数を5に変更"""
+    if not session.get('admin_logged_in'):
+        return jsonify({'status': 'error', 'message': '管理者権限が必要です'}), 403
+    
+    try:
+        print("🔧 全部屋のランキング表示人数を5に変更中...")
+        
+        # 全ての部屋設定を取得
+        room_settings = RoomSetting.query.all()
+        updated_count = 0
+        
+        for setting in room_settings:
+            if hasattr(setting, 'ranking_display_count'):
+                setting.ranking_display_count = 5
+                updated_count += 1
+            else:
+                print(f"⚠️ 部屋{setting.room_number}にranking_display_countカラムがありません")
+        
+        db.session.commit()
+        
+        print(f"✅ {updated_count}個の部屋設定を更新しました")
+        
+        return jsonify({
+            'status': 'success',
+            'message': f'全{updated_count}部屋のランキング表示人数を5に変更しました',
+            'updated_count': updated_count
+        })
+        
+    except Exception as e:
+        print(f"❌ 更新エラー: {e}")
+        db.session.rollback()
+        return jsonify({
+            'status': 'error',
+            'message': f'更新エラー: {str(e)}'
+        }), 500
 
 # CSV管理
 # app.pyのadmin_upload_room_csvルートをデバッグ版に置き換え
