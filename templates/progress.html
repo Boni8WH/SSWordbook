@@ -7,8 +7,43 @@
 
     <!-- ランキングセクション -->
     <div class="ranking-container">
-        <h3>ランキング (部屋：{{ current_user.room_number }})</h3>
-        <p>同じ部屋のユーザー内での上位10名を表示しています。</p>
+    <h3>ランキング (部屋：{{ current_user.room_number }})</h3>
+    <p>同じ部屋のユーザー内での上位{{ ranking_display_count }}名を表示しています。</p>
+        {% if current_user_stats %}
+        <div class="current-user-stats">
+            <h4>📊 あなたのスコア詳細</h4>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <span class="stat-label">総合スコア</span>
+                    <span class="stat-value main-score">{{ current_user_stats.balance_score|round(1) }}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">マスタリースコア</span>
+                    <span class="stat-value">{{ current_user_stats.mastery_score|round(1) }}</span>
+                    <small class="stat-description">マスターした問題数×10</small>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">信頼性スコア</span>
+                    <span class="stat-value">{{ current_user_stats.reliability_score|round(1) }}</span>
+                    <small class="stat-description">統計的補正済み正答率</small>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">活動スコア</span>
+                    <span class="stat-value">{{ current_user_stats.activity_score|round(1) }}</span>
+                    <small class="stat-description">学習活動量の評価</small>
+                </div>
+            </div>
+            <div class="basic-stats">
+                <p><strong>基本統計:</strong> 
+                    回答数: {{ current_user_stats.total_attempts }}回 | 
+                    正解数: {{ current_user_stats.total_correct }}回 | 
+                    正答率: {{ current_user_stats.accuracy_rate|round(1) }}% | 
+                    マスター数: {{ current_user_stats.mastered_count }}問 | 
+                    網羅率: {{ current_user_stats.coverage_rate|round(1) }}%
+                </p>
+            </div>
+        </div>
+        {% endif %}
         <div class="ranking-criteria">
             <p><strong>📊 ランキング基準:</strong> 信頼性重視の総合学習評価スコアの高い順</p>
             <p><strong>🔢 スコア算出:</strong> ① マスター数重視 + ② 信頼性補正済み正答率 + ③ 適度な学習量</p>
