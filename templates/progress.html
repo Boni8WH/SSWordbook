@@ -11,7 +11,26 @@
     <p>同じ部屋のユーザー内での上位5名を表示しています。</p>
         {% if current_user_stats %}
         <div class="current-user-stats">
-            <h4>📊 あなたのスコア詳細</h4>
+            <div class="stats-header">
+                <div class="stats-title-section">
+                    <h4>📊 あなたのスコア詳細</h4>
+                </div>
+                <div class="rank-section">
+                    <h4>🏆 あなたの順位</h4>
+                    {% if current_user_rank %}
+                    <div class="rank-display">
+                        <span class="rank-number">{{ current_user_rank }}</span>
+                        <span class="rank-text">位</span>
+                        <span class="rank-total">/ {{ total_users_in_room }}人</span>
+                    </div>
+                    {% else %}
+                    <div class="rank-display">
+                        <span class="rank-text">順位なし</span>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            
             <div class="stats-grid">
                 <div class="stat-item">
                     <span class="stat-label">総合スコア</span>
@@ -20,17 +39,17 @@
                 <div class="stat-item">
                     <span class="stat-label">マスタリースコア</span>
                     <span class="stat-value">{{ current_user_stats.mastery_score|round(1) }}</span>
-                    <small class="stat-description">(マスター数)<sup>1.3</sup> × 0.1</small>
+                    <small class="stat-description">マスターした問題数×10</small>
                 </div>
                 <div class="stat-item">
                     <span class="stat-label">信頼性スコア</span>
                     <span class="stat-value">{{ current_user_stats.reliability_score|round(1) }}</span>
-                    <small class="stat-description">(補正正答率)<sup>2</sup> × 5</small>
+                    <small class="stat-description">統計的補正済み正答率</small>
                 </div>
                 <div class="stat-item">
                     <span class="stat-label">活動スコア</span>
                     <span class="stat-value">{{ current_user_stats.activity_score|round(1) }}</span>
-                    <small class="stat-description">ln(回答数 + 1) × 0.2</small>
+                    <small class="stat-description">学習活動量の評価</small>
                 </div>
             </div>
             <div class="basic-stats">
