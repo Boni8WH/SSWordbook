@@ -3348,3 +3348,89 @@ a.nav-link.btn.change-username-button:hover,
        text-shadow: none !important;
    }
 }
+
+/* base.html または progress.html の <style> セクションに追加してください */
+
+.stats-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+.stats-title-section {
+    flex: 1;
+    min-width: 200px;
+}
+
+.rank-section {
+    flex: 0 0 auto;
+    text-align: center;
+    min-width: 150px;
+    margin-left: 20px;
+}
+
+.rank-section h4 {
+    margin-bottom: 10px;
+    color: #2c3e50;
+}
+
+.rank-display {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 15px 20px;
+    border-radius: 12px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    display: inline-block;
+    min-width: 120px;
+}
+
+.rank-number {
+    font-size: 2.2em;
+    font-weight: bold;
+    display: block;
+    line-height: 1;
+}
+
+.rank-text {
+    font-size: 1.1em;
+    font-weight: 600;
+    margin-left: 5px;
+}
+
+.rank-total {
+    font-size: 0.9em;
+    opacity: 0.9;
+    display: block;
+    margin-top: 5px;
+}
+
+/* 特別な順位のスタイル */
+.rank-display.rank-1 {
+    background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+    color: #333;
+}
+
+.rank-display.rank-2 {
+    background: linear-gradient(135deg, #C0C0C0 0%, #808080 100%);
+    color: #333;
+}
+
+.rank-display.rank-3 {
+    background: linear-gradient(135deg, #CD7F32 0%, #A0522D 100%);
+    color: white;
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 768px) {
+    .stats-header {
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .rank-section {
+        margin-left: 0;
+        margin-top: 15px;
+    }
+}
