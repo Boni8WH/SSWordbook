@@ -7,29 +7,35 @@
 
     <!-- ランキングセクション -->
     <div class="ranking-container">
-    <h3>ランキング (部屋：{{ current_user.room_number }})</h3>
-    <p>同じ部屋のユーザー内での上位5名を表示しています。</p>
-        {% if current_user_stats %}
-        <div class="current-user-stats">
-            <div class="stats-header">
-                <div class="stats-title-section">
-                    <h4>📊 あなたのスコア詳細</h4>
-                </div>
-                <div class="rank-section">
-                    <h4>🏆 あなたの順位</h4>
-                    {% if current_user_rank %}
-                    <div class="rank-display">
-                        <span class="rank-number">{{ current_user_rank }}</span>
-                        <span class="rank-text">位</span>
-                        <span class="rank-total">/ {{ total_users_in_room }}人</span>
-                    </div>
-                    {% else %}
-                    <div class="rank-display">
-                        <span class="rank-text">順位なし</span>
-                    </div>
+        <!-- ランキングヘッダー（タイトルと順位を横並び） -->
+        <div class="ranking-header">
+            <div class="ranking-title-section">
+                <h3>🏆 ランキング (部屋：{{ current_user.room_number }})</h3>
+                <p>同じ部屋のユーザー内での上位5名を表示しています。</p>
+            </div>
+            
+            {% if current_user_rank %}
+            <div class="user-rank-section">
+                <h4>あなたの順位</h4>
+                <div class="rank-display{% if current_user_rank == 1 %} rank-1{% elif current_user_rank == 2 %} rank-2{% elif current_user_rank == 3 %} rank-3{% endif %}">
+                    {% if current_user_rank == 1 %}
+                        <span class="rank-icon">👑</span>
+                    {% elif current_user_rank == 2 %}
+                        <span class="rank-icon">🥈</span>
+                    {% elif current_user_rank == 3 %}
+                        <span class="rank-icon">🥉</span>
                     {% endif %}
+                    <span class="rank-number">{{ current_user_rank }}</span>
+                    <span class="rank-text">位</span>
+                    <span class="rank-total">/ {{ total_users_in_room }}人</span>
                 </div>
             </div>
+            {% endif %}
+        </div>
+
+        {% if current_user_stats %}
+        <div class="current-user-stats">
+            <h4>📊 あなたのスコア詳細</h4>
             
             <div class="stats-grid">
                 <div class="stat-item">
@@ -63,6 +69,7 @@
             </div>
         </div>
         {% endif %}
+
         <div class="ranking-criteria">
             <p><strong>📊 ランキング基準:</strong> 信頼性重視の総合学習評価スコアの高い順</p>
             <p><strong>🔢 スコア算出:</strong> ① マスター数重視 + ② 信頼性補正済み正答率 + ③ 適度な学習量</p>
@@ -79,6 +86,7 @@
             </p>
             <p><small style="color: #6c757d;">※ 質の高い学習（理解+定着）と統計的に信頼できる成績を評価する方式です</small></p>
         </div>
+
         {% if top_10_ranking %}
         <div class="table-responsive">
             <table class="table table-striped table-sm">
