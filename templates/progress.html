@@ -5,10 +5,46 @@
 <section class="progress-section">
     <h2>進捗確認 - {{ current_user.username }} (部屋: {{ current_user.room_number }})</h2>
 
+    <div class="personal-score-container">
+        <h3><i class="fas fa-user"></i> あなたのスコア</h3>
+        {% if current_user_score %}
+        <div class="personal-score-grid">
+            <div class="score-card main-score">
+                <div class="score-label">総合スコア</div>
+                <div class="score-value primary">{{ current_user_score.comprehensive_score|round(1) }}</div>
+                <div class="score-subtitle">統計的信頼性を考慮した総合評価</div>
+            </div>
+            
+            <div class="score-card">
+                <div class="score-label">マスター数</div>
+                <div class="score-value">{{ current_user_score.mastered_count }}</div>
+                <div class="score-subtitle">/ {{ current_user_score.total_questions_for_room }}問</div>
+            </div>
+            
+            <div class="score-card">
+                <div class="score-label">正答率</div>
+                <div class="score-value">{{ current_user_score.accuracy_rate|round(1) }}%</div>
+                <div class="score-subtitle">{{ current_user_score.total_correct }}/{{ current_user_score.total_attempts }}回</div>
+            </div>
+            
+            <div class="score-card">
+                <div class="score-label">網羅率</div>
+                <div class="score-value">{{ current_user_score.coverage_rate|round(1) }}%</div>
+                <div class="score-subtitle">全問題に対するマスター率</div>
+            </div>
+        </div>
+        {% else %}
+        <p class="no-score-message">まだスコアがありません。問題を解いてみましょう！</p>
+        {% endif %}
+    </div>
+
+    <!-- セクション間の仕切り -->
+    <hr style="margin: 40px 0; border: none; border-top: 2px solid #e0e0e0; border-radius: 1px;">
+
     <!-- ランキングセクション -->
     <div class="ranking-container">
-        <h3>ランキング (部屋：{{ current_user.room_number }})</h3>
-        <p>同じ部屋のユーザー内での上位10名を表示しています。</p>
+        <h3><i class="fas fa-trophy"></i> ランキング (部屋：{{ current_user.room_number }}) - Top{{ ranking_display_count }}</h3>
+        <p>同じ部屋のユーザー内での上位{{ ranking_display_count }}名を表示しています。</p>
         <div class="ranking-criteria">
             <p><strong>📊 ランキング基準:</strong> 信頼性重視の総合学習評価スコアの高い順</p>
             <p><strong>🔢 スコア算出:</strong> ① マスター数重視 + ② 信頼性補正済み正答率 + ③ 適度な学習量</p>
@@ -25,7 +61,7 @@
             </p>
             <p><small style="color: #6c757d;">※ 質の高い学習（理解+定着）と統計的に信頼できる成績を評価する方式です</small></p>
         </div>
-        {% if top_10_ranking %}
+        {% if top_ranking %}
         <div class="table-responsive">
             <table class="table table-striped table-sm">
                 <thead class="table-dark">
@@ -40,10 +76,15 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% for entry in top_10_ranking %}
-                    <tr>
+                    {% for entry in top_ranking %}
+                    <tr {% if entry.username == current_user.username %}class="current-user-row"{% endif %}>
                         <td>{{ loop.index }}</td>
-                        <td>{{ entry.username }}</td>
+                        <td>
+                            {{ entry.username }}
+                            {% if entry.username == current_user.username %}
+                            <span class="badge bg-primary ms-1">あなた</span>
+                            {% endif %}
+                        </td>
                         <td>{{ entry.total_attempts }}</td>
                         <td>{{ entry.total_correct }}</td>
                         <td>{{ entry.accuracy_rate|round(1) }}%</td>

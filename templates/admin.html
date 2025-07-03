@@ -257,6 +257,7 @@
                             <th>部屋番号</th>
                             <th>最大単元番号</th>
                             <th>使用CSVファイル</th>
+                            <th>ランキング表示人数</th> <!-- ★新規追加 -->
                             <th>操作</th>
                         </tr>
                     </thead>
@@ -279,11 +280,11 @@
                             <td><strong>{{ room_num }}</strong></td>
                             <td>
                                 <input type="text"
-                                       id="maxUnit_{{ room_num }}"
-                                       value="{{ room_max_unit_settings.get(room_num, '9999') }}"
-                                       class="form-control unit-setting-input"
-                                       data-room-number="{{ room_num }}"
-                                       placeholder="例: 34 または 9999（全て）">
+                                    id="maxUnit_{{ room_num }}"
+                                    value="{{ room_max_unit_settings.get(room_num, '9999') }}"
+                                    class="form-control unit-setting-input"
+                                    data-room-number="{{ room_num }}"
+                                    placeholder="例: 34 または 9999（全て）">
                             </td>
                             <td>
                                 <select id="csvFile_{{ room_num }}" 
@@ -297,6 +298,17 @@
                                 <small class="form-text text-muted">
                                     現在の設定: <code id="current_csv_{{ room_num }}">{{ room_csv_settings.get(room_num, 'words.csv') }}</code>
                                 </small>
+                            </td>
+                            <!-- ★新規追加: ランキング表示人数 -->
+                            <td>
+                                <input type="number"
+                                    id="rankingCount_{{ room_num }}"
+                                    value="{{ room_ranking_settings.get(room_num, 10) }}"
+                                    class="form-control ranking-setting-input"
+                                    data-room-number="{{ room_num }}"
+                                    min="1" max="50"
+                                    placeholder="10">
+                                <small class="form-text text-muted">1-50人</small>
                             </td>
                             <td>
                                 <div class="btn-group-vertical btn-group-sm">
