@@ -3215,13 +3215,21 @@ def progress_page():
 
         # バランススコアで降順ソート
         ranking_data.sort(key=lambda x: (x['balance_score'], x['total_attempts']), reverse=True)
+
+        current_user_rank = None
+        if current_user_stats:
+            for index, user_data in enumerate(ranking_data, 1):
+                if user_data['username'] == current_user.username:
+                    current_user_rank = index
+                    break
         
         # ★修正：テンプレートで使用される変数名に統一
-        top_10_ranking = ranking_data[:ranking_display_count]
+        top_5_ranking = ranking_data[:ranking_display_count]
 
         print(f"ランキング対象ユーザー数: {len(ranking_data)}")
-        print(f"表示ランキング数: {len(top_10_ranking)}")
+        print(f"表示ランキング数: {len(top_5_ranking)}")
         print(f"現在のユーザーのスコア: {current_user_stats}")
+        print(f"現在のユーザーの順位: {current_user_rank}")
         print("=== 進捗ページ処理完了 ===\n")
 
         context = get_template_context()
@@ -3230,8 +3238,10 @@ def progress_page():
         return render_template('progress.html',
                                current_user=current_user,
                                user_progress_by_chapter=sorted_chapter_progress,
-                               top_10_ranking=top_10_ranking,  # この変数名に統一
-                               current_user_stats=current_user_stats,  # ★追加
+                               top_10_ranking=top_5_ranking,  # 変数名はテンプレートに合わせる
+                               current_user_stats=current_user_stats,
+                               current_user_rank=current_user_rank,  # ★追加
+                               total_users_in_room=len(ranking_data),  # ★追加
                                ranking_display_count=ranking_display_count,
                                **context)
     
