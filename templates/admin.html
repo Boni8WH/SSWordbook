@@ -246,7 +246,7 @@
 
     <section id="admin-room-settings">
         <h3>🏠 部屋ごとの設定管理</h3>
-        <p>各部屋の学習範囲、CSVファイル、ランキング表示人数を設定します。</p>
+        <p>各部屋の学習範囲とCSVファイルを設定します。</p>
 
         <!-- スクロール可能な部屋設定テーブル -->
         <div class="scrollable-table-container">
@@ -257,7 +257,6 @@
                             <th>部屋番号</th>
                             <th>最大単元番号</th>
                             <th>使用CSVファイル</th>
-                            <th>ランキング表示人数</th>
                             <th>操作</th>
                         </tr>
                     </thead>
@@ -298,17 +297,6 @@
                                 <small class="form-text text-muted">
                                     現在の設定: <code id="current_csv_{{ room_num }}">{{ room_csv_settings.get(room_num, 'words.csv') }}</code>
                                 </small>
-                            </td>
-                            <td>
-                                <input type="number"
-                                    id="rankingCount_{{ room_num }}"
-                                    value="10"
-                                    min="1"
-                                    max="50"
-                                    class="form-control ranking-count-input"
-                                    data-room-number="{{ room_num }}"
-                                    placeholder="表示人数">
-                                <small class="form-text text-muted">1-50人まで設定可能</small>
                             </td>
                             <td>
                                 <div class="btn-group-vertical btn-group-sm">
@@ -1112,15 +1100,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         room_number: roomNumber,
                         csv_filename: csvFilename
                     })
-                }),
-                fetch('/admin/update_room_ranking_setting', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        room_number: roomNumber,
-                        ranking_count: rankingCount
-                    })
                 })
+                // ranking設定の部分を削除
             ])
             .then(responses => {
                 console.log('📡 サーバーレスポンス受信:', responses.map(r => r.status));
@@ -1129,29 +1110,19 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(results => {
                 const unitResult = results[0];
                 const csvResult = results[1];
-                const rankingResult = results[2];
                 
-                console.log('📊 保存結果:', { unitResult, csvResult, rankingResult });
+                console.log('📊 保存結果:', { unitResult, csvResult });
                 
-                if (unitResult.status === 'success' && csvResult.status === 'success' && rankingResult.status === 'success') {
-                    alert(`✅ 部屋 ${roomNumber} の設定を更新しました:\n・最大単元: ${maxUnit}\n・CSVファイル: ${csvFilename}\n・ランキング表示人数: ${rankingCount}人`);
+                if (unitResult.status === 'success' && csvResult.status === 'success') {
+                    alert(`✅ 部屋 ${roomNumber} の設定を更新しました:\n・最大単元: ${maxUnit}\n・CSVファイル: ${csvFilename}`);
                     
-                    // 保存成功後、設定を再読み込み
                     loadRoomSettings();
                 } else {
-                    const errorMsg = (unitResult.message || csvResult.message || rankingResult.message || '不明なエラー');
+                    const errorMsg = (unitResult.message || csvResult.message || '不明なエラー');
                     alert('❌ 設定の保存中にエラーが発生しました: ' + errorMsg);
-                    console.error('❌ 保存エラー:', { unitResult, csvResult, rankingResult });
+                    console.error('❌ 保存エラー:', { unitResult, csvResult });
                 }
             })
-            .catch(error => {
-                console.error('❌ 通信エラー:', error);
-                alert('❌ 設定の保存中にエラーが発生しました: ' + error.message);
-            })
-            .finally(() => {
-                this.disabled = false;
-                this.textContent = '保存';
-            });
         });
     });
 
