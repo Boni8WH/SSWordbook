@@ -3004,7 +3004,13 @@ def progress_page():
         max_enabled_unit_num_str_for_ranking = room_setting_for_ranking.max_enabled_unit_number if room_setting_for_ranking else "9999"
         parsed_max_enabled_unit_num_for_ranking = parse_unit_number(max_enabled_unit_num_str_for_ranking)
 
-        ranking_display_count = room_setting_for_ranking.ranking_display_count if room_setting_for_ranking else 10
+        # ランキング表示人数を取得（カラムが存在しない場合はデフォルト10人）
+        ranking_display_count = 10  # デフォルト値
+        try:
+            if room_setting_for_ranking and hasattr(room_setting_for_ranking, 'ranking_display_count'):
+                ranking_display_count = room_setting_for_ranking.ranking_display_count
+        except Exception as e:
+            print(f"⚠️ ranking_display_countカラムが見つかりません。デフォルト値10を使用: {e}")
         
         total_questions_for_room_ranking = 0
         for word in word_data:
