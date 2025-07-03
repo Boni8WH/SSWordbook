@@ -3434,3 +3434,139 @@ a.nav-link.btn.change-username-button:hover,
         margin-top: 15px;
     }
 }
+
+/* base.html または progress.html の <style> セクションに追加してください */
+
+/* ランキングヘッダーのレイアウト */
+.ranking-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 25px;
+    gap: 30px;
+    flex-wrap: wrap;
+}
+
+.ranking-title-section {
+    flex: 1;
+    min-width: 300px;
+}
+
+.ranking-title-section h3 {
+    margin-bottom: 8px;
+    color: #2c3e50;
+    font-size: 1.4em;
+}
+
+.ranking-title-section p {
+    margin-bottom: 0;
+    color: #6c757d;
+    font-size: 0.95em;
+}
+
+.user-rank-section {
+    flex: 0 0 auto;
+    text-align: center;
+    min-width: 140px;
+}
+
+.user-rank-section h4 {
+    margin-bottom: 12px;
+    color: #2c3e50;
+    font-size: 1.1em;
+    font-weight: 600;
+}
+
+.rank-display {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 12px 18px;
+    border-radius: 10px;
+    box-shadow: 0 3px 6px rgba(0,0,0,0.1);
+    display: inline-block;
+    min-width: 110px;
+    transition: transform 0.2s ease;
+}
+
+.rank-display:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 12px rgba(0,0,0,0.15);
+}
+
+.rank-number {
+    font-size: 1.8em;
+    font-weight: bold;
+    display: block;
+    line-height: 1;
+}
+
+.rank-text {
+    font-size: 1em;
+    font-weight: 600;
+    margin-left: 4px;
+}
+
+.rank-total {
+    font-size: 0.85em;
+    opacity: 0.9;
+    display: block;
+    margin-top: 4px;
+}
+
+.rank-icon {
+    font-size: 1.1em;
+    display: block;
+    margin-bottom: 4px;
+}
+
+/* 特別な順位のスタイル */
+.rank-display.rank-1 {
+    background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+    color: #333;
+    border: 2px solid #FFD700;
+}
+
+.rank-display.rank-2 {
+    background: linear-gradient(135deg, #C0C0C0 0%, #808080 100%);
+    color: #333;
+    border: 2px solid #C0C0C0;
+}
+
+.rank-display.rank-3 {
+    background: linear-gradient(135deg, #CD7F32 0%, #A0522D 100%);
+    color: white;
+    border: 2px solid #CD7F32;
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 992px) {
+    .ranking-header {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        gap: 20px;
+    }
+    
+    .ranking-title-section {
+        min-width: auto;
+    }
+    
+    .user-rank-section {
+        min-width: auto;
+    }
+}
+
+@media (max-width: 576px) {
+    .ranking-header {
+        gap: 15px;
+    }
+    
+    .rank-display {
+        min-width: 100px;
+        padding: 10px 15px;
+    }
+    
+    .rank-number {
+        font-size: 1.6em;
+    }
+}
