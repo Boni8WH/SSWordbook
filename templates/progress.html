@@ -88,9 +88,9 @@
                     <i class="fas fa-info-circle"></i> 
                     上位5位までを表示しています
                 </p>
-                <a href="{{ url_for('full_ranking') }}" class="btn btn-outline-primary btn-sm">
+                <button class="btn btn-outline-primary btn-sm" onclick="showFullRanking()">
                     <i class="fas fa-list"></i> 全体ランキングを見る
-                </a>
+                </button>
             </div>
         </div>
 
@@ -347,6 +347,114 @@ function updateUserRank(rank, totalUsers) {
         <span class="progress-rank-text">位</span>
         <span class="progress-rank-total">/ ${totalUsers}人</span>
     `;
+}
+
+// 全体ランキングを表示する関数
+function showFullRanking() {
+    // 全体ランキングのモーダルを作成
+    const modal = document.createElement('div');
+    modal.className = 'modal fade';
+    modal.id = 'fullRankingModal';
+    modal.innerHTML = `
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">🏆 全体ランキング (部屋：{{ current_user.room_number }})</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="text-center">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-2 text-muted">全体ランキングを読み込み中...</p>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Bootstrap 5のモーダル初期化
+    const modalInstance = new bootstrap.Modal(modal);
+    modalInstance.show();
+    
+    // モーダルが閉じられたときにDOMから削除
+    modal.addEventListener('hidden.bs.modal', function() {
+        modal.remove();
+    });
+    
+    // 全体ランキングデータを取得
+    fetch('/api/ranking_data')
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                displayFullRankingInModal(data.ranking_data, modal);
+            } else {
+                throw new Error(data.message || '全体ランキングの取得に失敗しました');
+            }
+        })
+        .catch(error => {
+            console.error('❌ 全体ランキング取得エラー:', error);
+            const modalBody = modal.querySelector('.modal-body');
+            modalBody.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    全体ランキングの取得に失敗しました。
+                    <br><small>${error.message}</small>
+                </div>
+            `;
+        });
+}
+
+// 全体ランキングをモーダルに表示
+function displayFullRankingInModal(rankingData, modal) {
+    const modalBody = modal.querySelector('.modal-body');
+    
+    let html = '<div class="table-responsive">';
+    html += '<table class="table table-striped table-sm">';
+    html += '<thead class="table-dark">';
+    html += '<tr><th>順位</th><th>名前</th><th>回答数</th><th>正解数</th><th>正答率</th><th>総合スコア</th><th>網羅率</th></tr>';
+    html += '</thead><tbody>';
+    
+    rankingData.forEach((user, index) => {
+        let rowClass = '';
+        let rankIcon = '';
+        
+        if (index === 0) {
+            rowClass = 'table-warning';
+            rankIcon = '<i class="fas fa-crown text-warning me-1"></i>';
+        } else if (index === 1) {
+            rowClass = 'table-secondary';
+            rankIcon = '<i class="fas fa-medal text-secondary me-1"></i>';
+        } else if (index === 2) {
+            rowClass = 'table-info';
+            rankIcon = '<i class="fas fa-medal text-info me-1"></i>';
+        }
+        
+        html += `<tr class="${rowClass}">`;
+        html += `<td>${rankIcon}${index + 1}</td>`;
+        html += `<td><strong>${user.username}</strong></td>`;
+        html += `<td>${user.total_attempts}</td>`;
+        html += `<td>${user.total_correct}</td>`;
+        html += `<td>${user.accuracy_rate.toFixed(1)}%</td>`;
+        html += `<td><strong>${user.balance_score.toFixed(1)}</strong></td>`;
+        html += `<td>${user.coverage_rate.toFixed(1)}%</td>`;
+        html += '</tr>';
+    });
+    
+    html += '</tbody></table></div>';
+    
+    if (rankingData.length === 0) {
+        html = '<div class="alert alert-info">まだランキングデータがありません。</div>';
+    }
+    
+    modalBody.innerHTML = html;
+    console.log(`✅ 全体ランキング表示完了 (${rankingData.length}人)`);
 }
 
 // ページ読み込み時にランキングデータを非同期取得
