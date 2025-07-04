@@ -3,16 +3,25 @@ import json
 import csv
 import re
 from io import StringIO
-from datetime import datetime
+from datetime import datetime, timedelta
 import pytz
 import secrets
 import string
-from datetime import datetime, timedelta
-from flask_mail import Mail, Message
 import hashlib
 import logging
 import math
 import time
+
+# ===== 条件付きimport（schedule） =====
+try:
+    import schedule
+    import threading
+    SCHEDULER_AVAILABLE = True
+    print("✅ scheduleライブラリが利用可能です")
+except ImportError:
+    SCHEDULER_AVAILABLE = False
+    print("⚠️ scheduleライブラリが見つかりません。進捗自動更新は無効化されます。")
+    print("💡 インストール方法: pip install schedule")
 
 log_level = logging.INFO if os.environ.get('RENDER') == 'true' else logging.DEBUG
 logging.basicConfig(
@@ -28,6 +37,7 @@ if os.environ.get('RENDER') == 'true':
 logger = logging.getLogger(__name__)
 logger.info(f"ログレベル設定: {logging.getLevelName(log_level)} ({'本番' if os.environ.get('RENDER') == 'true' else 'ローカル'}環境)")
 
+# ===== Flask関連のimport =====
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, Response
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -44,6 +54,7 @@ basedir = os.path.abspath(os.path.dirname(__file__))
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['PERMANENT_SESSION_LIFETIME'] = 3600 * 24 * 7
 
+# ===== データベース設定 =====
 database_url = os.environ.get('DATABASE_URL')
 
 if database_url:
@@ -77,11 +88,13 @@ app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME')
 app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
 app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_DEFAULT_SENDER', app.config['MAIL_USERNAME'])
 
+from flask_mail import Mail, Message
 mail = Mail(app)
 
 # ===== SQLAlchemy初期化（1回のみ） =====
 db = SQLAlchemy(app)
 
+# ===== アップロード設定 =====
 UPLOAD_FOLDER = 'uploads'
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
@@ -90,6 +103,423 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 
 # 部屋ごとのCSVファイルを保存するフォルダ
 ROOM_CSV_FOLDER = 'room_csv'
+
+class ProgressCache(db.Model):
+    """進捗データのキャッシュテーブル"""
+    __tablename__ = 'progress_cache'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    room_number = db.Column(db.String(50), nullable=False, index=True)
+    user_id = db.Column(db.Integer, nullable=False)
+    username = db.Column(db.String(80), nullable=False)
+    
+    # 基本統計
+    total_attempts = db.Column(db.Integer, default=0)
+    total_correct = db.Column(db.Integer, default=0)
+    accuracy_rate = db.Column(db.Float, default=0.0)
+    mastered_count = db.Column(db.Integer, default=0)
+    coverage_rate = db.Column(db.Float, default=0.0)
+    
+    # スコア詳細
+    balance_score = db.Column(db.Float, default=0.0)
+    mastery_score = db.Column(db.Float, default=0.0)
+    reliability_score = db.Column(db.Float, default=0.0)
+    activity_score = db.Column(db.Float, default=0.0)
+    
+    # 章別データ（JSON形式）
+    chapter_progress = db.Column(db.Text)  # JSON文字列として保存
+    
+    # キャッシュ管理
+    last_login = db.Column(db.DateTime)
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))
+    cache_version = db.Column(db.String(20), default="1.0")
+    
+    # 複合インデックス
+    __table_args__ = (
+        db.Index('idx_progress_room_user', 'room_number', 'user_id'),
+    )
+
+# 進捗キャッシュの管理クラス
+class ProgressCacheManager:
+    
+    @staticmethod
+    def update_progress_cache():
+        """全部屋の進捗データを更新"""
+        try:
+            print("🔄 進捗キャッシュ更新開始...")
+            start_time = time.time()
+            
+            # 現在時刻が偶数時間かチェック
+            current_hour = datetime.now().hour
+            if current_hour % 2 != 0:
+                print("⏰ 偶数時間ではないため、更新をスキップします")
+                return
+            
+            # 全ユーザーを取得（管理者を除く）
+            users = User.query.filter(User.username != 'admin').all()
+            updated_users = 0
+            
+            for user in users:
+                try:
+                    cache_data = ProgressCacheManager._calculate_user_progress(user)
+                    if cache_data:
+                        ProgressCacheManager._save_user_cache(user, cache_data)
+                        updated_users += 1
+                        
+                        if updated_users % 10 == 0:
+                            print(f"📊 進捗更新: {updated_users}名完了")
+                
+                except Exception as user_error:
+                    print(f"⚠️ ユーザー{user.username}の更新エラー: {user_error}")
+                    continue
+            
+            # 古いキャッシュを削除（7日以上前）
+            ProgressCacheManager._cleanup_old_cache()
+            
+            elapsed_time = time.time() - start_time
+            print(f"✅ 進捗キャッシュ更新完了: {updated_users}名, {elapsed_time:.2f}秒")
+            
+        except Exception as e:
+            print(f"❌ 進捗キャッシュ更新エラー: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    @staticmethod
+    def _calculate_user_progress(user):
+        """個別ユーザーの進捗を計算"""
+        try:
+            # 部屋ごとの単語データを取得
+            word_data = load_word_data_for_room(user.room_number)
+            if not word_data:
+                return None
+                
+            user_problem_history = user.get_problem_history()
+            
+            # 部屋設定を取得
+            room_setting = RoomSetting.query.filter_by(room_number=user.room_number).first()
+            max_enabled_unit_num_str = room_setting.max_enabled_unit_number if room_setting else "9999"
+            parsed_max_enabled_unit_num = parse_unit_number(max_enabled_unit_num_str)
+            
+            # 章ごとの進捗を計算
+            chapter_progress_summary = {}
+            total_attempts = 0
+            total_correct = 0
+            mastered_problem_ids = set()
+            total_questions_for_room = 0
+            
+            # 有効な単語データで初期化
+            for word in word_data:
+                chapter_num = word['chapter']
+                unit_num = word['number']
+                category_name = word.get('category', '未分類')
+                
+                is_word_enabled_in_csv = word['enabled']
+                is_unit_enabled_by_room_setting = parse_unit_number(unit_num) <= parsed_max_enabled_unit_num
+                
+                if is_word_enabled_in_csv and is_unit_enabled_by_room_setting:
+                    total_questions_for_room += 1
+                    
+                    if chapter_num not in chapter_progress_summary:
+                        chapter_progress_summary[chapter_num] = {
+                            'chapter_name': f'第{chapter_num}章',
+                            'units': {},
+                            'total_questions': 0,
+                            'total_mastered': 0
+                        }
+                    
+                    if unit_num not in chapter_progress_summary[chapter_num]['units']:
+                        chapter_progress_summary[chapter_num]['units'][unit_num] = {
+                            'categoryName': category_name,
+                            'attempted_problems': set(),
+                            'mastered_problems': set(),
+                            'total_questions_in_unit': 0,
+                            'total_attempts': 0
+                        }
+                    
+                    chapter_progress_summary[chapter_num]['units'][unit_num]['total_questions_in_unit'] += 1
+                    chapter_progress_summary[chapter_num]['total_questions'] += 1
+            
+            # 学習履歴を処理
+            for problem_id, history in user_problem_history.items():
+                # 対応する単語を検索
+                matched_word = None
+                for word in word_data:
+                    if get_problem_id(word) == problem_id:
+                        matched_word = word
+                        break
+                
+                if matched_word:
+                    chapter_number = matched_word['chapter']
+                    unit_number = matched_word['number']
+                    
+                    is_word_enabled_in_csv = matched_word['enabled']
+                    is_unit_enabled_by_room_setting = parse_unit_number(unit_number) <= parsed_max_enabled_unit_num
+                    
+                    if (is_word_enabled_in_csv and is_unit_enabled_by_room_setting and 
+                        chapter_number in chapter_progress_summary and
+                        unit_number in chapter_progress_summary[chapter_number]['units']):
+                        
+                        correct_attempts = history.get('correct_attempts', 0)
+                        incorrect_attempts = history.get('incorrect_attempts', 0)
+                        total_problem_attempts = correct_attempts + incorrect_attempts
+                        
+                        total_attempts += total_problem_attempts
+                        total_correct += correct_attempts
+                        
+                        unit_data = chapter_progress_summary[chapter_number]['units'][unit_number]
+                        unit_data['total_attempts'] += total_problem_attempts
+                        
+                        if total_problem_attempts > 0:
+                            unit_data['attempted_problems'].add(problem_id)
+                            
+                            # マスター判定：正答率80%以上
+                            accuracy_rate = (correct_attempts / total_problem_attempts) * 100
+                            if accuracy_rate >= 80.0:
+                                unit_data['mastered_problems'].add(problem_id)
+                                mastered_problem_ids.add(problem_id)
+                                chapter_progress_summary[chapter_number]['total_mastered'] += 1
+            
+            # スコア計算
+            mastered_count = len(mastered_problem_ids)
+            coverage_rate = (mastered_count / total_questions_for_room * 100) if total_questions_for_room > 0 else 0
+            accuracy_rate = (total_correct / total_attempts * 100) if total_attempts > 0 else 0
+            
+            # ベイズ統計によるスコア計算
+            EXPECTED_AVG_ACCURACY = 0.7
+            CONFIDENCE_ATTEMPTS = 10
+            PRIOR_CORRECT = EXPECTED_AVG_ACCURACY * CONFIDENCE_ATTEMPTS
+            PRIOR_ATTEMPTS = CONFIDENCE_ATTEMPTS
+            
+            if total_attempts == 0:
+                bayesian_accuracy = 0
+                balance_score = 0
+            else:
+                bayesian_accuracy = (PRIOR_CORRECT + total_correct) / (PRIOR_ATTEMPTS + total_attempts)
+                balance_score = (
+                    (mastered_count ** 1.3) * 10 +
+                    (bayesian_accuracy ** 2) * 500 +
+                    math.log(total_attempts + 1) * 20
+                ) / 100
+            
+            mastery_score = (mastered_count ** 1.3) * 10 / 100
+            reliability_score = (bayesian_accuracy ** 2) * 500 / 100
+            activity_score = math.log(total_attempts + 1) * 20 / 100
+            
+            # 章別データを配列形式に変換
+            sorted_chapter_progress = {}
+            for chapter_num in sorted(chapter_progress_summary.keys(), key=lambda x: int(x) if x.isdigit() else float('inf')):
+                chapter_data = chapter_progress_summary[chapter_num]
+                
+                sorted_units = []
+                for unit_num in sorted(chapter_data['units'].keys(), key=lambda x: parse_unit_number(x)):
+                    unit_data = chapter_data['units'][unit_num]
+                    sorted_units.append({
+                        'unit_num': unit_num,
+                        'category_name': unit_data['categoryName'],
+                        'attempted_problems': list(unit_data['attempted_problems']),
+                        'mastered_problems': list(unit_data['mastered_problems']),
+                        'total_questions_in_unit': unit_data['total_questions_in_unit'],
+                        'total_attempts': unit_data['total_attempts']
+                    })
+                
+                sorted_chapter_progress[chapter_num] = {
+                    'chapter_name': chapter_data['chapter_name'],
+                    'units': sorted_units,
+                    'total_questions': chapter_data['total_questions'],
+                    'total_mastered': chapter_data['total_mastered']
+                }
+            
+            return {
+                'total_attempts': total_attempts,
+                'total_correct': total_correct,
+                'accuracy_rate': accuracy_rate,
+                'mastered_count': mastered_count,
+                'coverage_rate': coverage_rate,
+                'balance_score': balance_score,
+                'mastery_score': mastery_score,
+                'reliability_score': reliability_score,
+                'activity_score': activity_score,
+                'chapter_progress': json.dumps(sorted_chapter_progress, ensure_ascii=False)
+            }
+            
+        except Exception as e:
+            print(f"❌ ユーザー{user.username}の進捗計算エラー: {e}")
+            return None
+    
+    @staticmethod
+    def _save_user_cache(user, cache_data):
+        """ユーザーキャッシュを保存"""
+        try:
+            # 既存キャッシュを探す
+            existing_cache = ProgressCache.query.filter_by(
+                room_number=user.room_number,
+                user_id=user.id
+            ).first()
+            
+            if existing_cache:
+                # 既存データを更新
+                for key, value in cache_data.items():
+                    setattr(existing_cache, key, value)
+                existing_cache.username = user.username
+                existing_cache.last_login = user.last_login
+                existing_cache.updated_at = datetime.now(JST)
+            else:
+                # 新規作成
+                new_cache = ProgressCache(
+                    room_number=user.room_number,
+                    user_id=user.id,
+                    username=user.username,
+                    last_login=user.last_login,
+                    **cache_data
+                )
+                db.session.add(new_cache)
+            
+            db.session.commit()
+            
+        except Exception as e:
+            db.session.rollback()
+            print(f"❌ キャッシュ保存エラー({user.username}): {e}")
+    
+    @staticmethod
+    def _cleanup_old_cache():
+        """7日以上古いキャッシュを削除"""
+        try:
+            cutoff_date = datetime.now(JST) - timedelta(days=7)
+            old_caches = ProgressCache.query.filter(ProgressCache.updated_at < cutoff_date).all()
+            
+            if old_caches:
+                for cache in old_caches:
+                    db.session.delete(cache)
+                db.session.commit()
+                print(f"🗑️ 古いキャッシュ削除: {len(old_caches)}件")
+                
+        except Exception as e:
+            print(f"⚠️ キャッシュクリーンアップエラー: {e}")
+    
+    @staticmethod
+    def get_cached_progress(room_number):
+        """キャッシュされた進捗データを取得"""
+        try:
+            cached_data = ProgressCache.query.filter_by(room_number=room_number).all()
+            
+            if not cached_data:
+                return None, None
+            
+            # ランキング用データ
+            ranking_data = []
+            for cache in cached_data:
+                ranking_data.append({
+                    'username': cache.username,
+                    'total_attempts': cache.total_attempts,
+                    'total_correct': cache.total_correct,
+                    'accuracy_rate': cache.accuracy_rate,
+                    'coverage_rate': cache.coverage_rate,
+                    'mastered_count': cache.mastered_count,
+                    'balance_score': cache.balance_score,
+                    'mastery_score': cache.mastery_score,
+                    'reliability_score': cache.reliability_score,
+                    'activity_score': cache.activity_score,
+                    'total_questions_for_room': 0  # 後で設定
+                })
+            
+            # 最新更新時刻を取得
+            latest_update = max(cache.updated_at for cache in cached_data)
+            
+            return ranking_data, latest_update
+            
+        except Exception as e:
+            print(f"❌ キャッシュ取得エラー: {e}")
+            return None, None
+    
+    @staticmethod
+    def get_user_cached_progress(user_id):
+        """特定ユーザーのキャッシュデータを取得"""
+        try:
+            cache = ProgressCache.query.filter_by(user_id=user_id).first()
+            if not cache:
+                return None
+            
+            # 章別進捗をJSONから復元
+            chapter_progress = json.loads(cache.chapter_progress) if cache.chapter_progress else {}
+            
+            return {
+                'stats': {
+                    'total_attempts': cache.total_attempts,
+                    'total_correct': cache.total_correct,
+                    'accuracy_rate': cache.accuracy_rate,
+                    'coverage_rate': cache.coverage_rate,
+                    'mastered_count': cache.mastered_count,
+                    'balance_score': cache.balance_score,
+                    'mastery_score': cache.mastery_score,
+                    'reliability_score': cache.reliability_score,
+                    'activity_score': cache.activity_score
+                },
+                'chapter_progress': chapter_progress,
+                'updated_at': cache.updated_at
+            }
+            
+        except Exception as e:
+            print(f"❌ ユーザーキャッシュ取得エラー: {e}")
+            return None
+
+# スケジューラーのセットアップ
+def setup_progress_scheduler():
+    """進捗更新スケジューラーをセットアップ（scheduleライブラリ利用可能時のみ）"""
+    if not SCHEDULER_AVAILABLE:
+        print("⚠️ scheduleライブラリが利用できないため、自動更新は無効化されます")
+        return False
+    
+    try:
+        # 2時間おきに更新（0:00, 2:00, 4:00...）
+        schedule.every(2).hours.do(ProgressCacheManager.update_progress_cache)
+        
+        print("⏰ 進捗更新スケジューラーを設定しました（2時間おき）")
+        
+        # スケジューラーを別スレッドで実行
+        def run_scheduler():
+            while True:
+                schedule.run_pending()
+                time.sleep(60)  # 1分おきにチェック
+        
+        scheduler_thread = threading.Thread(target=run_scheduler, daemon=True)
+        scheduler_thread.start()
+        
+        print("🚀 進捗更新スケジューラーを開始しました")
+        return True
+        
+    except Exception as e:
+        print(f"❌ スケジューラー設定エラー: {e}")
+        return False
+
+# 次回更新時刻を取得する関数
+def get_next_update_time():
+    """次回更新時刻を取得"""
+    now = datetime.now(JST)
+    current_hour = now.hour
+    
+    # 次の偶数時間を計算
+    if current_hour % 2 == 0:
+        next_hour = current_hour + 2
+    else:
+        next_hour = current_hour + 1
+    
+    # 24時を超える場合は翌日の0時に
+    if next_hour >= 24:
+        next_day = now.date() + timedelta(days=1)
+        next_update = datetime.combine(next_day, datetime.min.time()).replace(hour=next_hour % 24)
+    else:
+        next_update = now.replace(hour=next_hour, minute=0, second=0, microsecond=0)
+    
+    return next_update
+
+def get_last_update_time():
+    """最終更新時刻を取得"""
+    try:
+        latest_cache = ProgressCache.query.order_by(ProgressCache.updated_at.desc()).first()
+        return latest_cache.updated_at if latest_cache else None
+    except Exception as e:
+        print(f"❌ 最終更新時刻取得エラー: {e}")
+        return None
 
 # ====================================================================
 # アプリ情報を取得するヘルパー関数
@@ -690,7 +1120,7 @@ def change_username_page():
 # app.py の migrate_database() 関数を以下に置き換えてください
 
 def migrate_database():
-    """データベーススキーマの変更を処理する（外部キー制約修正版）"""
+    """データベーススキーマの変更を処理する（進捗キャッシュ対応版）"""
     with app.app_context():
         print("🔄 データベースマイグレーションを開始...")
         
@@ -843,6 +1273,75 @@ def migrate_database():
             
             fix_foreign_key_constraints()
             
+            # 6. ProgressCacheテーブルの確認・作成
+            if not inspector.has_table('progress_cache'):
+                print("🔧 progress_cacheテーブルを作成します...")
+                try:
+                    # テーブルを作成
+                    db.create_all()
+                    
+                    # インデックスを手動で作成（必要に応じて）
+                    with db.engine.connect() as conn:
+                        try:
+                            # 部屋番号のインデックス
+                            conn.execute(text("""
+                                CREATE INDEX IF NOT EXISTS idx_progress_room 
+                                ON progress_cache (room_number)
+                            """))
+                            
+                            # 部屋番号+ユーザーIDの複合インデックス
+                            conn.execute(text("""
+                                CREATE INDEX IF NOT EXISTS idx_progress_room_user 
+                                ON progress_cache (room_number, user_id)
+                            """))
+                            
+                            conn.commit()
+                            print("✅ progress_cacheテーブルとインデックスを作成しました")
+                            
+                        except Exception as index_error:
+                            print(f"⚠️ インデックス作成エラー: {index_error}")
+                            
+                except Exception as table_error:
+                    print(f"❌ progress_cacheテーブル作成エラー: {table_error}")
+            else:
+                print("✅ progress_cacheテーブルは既に存在します")
+                
+                # 既存テーブルの場合、必要なカラムが存在するかチェック
+                columns = [col['name'] for col in inspector.get_columns('progress_cache')]
+                required_columns = [
+                    'room_number', 'user_id', 'username', 'total_attempts', 'total_correct',
+                    'accuracy_rate', 'mastered_count', 'coverage_rate', 'balance_score',
+                    'mastery_score', 'reliability_score', 'activity_score', 'chapter_progress',
+                    'last_login', 'updated_at', 'cache_version'
+                ]
+                
+                missing_columns = [col for col in required_columns if col not in columns]
+                if missing_columns:
+                    print(f"⚠️ progress_cacheテーブルに不足カラム: {missing_columns}")
+                    # 必要に応じてALTER TABLEでカラムを追加
+                    with db.engine.connect() as conn:
+                        for col_name in missing_columns:
+                            try:
+                                if col_name in ['total_attempts', 'total_correct', 'mastered_count']:
+                                    conn.execute(text(f'ALTER TABLE progress_cache ADD COLUMN {col_name} INTEGER DEFAULT 0'))
+                                elif col_name in ['accuracy_rate', 'coverage_rate', 'balance_score', 'mastery_score', 'reliability_score', 'activity_score']:
+                                    conn.execute(text(f'ALTER TABLE progress_cache ADD COLUMN {col_name} FLOAT DEFAULT 0.0'))
+                                elif col_name in ['room_number', 'username', 'cache_version']:
+                                    default_val = "'1.0'" if col_name == 'cache_version' else "''"
+                                    conn.execute(text(f'ALTER TABLE progress_cache ADD COLUMN {col_name} VARCHAR(50) DEFAULT {default_val}'))
+                                elif col_name == 'chapter_progress':
+                                    conn.execute(text(f'ALTER TABLE progress_cache ADD COLUMN {col_name} TEXT'))
+                                elif col_name in ['last_login', 'updated_at']:
+                                    conn.execute(text(f'ALTER TABLE progress_cache ADD COLUMN {col_name} TIMESTAMP'))
+                                elif col_name == 'user_id':
+                                    conn.execute(text(f'ALTER TABLE progress_cache ADD COLUMN {col_name} INTEGER DEFAULT 0'))
+                                
+                                print(f"✅ {col_name}カラムを追加しました")
+                            except Exception as add_col_error:
+                                print(f"⚠️ {col_name}カラム追加エラー: {add_col_error}")
+                        
+                        conn.commit()
+            
             print("✅ データベースマイグレーションが完了しました。")
             
         except Exception as e:
@@ -907,11 +1406,8 @@ def diagnose_database_environment():
     
     print("========================\n")
 
-# データベース初期化関数（完全リセット対応版）
-# app.py の create_tables_and_admin_user() 関数を以下に置き換えてください
-
 def create_tables_and_admin_user():
-    """データベース初期化関数（マイグレーション付き）"""
+    """データベース初期化関数（スケジューラー対応版）"""
     try:
         with app.app_context():
             logger.info("🔧 データベース初期化を開始...")
@@ -929,14 +1425,26 @@ def create_tables_and_admin_user():
             db.create_all()
             logger.info("✅ テーブルを確認/作成しました。")
             
-            # ★ 重要：マイグレーションを強制実行
+            # マイグレーション実行
             try:
                 logger.info("🔄 データベースマイグレーションを実行中...")
                 migrate_database()
                 logger.info("✅ マイグレーション完了")
             except Exception as migration_error:
                 logger.error(f"⚠️ マイグレーションエラー: {migration_error}")
-                # マイグレーションが失敗してもアプリは起動を続行
+            
+            # 進捗更新スケジューラーをセットアップ（条件付き）
+            if SCHEDULER_AVAILABLE:
+                try:
+                    setup_result = setup_progress_scheduler()
+                    if setup_result:
+                        logger.info("✅ 進捗更新スケジューラー開始")
+                    else:
+                        logger.warning("⚠️ 進捗更新スケジューラーの開始に失敗")
+                except Exception as scheduler_error:
+                    logger.error(f"⚠️ スケジューラー開始エラー: {scheduler_error}")
+            else:
+                logger.warning("⚠️ scheduleライブラリが利用できないため、手動更新のみ利用可能です")
             
             # 管理者ユーザー確認/作成
             try:
@@ -946,7 +1454,7 @@ def create_tables_and_admin_user():
                     logger.info("👤 管理者ユーザーを作成します...")
                     admin_user = User(
                         username='admin',
-                        original_username='admin',  # ★ 追加
+                        original_username='admin',
                         room_number='ADMIN',
                         student_id='000',
                         problem_history='{}',
@@ -972,6 +1480,22 @@ def create_tables_and_admin_user():
                 
             except Exception as e:
                 logger.error(f"⚠️ アプリ情報処理エラー: {e}")
+            
+            # 初回起動時に進捗キャッシュを作成（オプション）
+            try:
+                if 'ProgressCache' in globals():
+                    cached_count = ProgressCache.query.count()
+                    if cached_count == 0 and SCHEDULER_AVAILABLE:
+                        logger.info("📊 初回起動のため進捗キャッシュを作成します...")
+                        ProgressCacheManager.update_progress_cache()
+                        logger.info("✅ 初回進捗キャッシュ作成完了")
+                    else:
+                        logger.info(f"📊 既存の進捗キャッシュ: {cached_count}件")
+                else:
+                    logger.warning("⚠️ ProgressCacheモデルが定義されていません")
+                    
+            except Exception as cache_error:
+                logger.error(f"⚠️ 初回キャッシュ作成エラー: {cache_error}")
                 
             logger.info("🎉 データベース初期化が完了しました！")
                 
@@ -3232,6 +3756,8 @@ def admin_analyze_invalid_history_detailed():
 # ====================================================================
 # app.py の progress_page ルートを以下に置き換えてください
 
+# app.py の progress_page ルートを以下に置き換え
+
 @app.route('/progress')
 def progress_page():
     try:
@@ -3244,283 +3770,206 @@ def progress_page():
             flash('ユーザーが見つかりません。', 'danger')
             return redirect(url_for('logout'))
 
-        print(f"\n=== 進捗ページ処理開始 ===")
+        print(f"\n=== 進捗ページ処理開始（キャッシュ版） ===")
         print(f"ユーザー: {current_user.username} (部屋: {current_user.room_number})")
 
-        user_problem_history = current_user.get_problem_history()
-        print(f"学習履歴数: {len(user_problem_history)}")
+        # キャッシュから進捗データを取得
+        cached_ranking, last_update = ProgressCacheManager.get_cached_progress(current_user.room_number)
+        cached_user_progress = ProgressCacheManager.get_user_cached_progress(current_user.id)
         
-        # 部屋ごとの単語データを取得
-        word_data = load_word_data_for_room(current_user.room_number)
-        print(f"部屋の単語データ数: {len(word_data)}")
+        using_cache = False
         
-        room_setting = RoomSetting.query.filter_by(room_number=current_user.room_number).first()
-        max_enabled_unit_num_str = room_setting.max_enabled_unit_number if room_setting else "9999"
-        parsed_max_enabled_unit_num = parse_unit_number(max_enabled_unit_num_str)
-        print(f"最大単元番号: {max_enabled_unit_num_str}")
-
-        # 章ごとに進捗をまとめる
-        chapter_progress_summary = {}
-
-        # 有効な単語データで単元進捗を初期化
-        for word in word_data:
-            chapter_num = word['chapter']
-            unit_num = word['number']
-            category_name = word.get('category', '未分類')
+        if cached_ranking and cached_user_progress and last_update:
+            # キャッシュが存在する場合
+            using_cache = True
+            print(f"📊 キャッシュからデータ取得: 最終更新 {last_update}")
             
-            is_word_enabled_in_csv = word['enabled']
-            is_unit_enabled_by_room_setting = parse_unit_number(unit_num) <= parsed_max_enabled_unit_num
-
-            if is_word_enabled_in_csv and is_unit_enabled_by_room_setting:
-                # 章の初期化
-                if chapter_num not in chapter_progress_summary:
-                    chapter_progress_summary[chapter_num] = {
-                        'chapter_name': f'第{chapter_num}章',
-                        'units': {},
-                        'total_questions': 0,
-                        'total_mastered': 0
-                    }
-                
-                # 単元の初期化
-                if unit_num not in chapter_progress_summary[chapter_num]['units']:
-                    chapter_progress_summary[chapter_num]['units'][unit_num] = {
-                        'categoryName': category_name,
-                        'attempted_problems': set(),
-                        'mastered_problems': set(),
-                        'total_questions_in_unit': 0,
-                        'total_attempts': 0
-                    }
-                
-                chapter_progress_summary[chapter_num]['units'][unit_num]['total_questions_in_unit'] += 1
-                chapter_progress_summary[chapter_num]['total_questions'] += 1
-
-        # 学習履歴を処理
-        matched_problems = 0
-        unmatched_problems = 0
-        
-        for problem_id, history in user_problem_history.items():
-            # 問題IDに対応する単語を検索
-            matched_word = None
+            # ランキングデータ
+            ranking_data = cached_ranking
+            
+            # 現在のユーザーの統計
+            current_user_stats = cached_user_progress['stats']
+            
+            # 章別進捗
+            user_progress_by_chapter = cached_user_progress['chapter_progress']
+            
+            # 部屋の総問題数を設定（キャッシュからは取得できないので計算）
+            word_data = load_word_data_for_room(current_user.room_number)
+            room_setting = RoomSetting.query.filter_by(room_number=current_user.room_number).first()
+            max_enabled_unit_num_str = room_setting.max_enabled_unit_number if room_setting else "9999"
+            parsed_max_enabled_unit_num = parse_unit_number(max_enabled_unit_num_str)
+            
+            total_questions_for_room = 0
             for word in word_data:
-                generated_id = get_problem_id(word)
-                if generated_id == problem_id:
-                    matched_word = word
-                    break
+                is_word_enabled_in_csv = word['enabled']
+                is_unit_enabled_by_room_setting = parse_unit_number(word['number']) <= parsed_max_enabled_unit_num
+                if is_word_enabled_in_csv and is_unit_enabled_by_room_setting:
+                    total_questions_for_room += 1
+            
+            # ランキングデータに総問題数を設定
+            for data in ranking_data:
+                data['total_questions_for_room'] = total_questions_for_room
+            
+            current_user_stats['total_questions_for_room'] = total_questions_for_room
+            
+        else:
+            # キャッシュが存在しない場合は従来の処理
+            print("⚠️ キャッシュが見つからないため、リアルタイム計算を実行")
+            using_cache = False
+            
+            # 従来のロジック（省略せずに実装）
+            user_problem_history = current_user.get_problem_history()
+            word_data = load_word_data_for_room(current_user.room_number)
+            room_setting = RoomSetting.query.filter_by(room_number=current_user.room_number).first()
+            max_enabled_unit_num_str = room_setting.max_enabled_unit_number if room_setting else "9999"
+            parsed_max_enabled_unit_num = parse_unit_number(max_enabled_unit_num_str)
 
-            if matched_word:
-                matched_problems += 1
-                chapter_number = matched_word['chapter']
-                unit_number = matched_word['number']
+            # 章ごとに進捗をまとめる
+            chapter_progress_summary = {}
+
+            # 有効な単語データで単元進捗を初期化
+            for word in word_data:
+                chapter_num = word['chapter']
+                unit_num = word['number']
+                category_name = word.get('category', '未分類')
                 
-                is_word_enabled_in_csv = matched_word['enabled']
-                is_unit_enabled_by_room_setting = parse_unit_number(unit_number) <= parsed_max_enabled_unit_num
+                is_word_enabled_in_csv = word['enabled']
+                is_unit_enabled_by_room_setting = parse_unit_number(unit_num) <= parsed_max_enabled_unit_num
 
-                if (is_word_enabled_in_csv and is_unit_enabled_by_room_setting and 
-                    chapter_number in chapter_progress_summary and
-                    unit_number in chapter_progress_summary[chapter_number]['units']):
+                if is_word_enabled_in_csv and is_unit_enabled_by_room_setting:
+                    if chapter_num not in chapter_progress_summary:
+                        chapter_progress_summary[chapter_num] = {
+                            'chapter_name': f'第{chapter_num}章',
+                            'units': {},
+                            'total_questions': 0,
+                            'total_mastered': 0
+                        }
                     
-                    correct_attempts = history.get('correct_attempts', 0)
-                    incorrect_attempts = history.get('incorrect_attempts', 0)
-                    total_problem_attempts = correct_attempts + incorrect_attempts
+                    if unit_num not in chapter_progress_summary[chapter_num]['units']:
+                        chapter_progress_summary[chapter_num]['units'][unit_num] = {
+                            'categoryName': category_name,
+                            'attempted_problems': set(),
+                            'mastered_problems': set(),
+                            'total_questions_in_unit': 0,
+                            'total_attempts': 0
+                        }
                     
-                    unit_data = chapter_progress_summary[chapter_number]['units'][unit_number]
-                    unit_data['total_attempts'] += total_problem_attempts
+                    chapter_progress_summary[chapter_num]['units'][unit_num]['total_questions_in_unit'] += 1
+                    chapter_progress_summary[chapter_num]['total_questions'] += 1
+
+            # 学習履歴を処理
+            for problem_id, history in user_problem_history.items():
+                matched_word = None
+                for word in word_data:
+                    generated_id = get_problem_id(word)
+                    if generated_id == problem_id:
+                        matched_word = word
+                        break
+
+                if matched_word:
+                    chapter_number = matched_word['chapter']
+                    unit_number = matched_word['number']
                     
-                    if total_problem_attempts > 0:
-                        unit_data['attempted_problems'].add(problem_id)
+                    is_word_enabled_in_csv = matched_word['enabled']
+                    is_unit_enabled_by_room_setting = parse_unit_number(unit_number) <= parsed_max_enabled_unit_num
+
+                    if (is_word_enabled_in_csv and is_unit_enabled_by_room_setting and 
+                        chapter_number in chapter_progress_summary and
+                        unit_number in chapter_progress_summary[chapter_number]['units']):
                         
-                        # マスター判定：正答率80%以上
-                        accuracy_rate = (correct_attempts / total_problem_attempts) * 100
-                        if accuracy_rate >= 80.0:
-                            unit_data['mastered_problems'].add(problem_id)
-                            chapter_progress_summary[chapter_number]['total_mastered'] += 1
-            else:
-                unmatched_problems += 1
-
-        # データを整理してテンプレートに渡す形式に変換
-        sorted_chapter_progress = {}
-        for chapter_num in sorted(chapter_progress_summary.keys(), key=lambda x: int(x) if x.isdigit() else float('inf')):
-            chapter_data = chapter_progress_summary[chapter_num]
-            
-            # 単元データをソートして配列に変換
-            sorted_units = []
-            for unit_num in sorted(chapter_data['units'].keys(), key=lambda x: parse_unit_number(x)):
-                unit_data = chapter_data['units'][unit_num]
-                sorted_units.append({
-                    'unit_num': unit_num,
-                    'category_name': unit_data['categoryName'],
-                    'attempted_problems': list(unit_data['attempted_problems']),
-                    'mastered_problems': list(unit_data['mastered_problems']),
-                    'total_questions_in_unit': unit_data['total_questions_in_unit'],
-                    'total_attempts': unit_data['total_attempts']
-                })
-            
-            sorted_chapter_progress[chapter_num] = {
-                'chapter_name': chapter_data['chapter_name'],
-                'units': sorted_units,
-                'total_questions': chapter_data['total_questions'],
-                'total_mastered': chapter_data['total_mastered']
-            }
-
-        print(f"章別進捗: {len(sorted_chapter_progress)}章")
-
-        # =================
-        # ランキング計算
-        # =================
-        current_room_number = current_user.room_number
-        
-        all_users_for_ranking = User.query.filter_by(room_number=current_room_number).all()
-        ranking_data = []
-
-        room_setting_for_ranking = RoomSetting.query.filter_by(room_number=current_room_number).first()
-        max_enabled_unit_num_str_for_ranking = room_setting_for_ranking.max_enabled_unit_number if room_setting_for_ranking else "9999"
-        parsed_max_enabled_unit_num_for_ranking = parse_unit_number(max_enabled_unit_num_str_for_ranking)
-
-        # ランキング表示人数を取得（エラーハンドリング強化）
-        ranking_display_count = 5  # デフォルト値
-
-        try:
-            if room_setting_for_ranking:
-                # hasattr でカラムの存在を確認
-                if hasattr(room_setting_for_ranking, 'ranking_display_count'):
-                    ranking_display_count = room_setting_for_ranking.ranking_display_count or 5  # デフォルト値を5に変更
-                else:
-                    print("⚠️ ranking_display_count カラムが存在しません。デフォルト値5を使用")
-        except Exception as e:
-            print(f"⚠️ ranking_display_count 取得エラー: {e}")
-        
-        # 部屋の総問題数を計算
-        total_questions_for_room_ranking = 0
-        for word in word_data:
-            is_word_enabled_in_csv = word['enabled']
-            is_unit_enabled_by_room_setting = parse_unit_number(word['number']) <= parsed_max_enabled_unit_num_for_ranking
-            if is_word_enabled_in_csv and is_unit_enabled_by_room_setting:
-                total_questions_for_room_ranking += 1
-        
-        # 現在のユーザーのスコア計算用変数
-        current_user_stats = None
-
-        # 全ユーザーのスコアを計算
-        for user_obj in all_users_for_ranking:
-            if user_obj.username == 'admin':
-                continue
-                
-            total_attempts = 0
-            total_correct = 0
-            mastered_problem_ids = set()
-
-            user_obj_problem_history = user_obj.get_problem_history()
-
-            if isinstance(user_obj_problem_history, dict):
-                for problem_id, history in user_obj_problem_history.items():
-                    matched_word = None
-                    for word in word_data:
-                        generated_id = get_problem_id(word)
-                        if generated_id == problem_id:
-                            matched_word = word
-                            break
-
-                    if matched_word:
-                        is_word_enabled_in_csv = matched_word['enabled']
-                        is_unit_enabled_by_room_setting = parse_unit_number(matched_word['number']) <= parsed_max_enabled_unit_num_for_ranking
-
-                        if is_word_enabled_in_csv and is_unit_enabled_by_room_setting:
-                            correct_attempts = history.get('correct_attempts', 0)
-                            incorrect_attempts = history.get('incorrect_attempts', 0)
-                            problem_total_attempts = correct_attempts + incorrect_attempts
+                        correct_attempts = history.get('correct_attempts', 0)
+                        incorrect_attempts = history.get('incorrect_attempts', 0)
+                        total_problem_attempts = correct_attempts + incorrect_attempts
+                        
+                        unit_data = chapter_progress_summary[chapter_number]['units'][unit_number]
+                        unit_data['total_attempts'] += total_problem_attempts
+                        
+                        if total_problem_attempts > 0:
+                            unit_data['attempted_problems'].add(problem_id)
                             
-                            total_attempts += problem_total_attempts
-                            total_correct += correct_attempts
-                            
-                            if problem_total_attempts > 0:
-                                accuracy_rate = (correct_attempts / problem_total_attempts) * 100
-                                if accuracy_rate >= 80.0:
-                                    mastered_problem_ids.add(problem_id)
-            
-            user_mastered_count = len(mastered_problem_ids)
-            coverage_rate = (user_mastered_count / total_questions_for_room_ranking * 100) if total_questions_for_room_ranking > 0 else 0
-            
-            # ベイズ統計による正答率補正の設定値
-            EXPECTED_AVG_ACCURACY = 0.7
-            CONFIDENCE_ATTEMPTS = 10
-            PRIOR_CORRECT = EXPECTED_AVG_ACCURACY * CONFIDENCE_ATTEMPTS
-            PRIOR_ATTEMPTS = CONFIDENCE_ATTEMPTS
+                            accuracy_rate = (correct_attempts / total_problem_attempts) * 100
+                            if accuracy_rate >= 80.0:
+                                unit_data['mastered_problems'].add(problem_id)
+                                chapter_progress_summary[chapter_number]['total_mastered'] += 1
 
-            # ベイズ統計による総合評価型スコア計算
-            if total_attempts == 0:
-                comprehensive_score = 0
-                bayesian_accuracy = 0
-            else:
-                bayesian_accuracy = (PRIOR_CORRECT + total_correct) / (PRIOR_ATTEMPTS + total_attempts)
+            # データを整理
+            user_progress_by_chapter = {}
+            for chapter_num in sorted(chapter_progress_summary.keys(), key=lambda x: int(x) if x.isdigit() else float('inf')):
+                chapter_data = chapter_progress_summary[chapter_num]
                 
-                comprehensive_score = (
-                    (user_mastered_count ** 1.3) * 10 +
-                    (bayesian_accuracy ** 2) * 500 +
-                    math.log(total_attempts + 1) * 20
-                ) / 100
+                sorted_units = []
+                for unit_num in sorted(chapter_data['units'].keys(), key=lambda x: parse_unit_number(x)):
+                    unit_data = chapter_data['units'][unit_num]
+                    sorted_units.append({
+                        'unit_num': unit_num,
+                        'category_name': unit_data['categoryName'],
+                        'attempted_problems': list(unit_data['attempted_problems']),
+                        'mastered_problems': list(unit_data['mastered_problems']),
+                        'total_questions_in_unit': unit_data['total_questions_in_unit'],
+                        'total_attempts': unit_data['total_attempts']
+                    })
+                
+                user_progress_by_chapter[chapter_num] = {
+                    'chapter_name': chapter_data['chapter_name'],
+                    'units': sorted_units,
+                    'total_questions': chapter_data['total_questions'],
+                    'total_mastered': chapter_data['total_mastered']
+                }
 
-            # 3種類のスコア計算
-            mastery_score = (user_mastered_count ** 1.3) * 10 / 100
-            reliability_score = (bayesian_accuracy ** 2) * 500 / 100
-            activity_score = math.log(total_attempts + 1) * 20 / 100
+            # ランキング計算（従来のロジック）
+            current_room_number = current_user.room_number
+            all_users_for_ranking = User.query.filter_by(room_number=current_room_number).all()
+            ranking_data = []
 
-            user_data = {
-                'username': user_obj.username,
-                'total_attempts': total_attempts,
-                'total_correct': total_correct,
-                'accuracy_rate': (total_correct / total_attempts * 100) if total_attempts > 0 else 0,
-                'coverage_rate': coverage_rate,
-                'mastered_count': user_mastered_count,
-                'total_questions_for_room': total_questions_for_room_ranking,
-                'balance_score': comprehensive_score,
-                'mastery_score': mastery_score,
-                'reliability_score': reliability_score,
-                'activity_score': activity_score
-            }
+            total_questions_for_room_ranking = 0
+            for word in word_data:
+                is_word_enabled_in_csv = word['enabled']
+                is_unit_enabled_by_room_setting = parse_unit_number(word['number']) <= parsed_max_enabled_unit_num
+                if is_word_enabled_in_csv and is_unit_enabled_by_room_setting:
+                    total_questions_for_room_ranking += 1
 
-            ranking_data.append(user_data)
-            
-            # 現在のユーザーのスコアを記録
-            if user_obj.id == current_user.id:
-                current_user_stats = user_data
+            current_user_stats = None
 
-        # バランススコアで降順ソート
-        ranking_data.sort(key=lambda x: (x['balance_score'], x['total_attempts']), reverse=True)
+            for user_obj in all_users_for_ranking:
+                if user_obj.username == 'admin':
+                    continue
+                    
+                total_attempts = 0
+                total_correct = 0
+                mastered_problem_ids = set()
 
-        current_user_rank = None
-        if current_user_stats:
-            for index, user_data in enumerate(ranking_data, 1):
-                if user_data['username'] == current_user.username:
-                    current_user_rank = index
-                    break
-        
-        # ★修正：テンプレートで使用される変数名に統一
-        top_5_ranking = ranking_data[:ranking_display_count]
+                user_obj_problem_history = user_obj.get_problem_history()
 
-        print(f"ランキング対象ユーザー数: {len(ranking_data)}")
-        print(f"表示ランキング数: {len(top_5_ranking)}")
-        print(f"現在のユーザーのスコア: {current_user_stats}")
-        print(f"現在のユーザーの順位: {current_user_rank}")
-        print("=== 進捗ページ処理完了 ===\n")
+                if isinstance(user_obj_problem_history, dict):
+                    for problem_id, history in user_obj_problem_history.items():
+                        matched_word = None
+                        for word in word_data:
+                            generated_id = get_problem_id(word)
+                            if generated_id == problem_id:
+                                matched_word = word
+                                break
 
-        context = get_template_context()
-        
-        # ★修正：テンプレートで使用される変数名に統一
-        return render_template('progress.html',
-                               current_user=current_user,
-                               user_progress_by_chapter=sorted_chapter_progress,
-                               top_10_ranking=top_5_ranking,  # 変数名はテンプレートに合わせる
-                               current_user_stats=current_user_stats,
-                               current_user_rank=current_user_rank,  # ★追加
-                               total_users_in_room=len(ranking_data),  # ★追加
-                               ranking_display_count=ranking_display_count,
-                               **context)
-    
-    except Exception as e:
-        print(f"Error in progress_page: {e}")
-        import traceback
-        traceback.print_exc()
-        return f"Progress Error: {e}", 500
+                        if matched_word:
+                            is_word_enabled_in_csv = matched_word['enabled']
+                            is_unit_enabled_by_room_setting = parse_unit_number(matched_word['number']) <= parsed_max_enabled_unit_num
+
+                            if is_word_enabled_in_csv and is_unit_enabled_by_room_setting:
+                                correct_attempts = history.get('correct_attempts', 0)
+                                incorrect_attempts = history.get('incorrect_attempts', 0)
+                                problem_total_attempts = correct_attempts + incorrect_attempts
+                                
+                                total_attempts += problem_total_attempts
+                                total_correct += correct_attempts
+                                
+                                if problem_total_attempts > 0:
+                                    accuracy_rate = (correct_attempts / problem_total_attempts) * 100
+                                    if accuracy_rate >= 80.0:
+                                        mastered_problem_ids.add(problem_id)
+                
+                user_mastered_count = len(mastered_problem_ids)
+                coverage_rate = (user_mastered_count / total_questions_for_room_ranking * 100) if total_questions_for_room_ranking > 0 else 0
+                
+                EXPECTED_AVG_ACCURACY = 0
 
 # ====================================================================
 # 管理者ページ

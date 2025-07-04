@@ -36,3 +36,37 @@ databases:
   - name: world_history_postgres
     databaseName: world_history_db
     user: world_history_user
+  
+services:
+  - type: web
+    name: world-history-quiz
+    env: python
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "python app.py"
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: world-history-postgres
+          property: connectionString
+      - key: RENDER
+        value: "true"
+
+  # 進捗更新用のCron Job（2時間おき）
+  - type: cron
+    name: progress-cache-updater
+    env: python
+    buildCommand: "pip install -r requirements.txt"
+    schedule: "0 */2 * * *"  # 2時間おき（0:00, 2:00, 4:00...）
+    startCommand: "python scripts/update_progress_cache.py"
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: world-history-postgres
+          property: connectionString
+      - key: RENDER
+        value: "true"
+
+databases:
+  - name: world-history-postgres
+    databaseName: world_history_quiz
+    user: postgres
