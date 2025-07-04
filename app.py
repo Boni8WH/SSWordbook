@@ -177,7 +177,6 @@ def to_jst_filter(dt):
 
 # app.py の User モデルの定義を以下に置き換え
 class User(db.Model):
-    # 既存のカラム
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), nullable=False)
     original_username = db.Column(db.String(80), nullable=False)
@@ -190,7 +189,6 @@ class User(db.Model):
     last_login = db.Column(db.DateTime, default=lambda: datetime.now(JST))
     username_changed_at = db.Column(db.DateTime)
     
-    # 🆕 初回ログイン対応で追加するカラム
     is_first_login = db.Column(db.Boolean, default=True, nullable=False)
     password_changed_at = db.Column(db.DateTime)
     
@@ -229,11 +227,9 @@ class User(db.Model):
     def set_incorrect_words(self, words):
         self.incorrect_words = json.dumps(words)
 
-    # 新規メソッド：アカウント名変更
     def change_username(self, new_username):
         """アカウント名を変更する"""
         if not self.original_username:
-            # 初回変更の場合、現在の名前を original_username に保存
             self.original_username = self.username
         
         self.username = new_username
