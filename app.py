@@ -341,6 +341,150 @@ class CsvFileContent(db.Model):
             print(f"CSV parsing error: {e}")
             return []
 
+class UserStats(db.Model):
+    """ユーザーの学習統計を事前計算して保存するテーブル"""
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False, unique=True)
+    room_number = db.Column(db.String(50), nullable=False, index=True)  # 高速検索用インデックス
+    
+    # 基本統計
+    total_attempts = db.Column(db.Integer, default=0, nullable=False)
+    total_correct = db.Column(db.Integer, default=0, nullable=False)
+    mastered_count = db.Column(db.Integer, default=0, nullable=False)
+    
+    # 計算済みスコア
+    accuracy_rate = db.Column(db.Float, default=0.0, nullable=False)
+    coverage_rate = db.Column(db.Float, default=0.0, nullable=False)
+    balance_score = db.Column(db.Float, default=0.0, nullable=False)
+    mastery_score = db.Column(db.Float, default=0.0, nullable=False)
+    reliability_score = db.Column(db.Float, default=0.0, nullable=False)
+    activity_score = db.Column(db.Float, default=0.0, nullable=False)
+    
+    # メタデータ
+    last_updated = db.Column(db.DateTime, default=lambda: datetime.now(JST), nullable=False)
+    total_questions_in_room = db.Column(db.Integer, default=0, nullable=False)
+    
+    # リレーション
+    user = db.relationship('User', backref=db.backref('stats', uselist=False, passive_deletes=True))
+    
+    def __repr__(self):
+        return f'<UserStats {self.user.username}: {self.balance_score:.1f}>'
+
+    @classmethod
+    def get_or_create(cls, user_id):
+        """ユーザー統計を取得または作成"""
+        stats = cls.query.filter_by(user_id=user_id).first()
+        if not stats:
+            user = User.query.get(user_id)
+            if user:
+                stats = cls(
+                    user_id=user_id,
+                    room_number=user.room_number
+                )
+                db.session.add(stats)
+                db.session.flush()  # IDを取得するため
+        return stats
+
+    def update_stats(self, word_data=None):
+        """統計を再計算して更新"""
+        try:
+            user = self.user
+            if not user:
+                return False
+            
+            print(f"📊 統計更新開始: {user.username}")
+            
+            # 部屋の単語データを取得
+            if word_data is None:
+                word_data = load_word_data_for_room(user.room_number)
+            
+            # 部屋設定を取得
+            room_setting = RoomSetting.query.filter_by(room_number=user.room_number).first()
+            max_enabled_unit_num_str = room_setting.max_enabled_unit_number if room_setting else "9999"
+            parsed_max_enabled_unit_num = parse_unit_number(max_enabled_unit_num_str)
+            
+            # 有効な問題数を計算
+            total_questions_for_room = 0
+            for word in word_data:
+                is_word_enabled_in_csv = word['enabled']
+                is_unit_enabled_by_room_setting = parse_unit_number(word['number']) <= parsed_max_enabled_unit_num
+                if is_word_enabled_in_csv and is_unit_enabled_by_room_setting:
+                    total_questions_for_room += 1
+            
+            # 学習履歴を分析
+            user_history = user.get_problem_history()
+            total_attempts = 0
+            total_correct = 0
+            mastered_problem_ids = set()
+            
+            for problem_id, history in user_history.items():
+                # 対応する単語を検索
+                matched_word = None
+                for word in word_data:
+                    if get_problem_id(word) == problem_id:
+                        matched_word = word
+                        break
+                
+                if matched_word:
+                    is_word_enabled_in_csv = matched_word['enabled']
+                    is_unit_enabled_by_room_setting = parse_unit_number(matched_word['number']) <= parsed_max_enabled_unit_num
+                    
+                    if is_word_enabled_in_csv and is_unit_enabled_by_room_setting:
+                        correct_attempts = history.get('correct_attempts', 0)
+                        incorrect_attempts = history.get('incorrect_attempts', 0)
+                        problem_total_attempts = correct_attempts + incorrect_attempts
+                        
+                        total_attempts += problem_total_attempts
+                        total_correct += correct_attempts
+                        
+                        # マスター判定：正答率80%以上
+                        if problem_total_attempts > 0:
+                            accuracy_rate = (correct_attempts / problem_total_attempts) * 100
+                            if accuracy_rate >= 80.0:
+                                mastered_problem_ids.add(problem_id)
+            
+            # 基本統計を更新
+            self.total_attempts = total_attempts
+            self.total_correct = total_correct
+            self.mastered_count = len(mastered_problem_ids)
+            self.total_questions_in_room = total_questions_for_room
+            
+            # 正答率計算
+            self.accuracy_rate = (total_correct / total_attempts * 100) if total_attempts > 0 else 0
+            
+            # 網羅率計算
+            self.coverage_rate = (self.mastered_count / total_questions_for_room * 100) if total_questions_for_room > 0 else 0
+            
+            # ベイズ統計による正答率補正
+            EXPECTED_AVG_ACCURACY = 0.7
+            CONFIDENCE_ATTEMPTS = 10
+            PRIOR_CORRECT = EXPECTED_AVG_ACCURACY * CONFIDENCE_ATTEMPTS
+            PRIOR_ATTEMPTS = CONFIDENCE_ATTEMPTS
+            
+            if total_attempts == 0:
+                bayesian_accuracy = 0
+                self.balance_score = 0
+            else:
+                bayesian_accuracy = (PRIOR_CORRECT + total_correct) / (PRIOR_ATTEMPTS + total_attempts)
+                
+                # 各種スコア計算
+                self.mastery_score = (self.mastered_count ** 1.3) * 10 / 100
+                self.reliability_score = (bayesian_accuracy ** 2) * 500 / 100
+                self.activity_score = math.log(total_attempts + 1) * 20 / 100
+                
+                # 総合スコア
+                self.balance_score = self.mastery_score + self.reliability_score + self.activity_score
+            
+            # 更新日時
+            self.last_updated = datetime.now(JST)
+            
+            print(f"✅ 統計更新完了: {user.username} (スコア: {self.balance_score:.1f})")
+            return True
+            
+        except Exception as e:
+            print(f"❌ 統計更新エラー ({user.username}): {e}")
+            return False
+
 # ====================================================================
 # ヘルパー関数
 # ====================================================================
@@ -687,12 +831,10 @@ def change_username_page():
         return redirect(url_for('index'))
 
 # データベースマイグレーション関数
-# app.py の migrate_database() 関数を以下に置き換えてください
-
 def migrate_database():
-    """データベーススキーマの変更を処理する（外部キー制約修正版）"""
+    """データベーススキーマの変更を処理する（UserStats対応版）"""
     with app.app_context():
-        print("🔄 データベースマイグレーションを開始...")
+        print("🔄 データベースマイグレーション（UserStats対応）を開始...")
         
         try:
             inspector = inspect(db.engine)
@@ -845,17 +987,87 @@ def migrate_database():
             
             print("✅ データベースマイグレーションが完了しました。")
             
+            if not inspector.has_table('user_stats'):
+                    print("🔧 user_statsテーブルを作成します...")
+                    db.create_all()
+                    print("✅ user_statsテーブルを作成しました。")
+            else:
+                print("✅ user_statsテーブルは既に存在します。")
+                    
+                # 既存テーブルのカラム確認
+                columns = [col['name'] for col in inspector.get_columns('user_stats')]
+                required_columns = [
+                    'id', 'user_id', 'room_number', 'total_attempts', 'total_correct', 
+                    'mastered_count', 'accuracy_rate', 'coverage_rate', 'balance_score',
+                    'mastery_score', 'reliability_score', 'activity_score', 'last_updated',
+                    'total_questions_in_room'
+                ]
+                    
+                missing_columns = [col for col in required_columns if col not in columns]
+                if missing_columns:
+                    print(f"⚠️ user_statsテーブルに不足カラム: {missing_columns}")
+                    # 必要に応じてカラム追加処理
+                    with db.engine.connect() as conn:
+                        for col_name in missing_columns:
+                            if col_name == 'room_number':
+                                conn.execute(text('ALTER TABLE user_stats ADD COLUMN room_number VARCHAR(50) NOT NULL DEFAULT ""'))
+                            elif col_name in ['total_attempts', 'total_correct', 'mastered_count', 'total_questions_in_room']:
+                                conn.execute(text(f'ALTER TABLE user_stats ADD COLUMN {col_name} INTEGER DEFAULT 0'))
+                            elif col_name in ['accuracy_rate', 'coverage_rate', 'balance_score', 'mastery_score', 'reliability_score', 'activity_score']:
+                                conn.execute(text(f'ALTER TABLE user_stats ADD COLUMN {col_name} FLOAT DEFAULT 0.0'))
+                            elif col_name == 'last_updated':
+                                conn.execute(text('ALTER TABLE user_stats ADD COLUMN last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP'))
+                            print(f"✅ {col_name}カラムを追加しました。")
+                        conn.commit()
+                
+            print("✅ UserStats関連のマイグレーション完了")
+                
         except Exception as e:
             print(f"⚠️ マイグレーション中にエラーが発生しました: {e}")
             import traceback
             traceback.print_exc()
-            
-            # エラーが発生した場合のフォールバック処理
+
+def initialize_user_stats():
+    """全ユーザーの統計を初期化"""
+    try:
+        print("📊 ユーザー統計初期化開始...")
+        
+        users = User.query.filter(User.username != 'admin').all()
+        initialized_count = 0
+        
+        for user in users:
             try:
+                # 既存の統計があるかチェック
+                existing_stats = UserStats.query.filter_by(user_id=user.id).first()
+                if existing_stats:
+                    print(f"📋 既存統計更新: {user.username}")
+                    existing_stats.update_stats()
+                else:
+                    print(f"➕ 新規統計作成: {user.username}")
+                    stats = UserStats.get_or_create(user.id)
+                    stats.update_stats()
+                
+                initialized_count += 1
+                
+                # 10件ごとにコミット
+                if initialized_count % 10 == 0:
+                    db.session.commit()
+                    print(f"💾 中間コミット: {initialized_count}件完了")
+                    
+            except Exception as user_error:
+                print(f"❌ {user.username}の統計初期化エラー: {user_error}")
                 db.session.rollback()
-                print("🔄 トランザクションをロールバックしました")
-            except:
-                pass
+                continue
+        
+        # 最終コミット
+        db.session.commit()
+        print(f"✅ ユーザー統計初期化完了: {initialized_count}人")
+        return True
+        
+    except Exception as e:
+        print(f"❌ 統計初期化エラー: {e}")
+        db.session.rollback()
+        return False
 
 def verify_database_connection():
     """データベース接続確認関数"""
@@ -906,9 +1118,6 @@ def diagnose_database_environment():
         print(f"SQLAlchemy Engine確認エラー: {e}")
     
     print("========================\n")
-
-# データベース初期化関数（完全リセット対応版）
-# app.py の create_tables_and_admin_user() 関数を以下に置き換えてください
 
 def create_tables_and_admin_user():
     """データベース初期化関数（マイグレーション付き）"""
@@ -1012,8 +1221,6 @@ def generate_temp_password():
     """一時パスワードを生成"""
     characters = string.ascii_letters + string.digits
     return ''.join(secrets.choice(characters) for _ in range(8))
-
-# app.py のメール送信関数を以下に置き換え
 
 def send_password_reset_email(user, email, token):
     """パスワード再発行メールを送信（エラーハンドリング強化版）"""
@@ -1171,7 +1378,29 @@ def send_password_reset_email(user, email, token):
         
         raise e
 
-# app.py に緊急マイグレーション用のルートを追加
+@app.route('/admin/initialize_user_stats', methods=['POST'])
+def admin_initialize_user_stats():
+    """管理者用：ユーザー統計の強制初期化"""
+    if not session.get('admin_logged_in'):
+        return jsonify({'status': 'error', 'message': '管理者権限が必要です'}), 403
+    
+    try:
+        success = initialize_user_stats()
+        if success:
+            return jsonify({
+                'status': 'success',
+                'message': 'ユーザー統計の初期化が完了しました'
+            })
+        else:
+            return jsonify({
+                'status': 'error',
+                'message': '統計初期化中にエラーが発生しました'
+            })
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': f'初期化エラー: {str(e)}'
+        }), 500
 
 @app.route('/admin/add_first_login_columns', methods=['POST'])
 def admin_add_first_login_columns():
@@ -2222,6 +2451,7 @@ def api_load_quiz_progress():
 
 @app.route('/api/save_progress', methods=['POST'])
 def save_quiz_progress():
+    """学習進捗保存 + 統計自動更新"""
     try:
         if 'user_id' not in session:
             return jsonify(status='error', message='ログインしていません。'), 401
@@ -2234,22 +2464,42 @@ def save_quiz_progress():
         if not current_user:
             return jsonify(status='error', message='ユーザーが見つかりません。'), 404
 
+        print(f"💾 学習データ保存開始: {current_user.username}")
+
+        # 学習履歴を保存
         current_user.set_problem_history(received_problem_history)
         current_user.set_incorrect_words(received_incorrect_words)
+        
+        # ★重要：統計を自動更新
+        try:
+            user_stats = UserStats.get_or_create(current_user.id)
+            if user_stats:
+                # 部屋の単語データを一度だけ取得（効率化）
+                word_data = load_word_data_for_room(current_user.room_number)
+                user_stats.update_stats(word_data)
+                print(f"📊 統計自動更新: {current_user.username} (スコア: {user_stats.balance_score:.1f})")
+            else:
+                print(f"⚠️ 統計オブジェクト作成失敗: {current_user.username}")
+                
+        except Exception as stats_error:
+            print(f"⚠️ 統計更新エラー: {stats_error}")
+            # 統計更新が失敗しても学習データは保存
+        
+        # 一括コミット
         db.session.commit()
+        
+        print(f"✅ 学習データ保存完了: {current_user.username}")
 
-        return jsonify(status='success', message='進捗が保存されました。')
+        return jsonify(status='success', message='進捗が保存され、統計が更新されました。')
         
     except Exception as e:
-        print(f"Error saving progress: {e}")
+        print(f"❌ 進捗保存エラー: {e}")
         db.session.rollback()
         return jsonify(status='error', message=f'進捗の保存中にエラーが発生しました: {str(e)}'), 500
 
-# app.pyに追加する詳細な保存・読み込みデバッグルート
-
 @app.route('/api/save_progress_debug', methods=['POST'])
 def save_quiz_progress_debug():
-    """デバッグ情報付きの進捗保存"""
+    """デバッグ情報付きの進捗保存 + 統計自動更新"""
     try:
         if 'user_id' not in session:
             return jsonify(status='error', message='ログインしていません。'), 401
@@ -2288,6 +2538,25 @@ def save_quiz_progress_debug():
         # 実際に保存
         current_user.set_problem_history(received_problem_history)
         current_user.set_incorrect_words(received_incorrect_words)
+        
+        # ★統計を自動更新
+        stats_update_success = False
+        old_balance_score = 0
+        new_balance_score = 0
+        
+        try:
+            user_stats = UserStats.get_or_create(current_user.id)
+            if user_stats:
+                old_balance_score = user_stats.balance_score
+                word_data = load_word_data_for_room(current_user.room_number)
+                user_stats.update_stats(word_data)
+                new_balance_score = user_stats.balance_score
+                stats_update_success = True
+                print(f"📊 統計更新: {old_balance_score:.1f} → {new_balance_score:.1f}")
+                
+        except Exception as stats_error:
+            print(f"⚠️ 統計更新エラー: {stats_error}")
+
         db.session.commit()
 
         # 保存後の確認
@@ -2300,7 +2569,7 @@ def save_quiz_progress_debug():
 
         return jsonify(
             status='success', 
-            message='進捗が保存されました。',
+            message='進捗が保存され、統計が更新されました。',
             debug_info={
                 'old_history_count': len(old_history),
                 'new_history_count': len(received_problem_history),
@@ -2308,7 +2577,10 @@ def save_quiz_progress_debug():
                 'new_entries_count': len(new_entries),
                 'old_incorrect_count': len(old_incorrect),
                 'new_incorrect_count': len(received_incorrect_words),
-                'saved_incorrect_count': len(saved_incorrect)
+                'saved_incorrect_count': len(saved_incorrect),
+                'stats_updated': stats_update_success,
+                'old_balance_score': old_balance_score,
+                'new_balance_score': new_balance_score
             }
         )
         
@@ -3389,10 +3661,9 @@ def progress_page():
         return f"Progress Error: {e}", 500
 
 
-# 新しいAPIエンドポイント：ランキングデータを非同期取得
 @app.route('/api/ranking_data')
 def api_ranking_data():
-    """ランキングデータを非同期で取得"""
+    """ランキングデータを高速取得（事前計算版）"""
     try:
         if 'user_id' not in session:
             return jsonify(status='error', message='認証されていません。'), 401
@@ -3401,138 +3672,89 @@ def api_ranking_data():
         if not current_user:
             return jsonify(status='error', message='ユーザーが見つかりません。'), 404
 
-        print(f"\n=== ランキング計算開始 ({current_user.username}) ===")
+        print(f"\n=== 高速ランキング取得開始 ({current_user.username}) ===")
         start_time = time.time()
 
         current_room_number = current_user.room_number
         
-        # 部屋の単語データと設定を取得
-        word_data = load_word_data_for_room(current_room_number)
-        room_setting = RoomSetting.query.filter_by(room_number=current_room_number).first()
-        max_enabled_unit_num_str = room_setting.max_enabled_unit_number if room_setting else "9999"
-        parsed_max_enabled_unit_num = parse_unit_number(max_enabled_unit_num_str)
+        # ★重要：事前計算された統計データを高速取得
+        room_stats = UserStats.query.filter_by(room_number=current_room_number)\
+                                    .join(User)\
+                                    .filter(User.username != 'admin')\
+                                    .order_by(UserStats.balance_score.desc(), UserStats.total_attempts.desc())\
+                                    .all()
+        
+        print(f"📊 事前計算データ取得: {len(room_stats)}人分")
         
         # ランキング表示人数を取得
         ranking_display_count = 5
         try:
+            room_setting = RoomSetting.query.filter_by(room_number=current_room_number).first()
             if room_setting and hasattr(room_setting, 'ranking_display_count'):
                 ranking_display_count = room_setting.ranking_display_count or 5
         except Exception as e:
             print(f"⚠️ ranking_display_count 取得エラー: {e}")
         
-        # 部屋の総問題数を計算
-        total_questions_for_room_ranking = 0
-        for word in word_data:
-            is_word_enabled_in_csv = word['enabled']
-            is_unit_enabled_by_room_setting = parse_unit_number(word['number']) <= parsed_max_enabled_unit_num
-            if is_word_enabled_in_csv and is_unit_enabled_by_room_setting:
-                total_questions_for_room_ranking += 1
-        
-        # 部屋内の全ユーザーを取得
-        all_users_for_ranking = User.query.filter_by(room_number=current_room_number).all()
+        # ランキングデータを構築（計算済みデータを使用）
         ranking_data = []
         current_user_stats = None
-
-        # ベイズ統計による正答率補正の設定値
-        EXPECTED_AVG_ACCURACY = 0.7
-        CONFIDENCE_ATTEMPTS = 10
-        PRIOR_CORRECT = EXPECTED_AVG_ACCURACY * CONFIDENCE_ATTEMPTS
-        PRIOR_ATTEMPTS = CONFIDENCE_ATTEMPTS
-
-        # 全ユーザーのスコアを計算
-        for user_obj in all_users_for_ranking:
-            if user_obj.username == 'admin':
-                continue
-                
-            total_attempts = 0
-            total_correct = 0
-            mastered_problem_ids = set()
-
-            user_obj_problem_history = user_obj.get_problem_history()
-
-            if isinstance(user_obj_problem_history, dict):
-                for problem_id, history in user_obj_problem_history.items():
-                    matched_word = None
-                    for word in word_data:
-                        generated_id = get_problem_id(word)
-                        if generated_id == problem_id:
-                            matched_word = word
-                            break
-
-                    if matched_word:
-                        is_word_enabled_in_csv = matched_word['enabled']
-                        is_unit_enabled_by_room_setting = parse_unit_number(matched_word['number']) <= parsed_max_enabled_unit_num
-
-                        if is_word_enabled_in_csv and is_unit_enabled_by_room_setting:
-                            correct_attempts = history.get('correct_attempts', 0)
-                            incorrect_attempts = history.get('incorrect_attempts', 0)
-                            problem_total_attempts = correct_attempts + incorrect_attempts
-                            
-                            total_attempts += problem_total_attempts
-                            total_correct += correct_attempts
-                            
-                            if problem_total_attempts > 0:
-                                accuracy_rate = (correct_attempts / problem_total_attempts) * 100
-                                if accuracy_rate >= 80.0:
-                                    mastered_problem_ids.add(problem_id)
-            
-            user_mastered_count = len(mastered_problem_ids)
-            coverage_rate = (user_mastered_count / total_questions_for_room_ranking * 100) if total_questions_for_room_ranking > 0 else 0
-
-            # ベイズ統計による総合評価型スコア計算
-            if total_attempts == 0:
-                comprehensive_score = 0
-                bayesian_accuracy = 0
-            else:
-                bayesian_accuracy = (PRIOR_CORRECT + total_correct) / (PRIOR_ATTEMPTS + total_attempts)
-                
-                comprehensive_score = (
-                    (user_mastered_count ** 1.3) * 10 +
-                    (bayesian_accuracy ** 2) * 500 +
-                    math.log(total_attempts + 1) * 20
-                ) / 100
-
-            # 3種類のスコア計算
-            mastery_score = (user_mastered_count ** 1.3) * 10 / 100
-            reliability_score = (bayesian_accuracy ** 2) * 500 / 100
-            activity_score = math.log(total_attempts + 1) * 20 / 100
-
+        current_user_rank = None
+        
+        for index, stats in enumerate(room_stats, 1):
             user_data = {
-                'username': user_obj.username,
-                'total_attempts': total_attempts,
-                'total_correct': total_correct,
-                'accuracy_rate': (total_correct / total_attempts * 100) if total_attempts > 0 else 0,
-                'coverage_rate': coverage_rate,
-                'mastered_count': user_mastered_count,
-                'total_questions_for_room': total_questions_for_room_ranking,
-                'balance_score': comprehensive_score,
-                'mastery_score': mastery_score,
-                'reliability_score': reliability_score,
-                'activity_score': activity_score
+                'username': stats.user.username,
+                'total_attempts': stats.total_attempts,
+                'total_correct': stats.total_correct,
+                'accuracy_rate': stats.accuracy_rate,
+                'coverage_rate': stats.coverage_rate,
+                'mastered_count': stats.mastered_count,
+                'total_questions_for_room': stats.total_questions_in_room,
+                'balance_score': stats.balance_score,
+                'mastery_score': stats.mastery_score,
+                'reliability_score': stats.reliability_score,
+                'activity_score': stats.activity_score
             }
-
+            
             ranking_data.append(user_data)
             
-            # 現在のユーザーのスコアを記録
-            if user_obj.id == current_user.id:
+            # 現在のユーザーの統計を記録
+            if stats.user_id == current_user.id:
                 current_user_stats = user_data
+                current_user_rank = index
 
-        # バランススコアで降順ソート
-        ranking_data.sort(key=lambda x: (x['balance_score'], x['total_attempts']), reverse=True)
-
-        # 現在のユーザーの順位を特定
-        current_user_rank = None
-        if current_user_stats:
-            for index, user_data in enumerate(ranking_data, 1):
-                if user_data['username'] == current_user.username:
-                    current_user_rank = index
-                    break
-        
         # 上位ランキングを取得
         top_ranking = ranking_data[:ranking_display_count]
 
         elapsed_time = time.time() - start_time
-        print(f"=== ランキング計算完了: {elapsed_time:.2f}秒 ===\n")
+        print(f"=== 高速ランキング取得完了: {elapsed_time:.3f}秒 ===\n")
+        
+        # フォールバック：統計が見つからない場合
+        if not current_user_stats:
+            print(f"⚠️ {current_user.username}の統計が見つかりません。統計を作成します...")
+            try:
+                user_stats = UserStats.get_or_create(current_user.id)
+                if user_stats:
+                    user_stats.update_stats()
+                    db.session.commit()
+                    
+                    current_user_stats = {
+                        'username': current_user.username,
+                        'total_attempts': user_stats.total_attempts,
+                        'total_correct': user_stats.total_correct,
+                        'accuracy_rate': user_stats.accuracy_rate,
+                        'coverage_rate': user_stats.coverage_rate,
+                        'mastered_count': user_stats.mastered_count,
+                        'total_questions_for_room': user_stats.total_questions_in_room,
+                        'balance_score': user_stats.balance_score,
+                        'mastery_score': user_stats.mastery_score,
+                        'reliability_score': user_stats.reliability_score,
+                        'activity_score': user_stats.activity_score
+                    }
+                    current_user_rank = len(ranking_data) + 1
+                    print(f"✅ 統計作成完了: {current_user.username}")
+                    
+            except Exception as fallback_error:
+                print(f"❌ 統計作成エラー: {fallback_error}")
 
         return jsonify({
             'status': 'success',
@@ -3541,14 +3763,137 @@ def api_ranking_data():
             'current_user_rank': current_user_rank,
             'total_users_in_room': len(ranking_data),
             'ranking_display_count': ranking_display_count,
-            'calculation_time': round(elapsed_time, 2)
+            'calculation_time': round(elapsed_time, 3),
+            'using_precalculated': True,  # 事前計算データ使用フラグ
+            'data_source': 'user_stats_table'
         })
         
     except Exception as e:
-        print(f"❌ ランキング計算エラー: {e}")
+        print(f"❌ 高速ランキング取得エラー: {e}")
         import traceback
         traceback.print_exc()
         return jsonify(status='error', message=str(e)), 500
+
+# 管理者用：統計の確認・修復
+@app.route('/admin/check_user_stats')
+def admin_check_user_stats():
+    """管理者用：ユーザー統計の状態確認"""
+    if not session.get('admin_logged_in'):
+        return jsonify({'status': 'error', 'message': '管理者権限が必要です'}), 403
+    
+    try:
+        total_users = User.query.filter(User.username != 'admin').count()
+        total_stats = UserStats.query.count()
+        
+        # 統計が古いユーザーを検索（1日以上更新されていない）
+        one_day_ago = datetime.now(JST) - timedelta(days=1)
+        outdated_stats = UserStats.query.filter(UserStats.last_updated < one_day_ago).count()
+        
+        # 統計がないユーザーを検索
+        users_without_stats = db.session.query(User).outerjoin(UserStats).filter(
+            User.username != 'admin',
+            UserStats.id.is_(None)
+        ).count()
+        
+        # 部屋別統計
+        room_stats = db.session.query(
+            UserStats.room_number,
+            db.func.count(UserStats.id).label('count'),
+            db.func.avg(UserStats.balance_score).label('avg_score'),
+            db.func.max(UserStats.balance_score).label('max_score')
+        ).group_by(UserStats.room_number).all()
+        
+        room_summary = []
+        for room_stat in room_stats:
+            room_summary.append({
+                'room_number': room_stat.room_number,
+                'user_count': room_stat.count,
+                'avg_score': round(room_stat.avg_score, 1) if room_stat.avg_score else 0,
+                'max_score': round(room_stat.max_score, 1) if room_stat.max_score else 0
+            })
+        
+        return jsonify({
+            'status': 'success',
+            'summary': {
+                'total_users': total_users,
+                'total_stats': total_stats,
+                'users_without_stats': users_without_stats,
+                'outdated_stats': outdated_stats,
+                'coverage_rate': round((total_stats / total_users * 100), 1) if total_users > 0 else 0
+            },
+            'room_stats': room_summary
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': f'統計確認エラー: {str(e)}'
+        }), 500
+
+@app.route('/admin/repair_user_stats', methods=['POST'])
+def admin_repair_user_stats():
+    """管理者用：不足している統計データを修復"""
+    if not session.get('admin_logged_in'):
+        return jsonify({'status': 'error', 'message': '管理者権限が必要です'}), 403
+    
+    try:
+        print("🔧 ユーザー統計修復開始...")
+        
+        # 統計がないユーザーを検索
+        users_without_stats = db.session.query(User).outerjoin(UserStats).filter(
+            User.username != 'admin',
+            UserStats.id.is_(None)
+        ).all()
+        
+        # 古い統計を更新
+        one_day_ago = datetime.now(JST) - timedelta(days=1)
+        outdated_stats = UserStats.query.filter(UserStats.last_updated < one_day_ago).all()
+        
+        repaired_count = 0
+        updated_count = 0
+        
+        # 統計がないユーザーに新規作成
+        for user in users_without_stats:
+            try:
+                stats = UserStats.get_or_create(user.id)
+                if stats:
+                    stats.update_stats()
+                    repaired_count += 1
+                    print(f"🔧 新規統計作成: {user.username}")
+                    
+            except Exception as user_error:
+                print(f"❌ {user.username}の統計作成エラー: {user_error}")
+                continue
+        
+        # 古い統計を更新
+        for stats in outdated_stats:
+            try:
+                stats.update_stats()
+                updated_count += 1
+                print(f"🔄 統計更新: {stats.user.username}")
+                
+            except Exception as update_error:
+                print(f"❌ {stats.user.username}の統計更新エラー: {update_error}")
+                continue
+        
+        db.session.commit()
+        
+        message = f'修復完了: {repaired_count}件の統計を新規作成, {updated_count}件の統計を更新しました'
+        print(f"✅ {message}")
+        
+        return jsonify({
+            'status': 'success',
+            'message': message,
+            'repaired_count': repaired_count,
+            'updated_count': updated_count
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'status': 'error',
+            'message': f'修復エラー: {str(e)}'
+        }), 500
 
 # ====================================================================
 # 管理者ページ
