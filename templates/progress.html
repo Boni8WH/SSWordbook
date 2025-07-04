@@ -29,8 +29,8 @@
         <!-- ランキングヘッダー -->
         <div class="progress-ranking-header">
             <div class="progress-ranking-title-section">
-                <h3>🏆 ランキング (部屋：{{ current_user.room_number }})</h3>
-                <p>同じ部屋のユーザー内での上位ランキングを表示しています。</p>
+                <h3>🏆 ランキング Top5 (部屋：{{ current_user.room_number }})</h3>
+                <p>同じ部屋のユーザー内での上位5位までのランキングを表示しています。</p>
             </div>
         </div>
 
@@ -80,6 +80,17 @@
                         <!-- JavaScript で動的に挿入 -->
                     </tbody>
                 </table>
+            </div>
+            
+            <!-- 全体ランキング表示のリンク -->
+            <div class="text-center mt-3">
+                <p class="text-muted">
+                    <i class="fas fa-info-circle"></i> 
+                    上位5位までを表示しています
+                </p>
+                <a href="{{ url_for('full_ranking') }}" class="btn btn-outline-primary btn-sm">
+                    <i class="fas fa-list"></i> 全体ランキングを見る
+                </a>
             </div>
         </div>
 
@@ -180,7 +191,7 @@ async function loadRankingData() {
         if (data.status === 'success') {
             console.log(`✅ ランキングデータ取得成功 (${data.calculation_time}秒)`);
             
-            // ランキングテーブルを更新
+            // ランキングテーブルを更新（Top5のみ）
             updateRankingTable(data.ranking_data);
             
             // ユーザー統計を更新
@@ -210,24 +221,65 @@ async function loadRankingData() {
     }
 }
 
-// ランキングテーブルを更新
+// ランキングテーブルを更新（Top5のみ表示）
 function updateRankingTable(rankingData) {
     const tbody = document.getElementById('ranking-table-body');
     tbody.innerHTML = '';
     
-    rankingData.forEach((user, index) => {
+    // 上位5位までのみ表示
+    const top5Data = rankingData.slice(0, 5);
+    
+    top5Data.forEach((user, index) => {
         const row = document.createElement('tr');
+        
+        // 順位に応じてスタイルを適用
+        if (index === 0) {
+            row.classList.add('table-warning'); // 1位は金色
+        } else if (index === 1) {
+            row.classList.add('table-secondary'); // 2位は銀色
+        } else if (index === 2) {
+            row.classList.add('table-info'); // 3位は青色
+        }
+        
+        // 順位アイコンを追加
+        let rankIcon = '';
+        if (index === 0) {
+            rankIcon = '<i class="fas fa-crown text-warning me-1"></i>';
+        } else if (index === 1) {
+            rankIcon = '<i class="fas fa-medal text-secondary me-1"></i>';
+        } else if (index === 2) {
+            rankIcon = '<i class="fas fa-medal text-info me-1"></i>';
+        }
+        
         row.innerHTML = `
-            <td>${index + 1}</td>
-            <td>${user.username}</td>
+            <td>${rankIcon}${index + 1}</td>
+            <td><strong>${user.username}</strong></td>
             <td>${user.total_attempts}</td>
             <td>${user.total_correct}</td>
             <td>${user.accuracy_rate.toFixed(1)}%</td>
             <td><strong>${user.balance_score.toFixed(1)}</strong></td>
             <td>${user.coverage_rate.toFixed(1)}%</td>
         `;
+        
         tbody.appendChild(row);
     });
+    
+    // 5位未満の場合は空行を追加して見た目を整える
+    while (tbody.children.length < 5) {
+        const emptyRow = document.createElement('tr');
+        emptyRow.innerHTML = `
+            <td>${tbody.children.length + 1}</td>
+            <td class="text-muted">-</td>
+            <td class="text-muted">-</td>
+            <td class="text-muted">-</td>
+            <td class="text-muted">-</td>
+            <td class="text-muted">-</td>
+            <td class="text-muted">-</td>
+        `;
+        tbody.appendChild(emptyRow);
+    }
+    
+    console.log(`✅ Top5ランキング表示完了 (${top5Data.length}人表示)`);
 }
 
 // ユーザー統計を更新
@@ -492,6 +544,25 @@ document.addEventListener('DOMContentLoaded', function() {
 #ranking-error {
     text-align: center;
     margin: 20px 0;
+}
+
+/* ランキングテーブルのスタイル強化 */
+.table-warning {
+    background-color: rgba(255, 215, 0, 0.2) !important;
+}
+
+.table-secondary {
+    background-color: rgba(192, 192, 192, 0.2) !important;
+}
+
+.table-info {
+    background-color: rgba(205, 127, 50, 0.2) !important;
+}
+
+/* 全体ランキングリンクセクション */
+.text-center .text-muted {
+    font-size: 0.9em;
+    margin-bottom: 10px;
 }
 
 /* レスポンシブ対応 */
