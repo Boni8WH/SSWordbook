@@ -360,14 +360,16 @@ document.addEventListener('DOMContentLoaded', function() {
     margin-top: 3px;
 }
 
-/* 順位表示のスタイル */
+/* ★修正：コンパクトな順位表示 */
 .rank-display {
     text-align: center;
-    padding: 20px;
+    padding: 12px 16px;
     background-color: #f8f9fa;
-    border-radius: 15px;
+    border-radius: 12px;
     border: 2px solid #dee2e6;
-    min-width: 150px;
+    min-width: 120px;
+    max-width: 160px;
+    margin: 0 auto;
 }
 
 .rank-display.rank-1 {
@@ -389,29 +391,29 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 
 .rank-icon {
-    font-size: 1.5em;
-    margin-right: 8px;
+    font-size: 1.1em;
+    margin-right: 6px;
 }
 
 .rank-number {
-    font-size: 2.5em;
+    font-size: 1.8em;
     font-weight: bold;
     line-height: 1;
 }
 
 .rank-text {
-    font-size: 1.2em;
-    margin-left: 5px;
+    font-size: 1em;
+    margin-left: 3px;
 }
 
 .rank-total {
     display: block;
-    font-size: 0.9em;
+    font-size: 0.75em;
     opacity: 0.8;
-    margin-top: 5px;
+    margin-top: 3px;
 }
 
-/* ランキングヘッダーのレイアウト */
+/* ★修正：ランキングヘッダーのレイアウト改善 */
 .ranking-header {
     display: flex;
     justify-content: space-between;
@@ -426,12 +428,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
 .user-rank-section {
     flex: 0 0 auto;
+    min-width: 140px;
 }
 
 .user-rank-section h4 {
-    margin-bottom: 10px;
+    margin-bottom: 8px;
     color: #495057;
-    font-size: 1.1em;
+    font-size: 1em;
+    text-align: center;
 }
 
 /* レスポンシブ対応 */
@@ -439,6 +443,12 @@ document.addEventListener('DOMContentLoaded', function() {
     .ranking-header {
         flex-direction: column;
         align-items: stretch;
+        gap: 15px;
+    }
+    
+    .user-rank-section {
+        min-width: auto;
+        order: -1; /* モバイルでは順位を上に表示 */
     }
     
     .stats-grid {
@@ -446,7 +456,31 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     .rank-display {
-        margin: 10px auto;
+        margin: 0 auto 15px auto;
+        max-width: 140px;
+    }
+    
+    .rank-number {
+        font-size: 1.6em;
+    }
+    
+    .rank-icon {
+        font-size: 1em;
+    }
+}
+
+/* タブレット用の調整 */
+@media (max-width: 992px) and (min-width: 769px) {
+    .ranking-header {
+        gap: 15px;
+    }
+    
+    .user-rank-section {
+        min-width: 130px;
+    }
+    
+    .rank-display {
+        max-width: 140px;
     }
 }
 
