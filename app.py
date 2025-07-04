@@ -3752,6 +3752,8 @@ def admin_analyze_invalid_history_detailed():
 # ====================================================================
 # 進捗ページ
 # ====================================================================
+# 元の@app.route('/progress')を以下に置き換えてください
+
 @app.route('/progress')
 def progress_page():
     try:
@@ -3764,217 +3766,57 @@ def progress_page():
             flash('ユーザーが見つかりません。', 'danger')
             return redirect(url_for('logout'))
 
-        print(f"\n=== 進捗ページ処理開始 ===")
+        print(f"\n=== 進捗ページ表示開始（軽量版） ===")
         print(f"ユーザー: {current_user.username} (部屋: {current_user.room_number})")
 
-        # 従来のロジックで進捗を計算
-        user_problem_history = current_user.get_problem_history()
-        word_data = load_word_data_for_room(current_user.room_number)
-        room_setting = RoomSetting.query.filter_by(room_number=current_user.room_number).first()
-        max_enabled_unit_num_str = room_setting.max_enabled_unit_number if room_setting else "9999"
-        parsed_max_enabled_unit_num = parse_unit_number(max_enabled_unit_num_str)
+        # 1. キャッシュからランキングデータを取得を試行
+        cached_ranking = None
+        last_update_time = None
+        
+        try:
+            # ProgressCacheManagerが存在する場合はキャッシュを使用
+            if 'ProgressCacheManager' in globals():
+                cached_ranking, last_update_time = ProgressCacheManager.get_cached_progress(current_user.room_number)
+                if cached_ranking:
+                    print(f"✅ キャッシュからランキング取得: {len(cached_ranking)}人")
+        except Exception as cache_error:
+            print(f"⚠️ キャッシュ取得エラー: {cache_error}")
 
-        # 章ごとに進捗をまとめる
-        chapter_progress_summary = {}
+        # 2. キャッシュがない場合は簡易計算
+        if not cached_ranking:
+            print("🔄 キャッシュなし - 簡易計算を実行")
+            cached_ranking = get_simple_ranking_data(current_user.room_number)
+            last_update_time = datetime.now(JST)
 
-        # 有効な単語データで単元進捗を初期化
-        for word in word_data:
-            chapter_num = word['chapter']
-            unit_num = word['number']
-            category_name = word.get('category', '未分類')
-            
-            is_word_enabled_in_csv = word['enabled']
-            is_unit_enabled_by_room_setting = parse_unit_number(unit_num) <= parsed_max_enabled_unit_num
-
-            if is_word_enabled_in_csv and is_unit_enabled_by_room_setting:
-                if chapter_num not in chapter_progress_summary:
-                    chapter_progress_summary[chapter_num] = {
-                        'chapter_name': f'第{chapter_num}章',
-                        'units': {},
-                        'total_questions': 0,
-                        'total_mastered': 0
-                    }
-                
-                if unit_num not in chapter_progress_summary[chapter_num]['units']:
-                    chapter_progress_summary[chapter_num]['units'][unit_num] = {
-                        'categoryName': category_name,
-                        'attempted_problems': set(),
-                        'mastered_problems': set(),
-                        'total_questions_in_unit': 0,
-                        'total_attempts': 0
-                    }
-                
-                chapter_progress_summary[chapter_num]['units'][unit_num]['total_questions_in_unit'] += 1
-                chapter_progress_summary[chapter_num]['total_questions'] += 1
-
-        # 学習履歴を処理
-        for problem_id, history in user_problem_history.items():
-            matched_word = None
-            for word in word_data:
-                generated_id = get_problem_id(word)
-                if generated_id == problem_id:
-                    matched_word = word
-                    break
-
-            if matched_word:
-                chapter_number = matched_word['chapter']
-                unit_number = matched_word['number']
-                
-                is_word_enabled_in_csv = matched_word['enabled']
-                is_unit_enabled_by_room_setting = parse_unit_number(unit_number) <= parsed_max_enabled_unit_num
-
-                if (is_word_enabled_in_csv and is_unit_enabled_by_room_setting and 
-                    chapter_number in chapter_progress_summary and
-                    unit_number in chapter_progress_summary[chapter_number]['units']):
-                    
-                    correct_attempts = history.get('correct_attempts', 0)
-                    incorrect_attempts = history.get('incorrect_attempts', 0)
-                    total_problem_attempts = correct_attempts + incorrect_attempts
-                    
-                    unit_data = chapter_progress_summary[chapter_number]['units'][unit_number]
-                    unit_data['total_attempts'] += total_problem_attempts
-                    
-                    if total_problem_attempts > 0:
-                        unit_data['attempted_problems'].add(problem_id)
-                        
-                        accuracy_rate = (correct_attempts / total_problem_attempts) * 100
-                        if accuracy_rate >= 80.0:
-                            unit_data['mastered_problems'].add(problem_id)
-                            chapter_progress_summary[chapter_number]['total_mastered'] += 1
-
-        # データを整理
-        user_progress_by_chapter = {}
-        for chapter_num in sorted(chapter_progress_summary.keys(), key=lambda x: int(x) if x.isdigit() else float('inf')):
-            chapter_data = chapter_progress_summary[chapter_num]
-            
-            sorted_units = []
-            for unit_num in sorted(chapter_data['units'].keys(), key=lambda x: parse_unit_number(x)):
-                unit_data = chapter_data['units'][unit_num]
-                sorted_units.append({
-                    'unit_num': unit_num,
-                    'category_name': unit_data['categoryName'],
-                    'attempted_problems': list(unit_data['attempted_problems']),
-                    'mastered_problems': list(unit_data['mastered_problems']),
-                    'total_questions_in_unit': unit_data['total_questions_in_unit'],
-                    'total_attempts': unit_data['total_attempts']
-                })
-            
-            user_progress_by_chapter[chapter_num] = {
-                'chapter_name': chapter_data['chapter_name'],
-                'units': sorted_units,
-                'total_questions': chapter_data['total_questions'],
-                'total_mastered': chapter_data['total_mastered']
-            }
-
-        # ランキング計算
-        current_room_number = current_user.room_number
-        all_users_for_ranking = User.query.filter_by(room_number=current_room_number).all()
-        ranking_data = []
-
-        total_questions_for_room_ranking = 0
-        for word in word_data:
-            is_word_enabled_in_csv = word['enabled']
-            is_unit_enabled_by_room_setting = parse_unit_number(word['number']) <= parsed_max_enabled_unit_num
-            if is_word_enabled_in_csv and is_unit_enabled_by_room_setting:
-                total_questions_for_room_ranking += 1
-
+        # 3. 現在のユーザーの統計を取得
         current_user_stats = None
-
-        for user_obj in all_users_for_ranking:
-            if user_obj.username == 'admin':
-                continue
-                
-            total_attempts = 0
-            total_correct = 0
-            mastered_problem_ids = set()
-
-            user_obj_problem_history = user_obj.get_problem_history()
-
-            if isinstance(user_obj_problem_history, dict):
-                for problem_id, history in user_obj_problem_history.items():
-                    matched_word = None
-                    for word in word_data:
-                        generated_id = get_problem_id(word)
-                        if generated_id == problem_id:
-                            matched_word = word
-                            break
-
-                    if matched_word:
-                        is_word_enabled_in_csv = matched_word['enabled']
-                        is_unit_enabled_by_room_setting = parse_unit_number(matched_word['number']) <= parsed_max_enabled_unit_num
-
-                        if is_word_enabled_in_csv and is_unit_enabled_by_room_setting:
-                            correct_attempts = history.get('correct_attempts', 0)
-                            incorrect_attempts = history.get('incorrect_attempts', 0)
-                            problem_total_attempts = correct_attempts + incorrect_attempts
-                            
-                            total_attempts += problem_total_attempts
-                            total_correct += correct_attempts
-                            
-                            if problem_total_attempts > 0:
-                                accuracy_rate = (correct_attempts / problem_total_attempts) * 100
-                                if accuracy_rate >= 80.0:
-                                    mastered_problem_ids.add(problem_id)
-            
-            user_mastered_count = len(mastered_problem_ids)
-            coverage_rate = (user_mastered_count / total_questions_for_room_ranking * 100) if total_questions_for_room_ranking > 0 else 0
-            
-            # ベイズ統計によるスコア計算
-            EXPECTED_AVG_ACCURACY = 0.7
-            CONFIDENCE_ATTEMPTS = 10
-            PRIOR_CORRECT = EXPECTED_AVG_ACCURACY * CONFIDENCE_ATTEMPTS
-            PRIOR_ATTEMPTS = CONFIDENCE_ATTEMPTS
-            
-            if total_attempts == 0:
-                bayesian_accuracy = 0
-                balance_score = 0
-            else:
-                bayesian_accuracy = (PRIOR_CORRECT + total_correct) / (PRIOR_ATTEMPTS + total_attempts)
-                balance_score = (
-                    (user_mastered_count ** 1.3) * 10 +
-                    (bayesian_accuracy ** 2) * 500 +
-                    math.log(total_attempts + 1) * 20
-                ) / 100
-            
-            mastery_score = (user_mastered_count ** 1.3) * 10 / 100
-            reliability_score = (bayesian_accuracy ** 2) * 500 / 100
-            activity_score = math.log(total_attempts + 1) * 20 / 100
-            accuracy_rate = (total_correct / total_attempts * 100) if total_attempts > 0 else 0
-
-            user_data = {
-                'username': user_obj.username,
-                'total_attempts': total_attempts,
-                'total_correct': total_correct,
-                'accuracy_rate': accuracy_rate,
-                'coverage_rate': coverage_rate,
-                'mastered_count': user_mastered_count,
-                'balance_score': balance_score,
-                'mastery_score': mastery_score,
-                'reliability_score': reliability_score,
-                'activity_score': activity_score,
-                'total_questions_for_room': total_questions_for_room_ranking
-            }
-            
-            ranking_data.append(user_data)
-            
-            if user_obj.id == current_user.id:
+        for user_data in cached_ranking:
+            if user_data['username'] == current_user.username:
                 current_user_stats = user_data
+                break
 
-        # ランキングをバランススコア順でソート
-        ranking_data.sort(key=lambda x: x['balance_score'], reverse=True)
+        # 現在のユーザーが見つからない場合は空の統計を作成
+        if not current_user_stats:
+            current_user_stats = {
+                'username': current_user.username,
+                'total_attempts': 0,
+                'total_correct': 0,
+                'accuracy_rate': 0.0,
+                'coverage_rate': 0.0,
+                'mastered_count': 0,
+                'balance_score': 0.0,
+                'total_questions_for_room': 0
+            }
 
-        # 表示人数制限（デフォルト10人）
-        display_count = 10
-        if room_setting and hasattr(room_setting, 'ranking_display_count'):
-            display_count = room_setting.ranking_display_count or 10
+        # 4. 個人の章別進捗（簡易版）
+        user_progress_by_chapter = get_simple_user_progress(current_user)
 
-        ranking_data = ranking_data[:display_count]
+        # 5. 次回更新時刻を計算
+        next_update_time = get_next_even_hour()
 
-        print(f"✅ 進捗計算完了: {len(ranking_data)}人のランキング")
-
-        # JSONシリアライズ可能な形式に変換
+        # 6. 表示用データを準備
         ranking_data_safe = []
-        for user_data in ranking_data:
+        for user_data in cached_ranking:
             safe_data = {}
             for key, value in user_data.items():
                 if isinstance(value, (int, float, str, bool, type(None))):
@@ -3983,13 +3825,27 @@ def progress_page():
                     safe_data[key] = str(value)
             ranking_data_safe.append(safe_data)
 
+        # 7. 部屋設定から表示人数を取得
+        room_setting = RoomSetting.query.filter_by(room_number=current_user.room_number).first()
+        display_count = 10
+        if room_setting and hasattr(room_setting, 'ranking_display_count'):
+            display_count = room_setting.ranking_display_count or 10
+
+        # 表示人数で制限
+        ranking_data_safe = ranking_data_safe[:display_count]
+
+        print(f"✅ 進捗ページ表示準備完了: {len(ranking_data_safe)}人のランキング")
+
         context = get_template_context()
         context.update({
             'current_user': current_user,
             'current_user_stats': current_user_stats,
             'user_progress_by_chapter': user_progress_by_chapter,
             'ranking_data': ranking_data_safe,
-            'total_questions_for_room': total_questions_for_room_ranking
+            'total_questions_for_room': current_user_stats.get('total_questions_for_room', 0),
+            'last_update_time': last_update_time,
+            'next_update_time': next_update_time,
+            'using_cache': cached_ranking is not None
         })
 
         return render_template('progress.html', **context)
@@ -4001,9 +3857,159 @@ def progress_page():
         flash('進捗データの取得中にエラーが発生しました。', 'danger')
         return redirect(url_for('index'))
 
+def get_simple_ranking_data(room_number):
+    """簡易的なランキングデータを計算（重い処理を避ける）"""
+    try:
+        print(f"🔄 簡易ランキング計算開始: 部屋{room_number}")
+        
+        # 同じ部屋のユーザーを取得
+        users = User.query.filter_by(room_number=room_number).all()
+        ranking_data = []
+        
+        # 部屋の単語データを取得
+        word_data = load_word_data_for_room(room_number)
+        room_setting = RoomSetting.query.filter_by(room_number=room_number).first()
+        max_enabled_unit_num_str = room_setting.max_enabled_unit_number if room_setting else "9999"
+        parsed_max_enabled_unit_num = parse_unit_number(max_enabled_unit_num_str)
+        
+        # 有効な問題数を計算
+        total_questions_for_room = 0
+        for word in word_data:
+            is_word_enabled_in_csv = word['enabled']
+            is_unit_enabled_by_room_setting = parse_unit_number(word['number']) <= parsed_max_enabled_unit_num
+            if is_word_enabled_in_csv and is_unit_enabled_by_room_setting:
+                total_questions_for_room += 1
+        
+        for user in users:
+            if user.username == 'admin':
+                continue
+            
+            # 簡易統計計算
+            user_history = user.get_problem_history()
+            total_attempts = 0
+            total_correct = 0
+            mastered_count = 0
+            
+            # 履歴から基本統計を計算
+            for problem_id, history in user_history.items():
+                correct_attempts = history.get('correct_attempts', 0)
+                incorrect_attempts = history.get('incorrect_attempts', 0)
+                problem_total_attempts = correct_attempts + incorrect_attempts
+                
+                if problem_total_attempts > 0:
+                    total_attempts += problem_total_attempts
+                    total_correct += correct_attempts
+                    
+                    # 80%以上の正答率でマスター判定
+                    accuracy_rate = (correct_attempts / problem_total_attempts) * 100
+                    if accuracy_rate >= 80.0:
+                        mastered_count += 1
+            
+            # スコア計算
+            coverage_rate = (mastered_count / total_questions_for_room * 100) if total_questions_for_room > 0 else 0
+            accuracy_rate = (total_correct / total_attempts * 100) if total_attempts > 0 else 0
+            
+            # 簡易バランススコア
+            if total_attempts == 0:
+                balance_score = 0
+            else:
+                balance_score = (mastered_count * 0.7 + (accuracy_rate / 100) * 0.3) * 100
+            
+            user_data = {
+                'username': user.username,
+                'total_attempts': total_attempts,
+                'total_correct': total_correct,
+                'accuracy_rate': round(accuracy_rate, 1),
+                'coverage_rate': round(coverage_rate, 1),
+                'mastered_count': mastered_count,
+                'balance_score': round(balance_score, 1),
+                'mastery_score': round(mastered_count * 2, 1),
+                'reliability_score': round(accuracy_rate, 1),
+                'activity_score': round(min(total_attempts / 10, 100), 1),
+                'total_questions_for_room': total_questions_for_room
+            }
+            
+            ranking_data.append(user_data)
+        
+        # バランススコア順でソート
+        ranking_data.sort(key=lambda x: x['balance_score'], reverse=True)
+        
+        print(f"✅ 簡易ランキング計算完了: {len(ranking_data)}人")
+        return ranking_data
+        
+    except Exception as e:
+        print(f"❌ 簡易ランキング計算エラー: {e}")
+        return []
+
+def get_simple_user_progress(user):
+    """簡易的な個人進捗データを取得"""
+    try:
+        user_history = user.get_problem_history()
+        word_data = load_word_data_for_room(user.room_number)
+        
+        # 章別の簡易進捗
+        chapter_progress = {}
+        
+        # 履歴から章別統計を計算
+        for problem_id, history in user_history.items():
+            # 対応する単語を検索（簡易版）
+            matched_word = None
+            for word in word_data:
+                if get_problem_id(word) == problem_id:
+                    matched_word = word
+                    break
+            
+            if matched_word:
+                chapter_num = matched_word['chapter']
+                if chapter_num not in chapter_progress:
+                    chapter_progress[chapter_num] = {
+                        'chapter_name': f'第{chapter_num}章',
+                        'total_questions': 0,
+                        'total_mastered': 0,
+                        'units': []
+                    }
+                
+                # マスター判定
+                correct_attempts = history.get('correct_attempts', 0)
+                incorrect_attempts = history.get('incorrect_attempts', 0)
+                total_attempts = correct_attempts + incorrect_attempts
+                
+                if total_attempts > 0:
+                    accuracy_rate = (correct_attempts / total_attempts) * 100
+                    if accuracy_rate >= 80.0:
+                        chapter_progress[chapter_num]['total_mastered'] += 1
+                
+                chapter_progress[chapter_num]['total_questions'] += 1
+        
+        return chapter_progress
+        
+    except Exception as e:
+        print(f"❌ 個人進捗計算エラー: {e}")
+        return {}
+
+def get_next_even_hour():
+    """次の偶数時刻を計算"""
+    now = datetime.now(JST)
+    current_hour = now.hour
+    
+    if current_hour % 2 == 0:
+        next_hour = current_hour + 2
+    else:
+        next_hour = current_hour + 1
+    
+    if next_hour >= 24:
+        next_day = now.date() + timedelta(days=1)
+        next_update = datetime.combine(next_day, datetime.min.time()).replace(hour=next_hour % 24, tzinfo=JST)
+    else:
+        next_update = now.replace(hour=next_hour, minute=0, second=0, microsecond=0)
+    
+    return next_update
+
+# 既存の /update_my_progress を以下に置き換えてください
+
 @app.route('/update_my_progress', methods=['POST'])
 def update_my_progress():
-    """個人の進捗データを手動更新"""
+    """個人の進捗データを手動更新（軽量版）"""
     try:
         if 'user_id' not in session:
             return jsonify(status='error', message='ログインが必要です'), 401
@@ -4014,76 +4020,55 @@ def update_my_progress():
         
         print(f"📊 {current_user.username}の進捗データを手動更新中...")
         
-        # 進捗データを再計算（進捗ページと同じロジック）
-        user_problem_history = current_user.get_problem_history()
+        # 簡易統計計算
+        user_history = current_user.get_problem_history()
         word_data = load_word_data_for_room(current_user.room_number)
         room_setting = RoomSetting.query.filter_by(room_number=current_user.room_number).first()
         max_enabled_unit_num_str = room_setting.max_enabled_unit_number if room_setting else "9999"
         parsed_max_enabled_unit_num = parse_unit_number(max_enabled_unit_num_str)
-
-        # 統計を計算
-        total_attempts = 0
-        total_correct = 0
-        mastered_count = 0
+        
+        # 有効な問題数を計算
         total_questions_for_room = 0
-
-        # 有効な問題数をカウント
         for word in word_data:
             is_word_enabled_in_csv = word['enabled']
             is_unit_enabled_by_room_setting = parse_unit_number(word['number']) <= parsed_max_enabled_unit_num
             if is_word_enabled_in_csv and is_unit_enabled_by_room_setting:
                 total_questions_for_room += 1
-
+        
         # 学習履歴から統計を計算
-        for problem_id, history in user_problem_history.items():
-            matched_word = None
-            for word in word_data:
-                if get_problem_id(word) == problem_id:
-                    matched_word = word
-                    break
-
-            if matched_word:
-                is_word_enabled_in_csv = matched_word['enabled']
-                is_unit_enabled_by_room_setting = parse_unit_number(matched_word['number']) <= parsed_max_enabled_unit_num
-
-                if is_word_enabled_in_csv and is_unit_enabled_by_room_setting:
-                    correct_attempts = history.get('correct_attempts', 0)
-                    incorrect_attempts = history.get('incorrect_attempts', 0)
-                    problem_total_attempts = correct_attempts + incorrect_attempts
-                    
-                    total_attempts += problem_total_attempts
-                    total_correct += correct_attempts
-                    
-                    if problem_total_attempts > 0:
-                        accuracy_rate = (correct_attempts / problem_total_attempts) * 100
-                        if accuracy_rate >= 80.0:
-                            mastered_count += 1
-
+        total_attempts = 0
+        total_correct = 0
+        mastered_count = 0
+        
+        for problem_id, history in user_history.items():
+            correct_attempts = history.get('correct_attempts', 0)
+            incorrect_attempts = history.get('incorrect_attempts', 0)
+            problem_total_attempts = correct_attempts + incorrect_attempts
+            
+            if problem_total_attempts > 0:
+                total_attempts += problem_total_attempts
+                total_correct += correct_attempts
+                
+                # 80%以上の正答率でマスター判定
+                accuracy_rate = (correct_attempts / problem_total_attempts) * 100
+                if accuracy_rate >= 80.0:
+                    mastered_count += 1
+        
         # スコア計算
         coverage_rate = (mastered_count / total_questions_for_room * 100) if total_questions_for_room > 0 else 0
         accuracy_rate = (total_correct / total_attempts * 100) if total_attempts > 0 else 0
         
-        EXPECTED_AVG_ACCURACY = 0.7
-        CONFIDENCE_ATTEMPTS = 10
-        PRIOR_CORRECT = EXPECTED_AVG_ACCURACY * CONFIDENCE_ATTEMPTS
-        PRIOR_ATTEMPTS = CONFIDENCE_ATTEMPTS
-        
+        # 簡易バランススコア
         if total_attempts == 0:
-            bayesian_accuracy = 0
             balance_score = 0
         else:
-            bayesian_accuracy = (PRIOR_CORRECT + total_correct) / (PRIOR_ATTEMPTS + total_attempts)
-            balance_score = (
-                (mastered_count ** 1.3) * 10 +
-                (bayesian_accuracy ** 2) * 500 +
-                math.log(total_attempts + 1) * 20
-            ) / 100
+            balance_score = (mastered_count * 0.7 + (accuracy_rate / 100) * 0.3) * 100
 
         print(f"✅ 更新完了: マスター{mastered_count}問, 正答率{accuracy_rate:.1f}%, バランススコア{balance_score:.1f}")
 
         return jsonify({
             'status': 'success',
-            'message': '進捗データを更新しました',
+            'message': '進捗データを更新しました（次回の定期更新で正確なランキングに反映されます）',
             'stats': {
                 'total_attempts': total_attempts,
                 'total_correct': total_correct,
