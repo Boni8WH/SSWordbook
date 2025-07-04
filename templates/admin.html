@@ -391,104 +391,38 @@
 </div>
 </div>
 
-<section id="admin-emergency-fixes">
-    <h3>🆘 緊急修復</h3>
-    <p>統計データが表示されない問題やCSVアップロードエラーを修復します。</p>
-    
-    <div class="admin-panel" style="background-color: #fff3cd; border-left: 5px solid #ffc107;">
-        <h4>⚡ ワンクリック修復</h4>
-        <p>統計データの問題を一括で修復します。</p>
-        <button type="button" class="btn btn-warning btn-lg" onclick="fixStatsOnly()">
-            <i class="fas fa-chart-bar"></i> 📊 統計データのみ修復
-        </button>
+<section id="admin-user-stats-management">
+    <h3>📊 統計データ管理</h3>
+    <p>ユーザーの学習統計の状態確認・修復を行います。データが0になっている場合や新しいユーザーを追加した後に実行してください。</p>
+
+    <!-- 統計状態確認 -->
+    <div class="admin-panel" style="background-color: #e8f5e8; border-left: 5px solid #28a745; margin-bottom: 20px;">
+        <h4>📈 統計データ状態確認・修復</h4>
+        <p>ユーザー統計の整合性と最新性を確認し、問題がある場合は修復します。</p>
         
         <div style="margin-top: 15px;">
-            <button type="button" class="btn btn-info" onclick="checkSystemStatus()">
-                <i class="fas fa-search"></i> 🔍 システム状態確認
+            <button type="button" class="btn btn-info" onclick="checkUserStatsDetailed()">
+                <i class="fas fa-chart-line"></i> 📊 統計状態を詳細確認
+            </button>
+            
+            <button type="button" class="btn btn-warning" onclick="fixStatsComprehensive()" style="margin-left: 10px;">
+                <i class="fas fa-tools"></i> 🔧 統計データを完全修復
+            </button>
+            
+            <button type="button" class="btn btn-success" onclick="checkSystemStatus()" style="margin-left: 10px;">
+                <i class="fas fa-search"></i> 🔍 システム全体確認
             </button>
         </div>
     </div>
+
+    <!-- 統計確認結果表示エリア -->
+    <div id="statsCheckResult" style="margin-top: 15px; display: none;">
+        <h5>📊 統計確認結果</h5>
+        <div id="statsCheckContent" style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; border: 1px solid #dee2e6;">
+            <!-- 確認結果がここに表示されます -->
+        </div>
+    </div>
 </section>
-
-<div class="modal fade" id="userDetailModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">ユーザー詳細情報</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div id="userDetailContent">
-                    <div class="text-center">
-                        <div class="spinner-border" role="status">
-                            <span class="visually-hidden">Loading...</span>
-                        </div>
-                        <p class="mt-2">ユーザー情報を読み込み中...</p>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
-            </div>
-        </div>
-    </div>
-</div>
-<div class="modal fade" id="roomComparisonModal" tabindex="-1">
-    <div class="modal-dialog modal-xl">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">部屋比較分析</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div id="roomComparisonContent">
-                    <!-- 比較データが表示される -->
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
-                <button type="button" class="btn btn-success" onclick="exportComparisonData()">
-                    <i class="fas fa-download"></i> 比較データエクスポート
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-    <hr>
-
-    <section id="admin-user-stats-management">
-        <h3>📊 ユーザー統計管理</h3>
-        <p>事前計算されたユーザー統計の状態確認・修復を行います。</p>
-
-        <!-- 統計状態確認 -->
-        <div class="admin-panel" style="background-color: #e8f5e8; border-left: 5px solid #28a745; margin-bottom: 20px;">
-            <h4>📈 統計データ状態確認</h4>
-            <p>ユーザー統計の整合性と最新性を確認します。<br>
-            <strong>推奨：</strong>新しいユーザーを追加した後や、データに不整合がある場合に実行してください。</p>
-            
-            <div style="margin-top: 15px;">
-                <button type="button" class="btn btn-info" onclick="checkUserStats()">
-                    <i class="fas fa-chart-line"></i> 📊 統計状態を確認
-                </button>
-                
-                <button type="button" class="btn btn-success" onclick="repairUserStats()" style="margin-left: 10px;">
-                    <i class="fas fa-tools"></i> 🔧 統計データを修復
-                </button>
-                
-                <button type="button" class="btn btn-warning" onclick="initializeAllStats()" style="margin-left: 10px;">
-                    <i class="fas fa-sync-alt"></i> 🔄 全統計を強制再初期化
-                </button>
-            </div>
-        </div>
-
-        <!-- 統計確認結果表示エリア -->
-        <div id="statsCheckResult" style="margin-top: 15px; display: none;">
-            <h5>📊 統計状態確認結果</h5>
-            <div id="statsCheckContent" style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; border: 1px solid #dee2e6;">
-                <!-- 確認結果がここに表示されます -->
-            </div>
-        </div>
-    </section>
 
     <hr>
 
@@ -1459,6 +1393,167 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 console.log('✅ 管理者ページ JavaScript（統合版）読み込み完了');
+
+function fixStatsComprehensive() {
+    if (!confirm('統計データを包括的に修復しますか？\n\n以下の処理を実行します：\n• 既存統計データをクリア\n• 全ユーザーの学習履歴を詳細分析\n• 統計データを完全再計算\n\n処理に時間がかかります。')) {
+        return;
+    }
+    
+    const button = event.target;
+    const originalText = button.textContent;
+    button.disabled = true;
+    button.textContent = '修復中...';
+    
+    // 進捗表示を追加
+    const resultDiv = document.getElementById('statsCheckResult');
+    const contentDiv = document.getElementById('statsCheckContent');
+    
+    if (resultDiv && contentDiv) {
+        contentDiv.innerHTML = '<div class="text-center"><i class="fas fa-spinner fa-spin"></i> 統計データを修復中...</div>';
+        resultDiv.style.display = 'block';
+    }
+    
+    fetch('/admin/fix_stats_comprehensive', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            if (contentDiv) {
+                contentDiv.innerHTML = `
+                    <div class="alert alert-success">
+                        <h6><i class="fas fa-check-circle"></i> 修復完了</h6>
+                        <p>${data.message}</p>
+                        <ul>
+                            <li>修復ユーザー数: ${data.fixed_count}人</li>
+                            <li>総回答数: ${data.total_attempts_sum}回</li>
+                        </ul>
+                    </div>
+                `;
+            }
+            alert(`✅ 包括的修復完了！\n\n${data.message}\n修復人数: ${data.fixed_count}人\n総回答数: ${data.total_attempts_sum}回\n\nランキング表示を確認してください。`);
+        } else {
+            if (contentDiv) {
+                contentDiv.innerHTML = `
+                    <div class="alert alert-danger">
+                        <h6><i class="fas fa-exclamation-triangle"></i> 修復エラー</h6>
+                        <p>${data.message}</p>
+                    </div>
+                `;
+            }
+            alert(`❌ 修復エラー: ${data.message}`);
+        }
+    })
+    .catch(error => {
+        console.error('修復エラー:', error);
+        if (contentDiv) {
+            contentDiv.innerHTML = `
+                <div class="alert alert-danger">
+                    <h6><i class="fas fa-exclamation-triangle"></i> 通信エラー</h6>
+                    <p>サーバーとの通信中にエラーが発生しました</p>
+                </div>
+            `;
+        }
+        alert('❌ 修復中にエラーが発生しました。');
+    })
+    .finally(() => {
+        button.disabled = false;
+        button.textContent = originalText;
+    });
+}
+
+function checkUserStatsDetailed() {
+    const button = event.target;
+    const originalText = button.textContent;
+    button.disabled = true;
+    button.textContent = '確認中...';
+    
+    const resultDiv = document.getElementById('statsCheckResult');
+    const contentDiv = document.getElementById('statsCheckContent');
+    
+    if (contentDiv) {
+        contentDiv.innerHTML = '<div class="text-center"><i class="fas fa-spinner fa-spin"></i> 統計データを確認中...</div>';
+        resultDiv.style.display = 'block';
+    }
+    
+    fetch('/admin/check_user_stats_detailed')
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            const summary = data.summary;
+            const userDetails = data.user_details;
+            
+            let html = `
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>📊 全体統計</h6>
+                        <ul>
+                            <li>総ユーザー数: ${summary.total_users}人</li>
+                            <li>統計データ数: ${summary.total_stats}個</li>
+                            <li>カバー率: ${summary.coverage_rate}%</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>🔍 サンプルユーザー分析</h6>
+                        <ul>
+            `;
+            
+            userDetails.forEach(user => {
+                const status = user.has_stats && user.stats_attempts > 0 ? '✅' : '❌';
+                html += `<li>${status} ${user.username}: 履歴${user.history_count}件, スコア${user.stats_balance_score}</li>`;
+            });
+            
+            html += `
+                        </ul>
+                    </div>
+                </div>
+            `;
+            
+            if (summary.coverage_rate < 100 || userDetails.some(u => !u.has_stats || u.stats_attempts === 0)) {
+                html += `
+                    <div class="alert alert-warning mt-3">
+                        <strong>⚠️ 推奨アクション:</strong> 統計データに問題があります。「統計データを完全修復」を実行してください。
+                    </div>
+                `;
+            } else {
+                html += `
+                    <div class="alert alert-success mt-3">
+                        <strong>✅ 状態:</strong> 統計データは正常です。
+                    </div>
+                `;
+            }
+            
+            if (contentDiv) {
+                contentDiv.innerHTML = html;
+            }
+        } else {
+            if (contentDiv) {
+                contentDiv.innerHTML = `
+                    <div class="alert alert-danger">
+                        <h6><i class="fas fa-exclamation-triangle"></i> 確認エラー</h6>
+                        <p>${data.message}</p>
+                    </div>
+                `;
+            }
+        }
+    })
+    .catch(error => {
+        console.error('確認エラー:', error);
+        if (contentDiv) {
+            contentDiv.innerHTML = `
+                <div class="alert alert-danger">
+                    <h6><i class="fas fa-exclamation-triangle"></i> 通信エラー</h6>
+                    <p>サーバーとの通信中にエラーが発生しました</p>
+                </div>
+            `;
+        }
+    })
+    .finally(() => {
+        button.disabled = false;
+        button.textContent = originalText;
+    });
+}
 </script>
 
 <style>
