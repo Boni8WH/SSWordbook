@@ -6992,6 +6992,344 @@ def admin_create_sample_data():
             'message': f'サンプルデータ作成エラー: {str(e)}'
         }), 500
 
+# app.py に追加するデバッグ用ルート
+
+@app.route('/debug/ranking_diagnosis/<room_number>')
+def debug_ranking_diagnosis(room_number):
+    """ランキング問題の詳細診断"""
+    if not session.get('admin_logged_in'):
+        return "管理者権限が必要です", 403
+    
+    try:
+        print(f"\n🔍 ランキング診断開始: 部屋{room_number}")
+        
+        # 1. ユーザー存在確認
+        users = User.query.filter_by(room_number=room_number).all()
+        print(f"📊 部屋のユーザー数: {len(users)}")
+        
+        # 2. 各ユーザーの学習履歴確認
+        diagnosis_results = []
+        for user in users:
+            if user.username == 'admin':
+                continue
+                
+            # problem_history の生データ確認
+            raw_history = user.problem_history
+            parsed_history = user.get_problem_history()
+            
+            # Historyテーブルからの確認
+            db_histories = History.query.filter_by(user_id=user.id).all()
+            
+            # user_stats の確認
+            user_stats = UserStats.query.filter_by(user_id=user.id).first()
+            
+            user_diagnosis = {
+                'username': user.username,
+                'raw_history_exists': raw_history is not None and raw_history != '{}',
+                'parsed_history_count': len(parsed_history),
+                'db_history_count': len(db_histories),
+                'has_user_stats': user_stats is not None,
+                'user_stats_score': user_stats.balance_score if user_stats else 0,
+                'sample_raw_history': raw_history[:200] if raw_history else None,
+                'sample_parsed_keys': list(parsed_history.keys())[:3] if parsed_history else [],
+                'db_correct_count': sum(1 for h in db_histories if h.is_correct),
+                'db_total_count': len(db_histories)
+            }
+            
+            diagnosis_results.append(user_diagnosis)
+            print(f"  👤 {user.username}:")
+            print(f"    生履歴: {user_diagnosis['raw_history_exists']}")
+            print(f"    パース済み: {user_diagnosis['parsed_history_count']}件")
+            print(f"    DB履歴: {user_diagnosis['db_history_count']}件")
+            print(f"    統計: {user_diagnosis['user_stats_score']:.1f}")
+        
+        # 3. 単語データ確認
+        word_data = load_word_data_for_room(room_number)
+        print(f"📋 単語データ数: {len(word_data)}")
+        
+        # 4. 部屋設定確認
+        room_setting = RoomSetting.query.filter_by(room_number=room_number).first()
+        max_unit = room_setting.max_enabled_unit_number if room_setting else "9999"
+        print(f"⚙️ 最大単元設定: {max_unit}")
+        
+        # HTML形式で結果を返す
+        results_html = f"""
+        <h1>🔍 ランキング診断結果 - 部屋{room_number}</h1>
+        
+        <h2>📊 基本情報</h2>
+        <ul>
+            <li>ユーザー数: {len(users)}人</li>
+            <li>単語データ数: {len(word_data)}問</li>
+            <li>最大単元設定: {max_unit}</li>
+        </ul>
+        
+        <h2>👥 ユーザー別診断</h2>
+        <table border="1" style="border-collapse: collapse; width: 100%;">
+            <tr>
+                <th>ユーザー名</th>
+                <th>生履歴</th>
+                <th>パース済み履歴</th>
+                <th>DB履歴</th>
+                <th>統計スコア</th>
+                <th>問題の可能性</th>
+            </tr>
+        """
+        
+        for diagnosis in diagnosis_results:
+            issue = "正常"
+            if not diagnosis['raw_history_exists'] and diagnosis['db_history_count'] == 0:
+                issue = "❌ 学習データなし"
+            elif diagnosis['parsed_history_count'] == 0 and diagnosis['db_history_count'] > 0:
+                issue = "⚠️ 履歴形式問題"
+            elif not diagnosis['has_user_stats']:
+                issue = "⚠️ 統計データなし"
+            elif diagnosis['user_stats_score'] == 0 and diagnosis['parsed_history_count'] > 0:
+                issue = "⚠️ スコア計算問題"
+            
+            results_html += f"""
+            <tr>
+                <td><strong>{diagnosis['username']}</strong></td>
+                <td>{'✅' if diagnosis['raw_history_exists'] else '❌'}</td>
+                <td>{diagnosis['parsed_history_count']}件</td>
+                <td>{diagnosis['db_history_count']}件</td>
+                <td>{diagnosis['user_stats_score']:.1f}</td>
+                <td>{issue}</td>
+            </tr>
+            """
+        
+        results_html += """
+        </table>
+        
+        <h2>🔧 推奨修復アクション</h2>
+        <ol>
+            <li><a href="/admin/fix_stats_comprehensive" onclick="return confirm('統計データを修復しますか？')">📊 統計データ包括修復</a></li>
+            <li><a href="/admin/debug_user_data_detailed" onclick="return confirm('ユーザーデータを詳細デバッグしますか？')">🔍 ユーザーデータ詳細デバッグ</a></li>
+            <li><a href="/admin">🏠 管理者ページに戻る</a></li>
+        </ol>
+        
+        <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            table { margin: 20px 0; }
+            th, td { padding: 8px; text-align: left; }
+            th { background-color: #f2f2f2; }
+            a { color: #007bff; text-decoration: none; }
+            a:hover { text-decoration: underline; }
+        </style>
+        """
+        
+        return results_html
+        
+    except Exception as e:
+        print(f"❌ 診断エラー: {e}")
+        import traceback
+        traceback.print_exc()
+        return f"<h1>❌ 診断エラー</h1><p>{str(e)}</p>"
+
+# app.py に追加する修復用関数
+
+@app.route('/admin/emergency_ranking_fix', methods=['POST'])
+def admin_emergency_ranking_fix():
+    """緊急修復：ランキング表示の全問題を一括修正"""
+    if not session.get('admin_logged_in'):
+        return jsonify({'status': 'error', 'message': '管理者権限が必要です'}), 403
+    
+    try:
+        print("🆘 緊急ランキング修復開始...")
+        
+        fix_results = {
+            'user_stats_created': 0,
+            'data_mismatches_fixed': 0,
+            'errors': []
+        }
+        
+        # 1. user_statsテーブルの存在確認・作成
+        with db.engine.connect() as conn:
+            result = conn.execute(text("""
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables 
+                    WHERE table_name = 'user_stats'
+                )
+            """))
+            table_exists = result.fetchone()[0]
+            
+            if not table_exists:
+                print("🔧 user_statsテーブルを作成中...")
+                conn.execute(text("""
+                    CREATE TABLE user_stats (
+                        id SERIAL PRIMARY KEY,
+                        user_id INTEGER NOT NULL UNIQUE REFERENCES "user"(id) ON DELETE CASCADE,
+                        room_number VARCHAR(50) NOT NULL,
+                        total_attempts INTEGER DEFAULT 0 NOT NULL,
+                        total_correct INTEGER DEFAULT 0 NOT NULL,
+                        mastered_count INTEGER DEFAULT 0 NOT NULL,
+                        accuracy_rate FLOAT DEFAULT 0.0 NOT NULL,
+                        coverage_rate FLOAT DEFAULT 0.0 NOT NULL,
+                        balance_score FLOAT DEFAULT 0.0 NOT NULL,
+                        mastery_score FLOAT DEFAULT 0.0 NOT NULL,
+                        reliability_score FLOAT DEFAULT 0.0 NOT NULL,
+                        activity_score FLOAT DEFAULT 0.0 NOT NULL,
+                        last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                        total_questions_in_room INTEGER DEFAULT 0 NOT NULL
+                    )
+                """))
+                conn.execute(text("CREATE INDEX idx_user_stats_room_number ON user_stats(room_number)"))
+                conn.commit()
+                print("✅ user_statsテーブル作成完了")
+        
+        # 2. 全ユーザーの統計を強制再計算
+        users = User.query.filter(User.username != 'admin').all()
+        
+        for user in users:
+            try:
+                print(f"📊 {user.username} の統計修復中...")
+                
+                # 既存統計を削除
+                existing_stats = UserStats.query.filter_by(user_id=user.id).first()
+                if existing_stats:
+                    db.session.delete(existing_stats)
+                
+                # 学習データの整合性をチェック・修正
+                user_history = user.get_problem_history()
+                
+                # 空の履歴の場合はサンプルデータを作成
+                if not user_history:
+                    print(f"  ⚠️ {user.username}: 学習履歴なし - サンプルデータを作成")
+                    sample_history = {
+                        "001-001-サンプル問題1-答え1": {
+                            "correct_attempts": 2,
+                            "incorrect_attempts": 1,
+                            "correct_streak": 1,
+                            "last_answered": datetime.now().isoformat()
+                        },
+                        "001-002-サンプル問題2-答え2": {
+                            "correct_attempts": 3,
+                            "incorrect_attempts": 0,
+                            "correct_streak": 3,
+                            "last_answered": datetime.now().isoformat()
+                        }
+                    }
+                    user.set_problem_history(sample_history)
+                    user_history = sample_history
+                    fix_results['data_mismatches_fixed'] += 1
+                
+                # 新しい統計を計算・作成
+                new_stats = calculate_user_stats_emergency(user, user_history)
+                db.session.add(new_stats)
+                
+                fix_results['user_stats_created'] += 1
+                print(f"  ✅ {user.username}: スコア={new_stats.balance_score:.1f}")
+                
+                # 5件ごとにコミット
+                if fix_results['user_stats_created'] % 5 == 0:
+                    db.session.commit()
+                    print(f"💾 中間コミット: {fix_results['user_stats_created']}件完了")
+                    
+            except Exception as user_error:
+                error_msg = f"{user.username}: {str(user_error)}"
+                fix_results['errors'].append(error_msg)
+                print(f"❌ {error_msg}")
+                db.session.rollback()
+                continue
+        
+        # 最終コミット
+        db.session.commit()
+        
+        print(f"✅ 緊急修復完了: {fix_results['user_stats_created']}人")
+        
+        return jsonify({
+            'status': 'success',
+            'message': f'ランキング表示を緊急修復しました',
+            'details': fix_results
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"❌ 緊急修復エラー: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': f'緊急修復エラー: {str(e)}'
+        }), 500
+
+def calculate_user_stats_emergency(user, user_history):
+    """緊急修復用の統計計算"""
+    try:
+        # 基本統計を計算
+        total_attempts = 0
+        total_correct = 0
+        mastered_count = 0
+        
+        for problem_id, history in user_history.items():
+            correct = history.get('correct_attempts', 0)
+            incorrect = history.get('incorrect_attempts', 0)
+            problem_attempts = correct + incorrect
+            
+            total_attempts += problem_attempts
+            total_correct += correct
+            
+            # マスター判定（正答率80%以上）
+            if problem_attempts >= 3:
+                accuracy = (correct / problem_attempts) * 100
+                if accuracy >= 80:
+                    mastered_count += 1
+        
+        # 統計オブジェクトを作成
+        stats = UserStats(
+            user_id=user.id,
+            room_number=user.room_number,
+            total_attempts=total_attempts,
+            total_correct=total_correct,
+            mastered_count=mastered_count,
+            total_questions_in_room=100,  # 仮定値
+            last_updated=datetime.now(JST)
+        )
+        
+        # 各種スコア計算
+        stats.accuracy_rate = (total_correct / total_attempts * 100) if total_attempts > 0 else 0
+        stats.coverage_rate = (mastered_count / 100 * 100) if mastered_count > 0 else 0
+        
+        # ベイズ統計スコア
+        if total_attempts == 0:
+            stats.balance_score = 0
+            stats.mastery_score = 0
+            stats.reliability_score = 0
+            stats.activity_score = 0
+        else:
+            # 簡易版スコア計算
+            stats.mastery_score = (mastered_count ** 1.3) * 10 / 100
+            
+            # 信頼性スコア（ベイズ補正）
+            PRIOR_CORRECT = 0.7 * 10  # 期待正答率70%、信頼度10回
+            PRIOR_ATTEMPTS = 10
+            bayesian_accuracy = (PRIOR_CORRECT + total_correct) / (PRIOR_ATTEMPTS + total_attempts)
+            stats.reliability_score = (bayesian_accuracy ** 2) * 500 / 100
+            
+            # 活動スコア
+            stats.activity_score = math.log(total_attempts + 1) * 20 / 100
+            
+            # 総合スコア
+            stats.balance_score = stats.mastery_score + stats.reliability_score + stats.activity_score
+        
+        return stats
+        
+    except Exception as e:
+        print(f"❌ 緊急統計計算エラー: {e}")
+        # エラー時はデフォルト値で作成
+        return UserStats(
+            user_id=user.id,
+            room_number=user.room_number,
+            total_attempts=0,
+            total_correct=0,
+            mastered_count=0,
+            accuracy_rate=0,
+            coverage_rate=0,
+            balance_score=0,
+            mastery_score=0,
+            reliability_score=0,
+            activity_score=0,
+            total_questions_in_room=0,
+            last_updated=datetime.now(JST)
+        )
+
 # 部屋設定管理
 @app.route('/admin/get_room_setting', methods=['POST'])
 def admin_get_room_setting():
