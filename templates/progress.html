@@ -172,7 +172,6 @@ function toggleChapterProgress(chapterNum) {
     }
 }
 
-// ランキングデータの非同期読み込み
 async function loadRankingData() {
     console.log('🔄 ランキングデータ読み込み開始...');
     
@@ -182,20 +181,56 @@ async function loadRankingData() {
         document.getElementById('ranking-error').style.display = 'none';
         document.getElementById('ranking-table-container').style.display = 'none';
         
-        const response = await fetch('/api/ranking_data');
+        // APIリクエスト（タイムアウト設定）
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15秒タイムアウト
+        
+        const response = await fetch('/api/ranking_data', {
+            signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
         const data = await response.json();
+        console.log('📊 APIレスポンス:', data);
         
         if (data.status === 'success') {
-            console.log(`✅ ランキングデータ取得成功 (${data.calculation_time}秒)`);
+            console.log(`✅ ランキングデータ取得成功 (${data.calculation_time || 0}秒)`);
             
-            // ランキングテーブルを更新（Top5のみ）
+            // データの整合性チェック
+            if (!data.ranking_data || !Array.isArray(data.ranking_data)) {
+                throw new Error('ランキングデータの形式が正しくありません');
+            }
+            
+            // 全員のスコアが0の場合の警告
+            const allZeroScores = data.ranking_data.every(user => 
+                (user.balance_score || 0) === 0
+            );
+            
+            if (allZeroScores && data.ranking_data.length > 0) {
+                console.warn('⚠️ 全員のスコアが0です - 統計データに問題がある可能性があります');
+                showRankingWarning('統計データに問題がある可能性があります');
+            }
+            
+            // ランキングテーブルを更新
             updateRankingTable(data.ranking_data);
             
             // ユーザー統計を更新
-            updateUserStats(data.current_user_stats);
+            if (data.current_user_stats) {
+                updateUserStats(data.current_user_stats);
+            } else {
+                console.warn('⚠️ ユーザー統計データがありません');
+                showUserStatsError();
+            }
             
             // ユーザー順位を更新
-            updateUserRank(data.current_user_rank, data.total_users_in_room);
+            if (data.current_user_rank) {
+                updateUserRank(data.current_user_rank, data.total_users_in_room || 0);
+            }
             
             // 表示切り替え
             document.getElementById('ranking-loading').style.display = 'none';
@@ -212,16 +247,32 @@ async function loadRankingData() {
     } catch (error) {
         console.error('❌ ランキング読み込みエラー:', error);
         
-        // エラー表示
-        document.getElementById('ranking-loading').style.display = 'none';
-        document.getElementById('ranking-error').style.display = 'block';
+        let errorMessage = 'ランキングの取得に失敗しました';
+        
+        if (error.name === 'AbortError') {
+            errorMessage = 'タイムアウト: サーバーの応答が遅すぎます';
+        } else if (error.message) {
+            errorMessage = error.message;
+        }
+        
+        showRankingError(errorMessage);
     }
 }
 
-// ランキングテーブルを更新（Top5のみ表示）
+// ランキングテーブルを更新（エラーハンドリング強化版）
 function updateRankingTable(rankingData) {
     const tbody = document.getElementById('ranking-table-body');
+    if (!tbody) {
+        console.error('❌ ranking-table-body が見つかりません');
+        return;
+    }
+    
     tbody.innerHTML = '';
+    
+    if (!rankingData || rankingData.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">ランキングデータがありません</td></tr>';
+        return;
+    }
     
     // 上位5位までのみ表示
     const top5Data = rankingData.slice(0, 5);
@@ -229,13 +280,21 @@ function updateRankingTable(rankingData) {
     top5Data.forEach((user, index) => {
         const row = document.createElement('tr');
         
+        // データの検証
+        const username = user.username || 'N/A';
+        const totalAttempts = user.total_attempts || 0;
+        const totalCorrect = user.total_correct || 0;
+        const accuracyRate = user.accuracy_rate || 0;
+        const balanceScore = user.balance_score || 0;
+        const coverageRate = user.coverage_rate || 0;
+        
         // 順位に応じてスタイルを適用
         if (index === 0) {
-            row.classList.add('table-warning'); // 1位は金色
+            row.classList.add('table-warning');
         } else if (index === 1) {
-            row.classList.add('table-secondary'); // 2位は銀色
+            row.classList.add('table-secondary');
         } else if (index === 2) {
-            row.classList.add('table-info'); // 3位は青色
+            row.classList.add('table-info');
         }
         
         // 順位アイコンを追加
@@ -248,20 +307,32 @@ function updateRankingTable(rankingData) {
             rankIcon = '<i class="fas fa-medal text-info me-1"></i>';
         }
         
+        // スコアの色分け
+        let scoreClass = '';
+        if (balanceScore >= 50) {
+            scoreClass = 'text-success';
+        } else if (balanceScore >= 20) {
+            scoreClass = 'text-warning';
+        } else if (balanceScore > 0) {
+            scoreClass = 'text-info';
+        } else {
+            scoreClass = 'text-muted';
+        }
+        
         row.innerHTML = `
             <td>${rankIcon}${index + 1}</td>
-            <td><strong>${user.username}</strong></td>
-            <td>${user.total_attempts}</td>
-            <td>${user.total_correct}</td>
-            <td>${user.accuracy_rate.toFixed(1)}%</td>
-            <td><strong>${user.balance_score.toFixed(1)}</strong></td>
-            <td>${user.coverage_rate.toFixed(1)}%</td>
+            <td><strong>${username}</strong></td>
+            <td>${totalAttempts}</td>
+            <td>${totalCorrect}</td>
+            <td>${accuracyRate.toFixed(1)}%</td>
+            <td><strong class="${scoreClass}">${balanceScore.toFixed(1)}</strong></td>
+            <td>${coverageRate.toFixed(1)}%</td>
         `;
         
         tbody.appendChild(row);
     });
     
-    // 5位未満の場合は空行を追加して見た目を整える
+    // 5位未満の場合は空行を追加
     while (tbody.children.length < 5) {
         const emptyRow = document.createElement('tr');
         emptyRow.innerHTML = `
@@ -277,6 +348,55 @@ function updateRankingTable(rankingData) {
     }
     
     console.log(`✅ Top5ランキング表示完了 (${top5Data.length}人表示)`);
+}
+
+function showRankingError(message) {
+    document.getElementById('ranking-loading').style.display = 'none';
+    document.getElementById('ranking-table-container').style.display = 'none';
+    document.getElementById('ranking-error').style.display = 'block';
+    
+    const errorDiv = document.getElementById('ranking-error');
+    if (errorDiv) {
+        errorDiv.innerHTML = `
+            <div class="alert alert-warning">
+                <i class="fas fa-exclamation-triangle"></i>
+                ${message}
+                <button class="btn btn-sm btn-outline-primary ms-2" onclick="loadRankingData()">
+                    <i class="fas fa-redo"></i> 再試行
+                </button>
+            </div>
+        `;
+    }
+}
+
+function showRankingWarning(message) {
+    const warningDiv = document.createElement('div');
+    warningDiv.className = 'alert alert-warning mt-2';
+    warningDiv.innerHTML = `
+        <i class="fas fa-info-circle"></i> ${message}
+        <a href="/admin" class="btn btn-sm btn-outline-primary ms-2">
+            管理者ページで修復
+        </a>
+    `;
+    
+    const container = document.getElementById('ranking-table-container');
+    if (container) {
+        container.insertBefore(warningDiv, container.firstChild);
+    }
+}
+
+// ユーザー統計エラー表示
+function showUserStatsError() {
+    const statsDiv = document.getElementById('current-user-stats');
+    if (statsDiv) {
+        statsDiv.innerHTML = `
+            <div class="alert alert-info">
+                <h4>📊 統計データを準備中</h4>
+                <p>統計データが利用できません。しばらく学習を続けてから再度確認してください。</p>
+            </div>
+        `;
+        statsDiv.style.display = 'block';
+    }
 }
 
 // ユーザー統計を更新
