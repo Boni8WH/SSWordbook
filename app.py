@@ -190,24 +190,24 @@ class User(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     room_number = db.Column(db.String(50), nullable=False)
-    student_id = db.Column(db.String(50), nullable=False)  # ★attendance_numberからstudent_idに統一
+    student_id = db.Column(db.String(50), nullable=True)
     username = db.Column(db.String(100), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    last_login = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, nullable=True, default=datetime.utcnow)
+    last_login = db.Column(db.DateTime, nullable=True, default=datetime.utcnow)
     
     # ★修正：実際のカラム名に合わせる
-    room_password_hash = db.Column(db.String(255), nullable=False)
-    individual_password_hash = db.Column(db.String(255), nullable=False)
+    room_password_hash = db.Column(db.String(255), nullable=True)
+    individual_password_hash = db.Column(db.String(255), nullable=True)
     
     # 学習データ
-    problem_history = db.Column(db.Text, default='{}')
-    incorrect_words = db.Column(db.Text, default='[]')
+    problem_history = db.Column(db.Text, nullable=True, default='{}')
+    incorrect_words = db.Column(db.Text, nullable=True, default='[]')
     
     # 機能拡張用カラム
-    original_username = db.Column(db.String(80))
-    username_changed_at = db.Column(db.DateTime)
-    is_first_login = db.Column(db.Boolean, default=True)
-    password_changed_at = db.Column(db.DateTime)
+    original_username = db.Column(db.String(80), nullable=True)
+    username_changed_at = db.Column(db.DateTime, nullable=True)
+    is_first_login = db.Column(db.Boolean, nullable=True, default=True)
+    password_changed_at = db.Column(db.DateTime, nullable=True)
     
     # 初回ログイン機能用
     is_first_login = db.Column(db.Boolean, default=True)
@@ -221,16 +221,30 @@ class User(db.Model):
 
     # パスワード関連メソッド（変更なし）
     def set_room_password(self, password):
-        self.room_password_hash = generate_password_hash(password, method='pbkdf2:sha256', salt_length=8)
+        if hasattr(self, 'room_password_hash'):
+            self.room_password_hash = generate_password_hash(password, method='pbkdf2:sha256', salt_length=8)
+        elif hasattr(self, '_room_password_hash'):
+            self._room_password_hash = generate_password_hash(password, method='pbkdf2:sha256', salt_length=8)
 
     def check_room_password(self, password):
-        return check_password_hash(self.room_password_hash, password)
+        if hasattr(self, 'room_password_hash') and self.room_password_hash:
+            return check_password_hash(self.room_password_hash, password)
+        elif hasattr(self, '_room_password_hash') and self._room_password_hash:
+            return check_password_hash(self._room_password_hash, password)
+        return False
 
     def set_individual_password(self, password):
-        self.individual_password_hash = generate_password_hash(password, method='pbkdf2:sha256', salt_length=8)
+        if hasattr(self, 'individual_password_hash'):
+            self.individual_password_hash = generate_password_hash(password, method='pbkdf2:sha256', salt_length=8)
+        elif hasattr(self, '_individual_password_hash'):
+            self._individual_password_hash = generate_password_hash(password, method='pbkdf2:sha256', salt_length=8)
 
     def check_individual_password(self, password):
-        return check_password_hash(self.individual_password_hash, password)
+        if hasattr(self, 'individual_password_hash') and self.individual_password_hash:
+            return check_password_hash(self.individual_password_hash, password)
+        elif hasattr(self, '_individual_password_hash') and self._individual_password_hash:
+            return check_password_hash(self._individual_password_hash, password)
+        return False
 
     # その他のメソッドはそのまま...
     def get_problem_history(self):
@@ -2997,7 +3011,124 @@ def admin_cleanup_orphaned_tokens():
 # ====================================================================
 # ルーティング
 # ====================================================================
-
+@app.route('/emergency_fix_user_table')
+def emergency_fix_user_table():
+    """緊急修復：Userテーブルの不足カラムを追加"""
+    try:
+        print("🆘 緊急Userテーブル修復開始...")
+        
+        with db.engine.connect() as conn:
+            # 現在のカラムを確認
+            result = conn.execute(text("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'user'
+                ORDER BY ordinal_position
+            """))
+            existing_columns = [row[0] for row in result.fetchall()]
+            
+            print(f"既存カラム: {existing_columns}")
+            
+            # 必要なカラムのリスト
+            required_columns = {
+                'id': 'SERIAL PRIMARY KEY',
+                'room_number': 'VARCHAR(50) NOT NULL',
+                'student_id': 'VARCHAR(50) NOT NULL',
+                'username': 'VARCHAR(100) NOT NULL',
+                'created_at': 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP',
+                'last_login': 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP',
+                'room_password_hash': 'VARCHAR(255) NOT NULL',
+                'individual_password_hash': 'VARCHAR(255) NOT NULL',
+                'problem_history': 'TEXT DEFAULT \'{}\'',
+                'incorrect_words': 'TEXT DEFAULT \'[]\'',
+                'original_username': 'VARCHAR(80)',
+                'username_changed_at': 'TIMESTAMP',
+                'is_first_login': 'BOOLEAN DEFAULT TRUE',
+                'password_changed_at': 'TIMESTAMP'
+            }
+            
+            missing_columns = []
+            added_columns = []
+            
+            # 不足カラムを特定
+            for col_name, col_definition in required_columns.items():
+                if col_name not in existing_columns and col_name != 'id':  # idは既に存在する前提
+                    missing_columns.append((col_name, col_definition))
+            
+            if missing_columns:
+                print(f"不足カラム: {[col[0] for col in missing_columns]}")
+                
+                # 一つずつカラムを追加
+                for col_name, col_definition in missing_columns:
+                    try:
+                        # DEFAULT値がある場合とない場合で分ける
+                        if 'DEFAULT' in col_definition:
+                            sql = f'ALTER TABLE "user" ADD COLUMN {col_name} {col_definition}'
+                        else:
+                            # NOT NULL制約がある場合は一旦NULLABLEで追加
+                            base_type = col_definition.replace(' NOT NULL', '')
+                            sql = f'ALTER TABLE "user" ADD COLUMN {col_name} {base_type}'
+                        
+                        print(f"実行SQL: {sql}")
+                        conn.execute(text(sql))
+                        added_columns.append(col_name)
+                        print(f"✅ {col_name}カラムを追加しました")
+                        
+                    except Exception as col_error:
+                        print(f"❌ {col_name}カラム追加エラー: {col_error}")
+                        continue
+                
+                # 特別な処理が必要なカラム
+                if 'original_username' in added_columns:
+                    try:
+                        conn.execute(text('UPDATE "user" SET original_username = username WHERE original_username IS NULL'))
+                        print("✅ original_usernameを初期化しました")
+                    except Exception as e:
+                        print(f"⚠️ original_username初期化エラー: {e}")
+                
+                if 'is_first_login' in added_columns:
+                    try:
+                        conn.execute(text("UPDATE \"user\" SET is_first_login = FALSE WHERE username = 'admin'"))
+                        print("✅ adminユーザーのis_first_loginを設定しました")
+                    except Exception as e:
+                        print(f"⚠️ is_first_login設定エラー: {e}")
+                
+                conn.commit()
+                print(f"✅ 全変更をコミットしました")
+            else:
+                print("✅ 不足カラムはありません")
+            
+            # 修復後の状態確認
+            result = conn.execute(text("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'user'
+                ORDER BY ordinal_position
+            """))
+            final_columns = [row[0] for row in result.fetchall()]
+            
+            return f"""
+            <h1>✅ 緊急修復完了</h1>
+            <h3>修復前のカラム:</h3>
+            <p>{existing_columns}</p>
+            <h3>追加されたカラム:</h3>
+            <p>{added_columns}</p>
+            <h3>修復後のカラム:</h3>
+            <p>{final_columns}</p>
+            <p><a href="/">ホームページに戻る</a></p>
+            <p><a href="/admin">管理者ページに戻る</a></p>
+            """
+            
+    except Exception as e:
+        print(f"緊急修復失敗: {e}")
+        import traceback
+        traceback.print_exc()
+        return f"""
+        <h1>💥 緊急修復失敗</h1>
+        <p>エラー: {str(e)}</p>
+        <p>手動でPostgreSQLにアクセスして修復が必要です</p>
+        """
+    
 @app.route('/test')
 def test_page():
     return "<h1>Test Page</h1><p>This is a simple test page.</p>"
