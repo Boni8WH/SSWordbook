@@ -190,32 +190,49 @@ class User(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     room_number = db.Column(db.String(50), nullable=False)
-    room_password = db.Column(db.String(100), nullable=False)
-    attendance_number = db.Column(db.String(50), nullable=False)
-    individual_password = db.Column(db.String(100), nullable=False)
+    student_id = db.Column(db.String(50), nullable=False)  # ★attendance_numberからstudent_idに統一
     username = db.Column(db.String(100), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime, default=datetime.utcnow)
     
+    # ★修正：実際のカラム名に合わせる
+    room_password_hash = db.Column(db.String(255), nullable=False)
+    individual_password_hash = db.Column(db.String(255), nullable=False)
+    
+    # 学習データ
+    problem_history = db.Column(db.Text, default='{}')
+    incorrect_words = db.Column(db.Text, default='[]')
+    
+    # 機能拡張用カラム
+    original_username = db.Column(db.String(80))
+    username_changed_at = db.Column(db.DateTime)
+    is_first_login = db.Column(db.Boolean, default=True)
+    password_changed_at = db.Column(db.DateTime)
+    
+    # 初回ログイン機能用
+    is_first_login = db.Column(db.Boolean, default=True)
+    password_changed_at = db.Column(db.DateTime)
+    
     # 一意性制約
-    __table_args__ = (db.UniqueConstraint('room_number', 'attendance_number', name='unique_user_per_room'),)
+    __table_args__ = (db.UniqueConstraint('room_number', 'student_id', name='unique_user_per_room'),)
     
     def __repr__(self):
         return f'<User {self.id}: {self.username} (Room: {self.room_number})>'
 
-    # 既存のメソッドはそのまま
+    # パスワード関連メソッド（変更なし）
     def set_room_password(self, password):
-        self._room_password_hash = generate_password_hash(password, method='pbkdf2:sha256', salt_length=8)
+        self.room_password_hash = generate_password_hash(password, method='pbkdf2:sha256', salt_length=8)
 
     def check_room_password(self, password):
-        return check_password_hash(self._room_password_hash, password)
+        return check_password_hash(self.room_password_hash, password)
 
     def set_individual_password(self, password):
-        self._individual_password_hash = generate_password_hash(password, method='pbkdf2:sha256', salt_length=8)
+        self.individual_password_hash = generate_password_hash(password, method='pbkdf2:sha256', salt_length=8)
 
     def check_individual_password(self, password):
-        return check_password_hash(self._individual_password_hash, password)
+        return check_password_hash(self.individual_password_hash, password)
 
+    # その他のメソッドはそのまま...
     def get_problem_history(self):
         if self.problem_history:
             return json.loads(self.problem_history)
@@ -1046,9 +1063,9 @@ def change_username_page():
 
 # データベースマイグレーション関数
 def migrate_database():
-    """データベーススキーマの変更を処理する（UserStats対応版）"""
+    """データベーススキーマの変更を処理する（修正版）"""
     with app.app_context():
-        print("🔄 データベースマイグレーション（UserStats対応）を開始...")
+        print("🔄 データベースマイグレーション開始...")
         
         try:
             inspector = inspect(db.engine)
@@ -1058,186 +1075,166 @@ def migrate_database():
                 columns = [col['name'] for col in inspector.get_columns('user')]
                 print(f"📋 既存のUserテーブルカラム: {columns}")
                 
-                # アカウント名変更機能用のカラムを追加
-                if 'original_username' not in columns:
-                    print("🔧 original_usernameカラムを追加します...")
-                    with db.engine.connect() as conn:
-                        # 新しいカラムを追加
-                        conn.execute(text('ALTER TABLE "user" ADD COLUMN original_username VARCHAR(80)'))
-                        # 既存ユーザーの original_username を現在の username で初期化
-                        conn.execute(text('UPDATE "user" SET original_username = username WHERE original_username IS NULL'))
-                        # NOT NULL制約を追加
-                        conn.execute(text('ALTER TABLE "user" ALTER COLUMN original_username SET NOT NULL'))
-                        conn.commit()
-                    print("✅ original_usernameカラムを追加しました。")
-                
-                if 'username_changed_at' not in columns:
-                    print("🔧 username_changed_atカラムを追加します...")
-                    with db.engine.connect() as conn:
-                        conn.execute(text('ALTER TABLE "user" ADD COLUMN username_changed_at TIMESTAMP'))
-                        conn.commit()
-                    print("✅ username_changed_atカラムを追加しました。")
-                
-                # パスワードハッシュフィールドの文字数制限を拡張
-                print("🔧 パスワードハッシュフィールドの文字数制限を拡張します...")
                 with db.engine.connect() as conn:
+                    # ★修正：全ての変更を一つのトランザクションで実行
+                    trans = conn.begin()
                     try:
-                        conn.execute(text('ALTER TABLE "user" ALTER COLUMN _room_password_hash TYPE VARCHAR(255)'))
-                        conn.execute(text('ALTER TABLE "user" ALTER COLUMN _individual_password_hash TYPE VARCHAR(255)'))
-                        conn.commit()
-                        print("✅ パスワードハッシュフィールドを255文字に拡張しました。")
-                    except Exception as alter_error:
-                        print(f"⚠️ カラム変更エラー: {alter_error}")
-                
-                # last_loginカラムの確認・追加
-                if 'last_login' not in columns:
-                    print("🔧 last_loginカラムを追加します...")
-                    with db.engine.connect() as conn:
-                        conn.execute(text('ALTER TABLE "user" ADD COLUMN last_login TIMESTAMP'))
-                        conn.commit()
-                    print("✅ last_loginカラムを追加しました。")
-                
-                if 'is_first_login' not in columns:
-                    print("🔧 is_first_loginカラムを追加します...")
-                    with db.engine.connect() as conn:
-                        conn.execute(text('ALTER TABLE "user" ADD COLUMN is_first_login BOOLEAN DEFAULT TRUE'))
-                        # 既存のadminユーザーは初回ログイン完了済みにする
-                        conn.execute(text("UPDATE \"user\" SET is_first_login = FALSE WHERE username = 'admin'"))
-                        conn.commit()
-                    print("✅ is_first_loginカラムを追加しました。")
-                
-                if 'password_changed_at' not in columns:
-                    print("🔧 password_changed_atカラムを追加します...")
-                    with db.engine.connect() as conn:
-                        conn.execute(text('ALTER TABLE "user" ADD COLUMN password_changed_at TIMESTAMP'))
-                        conn.commit()
-                    print("✅ password_changed_atカラムを追加しました。")
+                        # 基本カラムの追加
+                        if 'room_password_hash' not in columns and '_room_password_hash' not in columns:
+                            conn.execute(text('ALTER TABLE "user" ADD COLUMN room_password_hash VARCHAR(255)'))
+                            print("✅ room_password_hashカラムを追加")
+                        
+                        if 'individual_password_hash' not in columns and '_individual_password_hash' not in columns:
+                            conn.execute(text('ALTER TABLE "user" ADD COLUMN individual_password_hash VARCHAR(255)'))
+                            print("✅ individual_password_hashカラムを追加")
+                        
+                        if 'problem_history' not in columns:
+                            conn.execute(text('ALTER TABLE "user" ADD COLUMN problem_history TEXT DEFAULT \'{}\''))
+                            print("✅ problem_historyカラムを追加")
+                        
+                        if 'incorrect_words' not in columns:
+                            conn.execute(text('ALTER TABLE "user" ADD COLUMN incorrect_words TEXT DEFAULT \'[]\''))
+                            print("✅ incorrect_wordsカラムを追加")
+                        
+                        if 'student_id' not in columns and 'attendance_number' not in columns:
+                            conn.execute(text('ALTER TABLE "user" ADD COLUMN student_id VARCHAR(50)'))
+                            print("✅ student_idカラムを追加")
+                        
+                        # アカウント名変更機能用
+                        if 'original_username' not in columns:
+                            conn.execute(text('ALTER TABLE "user" ADD COLUMN original_username VARCHAR(80)'))
+                            conn.execute(text('UPDATE "user" SET original_username = username WHERE original_username IS NULL'))
+                            print("✅ original_usernameカラムを追加")
+                        
+                        if 'username_changed_at' not in columns:
+                            conn.execute(text('ALTER TABLE "user" ADD COLUMN username_changed_at TIMESTAMP'))
+                            print("✅ username_changed_atカラムを追加")
+                        
+                        # 初回ログイン機能用
+                        if 'is_first_login' not in columns:
+                            conn.execute(text('ALTER TABLE "user" ADD COLUMN is_first_login BOOLEAN DEFAULT TRUE'))
+                            conn.execute(text("UPDATE \"user\" SET is_first_login = FALSE WHERE username = 'admin'"))
+                            print("✅ is_first_loginカラムを追加")
+                        
+                        if 'password_changed_at' not in columns:
+                            conn.execute(text('ALTER TABLE "user" ADD COLUMN password_changed_at TIMESTAMP'))
+                            print("✅ password_changed_atカラムを追加")
+                        
+                        if 'last_login' not in columns:
+                            conn.execute(text('ALTER TABLE "user" ADD COLUMN last_login TIMESTAMP'))
+                            print("✅ last_loginカラムを追加")
+                        
+                        # ★修正：一度にコミット
+                        trans.commit()
+                        print("✅ Userテーブルの変更をコミットしました")
+                        
+                    except Exception as user_error:
+                        trans.rollback()
+                        print(f"⚠️ Userテーブル変更エラー: {user_error}")
             
             # 2. RoomSettingテーブルの確認
             if inspector.has_table('room_setting'):
                 columns = [col['name'] for col in inspector.get_columns('room_setting')]
                 print(f"📋 既存のRoomSettingテーブルカラム: {columns}")
                 
-                if 'csv_filename' not in columns:
-                    print("🔧 csv_filenameカラムを追加します...")
-                    with db.engine.connect() as conn:
-                        conn.execute(text('ALTER TABLE room_setting ADD COLUMN csv_filename VARCHAR(100) DEFAULT \'words.csv\''))
-                        conn.commit()
-                    print("✅ csv_filenameカラムを追加しました。")
-                
-                # ★重要：ranking_display_count カラムを追加
-                if 'ranking_display_count' not in columns:
-                    print("🔧 ranking_display_countカラムを追加します...")
-                    with db.engine.connect() as conn:
-                        conn.execute(text('ALTER TABLE room_setting ADD COLUMN ranking_display_count INTEGER DEFAULT 10'))
-                        conn.commit()
-                    print("✅ ranking_display_countカラムを追加しました。")
-                
-                missing_columns = []
-                for col_name in ['created_at', 'updated_at']:
-                    if col_name not in columns:
-                        missing_columns.append(col_name)
-                
-                if missing_columns:
-                    with db.engine.connect() as conn:
-                        for col_name in missing_columns:
-                            print(f"🔧 {col_name}カラムを追加します...")
-                            conn.execute(text(f'ALTER TABLE room_setting ADD COLUMN {col_name} TIMESTAMP'))
-                            print(f"✅ {col_name}カラムを追加しました。")
-                        conn.commit()
+                with db.engine.connect() as conn:
+                    trans = conn.begin()
+                    try:
+                        if 'csv_filename' not in columns:
+                            conn.execute(text('ALTER TABLE room_setting ADD COLUMN csv_filename VARCHAR(100) DEFAULT \'words.csv\''))
+                            print("✅ csv_filenameカラムを追加")
+                        
+                        if 'ranking_display_count' not in columns:
+                            conn.execute(text('ALTER TABLE room_setting ADD COLUMN ranking_display_count INTEGER DEFAULT 10'))
+                            print("✅ ranking_display_countカラムを追加")
+                        
+                        if 'created_at' not in columns:
+                            conn.execute(text('ALTER TABLE room_setting ADD COLUMN created_at TIMESTAMP'))
+                            print("✅ created_atカラムを追加")
+                        
+                        if 'updated_at' not in columns:
+                            conn.execute(text('ALTER TABLE room_setting ADD COLUMN updated_at TIMESTAMP'))
+                            print("✅ updated_atカラムを追加")
+                        
+                        trans.commit()
+                        print("✅ RoomSettingテーブルの変更をコミットしました")
+                        
+                    except Exception as room_error:
+                        trans.rollback()
+                        print(f"⚠️ RoomSettingテーブル変更エラー: {room_error}")
             
-            # 3. App_infoテーブルの確認（★重要な修正箇所）
+            # 3. AppInfoテーブルの確認
             if inspector.has_table('app_info'):
                 columns = [col['name'] for col in inspector.get_columns('app_info')]
                 print(f"📋 既存のAppInfoテーブルカラム: {columns}")
                 
-                # school_nameカラムの追加
-                if 'school_name' not in columns:
-                    print("🔧 school_nameカラムを追加します...")
-                    with db.engine.connect() as conn:
-                        conn.execute(text('ALTER TABLE app_info ADD COLUMN school_name VARCHAR(100) DEFAULT \'朋優学院\''))
-                        conn.commit()
-                    print("✅ school_nameカラムを追加しました。")
+                with db.engine.connect() as conn:
+                    trans = conn.begin()
+                    try:
+                        if 'school_name' not in columns:
+                            conn.execute(text('ALTER TABLE app_info ADD COLUMN school_name VARCHAR(100) DEFAULT \'朋優学院\''))
+                            print("✅ school_nameカラムを追加")
+                        
+                        if 'app_settings' not in columns:
+                            conn.execute(text('ALTER TABLE app_info ADD COLUMN app_settings TEXT DEFAULT \'{}\''))
+                            print("✅ app_settingsカラムを追加")
+                        
+                        if 'created_at' not in columns:
+                            conn.execute(text('ALTER TABLE app_info ADD COLUMN created_at TIMESTAMP'))
+                            print("✅ created_atカラムを追加")
+                        
+                        if 'updated_at' not in columns:
+                            conn.execute(text('ALTER TABLE app_info ADD COLUMN updated_at TIMESTAMP'))
+                            print("✅ updated_atカラムを追加")
+                        
+                        if 'updated_by' not in columns:
+                            conn.execute(text('ALTER TABLE app_info ADD COLUMN updated_by VARCHAR(80) DEFAULT \'system\''))
+                            print("✅ updated_byカラムを追加")
+                        
+                        trans.commit()
+                        print("✅ AppInfoテーブルの変更をコミットしました")
+                        
+                    except Exception as app_error:
+                        trans.rollback()
+                        print(f"⚠️ AppInfoテーブル変更エラー: {app_error}")
+            
+            # 4. その他のテーブル作成
+            try:
+                # テーブルが存在しない場合は作成
+                missing_tables = []
+                for table_name in ['password_reset_token', 'csv_file_content', 'user_stats']:
+                    if not inspector.has_table(table_name):
+                        missing_tables.append(table_name)
                 
-                # 他の不足カラムもチェック
-                required_columns = {
-                    'app_settings': 'TEXT DEFAULT \'{}\'',
-                    'created_at': 'TIMESTAMP',
-                    'updated_at': 'TIMESTAMP',
-                    'updated_by': 'VARCHAR(80) DEFAULT \'system\''
-                }
+                if missing_tables:
+                    print(f"🔧 不足テーブルを作成: {missing_tables}")
+                    db.create_all()
+                    print("✅ 不足テーブルを作成しました")
                 
-                for col_name, col_definition in required_columns.items():
-                    if col_name not in columns:
-                        print(f"🔧 {col_name}カラムを追加します...")
-                        with db.engine.connect() as conn:
-                            conn.execute(text(f'ALTER TABLE app_info ADD COLUMN {col_name} {col_definition}'))
-                            conn.commit()
-                        print(f"✅ {col_name}カラムを追加しました。")
-            
-            # 4. その他のテーブル確認（password_reset_token, csv_file_content等）
-            if inspector.has_table('password_reset_token'):
-                columns = [col['name'] for col in inspector.get_columns('password_reset_token')]
-                if 'used_at' not in columns:
-                    print("🔧 password_reset_tokenテーブルにused_atカラムを追加します...")
-                    with db.engine.connect() as conn:
-                        conn.execute(text('ALTER TABLE password_reset_token ADD COLUMN used_at TIMESTAMP'))
-                        conn.commit()
-                    print("✅ used_atカラムを追加しました。")
-            else:
-                print("🔧 password_reset_tokenテーブルを作成します...")
-                db.create_all()
-                print("✅ password_reset_tokenテーブルを作成しました。")
-            
-            # 5. CsvFileContentテーブルの確認
-            if not inspector.has_table('csv_file_content'):
-                print("🔧 csv_file_contentテーブルを作成します...")
-                db.create_all()
-                print("✅ csv_file_contentテーブルを作成しました。")
-            else:
-                print("✅ csv_file_contentテーブルは既に存在します。")
-            
-            fix_foreign_key_constraints()
+                # user_statsテーブルの特別チェック
+                if inspector.has_table('user_stats'):
+                    stats_columns = [col['name'] for col in inspector.get_columns('user_stats')]
+                    required_stats_columns = [
+                        'room_number', 'total_attempts', 'total_correct', 'mastered_count',
+                        'accuracy_rate', 'coverage_rate', 'balance_score', 'mastery_score',
+                        'reliability_score', 'activity_score', 'last_updated', 'total_questions_in_room'
+                    ]
+                    
+                    missing_stats_columns = [col for col in required_stats_columns if col not in stats_columns]
+                    if missing_stats_columns:
+                        print(f"🔧 user_statsテーブルに不足カラム: {missing_stats_columns}")
+                        # カラム追加処理...
+                
+                # 外部キー制約の修正
+                fix_foreign_key_constraints()
+                
+            except Exception as table_error:
+                print(f"⚠️ テーブル作成エラー: {table_error}")
             
             print("✅ データベースマイグレーションが完了しました。")
             
-            if not inspector.has_table('user_stats'):
-                    print("🔧 user_statsテーブルを作成します...")
-                    db.create_all()
-                    print("✅ user_statsテーブルを作成しました。")
-            else:
-                print("✅ user_statsテーブルは既に存在します。")
-                    
-                # 既存テーブルのカラム確認
-                columns = [col['name'] for col in inspector.get_columns('user_stats')]
-                required_columns = [
-                    'id', 'user_id', 'room_number', 'total_attempts', 'total_correct', 
-                    'mastered_count', 'accuracy_rate', 'coverage_rate', 'balance_score',
-                    'mastery_score', 'reliability_score', 'activity_score', 'last_updated',
-                    'total_questions_in_room'
-                ]
-                    
-                missing_columns = [col for col in required_columns if col not in columns]
-                if missing_columns:
-                    print(f"⚠️ user_statsテーブルに不足カラム: {missing_columns}")
-                    # 必要に応じてカラム追加処理
-                    with db.engine.connect() as conn:
-                        for col_name in missing_columns:
-                            if col_name == 'room_number':
-                                conn.execute(text('ALTER TABLE user_stats ADD COLUMN room_number VARCHAR(50) NOT NULL DEFAULT ""'))
-                            elif col_name in ['total_attempts', 'total_correct', 'mastered_count', 'total_questions_in_room']:
-                                conn.execute(text(f'ALTER TABLE user_stats ADD COLUMN {col_name} INTEGER DEFAULT 0'))
-                            elif col_name in ['accuracy_rate', 'coverage_rate', 'balance_score', 'mastery_score', 'reliability_score', 'activity_score']:
-                                conn.execute(text(f'ALTER TABLE user_stats ADD COLUMN {col_name} FLOAT DEFAULT 0.0'))
-                            elif col_name == 'last_updated':
-                                conn.execute(text('ALTER TABLE user_stats ADD COLUMN last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP'))
-                            print(f"✅ {col_name}カラムを追加しました。")
-                        conn.commit()
-                
-            print("✅ UserStats関連のマイグレーション完了")
-                
         except Exception as e:
-            print(f"⚠️ マイグレーション中にエラーが発生しました: {e}")
+            print(f"❌ マイグレーション中にエラーが発生しました: {e}")
             import traceback
             traceback.print_exc()
 
@@ -1464,6 +1461,50 @@ def create_tables_and_admin_user():
     except Exception as e:
         logger.error(f"❌ データベース初期化エラー: {e}")
         raise
+
+@app.route('/emergency_fix_user_columns')
+def emergency_fix_user_columns():
+    """緊急修復：Userテーブルのカラム名を修正"""
+    try:
+        with db.engine.connect() as conn:
+            # 現在のカラムを確認
+            result = conn.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name = 'user'"))
+            existing_columns = [row[0] for row in result.fetchall()]
+            
+            messages = []
+            
+            # 必要なカラムを追加
+            if 'room_password_hash' not in existing_columns:
+                conn.execute(text('ALTER TABLE "user" ADD COLUMN room_password_hash VARCHAR(255)'))
+                messages.append("✅ room_password_hashカラムを追加")
+            
+            if 'individual_password_hash' not in existing_columns:
+                conn.execute(text('ALTER TABLE "user" ADD COLUMN individual_password_hash VARCHAR(255)'))
+                messages.append("✅ individual_password_hashカラムを追加")
+            
+            if 'problem_history' not in existing_columns:
+                conn.execute(text('ALTER TABLE "user" ADD COLUMN problem_history TEXT DEFAULT \'{}\''))
+                messages.append("✅ problem_historyカラムを追加")
+            
+            if 'incorrect_words' not in existing_columns:
+                conn.execute(text('ALTER TABLE "user" ADD COLUMN incorrect_words TEXT DEFAULT \'[]\''))
+                messages.append("✅ incorrect_wordsカラムを追加")
+            
+            conn.commit()
+            
+            return f"""
+            <h1>✅ 緊急修復完了</h1>
+            <ul>
+                {''.join(f'<li>{msg}</li>' for msg in messages)}
+            </ul>
+            <p><a href="/">ホームページに戻る</a></p>
+            """
+            
+    except Exception as e:
+        return f"""
+        <h1>❌ 緊急修復エラー</h1>
+        <p>エラー: {str(e)}</p>
+        """
 
 @app.route('/create_missing_tables')
 def create_missing_tables():
