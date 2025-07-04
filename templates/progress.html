@@ -3,7 +3,48 @@
 
 {% block content %}
 <section class="progress-section">
-    <h2>進捗確認 - {{ current_user.username }} (部屋: {{ current_user.room_number }})</h2>
+    <div class="progress-header">
+        <h2>進捗確認 - {{ current_user.username }} (部屋: {{ current_user.room_number }})</h2>
+        
+        <!-- 更新情報とボタン -->
+        <div class="update-info-container">
+            <div class="update-info">
+                {% if using_cache %}
+                    <p class="cache-status">
+                        <i class="fas fa-clock text-primary"></i>
+                        <strong>自動更新:</strong> 2時間おき（0:00, 2:00, 4:00...）
+                    </p>
+                    {% if last_update_time %}
+                    <p class="last-update">
+                        <i class="fas fa-sync-alt text-success"></i>
+                        <strong>最終更新:</strong> {{ last_update_time|to_jst }}
+                    </p>
+                    {% endif %}
+                    {% if next_update_time %}
+                    <p class="next-update">
+                        <i class="fas fa-clock text-info"></i>
+                        <strong>次回更新:</strong> {{ next_update_time.strftime('%H:%M') }}
+                    </p>
+                    {% endif %}
+                {% else %}
+                    <p class="realtime-status">
+                        <i class="fas fa-bolt text-warning"></i>
+                        <strong>リアルタイム表示中</strong>（キャッシュなし）
+                    </p>
+                {% endif %}
+            </div>
+            
+            <!-- 手動更新ボタン -->
+            <div class="manual-update-section">
+                <button id="updateMyProgressBtn" class="btn btn-outline-primary btn-sm">
+                    <i class="fas fa-sync-alt"></i> 自分の進捗を更新
+                </button>
+                <small class="text-muted d-block mt-1">
+                    最新の学習状況を反映します
+                </small>
+            </div>
+        </div>
+    </div>
 
     <!-- ランキングセクション -->
     <div class="ranking-container">
@@ -177,6 +218,85 @@
     </div>
 </section>
 
+<!-- CSS追加 -->
+<style>
+.progress-header {
+    margin-bottom: 30px;
+}
+
+.update-info-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    background-color: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+    margin-top: 15px;
+    border-left: 4px solid #007bff;
+}
+
+.update-info {
+    flex: 1;
+}
+
+.update-info p {
+    margin: 0 0 5px 0;
+    font-size: 0.9em;
+}
+
+.cache-status i, .last-update i, .next-update i, .realtime-status i {
+    margin-right: 5px;
+}
+
+.manual-update-section {
+    text-align: center;
+    min-width: 180px;
+}
+
+.manual-update-section small {
+    font-size: 0.8em;
+}
+
+.btn-loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.update-success {
+    color: #28a745;
+    font-weight: bold;
+}
+
+.update-error {
+    color: #dc3545;
+    font-weight: bold;
+}
+
+/* アニメーション */
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.fa-spin-custom {
+    animation: spin 1s linear infinite;
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 768px) {
+    .update-info-container {
+        flex-direction: column;
+        gap: 15px;
+    }
+    
+    .manual-update-section {
+        min-width: auto;
+        width: 100%;
+    }
+}
+</style>
+
+<!-- JavaScript追加 -->
 <script>
 function toggleChapterProgress(chapterNum) {
     const unitsDiv = document.getElementById('units-' + chapterNum);
@@ -190,5 +310,108 @@ function toggleChapterProgress(chapterNum) {
         icon.textContent = '▶';
     }
 }
+
+// 手動更新機能
+document.addEventListener('DOMContentLoaded', function() {
+    const updateBtn = document.getElementById('updateMyProgressBtn');
+    
+    if (updateBtn) {
+        updateBtn.addEventListener('click', function() {
+            // ボタンを無効化
+            updateBtn.classList.add('btn-loading');
+            updateBtn.disabled = true;
+            
+            // アイコンを回転アニメーション
+            const icon = updateBtn.querySelector('i');
+            icon.classList.add('fa-spin-custom');
+            
+            // ボタンテキストを変更
+            updateBtn.innerHTML = '<i class="fas fa-sync-alt fa-spin-custom"></i> 更新中...';
+            
+            // AJAX リクエスト
+            fetch('/update_my_progress', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    // 成功時
+                    updateBtn.innerHTML = '<i class="fas fa-check text-success"></i> 更新完了！';
+                    updateBtn.classList.add('update-success');
+                    
+                    // 成功メッセージを表示
+                    showUpdateMessage(data.message, 'success');
+                    
+                    // 2秒後にページをリロード
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 2000);
+                    
+                } else {
+                    // エラー時
+                    updateBtn.innerHTML = '<i class="fas fa-exclamation-triangle text-danger"></i> エラー';
+                    updateBtn.classList.add('update-error');
+                    
+                    showUpdateMessage(data.message || '更新中にエラーが発生しました', 'error');
+                    
+                    // 3秒後にボタンを復元
+                    setTimeout(resetUpdateButton, 3000);
+                }
+            })
+            .catch(error => {
+                console.error('更新エラー:', error);
+                updateBtn.innerHTML = '<i class="fas fa-exclamation-triangle text-danger"></i> 通信エラー';
+                updateBtn.classList.add('update-error');
+                
+                showUpdateMessage('通信エラーが発生しました', 'error');
+                
+                // 3秒後にボタンを復元
+                setTimeout(resetUpdateButton, 3000);
+            });
+        });
+    }
+    
+    function resetUpdateButton() {
+        updateBtn.classList.remove('btn-loading', 'update-success', 'update-error');
+        updateBtn.disabled = false;
+        updateBtn.innerHTML = '<i class="fas fa-sync-alt"></i> 自分の進捗を更新';
+    }
+    
+    function showUpdateMessage(message, type) {
+        // 既存のメッセージを削除
+        const existingAlert = document.querySelector('.update-alert');
+        if (existingAlert) {
+            existingAlert.remove();
+        }
+        
+        // 新しいメッセージを作成
+        const alertClass = type === 'success' ? 'alert-success' : 'alert-danger';
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert ${alertClass} alert-dismissible fade show update-alert`;
+        alertDiv.style.position = 'fixed';
+        alertDiv.style.top = '20px';
+        alertDiv.style.right = '20px';
+        alertDiv.style.zIndex = '9999';
+        alertDiv.style.minWidth = '300px';
+        
+        alertDiv.innerHTML = `
+            <strong>${type === 'success' ? '成功!' : 'エラー!'}</strong> ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        
+        document.body.appendChild(alertDiv);
+        
+        // 5秒後に自動削除
+        setTimeout(() => {
+            if (alertDiv.parentNode) {
+                alertDiv.remove();
+            }
+        }, 5000);
+    }
+});
 </script>
 {% endblock %}
