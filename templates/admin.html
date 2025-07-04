@@ -1043,88 +1043,86 @@ document.addEventListener('DOMContentLoaded', function() {
     initializeUserFiltering();
 
     // 部屋設定保存ボタンのイベントリスナー
-    document.querySelectorAll('.save-room-setting-btn').forEach(button => {
-        button.addEventListener('click', function() {
-            const roomNumber = this.dataset.roomNumber;
-            const maxUnitInput = document.getElementById('maxUnit_' + roomNumber);
-            const csvFileSelect = document.getElementById('csvFile_' + roomNumber);
-            const rankingCountInput = document.getElementById('rankingCount_' + roomNumber);
-            
-            console.log(`🔧 部屋設定保存開始: ${roomNumber}`);
-            
-            if (!maxUnitInput || !csvFileSelect || !rankingCountInput) {
-                alert('設定要素が見つかりません。');
-                console.error('❌ 設定要素が見つかりません:', {
-                    maxUnit: !!maxUnitInput,
-                    csvFile: !!csvFileSelect,
-                    rankingCount: !!rankingCountInput
-                });
-                return;
-            }
-            
-            const maxUnit = maxUnitInput.value.trim();
-            const csvFilename = csvFileSelect.value;
-            const rankingCount = parseInt(rankingCountInput.value) || 10;
-            
-            // バリデーション
-            if (rankingCount < 1 || rankingCount > 50) {
-                alert('ランキング表示人数は1-50人の間で設定してください。');
-                return;
-            }
-            
-            console.log(`📝 保存する設定:`, {
-                roomNumber: roomNumber,
-                maxUnit: maxUnit,
-                csvFilename: csvFilename,
-                rankingCount: rankingCount
+document.querySelectorAll('.save-room-setting-btn').forEach(button => {
+    button.addEventListener('click', function() {
+        const roomNumber = this.dataset.roomNumber;
+        const maxUnitInput = document.getElementById('maxUnit_' + roomNumber);
+        const csvFileSelect = document.getElementById('csvFile_' + roomNumber);
+        
+        console.log(`🔧 部屋設定保存開始: ${roomNumber}`);
+        
+        if (!maxUnitInput || !csvFileSelect) {
+            alert('設定要素が見つかりません。');
+            console.error('❌ 設定要素が見つかりません:', {
+                maxUnit: !!maxUnitInput,
+                csvFile: !!csvFileSelect
             });
+            return;
+        }
+        
+        const maxUnit = maxUnitInput.value.trim();
+        const csvFilename = csvFileSelect.value;
+        
+        console.log(`📝 保存する設定:`, {
+            roomNumber: roomNumber,
+            maxUnit: maxUnit,
+            csvFilename: csvFilename
+        });
 
-            // ボタンを無効化して重複実行を防ぐ
-            this.disabled = true;
-            this.textContent = '保存中...';
+        // ボタンを無効化して重複実行を防ぐ
+        this.disabled = true;
+        this.textContent = '保存中...';
 
-            // 単元設定、CSVファイル設定、ランキング表示人数設定を同時に更新
-            Promise.all([
-                fetch('{{ url_for("admin_update_room_unit_setting") }}', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        room_number: roomNumber,
-                        max_unit: maxUnit
-                    })
-                }),
-                fetch('{{ url_for("admin_update_room_csv_setting") }}', {
-                    method: 'POST', 
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        room_number: roomNumber,
-                        csv_filename: csvFilename
-                    })
+        // 単元設定、CSVファイル設定を同時に更新
+        Promise.all([
+            fetch('{{ url_for("admin_update_room_unit_setting") }}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    room_number: roomNumber,
+                    max_unit: maxUnit
                 })
-                // ranking設定の部分を削除
-            ])
-            .then(responses => {
-                console.log('📡 サーバーレスポンス受信:', responses.map(r => r.status));
-                return Promise.all(responses.map(r => r.json()));
+            }),
+            fetch('{{ url_for("admin_update_room_csv_setting") }}', {
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    room_number: roomNumber,
+                    csv_filename: csvFilename
+                })
             })
-            .then(results => {
-                const unitResult = results[0];
-                const csvResult = results[1];
+        ])
+        .then(responses => {
+            console.log('📡 サーバーレスポンス受信:', responses.map(r => r.status));
+            return Promise.all(responses.map(r => r.json()));
+        })
+        .then(results => {
+            const unitResult = results[0];
+            const csvResult = results[1];
+            
+            console.log('📊 保存結果:', { unitResult, csvResult });
+            
+            if (unitResult.status === 'success' && csvResult.status === 'success') {
+                alert(`✅ 部屋 ${roomNumber} の設定を更新しました:\n・最大単元: ${maxUnit}\n・CSVファイル: ${csvFilename}`);
                 
-                console.log('📊 保存結果:', { unitResult, csvResult });
-                
-                if (unitResult.status === 'success' && csvResult.status === 'success') {
-                    alert(`✅ 部屋 ${roomNumber} の設定を更新しました:\n・最大単元: ${maxUnit}\n・CSVファイル: ${csvFilename}`);
-                    
-                    loadRoomSettings();
-                } else {
-                    const errorMsg = (unitResult.message || csvResult.message || '不明なエラー');
-                    alert('❌ 設定の保存中にエラーが発生しました: ' + errorMsg);
-                    console.error('❌ 保存エラー:', { unitResult, csvResult });
-                }
-            })
+                loadRoomSettings();
+            } else {
+                const errorMsg = (unitResult.message || csvResult.message || '不明なエラー');
+                alert('❌ 設定の保存中にエラーが発生しました: ' + errorMsg);
+                console.error('❌ 保存エラー:', { unitResult, csvResult });
+            }
+        })
+        .catch(error => {
+            console.error('❌ 保存処理中にエラー:', error);
+            alert('❌ 設定の保存中にエラーが発生しました: ' + error.message);
+        })
+        .finally(() => {
+            // ボタンを元に戻す
+            this.disabled = false;
+            this.textContent = '保存';
         });
     });
+});
 
     // ユーザー削除ボタンのイベントリスナー
     document.querySelectorAll('.delete-user-btn').forEach(button => {
