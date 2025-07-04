@@ -3794,7 +3794,7 @@ def admin_analyze_invalid_history_detailed():
 # ====================================================================
 # 進捗ページ
 # ====================================================================
-# 元の@app.route('/progress')を以下に置き換えてください
+# 修正された進捗ページルート（正確なスコア計算版）
 
 @app.route('/progress')
 def progress_page():
@@ -3808,7 +3808,7 @@ def progress_page():
             flash('ユーザーが見つかりません。', 'danger')
             return redirect(url_for('logout'))
 
-        print(f"\n=== 進捗ページ表示開始（トランザクション安全版） ===")
+        print(f"\n=== 進捗ページ表示開始（修正版） ===")
         print(f"ユーザー: {current_user.username} (部屋: {current_user.room_number})")
 
         # トランザクションをクリーンアップ
@@ -3817,167 +3817,85 @@ def progress_page():
         except:
             pass
 
-        # 1. デフォルト値でフォールバック戦略
-        ranking_data_safe = []
-        current_user_stats = {
-            'username': current_user.username,
-            'total_attempts': 0,
-            'total_correct': 0,
-            'accuracy_rate': 0.0,
-            'coverage_rate': 0.0,
-            'mastered_count': 0,
-            'balance_score': 0.0,
-            'mastery_score': 0.0,
-            'reliability_score': 0.0,
-            'activity_score': 0.0,
-            'total_questions_for_room': 0
-        }
-        user_progress_by_chapter = {}
-        last_update_time = datetime.now(JST)
-
+        # 基本データ取得
+        word_data = load_word_data_for_room(current_user.room_number)
+        room_setting = None
         try:
-            # 2. 安全な部屋設定取得
-            room_setting = None
-            try:
-                room_setting = RoomSetting.query.filter_by(room_number=current_user.room_number).first()
-            except Exception as room_error:
-                print(f"⚠️ 部屋設定取得エラー: {room_error}")
-                db.session.rollback()
-
-            # 3. 安全な単語データ取得
-            word_data = []
-            try:
-                word_data = load_word_data_for_room_safe(current_user.room_number)
-                print(f"✅ 単語データ取得: {len(word_data)}問")
-            except Exception as word_error:
-                print(f"⚠️ 単語データ取得エラー: {word_error}")
-                db.session.rollback()
-
-            # 4. 安全なランキング計算
-            if word_data:
-                try:
-                    ranking_data_safe = get_safe_ranking_data(current_user.room_number, word_data, room_setting)
-                    print(f"✅ ランキング計算完了: {len(ranking_data_safe)}人")
-                    
-                    # 現在のユーザーの統計を取得
-                    for user_data in ranking_data_safe:
-                        if user_data['username'] == current_user.username:
-                            current_user_stats = user_data
-                            break
-                            
-                except Exception as ranking_error:
-                    print(f"⚠️ ランキング計算エラー: {ranking_error}")
-                    db.session.rollback()
-
-            # 5. 安全な個人進捗計算
-            try:
-                user_progress_by_chapter = get_safe_user_progress(current_user, word_data)
-            except Exception as progress_error:
-                print(f"⚠️ 個人進捗計算エラー: {progress_error}")
-
-        except Exception as main_error:
-            print(f"⚠️ メイン処理エラー: {main_error}")
+            room_setting = RoomSetting.query.filter_by(room_number=current_user.room_number).first()
+        except:
             db.session.rollback()
 
-        # 6. 表示人数制限
+        # ランキングデータを計算
+        ranking_data = get_corrected_ranking_data(current_user.room_number, word_data, room_setting)
+        
+        # 現在のユーザーの統計を取得
+        current_user_stats = None
+        for user_data in ranking_data:
+            if user_data['username'] == current_user.username:
+                current_user_stats = user_data
+                break
+
+        # デフォルト統計（見つからない場合）
+        if not current_user_stats:
+            current_user_stats = {
+                'username': current_user.username,
+                'total_attempts': 0,
+                'total_correct': 0,
+                'accuracy_rate': 0.0,
+                'coverage_rate': 0.0,
+                'mastered_count': 0,
+                'balance_score': 0.0,
+                'mastery_score': 0.0,
+                'reliability_score': 0.0,
+                'activity_score': 0.0,
+                'total_questions_for_room': len(word_data) if word_data else 0
+            }
+
+        # 個人進捗を計算
+        user_progress_by_chapter = get_corrected_user_progress(current_user, word_data, room_setting)
+
+        # 表示人数制限
         display_count = 10
         if room_setting and hasattr(room_setting, 'ranking_display_count'):
             display_count = room_setting.ranking_display_count or 10
-        ranking_data_safe = ranking_data_safe[:display_count]
+        ranking_data_limited = ranking_data[:display_count]
 
-        # 7. 次回更新時刻
-        next_update_time = get_next_even_hour()
-
-        print(f"✅ 進捗ページ表示準備完了")
+        print(f"✅ 進捗計算完了:")
+        print(f"   ユーザー統計: マスター{current_user_stats['mastered_count']}問, 正答率{current_user_stats['accuracy_rate']}%")
+        print(f"   ランキング: {len(ranking_data_limited)}人表示")
 
         context = get_template_context()
         context.update({
             'current_user': current_user,
             'current_user_stats': current_user_stats,
             'user_progress_by_chapter': user_progress_by_chapter,
-            'ranking_data': ranking_data_safe,
+            'ranking_data': ranking_data_limited,
             'total_questions_for_room': current_user_stats.get('total_questions_for_room', 0),
-            'last_update_time': last_update_time,
-            'next_update_time': next_update_time,
+            'last_update_time': datetime.now(JST),
+            'next_update_time': get_next_even_hour(),
             'using_cache': False,
-            'error_mode': len(ranking_data_safe) == 0
+            'error_mode': False
         })
 
         return render_template('progress.html', **context)
 
     except Exception as e:
-        print(f"❌ 進捗ページ致命的エラー: {e}")
+        print(f"❌ 進捗ページエラー: {e}")
         import traceback
         traceback.print_exc()
-        
-        # トランザクションをクリーンアップ
         try:
             db.session.rollback()
         except:
             pass
-        
         flash('進捗データの取得中にエラーが発生しました。', 'danger')
         return redirect(url_for('index'))
 
-def load_word_data_for_room_safe(room_number):
-    """安全な単語データ読み込み（トランザクションエラー対応）"""
+def get_corrected_ranking_data(room_number, word_data, room_setting=None):
+    """修正されたランキングデータ計算（正確なマスター判定）"""
     try:
-        # まずデフォルトファイルを試行
-        word_data = []
-        try:
-            with open('words.csv', 'r', encoding='utf-8') as f:
-                reader = csv.DictReader(f)
-                for row in reader:
-                    row['enabled'] = row.get('enabled', '1') == '1'
-                    row['chapter'] = str(row['chapter'])
-                    row['number'] = str(row['number'])
-                    word_data.append(row)
-            print(f"✅ デフォルトファイル読み込み: {len(word_data)}問")
-            return word_data
-        except FileNotFoundError:
-            print("⚠️ デフォルトファイルが見つかりません")
-
-        # データベースから部屋設定を安全に取得
-        try:
-            room_setting = RoomSetting.query.filter_by(room_number=room_number).first()
-            if room_setting and room_setting.csv_filename and room_setting.csv_filename != "words.csv":
-                csv_filename = room_setting.csv_filename
-                
-                # データベースからカスタムCSVを取得
-                csv_file = CsvFileContent.query.filter_by(filename=csv_filename).first()
-                if csv_file:
-                    content = csv_file.content
-                    reader = csv.DictReader(StringIO(content))
-                    word_data = []
-                    for row in reader:
-                        row['enabled'] = row.get('enabled', '1') == '1'
-                        row['chapter'] = str(row['chapter'])
-                        row['number'] = str(row['number'])
-                        word_data.append(row)
-                    print(f"✅ カスタムCSV読み込み: {len(word_data)}問 from {csv_filename}")
-                    return word_data
-        except Exception as db_error:
-            print(f"⚠️ データベース読み込みエラー: {db_error}")
-            db.session.rollback()
-
-        # フォールバック: 空のデータ
-        print("⚠️ 単語データの読み込みに失敗、空のデータを返します")
-        return []
+        print(f"🔄 修正ランキング計算開始: 部屋{room_number}")
         
-    except Exception as e:
-        print(f"❌ 単語データ読み込み致命的エラー: {e}")
-        try:
-            db.session.rollback()
-        except:
-            pass
-        return []
-
-def get_safe_ranking_data(room_number, word_data, room_setting=None):
-    """安全なランキングデータ計算"""
-    try:
-        print(f"🔄 安全ランキング計算開始: 部屋{room_number}")
-        
-        # 同じ部屋のユーザーを安全に取得
+        # ユーザー取得
         users = []
         try:
             users = User.query.filter_by(room_number=room_number).all()
@@ -3986,56 +3904,73 @@ def get_safe_ranking_data(room_number, word_data, room_setting=None):
             db.session.rollback()
             return []
         
-        ranking_data = []
-        
-        # 有効な問題数を計算
+        # 有効な問題IDのセットを作成
         max_enabled_unit_num_str = "9999"
         if room_setting:
             max_enabled_unit_num_str = room_setting.max_enabled_unit_number
         parsed_max_enabled_unit_num = parse_unit_number(max_enabled_unit_num_str)
         
+        valid_problem_ids = set()
         total_questions_for_room = 0
+        
         for word in word_data:
             is_word_enabled_in_csv = word['enabled']
             is_unit_enabled_by_room_setting = parse_unit_number(word['number']) <= parsed_max_enabled_unit_num
+            
             if is_word_enabled_in_csv and is_unit_enabled_by_room_setting:
+                problem_id = get_problem_id(word)
+                valid_problem_ids.add(problem_id)
                 total_questions_for_room += 1
+        
+        print(f"📊 有効問題数: {total_questions_for_room}問, 有効ID数: {len(valid_problem_ids)}個")
+        
+        ranking_data = []
         
         for user in users:
             if user.username == 'admin':
                 continue
             
             try:
-                # 簡易統計計算
                 user_history = user.get_problem_history()
                 total_attempts = 0
                 total_correct = 0
                 mastered_count = 0
                 
-                # 履歴から基本統計を計算
+                print(f"🔍 {user.username}: 履歴エントリ数{len(user_history)}")
+                
+                # 有効な問題IDの履歴のみを処理
+                valid_entries = 0
                 for problem_id, history in user_history.items():
-                    correct_attempts = history.get('correct_attempts', 0)
-                    incorrect_attempts = history.get('incorrect_attempts', 0)
-                    problem_total_attempts = correct_attempts + incorrect_attempts
-                    
-                    if problem_total_attempts > 0:
-                        total_attempts += problem_total_attempts
-                        total_correct += correct_attempts
+                    if problem_id in valid_problem_ids:  # ★重要：有効な問題のみ処理
+                        valid_entries += 1
+                        correct_attempts = history.get('correct_attempts', 0)
+                        incorrect_attempts = history.get('incorrect_attempts', 0)
+                        problem_total_attempts = correct_attempts + incorrect_attempts
                         
-                        # 80%以上の正答率でマスター判定
-                        accuracy_rate = (correct_attempts / problem_total_attempts) * 100
-                        if accuracy_rate >= 80.0:
-                            mastered_count += 1
+                        if problem_total_attempts > 0:
+                            total_attempts += problem_total_attempts
+                            total_correct += correct_attempts
+                            
+                            # マスター判定：80%以上の正答率
+                            accuracy_rate = (correct_attempts / problem_total_attempts) * 100
+                            if accuracy_rate >= 80.0:
+                                mastered_count += 1
+                
+                print(f"   有効エントリ: {valid_entries}個, マスター: {mastered_count}問")
                 
                 # スコア計算
                 coverage_rate = (mastered_count / total_questions_for_room * 100) if total_questions_for_room > 0 else 0
                 accuracy_rate = (total_correct / total_attempts * 100) if total_attempts > 0 else 0
                 
-                # 簡易バランススコア
+                # バランススコア（修正版）
                 if total_attempts == 0:
                     balance_score = 0
                 else:
-                    balance_score = (mastered_count * 0.7 + (accuracy_rate / 100) * 0.3) * 100
+                    # マスター数と正答率の組み合わせ
+                    mastery_component = (mastered_count / max(total_questions_for_room, 1)) * 60  # 60点満点
+                    accuracy_component = (accuracy_rate / 100) * 30  # 30点満点
+                    activity_component = min(total_attempts / 100, 1) * 10  # 10点満点
+                    balance_score = mastery_component + accuracy_component + activity_component
                 
                 user_data = {
                     'username': user.username,
@@ -4045,7 +3980,7 @@ def get_safe_ranking_data(room_number, word_data, room_setting=None):
                     'coverage_rate': round(coverage_rate, 1),
                     'mastered_count': mastered_count,
                     'balance_score': round(balance_score, 1),
-                    'mastery_score': round(mastered_count * 2, 1),
+                    'mastery_score': round(mastered_count * 1.5, 1),
                     'reliability_score': round(accuracy_rate, 1),
                     'activity_score': round(min(total_attempts / 10, 100), 1),
                     'total_questions_for_room': total_questions_for_room
@@ -4060,58 +3995,65 @@ def get_safe_ranking_data(room_number, word_data, room_setting=None):
         # バランススコア順でソート
         ranking_data.sort(key=lambda x: x['balance_score'], reverse=True)
         
-        print(f"✅ 安全ランキング計算完了: {len(ranking_data)}人")
+        print(f"✅ 修正ランキング計算完了: {len(ranking_data)}人")
         return ranking_data
         
     except Exception as e:
-        print(f"❌ 安全ランキング計算エラー: {e}")
+        print(f"❌ 修正ランキング計算エラー: {e}")
         try:
             db.session.rollback()
         except:
             pass
         return []
 
-def get_safe_user_progress(user, word_data):
-    """安全な個人進捗データ取得"""
+def get_corrected_user_progress(user, word_data, room_setting=None):
+    """修正された個人進捗計算"""
     try:
         user_history = user.get_problem_history()
+        
+        # 有効な問題IDのセットを作成
+        max_enabled_unit_num_str = "9999"
+        if room_setting:
+            max_enabled_unit_num_str = room_setting.max_enabled_unit_number
+        parsed_max_enabled_unit_num = parse_unit_number(max_enabled_unit_num_str)
+        
+        # 問題IDと単語のマッピング
+        problem_to_word = {}
+        for word in word_data:
+            is_word_enabled_in_csv = word['enabled']
+            is_unit_enabled_by_room_setting = parse_unit_number(word['number']) <= parsed_max_enabled_unit_num
+            
+            if is_word_enabled_in_csv and is_unit_enabled_by_room_setting:
+                problem_id = get_problem_id(word)
+                problem_to_word[problem_id] = word
+        
         chapter_progress = {}
         
-        # 履歴から章別統計を計算
+        # 有効な履歴エントリのみを処理
         for problem_id, history in user_history.items():
-            try:
-                # 対応する単語を検索（簡易版）
-                matched_word = None
-                for word in word_data:
-                    if get_problem_id(word) == problem_id:
-                        matched_word = word
-                        break
+            if problem_id in problem_to_word:  # ★重要：有効な問題のみ処理
+                word = problem_to_word[problem_id]
+                chapter_num = word['chapter']
                 
-                if matched_word:
-                    chapter_num = matched_word['chapter']
-                    if chapter_num not in chapter_progress:
-                        chapter_progress[chapter_num] = {
-                            'chapter_name': f'第{chapter_num}章',
-                            'total_questions': 0,
-                            'total_mastered': 0,
-                            'units': []
-                        }
-                    
-                    # マスター判定
-                    correct_attempts = history.get('correct_attempts', 0)
-                    incorrect_attempts = history.get('incorrect_attempts', 0)
-                    total_attempts = correct_attempts + incorrect_attempts
-                    
-                    if total_attempts > 0:
-                        accuracy_rate = (correct_attempts / total_attempts) * 100
-                        if accuracy_rate >= 80.0:
-                            chapter_progress[chapter_num]['total_mastered'] += 1
-                    
+                if chapter_num not in chapter_progress:
+                    chapter_progress[chapter_num] = {
+                        'chapter_name': f'第{chapter_num}章',
+                        'total_questions': 0,
+                        'total_mastered': 0,
+                        'units': []
+                    }
+                
+                # マスター判定
+                correct_attempts = history.get('correct_attempts', 0)
+                incorrect_attempts = history.get('incorrect_attempts', 0)
+                total_attempts = correct_attempts + incorrect_attempts
+                
+                if total_attempts > 0:
                     chapter_progress[chapter_num]['total_questions'] += 1
                     
-            except Exception as item_error:
-                print(f"⚠️ 履歴項目処理エラー: {item_error}")
-                continue
+                    accuracy_rate = (correct_attempts / total_attempts) * 100
+                    if accuracy_rate >= 80.0:
+                        chapter_progress[chapter_num]['total_mastered'] += 1
         
         return chapter_progress
         
@@ -5431,7 +5373,98 @@ def admin_debug_progress():
         traceback.print_exc()
         return f"Debug Error: {e}", 500
 
+# デバッグ用ルートをapp.pyに追加してください
 
+@app.route('/debug/ranking_data')
+def debug_ranking_data():
+    """ランキングデータのデバッグ表示"""
+    if 'user_id' not in session:
+        return jsonify(error='ログインが必要です'), 401
+    
+    current_user = User.query.get(session['user_id'])
+    if not current_user:
+        return jsonify(error='ユーザーが見つかりません'), 404
+    
+    try:
+        # データを取得
+        word_data = load_word_data_for_room(current_user.room_number)
+        room_setting = None
+        try:
+            room_setting = RoomSetting.query.filter_by(room_number=current_user.room_number).first()
+        except:
+            db.session.rollback()
+        
+        ranking_data = get_corrected_ranking_data(current_user.room_number, word_data, room_setting)
+        
+        # 現在のユーザーの詳細分析
+        user_history = current_user.get_problem_history()
+        
+        # 有効な問題IDを計算
+        valid_problem_ids = set()
+        for word in word_data:
+            problem_id = get_problem_id(word)
+            valid_problem_ids.add(problem_id)
+        
+        # 履歴の分析
+        history_analysis = {
+            'total_history_entries': len(user_history),
+            'valid_entries': 0,
+            'invalid_entries': 0,
+            'valid_problem_ids_sample': list(valid_problem_ids)[:5],
+            'user_history_sample': list(user_history.keys())[:5]
+        }
+        
+        for problem_id in user_history.keys():
+            if problem_id in valid_problem_ids:
+                history_analysis['valid_entries'] += 1
+            else:
+                history_analysis['invalid_entries'] += 1
+        
+        return jsonify({
+            'user_info': {
+                'username': current_user.username,
+                'room_number': current_user.room_number
+            },
+            'word_data_count': len(word_data),
+            'valid_problem_ids_count': len(valid_problem_ids),
+            'ranking_data': ranking_data,
+            'history_analysis': history_analysis,
+            'room_setting': {
+                'exists': room_setting is not None,
+                'csv_filename': room_setting.csv_filename if room_setting else None,
+                'max_unit': room_setting.max_enabled_unit_number if room_setting else None,
+                'display_count': getattr(room_setting, 'ranking_display_count', None) if room_setting else None
+            }
+        })
+        
+    except Exception as e:
+        return jsonify(error=str(e), traceback=str(e)), 500
+
+@app.route('/debug/template_context')
+def debug_template_context():
+    """テンプレートに渡されるコンテキストのデバッグ"""
+    if not session.get('admin_logged_in') and 'user_id' not in session:
+        return jsonify(error='ログインが必要です'), 401
+    
+    try:
+        # get_template_context()の内容を確認
+        context = get_template_context()
+        
+        # 追加の情報
+        debug_info = {
+            'template_context': context,
+            'session_info': {
+                'user_id': session.get('user_id'),
+                'username': session.get('username'),
+                'room_number': session.get('room_number'),
+                'admin_logged_in': session.get('admin_logged_in')
+            }
+        }
+        
+        return jsonify(debug_info)
+        
+    except Exception as e:
+        return jsonify(error=str(e)), 500
 
 # 1. 共通のapp_info取得関数を定義
 @app.context_processor
