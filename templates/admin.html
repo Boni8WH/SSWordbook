@@ -312,907 +312,270 @@
         </div>
     </section>
 
-<hr>
+    <hr>
 
-<!-- 全員ランキング表示セクション -->
-<div class="admin-panel">
-    <h3>🏆 全員ランキング表示</h3>
-    <p>各部屋の全ユーザーのランキングを確認できます。</p>
-    
-    <!-- 部屋選択 -->
-    <div class="room-selector-container">
-        <h4>部屋選択</h4>
-        <div class="room-buttons-grid" id="room-buttons">
-            <!-- JavaScript で動的に部屋ボタンを生成 -->
-        </div>
-    </div>
-    
-    <!-- 選択中の部屋表示 -->
-    <div id="selected-room-info" style="display: none;">
-        <h4>選択中の部屋: <span id="selected-room-name"></span></h4>
-        <p>この部屋の全ユーザーのランキングを表示しています。</p>
-    </div>
-    
-    <!-- ランキング表示エリア -->
-    <div id="admin-ranking-container">
-        <!-- 初期メッセージ -->
-        <div id="admin-ranking-initial" class="text-center py-4">
-            <i class="fas fa-trophy fa-3x text-muted mb-3"></i>
-            <p class="text-muted">部屋を選択してランキングを表示してください</p>
-        </div>
+    <!-- 全員ランキング表示セクション -->
+    <div class="admin-panel">
+        <h3>🏆 全員ランキング表示</h3>
+        <p>各部屋の全ユーザーのランキングを確認できます。</p>
         
-        <!-- ローディング表示 -->
-        <div id="admin-ranking-loading" class="text-center py-4" style="display: none;">
-            <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">Loading...</span>
+        <!-- 部屋選択セクション -->
+        <div class="room-selector-container">
+            <h4>部屋を選択してください</h4>
+            <div id="room-buttons" class="room-buttons-grid">
+                <!-- 動的に部屋ボタンが挿入されます -->
             </div>
-            <p class="mt-2 text-muted">ランキングを取得中...</p>
         </div>
-        
-        <!-- ランキングテーブル -->
-        <div id="admin-ranking-table-container" style="display: none;">
-            <div class="ranking-summary mb-3">
-                <div class="row">
-                    <div class="col-md-3">
-                        <div class="summary-card">
-                            <h5>総参加者数</h5>
-                            <span class="summary-value" id="total-users">0</span>
+
+        <!-- 選択中の部屋情報 -->
+        <div id="selected-room-info" class="alert alert-info" style="display: none;">
+            <h5>選択中の部屋: <span id="selected-room-name"></span></h5>
+            <button class="btn btn-sm btn-outline-warning" onclick="clearRankingView()">
+                <i class="fas fa-times"></i> 選択解除
+            </button>
+        </div>
+
+        <!-- ランキング表示エリア -->
+        <div id="admin-ranking-container">
+            <div id="admin-ranking-initial" class="text-center py-4">
+                <i class="fas fa-trophy fa-3x text-muted mb-3"></i>
+                <p class="text-muted">上記から部屋を選択してランキングを表示してください</p>
+            </div>
+            
+            <div id="admin-ranking-loading" class="text-center py-4" style="display: none;">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="mt-2 text-muted">ランキングを取得中...</p>
+            </div>
+            
+            <div id="admin-ranking-table-container" style="display: none;">
+                <!-- 統計サマリー -->
+                <div class="ranking-summary">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="summary-card">
+                                <h5>総ユーザー数</h5>
+                                <span class="summary-value" id="total-users">-</span>
+                            </div>
                         </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="summary-card">
-                            <h5>活発なユーザー</h5>
-                            <span class="summary-value" id="active-users">0</span>
+                        <div class="col-md-3">
+                            <div class="summary-card">
+                                <h5>アクティブユーザー</h5>
+                                <span class="summary-value" id="active-users">-</span>
+                            </div>
                         </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="summary-card">
-                            <h5>平均スコア</h5>
-                            <span class="summary-value" id="average-score">0.0</span>
+                        <div class="col-md-3">
+                            <div class="summary-card">
+                                <h5>平均スコア</h5>
+                                <span class="summary-value" id="average-score">-</span>
+                            </div>
                         </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="summary-card">
-                            <h5>最高スコア</h5>
-                            <span class="summary-value" id="max-score">0.0</span>
+                        <div class="col-md-3">
+                            <div class="summary-card">
+                                <h5>最高スコア</h5>
+                                <span class="summary-value" id="max-score">-</span>
+                            </div>
                         </div>
                     </div>
                 </div>
+
+                <!-- ランキングテーブル -->
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>順位</th>
+                                <th>名前</th>
+                                <th>最終ログイン</th>
+                                <th>回答数</th>
+                                <th>正解数</th>
+                                <th>正答率</th>
+                                <th>マスター数</th>
+                                <th>総合スコア</th>
+                                <th>網羅率</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-ranking-table-body">
+                            <!-- 動的にランキングデータが挿入されます -->
+                        </tbody>
+                    </table>
+                </div>
             </div>
             
-            <div class="table-responsive">
-                <table class="table table-striped table-hover">
-                    <thead class="table-dark">
-                        <tr>
-                            <th>順位</th>
-                            <th>名前</th>
-                            <th>最終ログイン</th>
-                            <th>回答数</th>
-                            <th>正解数</th>
-                            <th>正答率</th>
-                            <th>マスター数</th>
-                            <th>総合スコア</th>
-                            <th>網羅率</th>
-                        </tr>
-                    </thead>
-                    <tbody id="admin-ranking-table-body">
-                        <!-- JavaScript で動的に挿入 -->
-                    </tbody>
-                </table>
+            <div id="admin-ranking-error" class="alert alert-danger" style="display: none;">
+                <h5>エラーが発生しました</h5>
+                <p id="admin-ranking-error-message"></p>
+                <button class="btn btn-primary" onclick="retryLoadRanking()">
+                    <i class="fas fa-redo"></i> 再試行
+                </button>
             </div>
         </div>
         
-        <!-- エラー表示 -->
-        <div id="admin-ranking-error" class="alert alert-danger" style="display: none;">
-            <i class="fas fa-exclamation-triangle"></i>
-            <span id="admin-ranking-error-message">ランキングの取得に失敗しました。</span>
-            <button class="btn btn-sm btn-outline-primary ms-2" onclick="retryLoadRanking()">
-                <i class="fas fa-redo"></i> 再試行
+        <!-- 操作ボタン -->
+        <div class="admin-ranking-actions mt-3" id="admin-ranking-actions" style="display: none;">
+            <button class="btn btn-success" onclick="exportRankingData()">
+                <i class="fas fa-download"></i> CSVエクスポート
+            </button>
+            <button class="btn btn-info" onclick="refreshRanking()">
+                <i class="fas fa-sync"></i> データ更新
+            </button>
+            <button class="btn btn-warning" onclick="showRoomsComparison()">
+                <i class="fas fa-chart-bar"></i> 部屋比較
+            </button>
+            <button class="btn btn-primary" onclick="showDetailedUserInfo()">
+                <i class="fas fa-user-friends"></i> 詳細分析
             </button>
         </div>
     </div>
-    
-    <!-- 操作ボタン -->
-    <div class="admin-ranking-actions mt-3" id="admin-ranking-actions" style="display: none;">
-        <button class="btn btn-success" onclick="exportRankingData()">
-            <i class="fas fa-download"></i> CSVエクスポート
-        </button>
-        <button class="btn btn-info" onclick="refreshRanking()">
-            <i class="fas fa-sync"></i> データ更新
-        </button>
-        <button class="btn btn-warning" onclick="showRoomsComparison()">
-            <i class="fas fa-chart-bar"></i> 部屋比較
-        </button>
-        <button class="btn btn-secondary" onclick="clearRankingView()">
-            <i class="fas fa-times"></i> 表示クリア
-        </button>
-    </div>
-</div>
-<hr>
-
-<section id="admin-user-stats-management">
-    <h3>📊 ユーザー統計管理</h3>
-    <p>事前計算されたユーザー統計の状態確認・修復を行います。</p>
-
-    <!-- 統計状態確認 -->
-    <div class="admin-panel" style="background-color: #e8f5e8; border-left: 5px solid #28a745; margin-bottom: 20px;">
-        <h4>📈 統計データ状態確認</h4>
-        <p>ユーザー統計の整合性と最新性を確認します。<br>
-        <strong>推奨：</strong>新しいユーザーを追加した後や、データに不整合がある場合に実行してください。</p>
-        
-        <div style="margin-top: 15px;">
-            <button type="button" class="btn btn-info" onclick="checkUserStats()">
-                <i class="fas fa-chart-line"></i> 📊 統計状態を確認
-            </button>
-            
-            <button type="button" class="btn btn-success" onclick="repairUserStats()" style="margin-left: 10px;">
-                <i class="fas fa-tools"></i> 🔧 統計データを修復
-            </button>
-            
-            <button type="button" class="btn btn-warning" onclick="initializeAllStats()" style="margin-left: 10px;">
-                <i class="fas fa-sync-alt"></i> 🔄 全統計を強制再初期化
-            </button>
-        </div>
-    </div>
-
-    <!-- 統計確認結果表示エリア -->
-    <div id="statsCheckResult" style="margin-top: 15px; display: none;">
-        <h5>📊 統計状態確認結果</h5>
-        <div id="statsCheckContent" style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; border: 1px solid #dee2e6;">
-            <!-- 確認結果がここに表示されます -->
-        </div>
-    </div>
-</section>
 
     <hr>
 
-<section id="admin-database-management">
-    <h3>🔧 データベース管理</h3>
-    <p>学習履歴データの整合性確認とデータクリーンアップを行います。</p>
+    <section id="admin-user-stats-management">
+        <h3>📊 ユーザー統計管理</h3>
+        <p>事前計算されたユーザー統計の状態確認・修復を行います。</p>
 
-    <!-- 孤立したトークンのクリーンアップ -->
-    <div class="admin-panel" style="background-color: #fff3cd; border-left: 5px solid #ffc107; margin-bottom: 20px;">
-        <h4>🧹 孤立データのクリーンアップ</h4>
-        <p>削除されたユーザーに関連する古いパスワードリセットトークンを削除します。<br>
-        <strong>推奨：</strong>ユーザー削除後やメンテナンス時に実行してください。</p>
-        
-        <div style="margin-top: 15px;">
-            <button type="button" class="btn btn-warning" onclick="cleanupOrphanedTokens()">
-                <i class="fas fa-broom"></i> 🧹 孤立したトークンを削除
-            </button>
+        <!-- 統計状態確認 -->
+        <div class="admin-panel" style="background-color: #e8f5e8; border-left: 5px solid #28a745; margin-bottom: 20px;">
+            <h4>📈 統計データ状態確認</h4>
+            <p>ユーザー統計の整合性と最新性を確認します。<br>
+            <strong>推奨：</strong>新しいユーザーを追加した後や、データに不整合がある場合に実行してください。</p>
             
-            <button type="button" class="btn btn-info" onclick="checkDatabaseStatus()" style="margin-left: 10px;">
-                <i class="fas fa-search"></i> 📊 データベース状態確認
-            </button>
-        </div>
-    </div>
-
-    <div class="admin-panel" style="background-color: #fff8e1; border-left: 5px solid #ff9800; margin-bottom: 20px;">
-        <h4>🗑️ ID不一致履歴の削除</h4>
-        <p>現在の問題データと一致しない古い学習履歴を削除します。<br>
-        <strong>用途：</strong>問題文修正後に古いIDの履歴を削除する場合に使用。<br>
-        <strong>⚠️ 注意：</strong>削除された履歴は復元できません。</p>
-        
-        <div style="margin-top: 15px;">
-            <button type="button" class="btn btn-info" onclick="analyzeInvalidHistoryDetailed()">
-                <i class="fas fa-search"></i> 📊 詳細分析（デバッグ版）
-            </button>
-            
-            <button type="button" class="btn btn-warning" onclick="cleanInvalidHistory()" style="margin-left: 10px;">
-                <i class="fas fa-trash-alt"></i> 🗑️ 無効履歴を削除
-            </button>
-        </div>
-        
-        <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #ddd;">
-            <h5>🔍 特定ユーザーのデバッグ</h5>
-            <div class="row">
-                <div class="col-md-6">
-                    <div class="input-group">
-                        <input type="text" id="debugUsername" class="form-control" placeholder="ユーザー名を入力">
-                        <button class="btn btn-outline-secondary" onclick="debugSpecificUser()">
-                            <i class="fas fa-bug"></i> デバッグ
-                        </button>
-                    </div>
-                </div>
-                <div class="col-md-6">
-                    <button type="button" class="btn btn-danger btn-sm" onclick="forceCleanSpecificUser()">
-                        <i class="fas fa-exclamation-triangle"></i> 強制削除
-                    </button>
-                    <small class="text-muted d-block">※上記でユーザー名を入力後に使用</small>
-                </div>
-            </div>
-        </div>
-        
-        <!-- 無効履歴分析結果表示エリア -->
-        <div id="invalidHistoryAnalysisResult" style="margin-top: 15px; display: none;">
-            <h5>📊 無効履歴分析結果</h5>
-            <div id="invalidAnalysisContent" style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; border: 1px solid #dee2e6;">
-                <!-- 分析結果がここに表示されます -->
-            </div>
-        </div>
-        
-        <!-- デバッグ結果表示エリア -->
-        <div id="userDebugResult" style="margin-top: 15px; display: none;">
-            <h5>🔍 ユーザーデバッグ結果</h5>
-            <div id="debugContent" style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; border: 1px solid #dee2e6;">
-                <!-- デバッグ結果がここに表示されます -->
-            </div>
-        </div>
-    </div>
-
-    <!-- 全データ修正（従来機能・バックアップ用） -->
-    <div class="admin-panel" style="background-color: #ffebee; border-left: 5px solid #f44336; margin-top: 20px;">
-        <h4>⚠️ 全データ修正（バックアップ用）</h4>
-        <p>全ユーザーの学習履歴を強制的に新しいID形式に統一します。<br>
-        <strong>⚠️ 注意：</strong>この操作は全ユーザーの学習履歴に影響し、元に戻せません。<br>
-        <strong>推奨：</strong>通常は上記の「ID不一致問題のみ修正」を使用してください。</p>
-        
-        <div style="margin-top: 15px;">
-            <form action="{{ url_for('admin_fix_all_data_legacy') }}" method="POST" style="display: inline;" 
-                onsubmit="return confirm('全ユーザーデータを修正しますか？\n\n⚠️ この操作は元に戻せません。\n⚠️ すべての学習履歴が新しい形式に変換されます。\n⚠️ 通常は「ID不一致問題のみ修正」で十分です。\n\n本当に実行しますか？')">
-                <button type="submit" class="btn btn-danger">
-                    <i class="fas fa-exclamation-triangle"></i> ⚠️ 全データ強制修正（非推奨）
+            <div style="margin-top: 15px;">
+                <button type="button" class="btn btn-info" onclick="checkUserStats()">
+                    <i class="fas fa-chart-line"></i> 📊 統計状態を確認
                 </button>
-            </form>
-            
-            <a href="{{ url_for('admin_debug_progress') }}" class="btn btn-info" target="_blank" style="margin-left: 10px;">
-                <i class="fas fa-chart-line"></i> 📊 修正前の状態確認
-            </a>
-        </div>
-    </div>
-</section>
-
-<script>
-// 無効履歴の削除
-function cleanInvalidHistory() {
-    if (confirm('無効な学習履歴を削除しますか？\n\n⚠️ この操作は元に戻せません\n⚠️ 現在の問題データと一致しない履歴が完全に削除されます\n⚠️ 有効な履歴は保持されます\n\n削除を実行しますか？')) {
-        const button = event.target;
-        const originalText = button.textContent;
-        button.disabled = true;
-        button.textContent = '削除中...';
-        
-        // フォームを作成して送信
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = '/admin/clean_invalid_history';
-        
-        document.body.appendChild(form);
-        form.submit();
-    }
-}
-
-function cleanupOrphanedTokens() {
-    if (confirm('孤立したパスワードリセットトークンを削除しますか？\n\n※削除されたユーザーに関連する古いトークンが対象です。')) {
-        const button = event.target;
-        const originalText = button.textContent;
-        button.disabled = true;
-        button.textContent = 'クリーンアップ中...';
-        
-        fetch('/admin/cleanup_orphaned_tokens', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.status === 'success') {
-                alert(`✅ ${data.message}`);
-            } else {
-                alert(`❌ エラー: ${data.message}`);
-            }
-        })
-        .catch(error => {
-            console.error('クリーンアップエラー:', error);
-            alert('❌ クリーンアップ中にエラーが発生しました。');
-        })
-        .finally(() => {
-            button.disabled = false;
-            button.textContent = originalText;
-        });
-    }
-}
-
-function checkDatabaseStatus() {
-    fetch('/admin/check_database_status')
-        .then(response => response.json())
-        .then(data => {
-            if (data.status === 'success') {
-                const status = data.database_status;
-                let message = '📊 データベース状態確認結果:\n\n';
                 
-                for (const [tableName, tableInfo] of Object.entries(status.tables)) {
-                    message += `📋 ${tableName}: ${tableInfo.exists ? '存在' : '不在'}\n`;
-                    if (tableInfo.missing_columns.length > 0) {
-                        message += `   不足カラム: ${tableInfo.missing_columns.join(', ')}\n`;
-                    }
-                }
+                <button type="button" class="btn btn-success" onclick="repairUserStats()" style="margin-left: 10px;">
+                    <i class="fas fa-tools"></i> 🔧 統計データを修復
+                </button>
                 
-                if (status.needs_migration) {
-                    message += '\n⚠️ マイグレーションが必要です。';
-                } else {
-                    message += '\n✅ データベースは正常です。';
-                }
+                <button type="button" class="btn btn-warning" onclick="initializeAllStats()" style="margin-left: 10px;">
+                    <i class="fas fa-sync-alt"></i> 🔄 全統計を強制再初期化
+                </button>
+            </div>
+        </div>
+
+        <!-- 統計確認結果表示エリア -->
+        <div id="statsCheckResult" style="margin-top: 15px; display: none;">
+            <h5>📊 統計状態確認結果</h5>
+            <div id="statsCheckContent" style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; border: 1px solid #dee2e6;">
+                <!-- 確認結果がここに表示されます -->
+            </div>
+        </div>
+    </section>
+
+    <hr>
+
+    <section id="admin-database-management">
+        <h3>🔧 データベース管理</h3>
+        <p>学習履歴データの整合性確認とデータクリーンアップを行います。</p>
+
+        <!-- 孤立したトークンのクリーンアップ -->
+        <div class="admin-panel" style="background-color: #fff3cd; border-left: 5px solid #ffc107; margin-bottom: 20px;">
+            <h4>🧹 孤立データのクリーンアップ</h4>
+            <p>削除されたユーザーに関連する古いパスワードリセットトークンを削除します。<br>
+            <strong>推奨：</strong>ユーザー削除後やメンテナンス時に実行してください。</p>
+            
+            <div style="margin-top: 15px;">
+                <button type="button" class="btn btn-warning" onclick="cleanupOrphanedTokens()">
+                    <i class="fas fa-broom"></i> 🧹 孤立したトークンを削除
+                </button>
                 
-                alert(message);
-            } else {
-                alert(`❌ エラー: ${data.message}`);
-            }
-        })
-        .catch(error => {
-            console.error('状態確認エラー:', error);
-            alert('❌ データベース状態確認中にエラーが発生しました。');
-        });
-}
-
-function analyzeInvalidHistoryDetailed() {
-    const button = event.target;
-    const originalText = button.textContent;
-    button.disabled = true;
-    button.textContent = '詳細分析中...';
-    
-    fetch('/admin/analyze_invalid_history_detailed', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.status === 'success') {
-            displayInvalidHistoryAnalysisDetailed(data.analysis);
-        } else {
-            alert(`❌ エラー: ${data.message}`);
-        }
-    })
-    .catch(error => {
-        console.error('分析エラー:', error);
-        alert('❌ 分析中にエラーが発生しました。');
-    })
-    .finally(() => {
-        button.disabled = false;
-        button.textContent = originalText;
-    });
-}
-
-// 詳細分析結果の表示
-function displayInvalidHistoryAnalysisDetailed(analysis) {
-    const resultDiv = document.getElementById('invalidHistoryAnalysisResult');
-    const contentDiv = document.getElementById('invalidAnalysisContent');
-    
-    let html = `
-        <div class="row">
-            <div class="col-md-6">
-                <h6>📊 削除対象統計</h6>
-                <ul>
-                    <li>総ユーザー数: ${analysis.total_users}人</li>
-                    <li>無効履歴があるユーザー: ${analysis.users_with_invalid}人</li>
-                    <li>無効な学習履歴: ${analysis.total_invalid_entries}個</li>
-                    <li>無効な苦手問題: ${analysis.total_invalid_incorrect}個</li>
-                </ul>
-            </div>
-            <div class="col-md-6">
-                <h6>💡 推奨アクション</h6>
-                ${analysis.users_with_invalid === 0 ? 
-                    '<p class="text-success">✅ 無効な履歴はありません。削除は不要です。</p>' :
-                    `<p class="text-warning">⚠️ ${analysis.total_invalid_entries}個の無効履歴があります。<br>「無効履歴を削除」の実行を推奨します。</p>`
-                }
+                <button type="button" class="btn btn-info" onclick="checkDatabaseStatus()" style="margin-left: 10px;">
+                    <i class="fas fa-search"></i> 📊 データベース状態確認
+                </button>
             </div>
         </div>
-    `;
-    
-    if (analysis.user_details.length > 0) {
-        html += '<h6>👥 影響を受けるユーザー</h6>';
-        html += '<div class="table-responsive"><table class="table table-sm table-striped">';
-        html += '<thead><tr><th>ユーザー名</th><th>部屋</th><th>有効履歴</th><th>無効履歴</th><th>無効苦手問題</th><th>サンプル無効ID</th></tr></thead><tbody>';
-        
-        analysis.user_details.forEach(user => {
-            const sampleId = user.invalid_history_ids.length > 0 ? 
-                user.invalid_history_ids[0].substring(0, 40) + '...' : 
-                (user.invalid_incorrect_ids.length > 0 ? user.invalid_incorrect_ids[0].substring(0, 40) + '...' : '-');
+
+        <div class="admin-panel" style="background-color: #fff8e1; border-left: 5px solid #ff9800; margin-bottom: 20px;">
+            <h4>🗑️ ID不一致履歴の削除</h4>
+            <p>現在の問題データと一致しない古い学習履歴を削除します。<br>
+            <strong>用途：</strong>問題文修正後に古いIDの履歴を削除する場合に使用。<br>
+            <strong>⚠️ 注意：</strong>削除された履歴は復元できません。</p>
             
-            html += `<tr>
-                <td>${user.username}</td>
-                <td>${user.room_number}</td>
-                <td class="text-success">${user.valid_history}</td>
-                <td class="text-warning">${user.invalid_history}</td>
-                <td class="text-warning">${user.invalid_incorrect}</td>
-                <td><small class="text-muted">${sampleId}</small></td>
-            </tr>`;
-        });
-        
-        html += '</tbody></table></div>';
-    }
-    
-    // デバッグ情報も表示
-    if (analysis.debug_info && analysis.debug_info.length > 0) {
-        html += '<h6>🔧 デバッグ情報</h6>';
-        html += '<div class="table-responsive"><table class="table table-sm table-striped">';
-        html += '<thead><tr><th>ユーザー名</th><th>部屋</th><th>単語データ数</th><th>有効ID数</th><th>履歴数</th><th>無効ID例</th></tr></thead><tbody>';
-        
-        analysis.debug_info.slice(0, 10).forEach(debug => {
-            const invalidExample = debug.invalid_history_ids.length > 0 ? 
-                debug.invalid_history_ids[0].substring(0, 30) + '...' : '-';
-            
-            html += `<tr>
-                <td>${debug.username}</td>
-                <td>${debug.room_number}</td>
-                <td>${debug.word_data_count}</td>
-                <td>${debug.valid_ids_count}</td>
-                <td>${debug.total_history}</td>
-                <td><small class="text-muted">${invalidExample}</small></td>
-            </tr>`;
-        });
-        
-        html += '</tbody></table></div>';
-    }
-    
-    contentDiv.innerHTML = html;
-    resultDiv.style.display = 'block';
-}
-
-// 特定ユーザーのデバッグ
-function debugSpecificUser() {
-    const username = document.getElementById('debugUsername').value.trim();
-    if (!username) {
-        alert('ユーザー名を入力してください。');
-        return;
-    }
-    
-    fetch(`/admin/debug_user/${encodeURIComponent(username)}`)
-    .then(response => response.json())
-    .then(data => {
-        if (data.status === 'success') {
-            displayUserDebugResult(data.debug_data);
-        } else {
-            alert(`❌ エラー: ${data.message}`);
-        }
-    })
-    .catch(error => {
-        console.error('デバッグエラー:', error);
-        alert('❌ デバッグ中にエラーが発生しました。');
-    });
-}
-
-// ユーザーデバッグ結果の表示
-function displayUserDebugResult(debugData) {
-    const resultDiv = document.getElementById('userDebugResult');
-    const contentDiv = document.getElementById('debugContent');
-    
-    let html = `
-        <h6>👤 ${debugData.user} のデバッグ結果</h6>
-        <div class="row">
-            <div class="col-md-6">
-                <ul>
-                    <li>部屋番号: ${debugData.room_number}</li>
-                    <li>総履歴数: ${debugData.total_history}</li>
-                    <li>一致する履歴: ${debugData.matched_history}</li>
-                    <li>不一致な履歴: ${debugData.unmatched_history}</li>
-                </ul>
-            </div>
-            <div class="col-md-6">
-                <ul>
-                    <li>有効ID数: ${debugData.valid_ids_count}</li>
-                    <li>不一致苦手問題: ${debugData.unmatched_incorrect.length}</li>
-                </ul>
-            </div>
-        </div>
-    `;
-    
-    if (debugData.unmatched_details.length > 0) {
-        html += '<h6>❌ 不一致な履歴の詳細</h6>';
-        html += '<div class="table-responsive"><table class="table table-sm table-striped">';
-        html += '<thead><tr><th>問題ID</th><th>正解回数</th><th>不正解回数</th><th>最終回答日</th></tr></thead><tbody>';
-        
-        debugData.unmatched_details.forEach(detail => {
-            html += `<tr>
-                <td><small>${detail.id}</small></td>
-                <td>${detail.correct_attempts}</td>
-                <td>${detail.incorrect_attempts}</td>
-                <td><small>${detail.last_answered}</small></td>
-            </tr>`;
-        });
-        
-        html += '</tbody></table></div>';
-    }
-    
-    contentDiv.innerHTML = html;
-    resultDiv.style.display = 'block';
-}
-
-// 特定ユーザーの強制削除
-function forceCleanSpecificUser() {
-    const username = document.getElementById('debugUsername').value.trim();
-    if (!username) {
-        alert('ユーザー名を入力してください。');
-        return;
-    }
-    
-    if (confirm(`ユーザー「${username}」の不一致履歴を強制削除しますか？\n\n⚠️ この操作は元に戻せません\n⚠️ 無効なIDの履歴のみが削除されます`)) {
-        // フォームを作成して送信
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = `/admin/force_clean_user/${encodeURIComponent(username)}`;
-        
-        document.body.appendChild(form);
-        form.submit();
-    }
-}
-
-function checkUserStats() {
-    const button = event.target;
-    const originalText = button.textContent;
-    button.disabled = true;
-    button.textContent = '確認中...';
-    
-    fetch('/admin/check_user_stats')
-        .then(response => response.json())
-        .then(data => {
-            if (data.status === 'success') {
-                displayStatsCheckResult(data);
-            } else {
-                alert(`❌ エラー: ${data.message}`);
-            }
-        })
-        .catch(error => {
-            console.error('統計確認エラー:', error);
-            alert('❌ 統計確認中にエラーが発生しました。');
-        })
-        .finally(() => {
-            button.disabled = false;
-            button.textContent = originalText;
-        });
-}
-
-// 統計確認結果の表示
-function displayStatsCheckResult(data) {
-    const resultDiv = document.getElementById('statsCheckResult');
-    const contentDiv = document.getElementById('statsCheckContent');
-    
-    const summary = data.summary;
-    const roomStats = data.room_stats;
-    
-    let html = `
-        <div class="row">
-            <div class="col-md-6">
-                <h6>📊 全体統計</h6>
-                <ul>
-                    <li>総ユーザー数: ${summary.total_users}人</li>
-                    <li>統計データ数: ${summary.total_stats}個</li>
-                    <li>統計なしユーザー: ${summary.users_without_stats}人</li>
-                    <li>古い統計: ${summary.outdated_stats}個</li>
-                    <li>カバー率: ${summary.coverage_rate}%</li>
-                </ul>
-            </div>
-            <div class="col-md-6">
-                <h6>💡 推奨アクション</h6>
-                ${summary.users_without_stats === 0 && summary.outdated_stats === 0 ? 
-                    '<p class="text-success">✅ 統計データは最新です。修復は不要です。</p>' :
-                    `<p class="text-warning">⚠️ ${summary.users_without_stats + summary.outdated_stats}件の統計に問題があります。<br>「統計データを修復」の実行を推奨します。</p>`
-                }
-            </div>
-        </div>
-    `;
-    
-    if (roomStats.length > 0) {
-        html += '<h6>🏠 部屋別統計</h6>';
-        html += '<div class="table-responsive"><table class="table table-sm table-striped">';
-        html += '<thead><tr><th>部屋番号</th><th>ユーザー数</th><th>平均スコア</th><th>最高スコア</th></tr></thead><tbody>';
-        
-        roomStats.forEach(room => {
-            html += `<tr>
-                <td><span class="badge bg-secondary">${room.room_number}</span></td>
-                <td>${room.user_count}人</td>
-                <td>${room.avg_score}</td>
-                <td class="text-success"><strong>${room.max_score}</strong></td>
-            </tr>`;
-        });
-        
-        html += '</tbody></table></div>';
-    }
-    
-    contentDiv.innerHTML = html;
-    resultDiv.style.display = 'block';
-}
-
-// 統計データの修復
-function repairUserStats() {
-    if (confirm('統計データの修復を実行しますか？\n\n・統計がないユーザーに新規作成\n・古い統計データを更新\n\n処理に時間がかかる場合があります。')) {
-        const button = event.target;
-        const originalText = button.textContent;
-        button.disabled = true;
-        button.textContent = '修復中...';
-        
-        fetch('/admin/repair_user_stats', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.status === 'success') {
-                alert(`✅ ${data.message}`);
-                // 修復後に状態を再確認
-                setTimeout(() => checkUserStats(), 1000);
-            } else {
-                alert(`❌ エラー: ${data.message}`);
-            }
-        })
-        .catch(error => {
-            console.error('修復エラー:', error);
-            alert('❌ 修復中にエラーが発生しました。');
-        })
-        .finally(() => {
-            button.disabled = false;
-            button.textContent = originalText;
-        });
-    }
-}
-
-// 全統計の強制再初期化
-function initializeAllStats() {
-    if (confirm('全ユーザーの統計を強制再初期化しますか？\n\n⚠️ この操作は時間がかかります\n⚠️ 全ての統計データが再計算されます\n\n実行しますか？')) {
-        const button = event.target;
-        const originalText = button.textContent;
-        button.disabled = true;
-        button.textContent = '初期化中...';
-        
-        fetch('/admin/initialize_user_stats', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.status === 'success') {
-                alert(`✅ ${data.message}`);
-                // 初期化後に状態を再確認
-                setTimeout(() => checkUserStats(), 1000);
-            } else {
-                alert(`❌ エラー: ${data.message}`);
-            }
-        })
-        .catch(error => {
-            console.error('初期化エラー:', error);
-            alert('❌ 初期化中にエラーが発生しました。');
-        })
-        .finally(() => {
-            button.disabled = false;
-            button.textContent = originalText;
-        });
-    }
-}
-
-// 高速ランキングのテスト
-function testFastRanking() {
-    const button = event.target;
-    const originalText = button.textContent;
-    button.disabled = true;
-    button.textContent = 'テスト中...';
-    
-    const startTime = performance.now();
-    
-    fetch('/api/ranking_data')
-        .then(response => response.json())
-        .then(data => {
-            const endTime = performance.now();
-            const clientTime = endTime - startTime;
-            
-            if (data.status === 'success') {
-                displayRankingTestResult(data, clientTime);
-            } else {
-                alert(`❌ エラー: ${data.message}`);
-            }
-        })
-        .catch(error => {
-            console.error('ランキングテストエラー:', error);
-            alert('❌ ランキングテスト中にエラーが発生しました。');
-        })
-        .finally(() => {
-            button.disabled = false;
-            button.textContent = originalText;
-        });
-}
-
-// ランキングテスト結果の表示
-function displayRankingTestResult(data, clientTime) {
-    const resultDiv = document.getElementById('rankingTestResult');
-    const contentDiv = document.getElementById('rankingTestContent');
-    
-    const serverTime = data.calculation_time * 1000; // 秒をミリ秒に変換
-    const totalTime = clientTime;
-    
-    let html = `
-        <div class="row">
-            <div class="col-md-6">
-                <h6>⏱️ 速度測定結果</h6>
-                <ul>
-                    <li>サーバー処理時間: <strong>${serverTime.toFixed(1)}ms</strong></li>
-                    <li>ネットワーク時間: <strong>${(totalTime - serverTime).toFixed(1)}ms</strong></li>
-                    <li>総処理時間: <strong>${totalTime.toFixed(1)}ms</strong></li>
-                    <li>データソース: <strong>${data.data_source}</strong></li>
-                    <li>事前計算使用: ${data.using_precalculated ? '✅ はい' : '❌ いいえ'}</li>
-                </ul>
-            </div>
-            <div class="col-md-6">
-                <h6>📊 取得データ</h6>
-                <ul>
-                    <li>対象ユーザー数: ${data.total_users_in_room}人</li>
-                    <li>表示ランキング数: ${data.ranking_display_count}人</li>
-                    <li>現在のユーザー順位: ${data.current_user_rank || 'N/A'}位</li>
-                </ul>
+            <div style="margin-top: 15px;">
+                <button type="button" class="btn btn-info" onclick="analyzeInvalidHistoryDetailed()">
+                    <i class="fas fa-search"></i> 📊 詳細分析（デバッグ版）
+                </button>
                 
-                <div class="mt-3">
-                    ${totalTime < 1000 ? 
-                        '<div class="alert alert-success py-2">🚀 優秀！1秒以内で完了</div>' :
-                        totalTime < 3000 ?
-                        '<div class="alert alert-warning py-2">⚡ 良好！3秒以内で完了</div>' :
-                        '<div class="alert alert-danger py-2">🐌 改善必要！3秒以上かかりました</div>'
-                    }
-                </div>
+                <button type="button" class="btn btn-warning" onclick="cleanInvalidHistory()" style="margin-left: 10px;">
+                    <i class="fas fa-trash-alt"></i> 🗑️ 無効履歴を削除
+                </button>
             </div>
-        </div>
-    `;
-    
-    if (data.ranking_data && data.ranking_data.length > 0) {
-        html += '<h6>🏆 上位ランキング（サンプル）</h6>';
-        html += '<div class="table-responsive"><table class="table table-sm table-striped">';
-        html += '<thead><tr><th>順位</th><th>名前</th><th>スコア</th><th>正答率</th></tr></thead><tbody>';
-        
-        data.ranking_data.slice(0, 3).forEach((user, index) => {
-            html += `<tr>
-                <td>${index + 1}</td>
-                <td>${user.username}</td>
-                <td><strong>${user.balance_score.toFixed(1)}</strong></td>
-                <td>${user.accuracy_rate.toFixed(1)}%</td>
-            </tr>`;
-        });
-        
-        html += '</tbody></table></div>';
-    }
-    
-    contentDiv.innerHTML = html;
-    resultDiv.style.display = 'block';
-}
-
-// 速度比較の表示
-function showRankingComparison() {
-    const comparisonHtml = `
-        <div class="modal fade" id="speedComparisonModal" tabindex="-1">
-            <div class="modal-dialog modal-lg">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">⚡ ランキング速度比較</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body">
-                        <table class="table table-striped">
-                            <thead>
-                                <tr>
-                                    <th>ユーザー数</th>
-                                    <th>従来方式</th>
-                                    <th>事前計算方式</th>
-                                    <th>改善率</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td>10人</td>
-                                    <td>2-3秒</td>
-                                    <td><strong class="text-success">0.1秒</strong></td>
-                                    <td class="text-success">20-30倍高速</td>
-                                </tr>
-                                <tr>
-                                    <td>50人</td>
-                                    <td>5-8秒</td>
-                                    <td><strong class="text-success">0.1秒</strong></td>
-                                    <td class="text-success">50-80倍高速</td>
-                                </tr>
-                                <tr>
-                                    <td>100人</td>
-                                    <td>10-15秒</td>
-                                    <td><strong class="text-success">0.1秒</strong></td>
-                                    <td class="text-success">100-150倍高速</td>
-                                </tr>
-                                <tr>
-                                    <td>500人</td>
-                                    <td>30-60秒（タイムアウト）</td>
-                                    <td><strong class="text-success">0.1秒</strong></td>
-                                    <td class="text-success">300-600倍高速</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                        
-                        <div class="alert alert-info mt-3">
-                            <h6>🚀 事前計算システムの利点：</h6>
-                            <ul class="mb-0">
-                                <li>ユーザー数に関係なく一定の高速性能</li>
-                                <li>サーバー負荷の大幅削減</li>
-                                <li>学習データ保存時に自動でスコア更新</li>
-                                <li>データ整合性の完全保証</li>
-                            </ul>
+            
+            <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #ddd;">
+                <h5>🔍 特定ユーザーのデバッグ</h5>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="input-group">
+                            <input type="text" id="debugUsername" class="form-control" placeholder="ユーザー名を入力">
+                            <button class="btn btn-outline-secondary" onclick="debugSpecificUser()">
+                                <i class="fas fa-bug"></i> デバッグ
+                            </button>
                         </div>
                     </div>
+                    <div class="col-md-6">
+                        <button type="button" class="btn btn-danger btn-sm" onclick="forceCleanSpecificUser()">
+                            <i class="fas fa-exclamation-triangle"></i> 強制削除
+                        </button>
+                        <small class="text-muted d-block">※上記でユーザー名を入力後に使用</small>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 無効履歴分析結果表示エリア -->
+            <div id="invalidHistoryAnalysisResult" style="margin-top: 15px; display: none;">
+                <h5>📊 無効履歴分析結果</h5>
+                <div id="invalidAnalysisContent" style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; border: 1px solid #dee2e6;">
+                    <!-- 分析結果がここに表示されます -->
+                </div>
+            </div>
+            
+            <!-- デバッグ結果表示エリア -->
+            <div id="userDebugResult" style="margin-top: 15px; display: none;">
+                <h5>🔍 ユーザーデバッグ結果</h5>
+                <div id="debugContent" style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; border: 1px solid #dee2e6;">
+                    <!-- デバッグ結果がここに表示されます -->
                 </div>
             </div>
         </div>
-    `;
-    
-    // モーダルを一時的にDOM挿入して表示
-    const modalDiv = document.createElement('div');
-    modalDiv.innerHTML = comparisonHtml;
-    document.body.appendChild(modalDiv);
-    
-    const modal = new bootstrap.Modal(document.getElementById('speedComparisonModal'));
-    modal.show();
-    
-    // モーダルが閉じられたらDOMから削除
-    document.getElementById('speedComparisonModal').addEventListener('hidden.bs.modal', function () {
-        document.body.removeChild(modalDiv);
-    });
-}
-</script>
 
-<style>
-.admin-panel {
-    background-color: #f9f9f9;
-    padding: 20px;
-    border-radius: 8px;
-    margin-bottom: 20px;
-    border: 1px solid #eee;
-}
+        <!-- 全データ修正（従来機能・バックアップ用） -->
+        <div class="admin-panel" style="background-color: #ffebee; border-left: 5px solid #f44336; margin-top: 20px;">
+            <h4>⚠️ 全データ修正（バックアップ用）</h4>
+            <p>全ユーザーの学習履歴を強制的に新しいID形式に統一します。<br>
+            <strong>⚠️ 注意：</strong>この操作は全ユーザーの学習履歴に影響し、元に戻せません。<br>
+            <strong>推奨：</strong>通常は上記の「ID不一致問題のみ修正」を使用してください。</p>
+            
+            <div style="margin-top: 15px;">
+                <form action="{{ url_for('admin_fix_all_data_legacy') }}" method="POST" style="display: inline;" 
+                    onsubmit="return confirm('全ユーザーデータを修正しますか？\n\n⚠️ この操作は元に戻せません。\n⚠️ すべての学習履歴が新しい形式に変換されます。\n⚠️ 通常は「ID不一致問題のみ修正」で十分です。\n\n本当に実行しますか？')">
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fas fa-exclamation-triangle"></i> ⚠️ 全データ強制修正（非推奨）
+                    </button>
+                </form>
+                
+                <a href="{{ url_for('admin_debug_progress') }}" class="btn btn-info" target="_blank" style="margin-left: 10px;">
+                    <i class="fas fa-chart-line"></i> 📊 修正前の状態確認
+                </a>
+            </div>
+        </div>
+    </section>
 
-.admin-panel h4 {
-    margin-top: 0;
-    margin-bottom: 10px;
-}
-
-.admin-panel p {
-    margin-bottom: 15px;
-    line-height: 1.5;
-}
-
-#unmatchedAnalysisResult {
-    margin-top: 15px;
-    animation: fadeIn 0.3s ease-in;
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-}
-
-.table-responsive {
-    margin-top: 10px;
-}
-
-.text-success {
-    color: #28a745 !important;
-}
-
-.text-warning {
-    color: #ffc107 !important;
-}
-
-.text-danger {
-    color: #dc3545 !important;
-}
-</style>
+    <!-- リセット確認フォーム（非表示） -->
+    <form id="resetForm" action="{{ url_for('admin_app_info_reset') }}" method="POST" style="display: none;">
+    </form>
 </div>
 
-
-
-<!-- リセット確認フォーム（非表示） -->
-<form id="resetForm" action="{{ url_for('admin_app_info_reset') }}" method="POST" style="display: none;">
-</form>
-
-<!-- admin.htmlのJavaScript部分の完全修正版 -->
-<!-- 既存のscriptタグを以下で置き換えてください -->
-
 <script>
-// ========================================
-// Bootstrap 5対応の修正版JavaScript
-// ========================================
+console.log('🔧 admin.html スクリプト読み込み開始（修正版）');
 
-console.log('🔧 admin.html スクリプト読み込み開始（Bootstrap 5対応版）');
-
-// 管理者ランキング機能の変数
-let selectedRoom = null;
-let currentRankingData = null;
+// ========================================
+// グローバル変数（重複宣言を修正）
+// ========================================
+var selectedRoom = null;
+var currentRankingData = null;
 
 // ========================================
 // 1. 基本的な部屋・CSV管理機能
@@ -1395,7 +758,7 @@ function deleteCsvFile(filename) {
 }
 
 // ========================================
-// 2. ランキング機能（Bootstrap 5対応）
+// 2. ランキング機能
 // ========================================
 
 // 部屋一覧を取得して表示
@@ -1477,7 +840,7 @@ function selectRoom(roomNumber) {
     
     // クリックされたボタンを取得
     const clickedButton = Array.from(document.querySelectorAll('.room-button')).find(btn => 
-        btn.onclick.toString().includes(roomNumber)
+        btn.onclick && btn.onclick.toString().includes(roomNumber)
     );
     
     if (clickedButton) {
@@ -1486,8 +849,15 @@ function selectRoom(roomNumber) {
     }
     
     // 選択中の部屋情報を表示
-    document.getElementById('selected-room-name').textContent = roomNumber;
-    document.getElementById('selected-room-info').style.display = 'block';
+    const selectedRoomName = document.getElementById('selected-room-name');
+    const selectedRoomInfo = document.getElementById('selected-room-info');
+    
+    if (selectedRoomName) {
+        selectedRoomName.textContent = roomNumber;
+    }
+    if (selectedRoomInfo) {
+        selectedRoomInfo.style.display = 'block';
+    }
     
     // ランキングを取得
     loadRankingForRoom(roomNumber);
@@ -1499,11 +869,19 @@ async function loadRankingForRoom(roomNumber) {
         console.log('📊 ランキング取得開始:', roomNumber);
         
         // 表示をリセット
-        document.getElementById('admin-ranking-initial').style.display = 'none';
-        document.getElementById('admin-ranking-loading').style.display = 'block';
-        document.getElementById('admin-ranking-table-container').style.display = 'none';
-        document.getElementById('admin-ranking-error').style.display = 'none';
-        document.getElementById('admin-ranking-actions').style.display = 'none';
+        const elements = {
+            initial: document.getElementById('admin-ranking-initial'),
+            loading: document.getElementById('admin-ranking-loading'),
+            container: document.getElementById('admin-ranking-table-container'),
+            error: document.getElementById('admin-ranking-error'),
+            actions: document.getElementById('admin-ranking-actions')
+        };
+        
+        if (elements.initial) elements.initial.style.display = 'none';
+        if (elements.loading) elements.loading.style.display = 'block';
+        if (elements.container) elements.container.style.display = 'none';
+        if (elements.error) elements.error.style.display = 'none';
+        if (elements.actions) elements.actions.style.display = 'none';
         
         // APIを呼び出し
         const response = await fetch(`/api/admin/room_ranking/${encodeURIComponent(roomNumber)}`);
@@ -1520,9 +898,9 @@ async function loadRankingForRoom(roomNumber) {
             displayAdminRanking(data.ranking_data, data.statistics);
             
             // 表示を更新
-            document.getElementById('admin-ranking-loading').style.display = 'none';
-            document.getElementById('admin-ranking-table-container').style.display = 'block';
-            document.getElementById('admin-ranking-actions').style.display = 'block';
+            if (elements.loading) elements.loading.style.display = 'none';
+            if (elements.container) elements.container.style.display = 'block';
+            if (elements.actions) elements.actions.style.display = 'block';
             
         } else {
             throw new Error(data.message || 'ランキングの取得に失敗しました');
@@ -1532,9 +910,13 @@ async function loadRankingForRoom(roomNumber) {
         console.error('❌ ランキング取得エラー:', error);
         
         // エラー表示
-        document.getElementById('admin-ranking-loading').style.display = 'none';
-        document.getElementById('admin-ranking-error').style.display = 'block';
-        document.getElementById('admin-ranking-error-message').textContent = error.message;
+        const loadingEl = document.getElementById('admin-ranking-loading');
+        const errorEl = document.getElementById('admin-ranking-error');
+        const errorMsgEl = document.getElementById('admin-ranking-error-message');
+        
+        if (loadingEl) loadingEl.style.display = 'none';
+        if (errorEl) errorEl.style.display = 'block';
+        if (errorMsgEl) errorMsgEl.textContent = error.message;
     }
 }
 
@@ -1543,10 +925,17 @@ function displayAdminRanking(rankingData, statistics) {
     console.log('📊 ランキング表示開始:', rankingData.length, '人');
     
     // 統計情報を更新
-    document.getElementById('total-users').textContent = statistics.total_users || 0;
-    document.getElementById('active-users').textContent = statistics.active_users || 0;
-    document.getElementById('average-score').textContent = (statistics.average_score || 0).toFixed(1);
-    document.getElementById('max-score').textContent = (statistics.max_score || 0).toFixed(1);
+    const statsElements = {
+        totalUsers: document.getElementById('total-users'),
+        activeUsers: document.getElementById('active-users'),
+        averageScore: document.getElementById('average-score'),
+        maxScore: document.getElementById('max-score')
+    };
+    
+    if (statsElements.totalUsers) statsElements.totalUsers.textContent = statistics.total_users || 0;
+    if (statsElements.activeUsers) statsElements.activeUsers.textContent = statistics.active_users || 0;
+    if (statsElements.averageScore) statsElements.averageScore.textContent = (statistics.average_score || 0).toFixed(1);
+    if (statsElements.maxScore) statsElements.maxScore.textContent = (statistics.max_score || 0).toFixed(1);
     
     // テーブルを更新
     const tbody = document.getElementById('admin-ranking-table-body');
@@ -1607,10 +996,10 @@ function displayAdminRanking(rankingData, statistics) {
 }
 
 // ========================================
-// 3. モーダル機能（Bootstrap 5対応）
+// 3. モーダル機能
 // ========================================
 
-// ユーザー詳細情報を表示するモーダル（Bootstrap 5対応）
+// ユーザー詳細情報を表示するモーダル
 function showUserDetails(userId) {
     // モーダルを作成
     const modal = document.createElement('div');
@@ -1644,54 +1033,23 @@ function showUserDetails(userId) {
     const modalInstance = new bootstrap.Modal(modal);
     modalInstance.show();
     
-    // モーダルが閉じられたときに削除（Bootstrap 5のイベント名）
+    // モーダルが閉じられたときに削除
     modal.addEventListener('hidden.bs.modal', function() {
         modal.remove();
     });
     
     // 簡易版の詳細表示
     setTimeout(() => {
-        modal.querySelector('.modal-body').innerHTML = `
-            <div class="alert alert-info">
-                <h6>ユーザーID: ${userId}</h6>
-                <p>詳細情報機能は実装中です。</p>
-            </div>
-        `;
+        const modalBody = modal.querySelector('.modal-body');
+        if (modalBody) {
+            modalBody.innerHTML = `
+                <div class="alert alert-info">
+                    <h6>ユーザーID: ${userId}</h6>
+                    <p>詳細情報機能は実装中です。</p>
+                </div>
+            `;
+        }
     }, 1000);
-}
-
-// 部屋比較データを表示（Bootstrap 5対応）
-function displayRoomsComparison(roomsData) {
-    const modal = document.createElement('div');
-    modal.className = 'modal fade';
-    modal.id = 'roomsComparisonModal';
-    modal.innerHTML = `
-        <div class="modal-dialog modal-xl">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">部屋別学習統計比較</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="alert alert-info">
-                        <h6>部屋比較機能</h6>
-                        <p>詳細な部屋比較機能は実装中です。</p>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-    const modalInstance = new bootstrap.Modal(modal);
-    modalInstance.show();
-    
-    modal.addEventListener('hidden.bs.modal', function() {
-        modal.remove();
-    });
 }
 
 // ========================================
@@ -1722,14 +1080,22 @@ function clearRankingView() {
     });
     
     // 表示をリセット
-    document.getElementById('selected-room-info').style.display = 'none';
-    document.getElementById('admin-ranking-initial').style.display = 'block';
-    document.getElementById('admin-ranking-table-container').style.display = 'none';
-    document.getElementById('admin-ranking-error').style.display = 'none';
-    document.getElementById('admin-ranking-actions').style.display = 'none';
+    const elements = {
+        info: document.getElementById('selected-room-info'),
+        initial: document.getElementById('admin-ranking-initial'),
+        container: document.getElementById('admin-ranking-table-container'),
+        error: document.getElementById('admin-ranking-error'),
+        actions: document.getElementById('admin-ranking-actions')
+    };
+    
+    if (elements.info) elements.info.style.display = 'none';
+    if (elements.initial) elements.initial.style.display = 'block';
+    if (elements.container) elements.container.style.display = 'none';
+    if (elements.error) elements.error.style.display = 'none';
+    if (elements.actions) elements.actions.style.display = 'none';
 }
 
-// CSVエクスポート（簡略化）
+// CSVエクスポート
 function exportRankingData() {
     if (!currentRankingData || !selectedRoom) {
         alert('エクスポートするデータがありません。');
@@ -1782,8 +1148,12 @@ function showRoomsComparison() {
     alert('部屋比較機能は実装中です');
 }
 
+function showDetailedUserInfo() {
+    alert('詳細分析機能は実装中です');
+}
+
 // ========================================
-// 5. 初期化とその他の機能
+// 5. ユーザーテーブル管理機能
 // ========================================
 
 // ユーザーテーブルのソート機能
@@ -1885,6 +1255,10 @@ function filterUsers() {
     });
 }
 
+// ========================================
+// 6. 統計・データベース管理機能
+// ========================================
+
 // 統計管理関数
 function checkUserStats() {
     const button = event.target;
@@ -1915,6 +1289,8 @@ function checkUserStats() {
 function displayStatsCheckResult(data) {
     const resultDiv = document.getElementById('statsCheckResult');
     const contentDiv = document.getElementById('statsCheckContent');
+    
+    if (!resultDiv || !contentDiv) return;
     
     const summary = data.summary;
     const roomStats = data.room_stats;
@@ -2091,13 +1467,97 @@ function checkDatabaseStatus() {
         });
 }
 
-// 無効履歴分析・削除関数（簡略化）
+// 無効履歴分析・削除関数
 function analyzeInvalidHistoryDetailed() {
-    alert('詳細分析機能は実装中です');
+    const button = event.target;
+    const originalText = button.textContent;
+    button.disabled = true;
+    button.textContent = '詳細分析中...';
+    
+    fetch('/admin/analyze_invalid_history_detailed', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            displayInvalidHistoryAnalysisDetailed(data.analysis);
+        } else {
+            alert(`❌ エラー: ${data.message}`);
+        }
+    })
+    .catch(error => {
+        console.error('分析エラー:', error);
+        alert('❌ 分析中にエラーが発生しました。');
+    })
+    .finally(() => {
+        button.disabled = false;
+        button.textContent = originalText;
+    });
+}
+
+// 詳細分析結果の表示
+function displayInvalidHistoryAnalysisDetailed(analysis) {
+    const resultDiv = document.getElementById('invalidHistoryAnalysisResult');
+    const contentDiv = document.getElementById('invalidAnalysisContent');
+    
+    if (!resultDiv || !contentDiv) return;
+    
+    let html = `
+        <div class="row">
+            <div class="col-md-6">
+                <h6>📊 削除対象統計</h6>
+                <ul>
+                    <li>総ユーザー数: ${analysis.total_users}人</li>
+                    <li>無効履歴があるユーザー: ${analysis.users_with_invalid}人</li>
+                    <li>無効な学習履歴: ${analysis.total_invalid_entries}個</li>
+                    <li>無効な苦手問題: ${analysis.total_invalid_incorrect}個</li>
+                </ul>
+            </div>
+            <div class="col-md-6">
+                <h6>💡 推奨アクション</h6>
+                ${analysis.users_with_invalid === 0 ? 
+                    '<p class="text-success">✅ 無効な履歴はありません。削除は不要です。</p>' :
+                    `<p class="text-warning">⚠️ ${analysis.total_invalid_entries}個の無効履歴があります。<br>「無効履歴を削除」の実行を推奨します。</p>`
+                }
+            </div>
+        </div>
+    `;
+    
+    if (analysis.user_details && analysis.user_details.length > 0) {
+        html += '<h6>👥 影響を受けるユーザー</h6>';
+        html += '<div class="table-responsive"><table class="table table-sm table-striped">';
+        html += '<thead><tr><th>ユーザー名</th><th>部屋</th><th>有効履歴</th><th>無効履歴</th><th>無効苦手問題</th><th>サンプル無効ID</th></tr></thead><tbody>';
+        
+        analysis.user_details.forEach(user => {
+            const sampleId = user.invalid_history_ids && user.invalid_history_ids.length > 0 ? 
+                user.invalid_history_ids[0].substring(0, 40) + '...' : 
+                (user.invalid_incorrect_ids && user.invalid_incorrect_ids.length > 0 ? user.invalid_incorrect_ids[0].substring(0, 40) + '...' : '-');
+            
+            html += `<tr>
+                <td>${user.username}</td>
+                <td>${user.room_number}</td>
+                <td class="text-success">${user.valid_history}</td>
+                <td class="text-warning">${user.invalid_history}</td>
+                <td class="text-warning">${user.invalid_incorrect}</td>
+                <td><small class="text-muted">${sampleId}</small></td>
+            </tr>`;
+        });
+        
+        html += '</tbody></table></div>';
+    }
+    
+    contentDiv.innerHTML = html;
+    resultDiv.style.display = 'block';
 }
 
 function cleanInvalidHistory() {
-    if (confirm('無効な学習履歴を削除しますか？\n\n⚠️ この操作は元に戻せません')) {
+    if (confirm('無効な学習履歴を削除しますか？\n\n⚠️ この操作は元に戻せません\n⚠️ 現在の問題データと一致しない履歴が完全に削除されます\n⚠️ 有効な履歴は保持されます\n\n削除を実行しますか？')) {
+        const button = event.target;
+        const originalText = button.textContent;
+        button.disabled = true;
+        button.textContent = '削除中...';
+        
         // フォームを作成して送信
         const form = document.createElement('form');
         form.method = 'POST';
@@ -2108,15 +1568,78 @@ function cleanInvalidHistory() {
     }
 }
 
+// 特定ユーザーのデバッグ
 function debugSpecificUser() {
     const username = document.getElementById('debugUsername').value.trim();
     if (!username) {
         alert('ユーザー名を入力してください。');
         return;
     }
-    alert(`${username}のデバッグ機能は実装中です`);
+    
+    fetch(`/admin/debug_user/${encodeURIComponent(username)}`)
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            displayUserDebugResult(data.debug_data);
+        } else {
+            alert(`❌ エラー: ${data.message}`);
+        }
+    })
+    .catch(error => {
+        console.error('デバッグエラー:', error);
+        alert('❌ デバッグ中にエラーが発生しました。');
+    });
 }
 
+// ユーザーデバッグ結果の表示
+function displayUserDebugResult(debugData) {
+    const resultDiv = document.getElementById('userDebugResult');
+    const contentDiv = document.getElementById('debugContent');
+    
+    if (!resultDiv || !contentDiv) return;
+    
+    let html = `
+        <h6>👤 ${debugData.user} のデバッグ結果</h6>
+        <div class="row">
+            <div class="col-md-6">
+                <ul>
+                    <li>部屋番号: ${debugData.room_number}</li>
+                    <li>総履歴数: ${debugData.total_history}</li>
+                    <li>一致する履歴: ${debugData.matched_history}</li>
+                    <li>不一致な履歴: ${debugData.unmatched_history}</li>
+                </ul>
+            </div>
+            <div class="col-md-6">
+                <ul>
+                    <li>有効ID数: ${debugData.valid_ids_count}</li>
+                    <li>不一致苦手問題: ${debugData.unmatched_incorrect ? debugData.unmatched_incorrect.length : 0}</li>
+                </ul>
+            </div>
+        </div>
+    `;
+    
+    if (debugData.unmatched_details && debugData.unmatched_details.length > 0) {
+        html += '<h6>❌ 不一致な履歴の詳細</h6>';
+        html += '<div class="table-responsive"><table class="table table-sm table-striped">';
+        html += '<thead><tr><th>問題ID</th><th>正解回数</th><th>不正解回数</th><th>最終回答日</th></tr></thead><tbody>';
+        
+        debugData.unmatched_details.forEach(detail => {
+            html += `<tr>
+                <td><small>${detail.id}</small></td>
+                <td>${detail.correct_attempts}</td>
+                <td>${detail.incorrect_attempts}</td>
+                <td><small>${detail.last_answered}</small></td>
+            </tr>`;
+        });
+        
+        html += '</tbody></table></div>';
+    }
+    
+    contentDiv.innerHTML = html;
+    resultDiv.style.display = 'block';
+}
+
+// 特定ユーザーの強制削除
 function forceCleanSpecificUser() {
     const username = document.getElementById('debugUsername').value.trim();
     if (!username) {
@@ -2124,19 +1647,23 @@ function forceCleanSpecificUser() {
         return;
     }
     
-    if (confirm(`ユーザー「${username}」の不一致履歴を強制削除しますか？`)) {
-        alert('強制削除機能は実装中です');
+    if (confirm(`ユーザー「${username}」の不一致履歴を強制削除しますか？\n\n⚠️ この操作は元に戻せません\n⚠️ 無効なIDの履歴のみが削除されます`)) {
+        // フォームを作成して送信
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = `/admin/force_clean_user/${encodeURIComponent(username)}`;
+        
+        document.body.appendChild(form);
+        form.submit();
     }
 }
 
-console.log('✅ 全ての関数定義完了');
-
 // ========================================
-// 6. DOMContentLoaded イベントリスナー
+// 7. DOMContentLoaded イベントリスナー
 // ========================================
 
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('📋 管理者ページ読み込み完了（Bootstrap 5対応版）');
+    console.log('📋 管理者ページ読み込み完了（修正版）');
     
     // 初期ロード時にCSVファイル一覧とセレクトボックスを更新
     setTimeout(() => {
@@ -2272,7 +1799,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }, 1000);
 });
 
-console.log('🎉 admin.html スクリプト読み込み完了（Bootstrap 5対応版）');
+console.log('🎉 admin.html スクリプト読み込み完了（修正版）');
 </script>
 
 <style>
@@ -2282,6 +1809,16 @@ console.log('🎉 admin.html スクリプト読み込み完了（Bootstrap 5対�
     border-radius: 8px;
     margin-bottom: 20px;
     border: 1px solid #eee;
+}
+
+.admin-panel h4 {
+    margin-top: 0;
+    margin-bottom: 10px;
+}
+
+.admin-panel p {
+    margin-bottom: 15px;
+    line-height: 1.5;
 }
 
 .download-buttons {
@@ -2357,527 +1894,6 @@ console.log('🎉 admin.html スクリプト読み込み完了（Bootstrap 5対�
     padding: 0.25rem 0.5rem;
 }
 
-@media (max-width: 767px) {
-    .download-buttons {
-        flex-direction: column;
-    }
-    
-    .download-buttons .btn {
-        width: 100%;
-        margin-bottom: 5px;
-    }
-    
-    .btn-group-vertical {
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
-    }
-    
-    .btn-group-vertical .btn {
-        font-size: 0.7rem;
-        padding: 4px 8px;
-    }
-    
-    .scrollable-table-container {
-        max-height: 300px;
-    }
-    
-    .table-controls .row {
-        margin-bottom: 0;
-    }
-    
-    .table-controls .col-md-6 {
-        margin-bottom: 10px;
-    }
-    
-    /* スマホでのテーブル表示改善 */
-    .table {
-        font-size: 0.8rem;
-    }
-    
-    .table th,
-    .table td {
-        padding: 0.3rem;
-        white-space: nowrap;
-    }
-}
-</style>
-
-<script>
-// 管理者ランキング機能の変数
-let selectedRoom = null;
-let currentRankingData = null;
-
-// ページ読み込み時に部屋一覧を取得
-document.addEventListener('DOMContentLoaded', function() {
-    loadRoomList();
-});
-
-// 部屋一覧を取得して表示
-async function loadRoomList() {
-    try {
-        console.log('🔍 部屋一覧取得開始...');
-        const response = await fetch('/api/rooms');
-        
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-        
-        const data = await response.json();
-        
-        if (data.status === 'success') {
-            console.log('✅ 部屋一覧取得成功:', data.rooms.length, '部屋');
-            displayRoomButtons(data.rooms);
-        } else {
-            throw new Error(data.message || '部屋一覧の取得に失敗しました');
-        }
-    } catch (error) {
-        console.error('❌ 部屋一覧の取得エラー:', error);
-        // エラー時の表示
-        const container = document.getElementById('room-buttons');
-        if (container) {
-            container.innerHTML = `
-                <div class="alert alert-warning">
-                    <i class="fas fa-exclamation-triangle"></i>
-                    部屋一覧の取得に失敗しました: ${error.message}
-                </div>
-            `;
-        }
-    }
-}
-
-// 部屋ボタンを表示
-function displayRoomButtons(rooms) {
-    const container = document.getElementById('room-buttons');
-    if (!container) {
-        console.error('❌ room-buttons コンテナが見つかりません');
-        return;
-    }
-    
-    container.innerHTML = '';
-    
-    if (rooms.length === 0) {
-        container.innerHTML = '<p class="text-muted">登録されている部屋がありません</p>';
-        return;
-    }
-    
-    rooms.forEach(room => {
-        const button = document.createElement('button');
-        button.className = 'btn btn-outline-primary room-button';
-        button.innerHTML = `
-            <i class="fas fa-door-open"></i>
-            部屋: ${room.room_number}
-            <small class="d-block">(${room.user_count}人)</small>
-        `;
-        
-        // onclick イベントを設定
-        button.onclick = () => selectRoom(room.room_number);
-        
-        container.appendChild(button);
-    });
-    
-    console.log('✅ 部屋ボタン表示完了:', rooms.length, '個');
-}
-
-// 部屋を選択
-function selectRoom(roomNumber) {
-    console.log('🏠 部屋選択:', roomNumber);
-    selectedRoom = roomNumber;
-    
-    // 選択状態を更新
-    document.querySelectorAll('.room-button').forEach(btn => {
-        btn.classList.remove('btn-primary');
-        btn.classList.add('btn-outline-primary');
-    });
-    
-    // クリックされたボタンを取得（修正：event.targetではなく正しい方法）
-    const clickedButton = Array.from(document.querySelectorAll('.room-button')).find(btn => 
-        btn.onclick.toString().includes(roomNumber)
-    );
-    
-    if (clickedButton) {
-        clickedButton.classList.remove('btn-outline-primary');
-        clickedButton.classList.add('btn-primary');
-    }
-    
-    // 選択中の部屋情報を表示
-    document.getElementById('selected-room-name').textContent = roomNumber;
-    document.getElementById('selected-room-info').style.display = 'block';
-    
-    // ランキングを取得
-    loadRankingForRoom(roomNumber);
-}
-
-// 特定の部屋のランキングを取得
-async function loadRankingForRoom(roomNumber) {
-    try {
-        console.log('📊 ランキング取得開始:', roomNumber);
-        
-        // 表示をリセット
-        document.getElementById('admin-ranking-initial').style.display = 'none';
-        document.getElementById('admin-ranking-loading').style.display = 'block';
-        document.getElementById('admin-ranking-table-container').style.display = 'none';
-        document.getElementById('admin-ranking-error').style.display = 'none';
-        document.getElementById('admin-ranking-actions').style.display = 'none';
-        
-        // APIを呼び出し
-        const response = await fetch(`/api/admin/room_ranking/${encodeURIComponent(roomNumber)}`);
-        
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-        
-        const data = await response.json();
-        
-        if (data.status === 'success') {
-            console.log('✅ ランキング取得成功:', data.ranking_data.length, '人');
-            currentRankingData = data.ranking_data;
-            displayAdminRanking(data.ranking_data, data.statistics);
-            
-            // 表示を更新
-            document.getElementById('admin-ranking-loading').style.display = 'none';
-            document.getElementById('admin-ranking-table-container').style.display = 'block';
-            document.getElementById('admin-ranking-actions').style.display = 'block';
-            
-        } else {
-            throw new Error(data.message || 'ランキングの取得に失敗しました');
-        }
-        
-    } catch (error) {
-        console.error('❌ ランキング取得エラー:', error);
-        
-        // エラー表示
-        document.getElementById('admin-ranking-loading').style.display = 'none';
-        document.getElementById('admin-ranking-error').style.display = 'block';
-        document.getElementById('admin-ranking-error-message').textContent = error.message;
-    }
-}
-
-// ランキングテーブルを表示
-function displayAdminRanking(rankingData, statistics) {
-    console.log('📊 ランキング表示開始:', rankingData.length, '人');
-    
-    // 統計情報を更新
-    document.getElementById('total-users').textContent = statistics.total_users || 0;
-    document.getElementById('active-users').textContent = statistics.active_users || 0;
-    document.getElementById('average-score').textContent = (statistics.average_score || 0).toFixed(1);
-    document.getElementById('max-score').textContent = (statistics.max_score || 0).toFixed(1);
-    
-    // テーブルを更新
-    const tbody = document.getElementById('admin-ranking-table-body');
-    if (!tbody) {
-        console.error('❌ admin-ranking-table-body が見つかりません');
-        return;
-    }
-    
-    tbody.innerHTML = '';
-    
-    if (rankingData.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted">ランキングデータがありません</td></tr>';
-        return;
-    }
-    
-    rankingData.forEach((user, index) => {
-        const row = document.createElement('tr');
-        
-        // 順位に応じてスタイルを適用
-        if (index === 0) row.classList.add('table-warning'); // 1位
-        else if (index === 1) row.classList.add('table-secondary'); // 2位
-        else if (index === 2) row.classList.add('table-info'); // 3位
-        
-        // 最終ログイン時刻をフォーマット
-        const lastLogin = user.last_login ? 
-            new Date(user.last_login).toLocaleString('ja-JP') : 
-            'なし';
-        
-        row.innerHTML = `
-            <td>
-                ${index + 1}
-                ${index === 0 ? '<i class="fas fa-crown text-warning"></i>' : ''}
-                ${index === 1 ? '<i class="fas fa-medal text-secondary"></i>' : ''}
-                ${index === 2 ? '<i class="fas fa-medal text-info"></i>' : ''}
-            </td>
-            <td>
-                <strong style="cursor: pointer; color: #007bff;" onclick="showUserDetails(${user.user_id || 0})">
-                    ${user.username || 'N/A'}
-                </strong>
-                <i class="fas fa-external-link-alt ms-1" style="font-size: 0.7em; color: #6c757d;"></i>
-            </td>
-            <td><small>${lastLogin}</small></td>
-            <td>${user.total_attempts || 0}</td>
-            <td>${user.total_correct || 0}</td>
-            <td>${(user.accuracy_rate || 0).toFixed(1)}%</td>
-            <td>${user.mastered_count || 0}</td>
-            <td><strong>${(user.balance_score || 0).toFixed(1)}</strong></td>
-            <td>${(user.coverage_rate || 0).toFixed(1)}%</td>
-        `;
-        
-        // ユーザーIDをデータ属性として保存
-        row.dataset.userId = user.user_id || 0;
-        
-        tbody.appendChild(row);
-    });
-    
-    console.log('✅ ランキング表示完了');
-}
-
-// ランキングを再取得
-function refreshRanking() {
-    if (selectedRoom) {
-        loadRankingForRoom(selectedRoom);
-    }
-}
-
-function retryLoadRanking() {
-    if (selectedRoom) {
-        loadRankingForRoom(selectedRoom);
-    }
-}
-
-// 表示をクリア
-function clearRankingView() {
-    selectedRoom = null;
-    currentRankingData = null;
-    
-    // 選択状態をリセット
-    document.querySelectorAll('.room-button').forEach(btn => {
-        btn.classList.remove('btn-primary');
-        btn.classList.add('btn-outline-primary');
-    });
-    
-    // 表示をリセット
-    document.getElementById('selected-room-info').style.display = 'none';
-    document.getElementById('admin-ranking-initial').style.display = 'block';
-    document.getElementById('admin-ranking-table-container').style.display = 'none';
-    document.getElementById('admin-ranking-error').style.display = 'none';
-    document.getElementById('admin-ranking-actions').style.display = 'none';
-}
-
-// CSVエクスポート
-function exportRankingData() {
-    if (!currentRankingData || !selectedRoom) {
-        alert('エクスポートするデータがありません。');
-        return;
-    }
-    
-    console.log('📥 CSVエクスポート開始');
-    
-    try {
-        // CSVデータを作成
-        const csvHeader = '順位,名前,最終ログイン,回答数,正解数,正答率,マスター数,総合スコア,網羅率\n';
-        const csvRows = currentRankingData.map((user, index) => {
-            const lastLogin = user.last_login ? 
-                new Date(user.last_login).toLocaleString('ja-JP') : 
-                'なし';
-            
-            return [
-                index + 1,
-                user.username || 'N/A',
-                lastLogin,
-                user.total_attempts || 0,
-                user.total_correct || 0,
-                (user.accuracy_rate || 0).toFixed(1) + '%',
-                user.mastered_count || 0,
-                (user.balance_score || 0).toFixed(1),
-                (user.coverage_rate || 0).toFixed(1) + '%'
-            ].join(',');
-        });
-        
-        const csvData = csvHeader + csvRows.join('\n');
-        
-        // ファイルをダウンロード
-        const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.download = `ranking_room_${selectedRoom}_${new Date().toISOString().split('T')[0]}.csv`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        
-        console.log('✅ CSVエクスポート完了');
-    } catch (error) {
-        console.error('❌ CSVエクスポートエラー:', error);
-        alert('CSVエクスポートに失敗しました: ' + error.message);
-    }
-}
-
-// ユーザー詳細情報を表示するモーダル
-function showUserDetails(userId) {
-    // モーダルを作成
-    const modal = document.createElement('div');
-    modal.className = 'modal fade';
-    modal.id = 'userDetailsModal';
-    modal.innerHTML = `
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">ユーザー詳細情報</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="text-center">
-                        <div class="spinner-border" role="status">
-                            <span class="visually-hidden">Loading...</span>
-                        </div>
-                        <p class="mt-2">ユーザー情報を読み込み中...</p>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-    
-    // Bootstrap 5のモーダル初期化
-    const modalInstance = new bootstrap.Modal(modal);
-    modalInstance.show();
-    
-    // モーダルが閉じられたときに削除（Bootstrap 5のイベント名）
-    modal.addEventListener('hidden.bs.modal', function() {
-        modal.remove();
-    });
-
-// ユーザー詳細をモーダルに表示
-function displayUserDetailsInModal(data, modal) {
-    const userInfo = data.user_info;
-    const stats = data.statistics;
-    const chapterStats = data.chapter_stats;
-    const recentActivities = data.recent_activities;
-    const learningPattern = data.learning_pattern;
-    
-    const modalBody = modal.querySelector('.modal-body');
-    modalBody.innerHTML = `
-        <!-- ユーザー基本情報 -->
-        <div class="row mb-4">
-            <div class="col-md-6">
-                <h6 class="fw-bold">基本情報</h6>
-                <p><strong>名前:</strong> ${userInfo.username}</p>
-                <p><strong>部屋:</strong> ${userInfo.room_number}</p>
-                <p><strong>最終ログイン:</strong> ${userInfo.last_login ? new Date(userInfo.last_login).toLocaleString('ja-JP') : 'なし'}</p>
-            </div>
-            <div class="col-md-6">
-                <h6 class="fw-bold">学習統計</h6>
-                <p><strong>総合スコア:</strong> ${stats.balance_score.toFixed(1)}</p>
-                <p><strong>回答数:</strong> ${stats.total_attempts}回</p>
-                <p><strong>正答率:</strong> ${stats.accuracy_rate.toFixed(1)}%</p>
-                <p><strong>マスター数:</strong> ${stats.mastered_count}問</p>
-                <p><strong>網羅率:</strong> ${stats.coverage_rate.toFixed(1)}%</p>
-            </div>
-        </div>
-        
-        <!-- 学習パターン -->
-        <div class="mb-4">
-            <h6 class="fw-bold">学習パターン</h6>
-            <div class="alert alert-info">
-                <strong>${learningPattern.description}</strong>
-                <ul class="mt-2 mb-0">
-                    <li>学習日数: ${learningPattern.learning_days}日</li>
-                    <li>1日平均: ${learningPattern.avg_daily_count}回</li>
-                    <li>最近の活動: ${learningPattern.recent_activity_days}日</li>
-                </ul>
-            </div>
-        </div>
-        
-        <!-- 章別統計 -->
-        <div class="mb-4">
-            <h6 class="fw-bold">章別統計</h6>
-            <div class="table-responsive">
-                <table class="table table-sm table-striped">
-                    <thead>
-                        <tr>
-                            <th>章</th>
-                            <th>回答数</th>
-                            <th>正解数</th>
-                            <th>正答率</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${chapterStats.map(chapter => `
-                            <tr>
-                                <td>第${chapter.chapter}章</td>
-                                <td>${chapter.total_attempts}</td>
-                                <td>${chapter.correct_count}</td>
-                                <td>${chapter.accuracy_rate.toFixed(1)}%</td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-        
-        <!-- 最近の学習活動 -->
-        <div class="mb-4">
-            <h6 class="fw-bold">最近の学習活動（直近20件）</h6>
-            <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
-                <table class="table table-sm">
-                    <thead>
-                        <tr>
-                            <th>日時</th>
-                            <th>章-問題</th>
-                            <th>結果</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${recentActivities.map(activity => `
-                            <tr>
-                                <td><small>${new Date(activity.created_at).toLocaleString('ja-JP')}</small></td>
-                                <td>${activity.chapter}-${activity.number}</td>
-                                <td>
-                                    ${activity.is_correct ? 
-                                        '<span class="badge bg-success">正解</span>' : 
-                                        '<span class="badge bg-danger">不正解</span>'
-                                    }
-                                </td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    `;
-}
-
-// 部屋比較データを表示
-function showRoomsComparison() {
-    alert('部屋比較機能は実装中です');
-}
-
-// 部屋比較データを表示
-function displayRoomsComparison(roomsData) {
-    const modal = document.createElement('div');
-    modal.className = 'modal fade';
-    modal.id = 'roomsComparisonModal';
-    modal.innerHTML = `
-        <div class="modal-dialog modal-xl">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">部屋別学習統計比較</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <!-- 既存のテーブル内容 -->
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-    const modalInstance = new bootstrap.Modal(modal);
-    modalInstance.show();
-    
-    modal.addEventListener('hidden.bs.modal', function() {
-        modal.remove();
-    });
-}
-</script>
-
-<style>
 /* 管理者ランキングセクション専用スタイル */
 .room-selector-container {
     margin-bottom: 25px;
@@ -2977,8 +1993,82 @@ function displayRoomsComparison(roomsData) {
     margin-left: 5px;
 }
 
+/* フェードイン効果 */
+#invalidHistoryAnalysisResult,
+#userDebugResult,
+#statsCheckResult {
+    margin-top: 15px;
+    animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* 結果表示エリア */
+.table-responsive {
+    margin-top: 10px;
+}
+
+.text-success {
+    color: #28a745 !important;
+}
+
+.text-warning {
+    color: #ffc107 !important;
+}
+
+.text-danger {
+    color: #dc3545 !important;
+}
+
 /* レスポンシブ対応 */
 @media (max-width: 768px) {
+    .download-buttons {
+        flex-direction: column;
+    }
+    
+    .download-buttons .btn {
+        width: 100%;
+        margin-bottom: 5px;
+    }
+    
+    .btn-group-vertical {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+    
+    .btn-group-vertical .btn {
+        font-size: 0.7rem;
+        padding: 4px 8px;
+    }
+    
+    .scrollable-table-container {
+        max-height: 300px;
+    }
+    
+    .table-controls .row {
+        margin-bottom: 0;
+    }
+    
+    .table-controls .col-md-6 {
+        margin-bottom: 10px;
+    }
+    
+    /* スマホでのテーブル表示改善 */
+    .table {
+        font-size: 0.8rem;
+    }
+    
+    .table th,
+    .table td {
+        padding: 0.3rem;
+        white-space: nowrap;
+    }
+    
+    /* 部屋ボタン */
     .room-buttons-grid {
         grid-template-columns: 1fr;
     }
