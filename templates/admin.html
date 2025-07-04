@@ -187,57 +187,47 @@
     <hr>
 
     <!-- 部屋ごとCSVファイル管理セクション -->
-    <section id="admin-csv-management">
-        <h3>📁 部屋ごとCSVファイル管理</h3>
-        <p>各部屋で使用する単語帳CSVファイルを個別に設定できます。アップロードしない場合はデフォルトのwords.csvが使用されます。</p>
-        <div class="csv-template-section" style="margin-bottom: 25px; padding: 15px; background-color: #f0f8ff; border: 1px solid #87ceeb; border-radius: 6px; border-left: 4px solid #17a2b8;">
-            <h4 style="margin-top: 0; color: #17a2b8; display: flex; align-items: center; gap: 8px;">
+    <section id="admin-csv-management-fixed">
+        <h3>📁 CSVファイル管理（修正版）</h3>
+        <p>改善されたエラーハンドリングで安全にCSVファイルをアップロードできます。</p>
+        
+        <div class="csv-template-section" style="margin-bottom: 25px; padding: 15px; background-color: #f0f8ff; border: 1px solid #87ceeb; border-radius: 6px;">
+            <h4 style="margin-top: 0; color: #17a2b8;">
                 <i class="fas fa-download"></i> CSVテンプレートダウンロード
             </h4>
-            <p style="color: #666; font-size: 0.9em; margin-bottom: 15px;">
-                正しい形式の単語帳CSVファイルを作成するためのテンプレートです。サンプルデータ付きですぐに編集を開始できます。
-            </p>
             <a href="{{ url_for('download_csv_template') }}" class="btn btn-outline-info btn-sm">
                 <i class="fas fa-file-csv"></i> 単語帳CSVテンプレートをダウンロード
             </a>
-            <small class="text-muted d-block mt-2">
-                ※ ファイル形式：chapter, number, category, question, answer, enabled
-            </small>
-        </div>
-        <h4>CSVファイルアップロード</h4>
-        <div style="background-color: #e8f4fd; border: 1px solid #b3d7ff; border-radius: 5px; padding: 15px; margin-bottom: 20px;">
-            <p><strong>CSVファイル形式要件:</strong></p>
-            <ul>
-                <li>ヘッダー行: chapter, number, category, question, answer, enabled</li>
-                <li>enabled列: 1（有効）または0（無効）</li>
-                <li>文字エンコーディング: UTF-8</li>
-                <li>ファイル名は元の名前のまま保存されます</li>
-            </ul>
         </div>
         
-        <form action="{{ url_for('admin_upload_room_csv') }}" method="POST" enctype="multipart/form-data" class="upload-form">
-            <div class="input-group">
-                <label for="room_csv_file">CSVファイルを選択:</label>
-                <input type="file" id="room_csv_file" name="file" accept=".csv" required>
-                <small class="form-text text-muted">＊ファイル名は半角英数字＊</small>
-            </div>
-            <button type="submit" class="btn btn-success">CSVファイルアップロード</button>
-        </form>
-
-        <h4>アップロード済みCSVファイル一覧</h4>
-        <div id="csv-files-list">
-            <div class="d-flex gap-2 mb-3">
-                <button class="btn btn-info btn-sm" onclick="loadCsvFilesList()">
-                    <i class="fas fa-sync-alt"></i> ファイル一覧を更新
-                </button>
-            </div>
-            <!-- スクロール可能なCSVファイルリスト -->
-            <div class="scrollable-table-container">
-                <div id="csv-files-container" style="margin-top: 15px;">
-                    <p class="text-info">📋 ファイル一覧を読み込み中...</p>
+        <h4>CSVファイルアップロード（修正版）</h4>
+        <div class="upload-form-container">
+            <form id="csvUploadForm" enctype="multipart/form-data" class="upload-form">
+                <div class="input-group">
+                    <label for="room_csv_file_fixed">CSVファイルを選択:</label>
+                    <input type="file" id="room_csv_file_fixed" name="file" accept=".csv" required>
+                    <small class="form-text text-muted">
+                        ✅ UTF-8またはShift_JIS対応<br>
+                        ✅ 詳細なエラーメッセージ<br>
+                        ✅ ファイル形式自動検証
+                    </small>
                 </div>
-            </div>
+                <button type="button" class="btn btn-success" onclick="uploadCsvFixed()">
+                    <i class="fas fa-upload"></i> 安全アップロード
+                </button>
+            </form>
         </div>
+        
+        <!-- アップロード進捗表示 -->
+        <div id="uploadProgress" style="display: none; margin-top: 15px;">
+            <div class="progress">
+                <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 0%"></div>
+            </div>
+            <p class="mt-2 text-center">アップロード中...</p>
+        </div>
+        
+        <!-- 結果表示エリア -->
+        <div id="uploadResult" style="margin-top: 15px;"></div>
     </section>
 
     <hr>
@@ -316,20 +306,17 @@
 
     <!-- 全員ランキング表示セクション -->
     <div class="admin-panel">
-    <h3>🏆 全員ランキング表示（改善版）</h3>
+    <h3>🏆 全員ランキング表示</h3>
     <p>各部屋の全ユーザーのランキングを確認できます。</p>
     
-    <!-- 改善された部屋選択UI -->
     <div class="room-selector-container">
         <h4>部屋を選択してください</h4>
         
-        <!-- コンパクトな選択フォーム -->
         <div class="room-select-form">
             <div class="form-group">
                 <label for="roomSelectDropdown">部屋選択:</label>
                 <select id="roomSelectDropdown" class="form-control">
                     <option value="">-- 部屋を選択 --</option>
-                    <!-- JavaScriptで動的に追加 -->
                 </select>
             </div>
             <button class="btn btn-primary" onclick="loadSelectedRoom()">
@@ -339,115 +326,90 @@
                 <i class="fas fa-sync"></i> 部屋一覧更新
             </button>
         </div>
-        
-        <!-- クイックアクセスボタン（最近使用した部屋） -->
-        <div class="quick-access-section" style="display: none;">
-            <h5>クイックアクセス</h5>
-            <div id="quickAccessButtons" class="quick-access-buttons">
-                <!-- 最近使用した部屋のボタンが表示される -->
-            </div>
-        </div>
-    </div>
-
-    <!-- 選択中の部屋情報 -->
-    <div id="selectedRoomInfo" class="alert alert-info" style="display: none;">
-        <div class="room-info-header">
-            <h5>選択中の部屋: <span id="selectedRoomName"></span></h5>
-            <div class="room-actions">
-                <button class="btn btn-sm btn-success" onclick="exportRoomData()">
-                    <i class="fas fa-download"></i> CSVエクスポート
-                </button>
-                <button class="btn btn-sm btn-info" onclick="refreshRoomRanking()">
-                    <i class="fas fa-sync"></i> データ更新
-                </button>
-                <button class="btn btn-sm btn-warning" onclick="showRoomComparison()">
-                    <i class="fas fa-balance-scale"></i> 部屋比較
-                </button>
-                <button class="btn btn-sm btn-outline-secondary" onclick="clearRankingView()">
-                    <i class="fas fa-times"></i> 選択解除
-                </button>
-            </div>
-        </div>
     </div>
 
     <!-- ランキング表示エリア -->
     <div id="adminRankingContainer">
-        <div id="adminRankingInitial" class="text-center py-4">
-            <i class="fas fa-trophy fa-3x text-muted mb-3"></i>
-            <p class="text-muted">上記から部屋を選択してランキングを表示してください</p>
-        </div>
-        
-        <div id="adminRankingLoading" class="text-center py-4" style="display: none;">
-            <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">Loading...</span>
-            </div>
-            <p class="mt-2 text-muted">ランキングを取得中...</p>
-        </div>
-        
-        <div id="adminRankingTableContainer" style="display: none;">
-            <!-- 統計サマリー -->
-            <div class="ranking-summary">
-                <div class="row">
-                    <div class="col-md-3">
-                        <div class="summary-card">
-                            <h5>総ユーザー数</h5>
-                            <span class="summary-value" id="totalUsers">-</span>
-                        </div>
+    <div id="adminRankingInitial" class="text-center py-4">
+        <i class="fas fa-trophy fa-3x text-muted mb-3"></i>
+        <p class="text-muted">上記から部屋を選択してランキングを表示してください</p>
+    </div>
+    
+    <div id="adminRankingTableContainer" style="display: none;">
+        <!-- 統計サマリー -->
+        <div class="ranking-summary">
+            <div class="row">
+                <div class="col-md-3">
+                    <div class="summary-card">
+                        <h5>総ユーザー数</h5>
+                        <span class="summary-value" id="totalUsers">-</span>
                     </div>
-                    <div class="col-md-3">
-                        <div class="summary-card">
-                            <h5>アクティブユーザー</h5>
-                            <span class="summary-value" id="activeUsers">-</span>
-                        </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="summary-card">
+                        <h5>アクティブユーザー</h5>
+                        <span class="summary-value" id="activeUsers">-</span>
                     </div>
-                    <div class="col-md-3">
-                        <div class="summary-card">
-                            <h5>平均スコア</h5>
-                            <span class="summary-value" id="averageScore">-</span>
-                        </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="summary-card">
+                        <h5>平均スコア</h5>
+                        <span class="summary-value" id="averageScore">-</span>
                     </div>
-                    <div class="col-md-3">
-                        <div class="summary-card">
-                            <h5>最高スコア</h5>
-                            <span class="summary-value" id="maxScore">-</span>
-                        </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="summary-card">
+                        <h5>最高スコア</h5>
+                        <span class="summary-value" id="maxScore">-</span>
                     </div>
                 </div>
             </div>
-
-            <!-- ランキングテーブル -->
-            <div class="table-responsive">
-                <table class="table table-striped table-hover ranking-table">
-                    <thead class="table-dark">
-                        <tr>
-                            <th>順位</th>
-                            <th>名前</th>
-                            <th>最終ログイン</th>
-                            <th>回答数</th>
-                            <th>正解数</th>
-                            <th>正答率</th>
-                            <th>マスター数</th>
-                            <th>総合スコア</th>
-                            <th>網羅率</th>
-                            <th>操作</th>
-                        </tr>
-                    </thead>
-                    <tbody id="adminRankingTableBody">
-                        <!-- 動的にランキングデータが挿入されます -->
-                    </tbody>
-                </table>
-            </div>
         </div>
-        
-        <div id="adminRankingError" class="alert alert-danger" style="display: none;">
-            <h5>エラーが発生しました</h5>
-            <p id="adminRankingErrorMessage"></p>
-            <button class="btn btn-primary" onclick="retryLoadRanking()">
-                <i class="fas fa-redo"></i> 再試行
-            </button>
+
+        <!-- ランキングテーブル-->
+        <div class="table-responsive">
+            <table class="table table-striped table-hover ranking-table">
+                <thead class="table-dark">
+                    <tr>
+                        <th>順位</th>
+                        <th>名前</th>
+                        <th>最終ログイン</th>
+                        <th>回答数</th>
+                        <th>正解数</th>
+                        <th>正答率</th>
+                        <th>マスター数</th>
+                        <th>総合スコア</th>
+                        <th>網羅率</th>
+                    </tr>
+                </thead>
+                <tbody id="adminRankingTableBody">
+                    <!-- 動的にランキングデータが挿入されます -->
+                </tbody>
+            </table>
         </div>
     </div>
 </div>
+</div>
+
+<section id="admin-emergency-fixes">
+    <h3>🆘 緊急修復</h3>
+    <p>統計データが表示されない問題やCSVアップロードエラーを修復します。</p>
+    
+    <div class="admin-panel" style="background-color: #fff3cd; border-left: 5px solid #ffc107;">
+        <h4>⚡ ワンクリック修復</h4>
+        <p>統計データの問題を一括で修復します。</p>
+        <button type="button" class="btn btn-warning btn-lg" onclick="fixStatsOnly()">
+            <i class="fas fa-chart-bar"></i> 📊 統計データのみ修復
+        </button>
+        
+        <div style="margin-top: 15px;">
+            <button type="button" class="btn btn-info" onclick="checkSystemStatus()">
+                <i class="fas fa-search"></i> 🔍 システム状態確認
+            </button>
+        </div>
+    </div>
+</section>
+
 <div class="modal fade" id="userDetailModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
@@ -467,9 +429,6 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
-                <button type="button" class="btn btn-primary" onclick="downloadUserData()">
-                    <i class="fas fa-download"></i> データエクスポート
-                </button>
             </div>
         </div>
     </div>
@@ -606,7 +565,7 @@
                 </div>
             </div>
         </div>
-
+        
         <!-- 全データ修正（従来機能・バックアップ用） -->
         <div class="admin-panel" style="background-color: #ffebee; border-left: 5px solid #f44336; margin-top: 20px;">
             <h4>⚠️ 全データ修正（バックアップ用）</h4>
@@ -628,7 +587,6 @@
             </div>
         </div>
     </section>
-
     <!-- リセット確認フォーム（非表示） -->
     <form id="resetForm" action="{{ url_for('admin_app_info_reset') }}" method="POST" style="display: none;">
     </form>
@@ -680,6 +638,76 @@ function loadRoomSettings() {
         .catch(error => {
             console.error(`❌ 部屋${roomNumber}の設定読み込みエラー:`, error);
         });
+    });
+}
+
+// ===== 緊急修復機能 =====
+function emergencyFixAll() {
+    if (!confirm('全ての問題を修復しますか？\n\n以下の修復を実行します：\n• 統計データの再計算\n• ランキング表示の修復\n• データベーステーブルの整合性確認\n\n処理に時間がかかる場合があります。')) {
+        return;
+    }
+    
+    const button = event.target;
+    const originalText = button.textContent;
+    button.disabled = true;
+    button.textContent = '修復中...';
+    
+    fetch('/admin/fix_ranking_display', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            alert(`✅ 修復完了！\n\n${data.message}\n統計修復: ${data.stats_fixed}人分\n\nページをリロードします。`);
+            location.reload();
+        } else {
+            alert(`❌ 修復エラー: ${data.message}`);
+        }
+    })
+    .catch(error => {
+        console.error('修復エラー:', error);
+        alert('❌ 修復中にエラーが発生しました。');
+    })
+    .finally(() => {
+        button.disabled = false;
+        button.textContent = originalText;
+    });
+}
+
+function checkSystemStatus() {
+    const button = event.target;
+    const originalText = button.textContent;
+    button.disabled = true;
+    button.textContent = '確認中...';
+    
+    fetch('/admin/check_system_status')
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            let statusMessage = '📊 システム状態確認結果:\n\n';
+            statusMessage += `総ユーザー数: ${data.total_users}人\n`;
+            statusMessage += `統計データ数: ${data.total_stats}個\n`;
+            statusMessage += `統計カバー率: ${data.stats_coverage}\n\n`;
+            
+            if (data.total_stats < data.total_users) {
+                statusMessage += '⚠️ 推奨アクション: 統計データの修復が必要です';
+            } else {
+                statusMessage += '✅ 統計データは正常です';
+            }
+            
+            alert(statusMessage);
+        } else {
+            alert(`❌ エラー: ${data.message}`);
+        }
+    })
+    .catch(error => {
+        console.error('状態確認エラー:', error);
+        alert('❌ システム状態の確認中にエラーが発生しました。');
+    })
+    .finally(() => {
+        button.disabled = false;
+        button.textContent = originalText;
     });
 }
 
@@ -797,6 +825,110 @@ function deleteCsvFile(filename) {
         document.body.appendChild(form);
         form.submit();
     }
+}
+
+function uploadCsvFixed() {
+    const fileInput = document.getElementById('room_csv_file_fixed');
+    const file = fileInput.files[0];
+    
+    if (!file) {
+        alert('ファイルを選択してください。');
+        return;
+    }
+    
+    if (!file.name.endsWith('.csv')) {
+        alert('CSVファイルを選択してください。');
+        return;
+    }
+    
+    // ファイルサイズチェック（10MB制限）
+    if (file.size > 10 * 1024 * 1024) {
+        alert('ファイルサイズが大きすぎます（10MB以下にしてください）。');
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    // UI更新
+    const progressDiv = document.getElementById('uploadProgress');
+    const resultDiv = document.getElementById('uploadResult');
+    const uploadButton = event.target;
+    
+    progressDiv.style.display = 'block';
+    resultDiv.innerHTML = '';
+    uploadButton.disabled = true;
+    uploadButton.textContent = 'アップロード中...';
+    
+    // プログレスバーアニメーション
+    const progressBar = progressDiv.querySelector('.progress-bar');
+    let progress = 0;
+    const progressInterval = setInterval(() => {
+        progress += Math.random() * 15;
+        if (progress > 90) progress = 90;
+        progressBar.style.width = progress + '%';
+    }, 200);
+    
+    fetch('/admin/upload_room_csv_fixed', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        clearInterval(progressInterval);
+        progressBar.style.width = '100%';
+        
+        setTimeout(() => {
+            progressDiv.style.display = 'none';
+            
+            if (data.status === 'success') {
+                resultDiv.innerHTML = `
+                    <div class="alert alert-success">
+                        <h6><i class="fas fa-check-circle"></i> アップロード成功</h6>
+                        <p>${data.message}</p>
+                        <small>
+                            📊 単語数: ${data.word_count}問<br>
+                            📁 ファイルサイズ: ${data.file_size_kb}KB
+                        </small>
+                    </div>
+                `;
+                
+                // ファイル一覧を更新
+                if (typeof loadCsvFilesList === 'function') {
+                    loadCsvFilesList();
+                }
+                
+                // フォームをリセット
+                fileInput.value = '';
+                
+            } else {
+                resultDiv.innerHTML = `
+                    <div class="alert alert-danger">
+                        <h6><i class="fas fa-exclamation-triangle"></i> アップロード失敗</h6>
+                        <p>${data.message}</p>
+                        <small>ファイルを確認して再度お試しください。</small>
+                    </div>
+                `;
+            }
+        }, 500);
+    })
+    .catch(error => {
+        clearInterval(progressInterval);
+        progressDiv.style.display = 'none';
+        
+        console.error('アップロードエラー:', error);
+        resultDiv.innerHTML = `
+            <div class="alert alert-danger">
+                <h6><i class="fas fa-exclamation-triangle"></i> 通信エラー</h6>
+                <p>サーバーとの通信中にエラーが発生しました。</p>
+                <small>ネットワーク接続を確認して再度お試しください。</small>
+            </div>
+        `;
+    })
+    .finally(() => {
+        uploadButton.disabled = false;
+        uploadButton.textContent = '安全アップロード';
+    });
 }
 
 // ========================================
@@ -978,7 +1110,7 @@ function displayRanking(rankingData, statistics) {
     tbody.innerHTML = '';
     
     if (rankingData.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="10" class="text-center text-muted">ランキングデータがありません</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted">ランキングデータがありません</td></tr>';
         return;
     }
     
@@ -994,6 +1126,7 @@ function displayRanking(rankingData, statistics) {
             new Date(user.last_login).toLocaleString('ja-JP') : 
             'なし';
         
+        // 操作列を削除し、名前をクリック可能にする（修正版）
         row.innerHTML = `
             <td>
                 <strong>${index + 1}</strong>
@@ -1002,7 +1135,7 @@ function displayRanking(rankingData, statistics) {
                 ${index === 2 ? '<i class="fas fa-medal text-warning ms-1"></i>' : ''}
             </td>
             <td>
-                <span class="user-name-link" onclick="showUserDetails(${user.user_id || 0})">
+                <span class="user-name-link" onclick="showUserDetailsSimple('${user.username}', ${user.total_attempts}, ${user.total_correct}, ${user.accuracy_rate}, ${user.mastered_count})" style="cursor: pointer; color: #007bff; text-decoration: underline; font-weight: 600;">
                     ${user.username || 'N/A'}
                 </span>
             </td>
@@ -1013,37 +1146,72 @@ function displayRanking(rankingData, statistics) {
             <td>${user.mastered_count || 0}</td>
             <td><strong>${(user.balance_score || 0).toFixed(1)}</strong></td>
             <td>${(user.coverage_rate || 0).toFixed(1)}%</td>
-            <td>
-                <button class="btn btn-sm btn-outline-info" onclick="showUserDetails(${user.user_id || 0})">
-                    <i class="fas fa-eye"></i>
-                </button>
-            </td>
         `;
         
         tbody.appendChild(row);
     });
 }
 
-// ユーザー詳細を表示
-function showUserDetails(userId) {
-    console.log('👤 ユーザー詳細表示:', userId);
+// 緊急修復機能を追加
+function fixStatsOnly() {
+    if (!confirm('統計データを修復しますか？\n\n以下の修復を実行します：\n• 統計テーブルの作成・確認\n• 全ユーザーの統計データを再計算\n\n処理に時間がかかる場合があります。')) {
+        return;
+    }
     
-    // 簡易版の詳細表示（APIが存在する場合に拡張可能）
+    const button = event.target;
+    const originalText = button.textContent;
+    button.disabled = true;
+    button.textContent = '修復中...';
+    
+    fetch('/admin/fix_stats_only', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            alert(`✅ 統計修復完了！\n\n${data.message}\n修復人数: ${data.fixed_count}人\n\nページをリロードします。`);
+            location.reload();
+        } else {
+            alert(`❌ 修復エラー: ${data.message}`);
+        }
+    })
+    .catch(error => {
+        console.error('修復エラー:', error);
+        alert('❌ 修復中にエラーが発生しました。');
+    })
+    .finally(() => {
+        button.disabled = false;
+        button.textContent = originalText;
+    });
+}
+
+// ユーザー詳細を表示
+function showUserDetailsSimple(username, totalAttempts, totalCorrect, accuracyRate, masteredCount) {
+    const message = `ユーザー詳細情報:
+
+👤 名前: ${username}
+📊 総回答数: ${totalAttempts}
+✅ 正解数: ${totalCorrect}
+📈 正答率: ${accuracyRate.toFixed(1)}%
+🏆 マスター数: ${masteredCount}
+
+※ より詳細な情報は進捗ページで確認できます。`;
+    
+    alert(message);
+}
+
+function showUserDetails(userId) {
+    // 簡易版にリダイレクト
     if (currentRankingData) {
         const user = currentRankingData.find(u => u.user_id === userId);
         if (user) {
-            alert(`ユーザー詳細情報:
-
-名前: ${user.username}
-総回答数: ${user.total_attempts}
-正解数: ${user.total_correct}
-正答率: ${user.accuracy_rate.toFixed(1)}%
-マスター数: ${user.mastered_count}
-総合スコア: ${user.balance_score.toFixed(1)}
-網羅率: ${user.coverage_rate.toFixed(1)}%`);
+            showUserDetailsSimple(user.username, user.total_attempts, user.total_correct, user.accuracy_rate, user.mastered_count);
         }
     }
 }
+
+console.log('✅ 管理者ページ JavaScript（修正版）読み込み完了');
 
 // ========================================
 // 3. モーダル機能
@@ -1785,6 +1953,95 @@ console.log('✅ 管理者ページ JavaScript（統合版）読み込み完了'
     .ranking-table th,
     .ranking-table td {
         padding: 6px 4px;
+    }
+}
+
+* 緊急修復セクションのスタイル */
+#admin-emergency-fixes .admin-panel {
+    margin-bottom: 30px;
+}
+
+#admin-emergency-fixes .btn-lg {
+    font-size: 1.2rem;
+    padding: 12px 30px;
+    margin-bottom: 15px;
+}
+
+/* アップロード進捗バーのスタイル */
+.progress {
+    height: 25px;
+    background-color: #e9ecef;
+    border-radius: 15px;
+    overflow: hidden;
+}
+
+.progress-bar {
+    transition: width 0.3s ease;
+    background: linear-gradient(45deg, #007bff, #0056b3);
+}
+
+/* 結果表示のスタイル */
+#uploadResult .alert {
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+#uploadResult .alert-success {
+    border-left: 5px solid #28a745;
+}
+
+#uploadResult .alert-danger {
+    border-left: 5px solid #dc3545;
+}
+
+/* ユーザー名リンクのスタイル改善 */
+.user-name-link {
+    font-weight: 600;
+    transition: all 0.2s ease;
+}
+
+.user-name-link:hover {
+    color: #0056b3 !important;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+}
+
+/* ランキングテーブルの改善 */
+.ranking-table th {
+    position: sticky;
+    top: 0;
+    background-color: #343a40 !important;
+    z-index: 10;
+}
+
+.ranking-table tbody tr:hover {
+    background-color: rgba(0,123,255,0.1);
+    transform: scale(1.005);
+    transition: all 0.2s ease;
+}
+
+/* 統計カードの改善 */
+.summary-card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.summary-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 768px) {
+    #admin-emergency-fixes .btn-lg {
+        width: 100%;
+        margin-bottom: 10px;
+    }
+    
+    .ranking-table {
+        font-size: 0.85rem;
+    }
+    
+    .summary-card {
+        margin-bottom: 15px;
     }
 }
 </style>
