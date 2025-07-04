@@ -13,6 +13,13 @@ import hashlib
 import logging
 import math
 import time
+from flask import jsonify, request
+from datetime import datetime
+import math
+from flask_sqlalchemy import SQLAlchemy
+from datetime import datetime
+from flask import request, jsonify, session, render_template
+import random
 
 log_level = logging.INFO if os.environ.get('RENDER') == 'true' else logging.DEBUG
 logging.basicConfig(
@@ -177,26 +184,24 @@ def to_jst_filter(dt):
 
 # app.py の User モデルの定義を以下に置き換え
 class User(db.Model):
+    """ユーザー情報を格納するテーブル"""
+    
+    __tablename__ = 'user'
+    
     id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(80), nullable=False)
-    original_username = db.Column(db.String(80), nullable=False)
     room_number = db.Column(db.String(50), nullable=False)
-    _room_password_hash = db.Column(db.String(255))
-    student_id = db.Column(db.String(50), nullable=False)
-    _individual_password_hash = db.Column(db.String(255))
-    problem_history = db.Column(db.Text)
-    incorrect_words = db.Column(db.Text)
-    last_login = db.Column(db.DateTime, default=lambda: datetime.now(JST))
-    username_changed_at = db.Column(db.DateTime)
+    room_password = db.Column(db.String(100), nullable=False)
+    attendance_number = db.Column(db.String(50), nullable=False)
+    individual_password = db.Column(db.String(100), nullable=False)
+    username = db.Column(db.String(100), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    last_login = db.Column(db.DateTime, default=datetime.utcnow)
     
-    is_first_login = db.Column(db.Boolean, default=True, nullable=False)
-    password_changed_at = db.Column(db.DateTime)
+    # 一意性制約
+    __table_args__ = (db.UniqueConstraint('room_number', 'attendance_number', name='unique_user_per_room'),)
     
-    # 複合ユニーク制約
-    __table_args__ = (
-        db.UniqueConstraint('room_number', 'student_id', 'username', 
-                          name='unique_room_student_username'),
-    )
+    def __repr__(self):
+        return f'<User {self.id}: {self.username} (Room: {self.room_number})>'
 
     # 既存のメソッドはそのまま
     def set_room_password(self, password):
@@ -301,6 +306,27 @@ class AppInfo(db.Model):
             'contactEmail': self.contact_email,
             'schoolName': getattr(self, 'school_name', '朋優学院')  # ★ 追加
         }
+
+class History(db.Model):
+    """学習履歴を記録するテーブル"""
+    
+    __tablename__ = 'history'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    chapter = db.Column(db.Integer, nullable=False)
+    number = db.Column(db.Integer, nullable=False)
+    question = db.Column(db.Text, nullable=False)
+    correct_answer = db.Column(db.Text, nullable=False)
+    user_answer = db.Column(db.Text, nullable=False)
+    is_correct = db.Column(db.Boolean, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # リレーションシップ
+    user = db.relationship('User', backref=db.backref('histories', lazy=True))
+    
+    def __repr__(self):
+        return f'<History {self.id}: User{self.user_id} Ch{self.chapter}-{self.number} {"○" if self.is_correct else "×"}>'
 
 class PasswordResetToken(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -484,6 +510,194 @@ class UserStats(db.Model):
         except Exception as e:
             print(f"❌ 統計更新エラー ({user.username}): {e}")
             return False
+
+# 既存のWordモデルも参考として
+class Word(db.Model):
+    """単語帳データを格納するテーブル"""
+    
+    __tablename__ = 'word'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    chapter = db.Column(db.Integer, nullable=False)
+    number = db.Column(db.Integer, nullable=False)
+    category = db.Column(db.String(200), nullable=False)
+    question = db.Column(db.Text, nullable=False)
+    answer = db.Column(db.Text, nullable=False)
+    enabled = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def __repr__(self):
+        return f'<Word {self.id}: Ch{self.chapter}-{self.number} {self.category}>'
+
+# データベース初期化関数
+def init_db():
+    """データベースを初期化"""
+    try:
+        db.create_all()
+        print("✅ データベーステーブルが作成されました")
+    except Exception as e:
+        print(f"❌ データベース初期化エラー: {str(e)}")
+
+# 学習履歴を保存する関数
+def save_answer_history(user_id, chapter, number, question, correct_answer, user_answer, is_correct):
+    """回答履歴をデータベースに保存"""
+    try:
+        history = History(
+            user_id=user_id,
+            chapter=chapter,
+            number=number,
+            question=question,
+            correct_answer=correct_answer,
+            user_answer=user_answer,
+            is_correct=is_correct
+        )
+        
+        db.session.add(history)
+        db.session.commit()
+        
+        return True
+        
+    except Exception as e:
+        print(f"❌ 学習履歴保存エラー: {str(e)}")
+        db.session.rollback()
+        return False
+
+# 学習履歴を取得する関数
+def get_user_history(user_id, limit=None):
+    """ユーザーの学習履歴を取得"""
+    try:
+        query = History.query.filter_by(user_id=user_id).order_by(History.created_at.desc())
+        
+        if limit:
+            query = query.limit(limit)
+            
+        return query.all()
+        
+    except Exception as e:
+        print(f"❌ 学習履歴取得エラー: {str(e)}")
+        return []
+
+# 問題別の正答率を取得する関数
+def get_problem_accuracy(user_id, chapter, number):
+    """特定の問題の正答率を取得"""
+    try:
+        histories = History.query.filter_by(
+            user_id=user_id,
+            chapter=chapter,
+            number=number
+        ).all()
+        
+        if not histories:
+            return 0, 0  # 正答率, 回答数
+        
+        total_attempts = len(histories)
+        correct_count = sum(1 for h in histories if h.is_correct)
+        accuracy = (correct_count / total_attempts) * 100
+        
+        return accuracy, total_attempts
+        
+    except Exception as e:
+        print(f"❌ 問題別正答率取得エラー: {str(e)}")
+        return 0, 0
+
+# 弱点問題を取得する関数
+def get_weak_problems(user_id, min_attempts=3, max_accuracy=60):
+    """弱点問題を取得（正答率が低い問題）"""
+    try:
+        # 問題ごとの統計を取得
+        problem_stats = db.session.query(
+            History.chapter,
+            History.number,
+            History.question,
+            History.correct_answer,
+            db.func.count(History.id).label('total_attempts'),
+            db.func.sum(db.case([(History.is_correct == True, 1)], else_=0)).label('correct_count')
+        ).filter(
+            History.user_id == user_id
+        ).group_by(
+            History.chapter, History.number, History.question, History.correct_answer
+        ).having(
+            db.func.count(History.id) >= min_attempts
+        ).all()
+        
+        # 弱点問題を抽出
+        weak_problems = []
+        for stat in problem_stats:
+            accuracy = (stat.correct_count / stat.total_attempts) * 100
+            if accuracy <= max_accuracy:
+                weak_problems.append({
+                    'chapter': stat.chapter,
+                    'number': stat.number,
+                    'question': stat.question,
+                    'correct_answer': stat.correct_answer,
+                    'total_attempts': stat.total_attempts,
+                    'correct_count': stat.correct_count,
+                    'accuracy': accuracy
+                })
+        
+        # 正答率の低い順でソート
+        weak_problems.sort(key=lambda x: x['accuracy'])
+        
+        return weak_problems
+        
+    except Exception as e:
+        print(f"❌ 弱点問題取得エラー: {str(e)}")
+        return []
+
+# 使用例：クイズ回答処理での履歴保存
+def process_quiz_answer(user_id, chapter, number, question, correct_answer, user_answer):
+    """クイズ回答を処理し、履歴を保存"""
+    try:
+        # 正解判定
+        is_correct = user_answer.strip().lower() == correct_answer.strip().lower()
+        
+        # 履歴を保存
+        success = save_answer_history(
+            user_id=user_id,
+            chapter=chapter,
+            number=number,
+            question=question,
+            correct_answer=correct_answer,
+            user_answer=user_answer,
+            is_correct=is_correct
+        )
+        
+        if success:
+            print(f"✅ 回答履歴を保存しました: User{user_id} Ch{chapter}-{number} {'○' if is_correct else '×'}")
+        
+        return {
+            'is_correct': is_correct,
+            'saved': success
+        }
+        
+    except Exception as e:
+        print(f"❌ クイズ回答処理エラー: {str(e)}")
+        return {
+            'is_correct': False,
+            'saved': False
+        }
+
+# マイグレーション用のサンプル
+def migrate_existing_data():
+    """既存データがある場合のマイグレーション例"""
+    try:
+        # 既存のHistoryテーブルがない場合、作成
+        if not db.engine.dialect.has_table(db.engine, 'history'):
+            db.create_all()
+            print("✅ Historyテーブルを作成しました")
+        else:
+            print("ℹ️ Historyテーブルは既に存在します")
+            
+    except Exception as e:
+        print(f"❌ マイグレーションエラー: {str(e)}")
+
+# app.pyのメイン部分で実行
+if __name__ == '__main__':
+    with app.app_context():
+        init_db()  # データベース初期化
+        migrate_existing_data()  # 既存データのマイグレーション
+        
+    app.run(debug=True)
 
 # ====================================================================
 # ヘルパー関数
@@ -1327,7 +1541,914 @@ def admin_manual_create_stats_table():
             'status': 'error',
             'message': f'テーブル作成エラー: {str(e)}'
         }), 500
+
+# 部屋一覧取得API
+@app.route('/api/rooms', methods=['GET'])
+def get_rooms():
+    """管理者用：全部屋の一覧を取得"""
+    try:
+        # 管理者権限チェック
+        if not session.get('admin_logged_in'):
+            return jsonify({'status': 'error', 'message': '管理者権限が必要です'}), 403
+        
+        # 部屋別のユーザー数を取得
+        rooms_query = db.session.query(
+            User.room_number,
+            db.func.count(User.id).label('user_count')
+        ).group_by(User.room_number).order_by(User.room_number).all()
+        
+        rooms = []
+        for room_data in rooms_query:
+            rooms.append({
+                'room_number': room_data.room_number,
+                'user_count': room_data.user_count
+            })
+        
+        return jsonify({
+            'status': 'success',
+            'rooms': rooms,
+            'total_rooms': len(rooms)
+        })
+        
+    except Exception as e:
+        print(f"❌ 部屋一覧取得エラー: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': '部屋一覧の取得に失敗しました'
+        }), 500
+
+# 特定部屋の全員ランキング取得API
+@app.route('/api/admin/room_ranking/<room_number>', methods=['GET'])
+def get_room_ranking(room_number):
+    """管理者用：特定の部屋の全ユーザーのランキングを取得"""
+    try:
+        # 管理者権限チェック
+        if not session.get('admin_logged_in'):
+            return jsonify({'status': 'error', 'message': '管理者権限が必要です'}), 403
+        
+        start_time = time.time()
+        
+        # 指定された部屋のユーザーを取得
+        users_in_room = User.query.filter_by(room_number=room_number).all()
+        
+        if not users_in_room:
+            return jsonify({
+                'status': 'error',
+                'message': f'部屋 {room_number} にユーザーが存在しません'
+            }), 404
+        
+        print(f"🔍 部屋 {room_number} のユーザー数: {len(users_in_room)}")
+        
+        # 各ユーザーの統計を計算
+        user_stats = []
+        total_scores = []
+        active_count = 0
+        
+        for user in users_in_room:
+            # ユーザーの学習履歴を取得
+            histories = History.query.filter_by(user_id=user.id).all()
+            
+            # 基本統計
+            total_attempts = len(histories)
+            total_correct = sum(1 for h in histories if h.is_correct)
+            accuracy_rate = (total_correct / total_attempts * 100) if total_attempts > 0 else 0
+            
+            # マスター数の計算（80%以上の正答率）
+            mastered_count = calculate_mastered_problems(user.id)
+            
+            # 網羅率の計算
+            coverage_rate = calculate_coverage_rate(user.id)
+            
+            # 活発なユーザーの判定（10回以上回答）
+            if total_attempts >= 10:
+                active_count += 1
+            
+            # 総合スコアの計算（既存のロジックを使用）
+            balance_score = calculate_balance_score(
+                mastered_count, accuracy_rate, total_attempts
+            )
+            
+            user_stats.append({
+                'user_id': user.id,
+                'username': user.username,
+                'last_login': user.last_login.isoformat() if user.last_login else None,
+                'total_attempts': total_attempts,
+                'total_correct': total_correct,
+                'accuracy_rate': accuracy_rate,
+                'mastered_count': mastered_count,
+                'coverage_rate': coverage_rate,
+                'balance_score': balance_score,
+                'mastery_score': math.pow(mastered_count, 1.3) * 0.1,
+                'reliability_score': calculate_reliability_score(accuracy_rate, total_attempts),
+                'activity_score': math.log(total_attempts + 1) * 0.2
+            })
+            
+            if balance_score > 0:
+                total_scores.append(balance_score)
+        
+        # スコアでソート（降順）
+        user_stats.sort(key=lambda x: x['balance_score'], reverse=True)
+        
+        # 統計情報を計算
+        statistics = {
+            'total_users': len(user_stats),
+            'active_users': active_count,
+            'average_score': sum(total_scores) / len(total_scores) if total_scores else 0,
+            'max_score': max(total_scores) if total_scores else 0,
+            'min_score': min(total_scores) if total_scores else 0
+        }
+        
+        calculation_time = time.time() - start_time
+        print(f"✅ 部屋 {room_number} のランキング計算完了: {calculation_time:.2f}秒")
+        
+        return jsonify({
+            'status': 'success',
+            'room_number': room_number,
+            'ranking_data': user_stats,
+            'statistics': statistics,
+            'calculation_time': round(calculation_time, 2)
+        })
+        
+    except Exception as e:
+        print(f"❌ 部屋ランキング取得エラー: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': f'部屋 {room_number} のランキング取得に失敗しました'
+        }), 500
+
+def calculate_balance_score(mastered_count, accuracy_rate, total_attempts):
+    """総合スコアの計算（既存のロジックと同じ）"""
+    try:
+        # マスタリースコア: (マスター数)^1.3 * 0.1
+        mastery_score = math.pow(mastered_count, 1.3) * 0.1
+        
+        # 信頼性スコア: 補正された正答率の2乗 * 5
+        reliability_score = calculate_reliability_score(accuracy_rate, total_attempts)
+        
+        # 活動スコア: ln(回答数 + 1) * 0.2
+        activity_score = math.log(total_attempts + 1) * 0.2
+        
+        # 総合スコア
+        balance_score = mastery_score + reliability_score + activity_score
+        
+        return balance_score
+        
+    except Exception as e:
+        print(f"❌ スコア計算エラー: {str(e)}")
+        return 0
+
+def calculate_reliability_score(accuracy_rate, total_attempts):
+    """信頼性スコアの計算"""
+    try:
+        if total_attempts == 0:
+            return 0
+        
+        # 統計的補正係数（回答数が少ないほど厳しく）
+        confidence_factor = min(1.0, total_attempts / 50)
+        
+        # 補正された正答率
+        adjusted_accuracy = accuracy_rate * confidence_factor
+        
+        # 信頼性スコア
+        reliability_score = math.pow(adjusted_accuracy / 100, 2) * 5
+        
+        return reliability_score
+        
+    except Exception as e:
+        print(f"❌ 信頼性スコア計算エラー: {str(e)}")
+        return 0
+
+def calculate_mastered_problems(user_id):
+    """マスター数の計算（80%以上の正答率）"""
+    try:
+        # 問題ごとの正答率を計算
+        problem_stats = db.session.query(
+            History.chapter,
+            History.number,
+            db.func.count(History.id).label('total_attempts'),
+            db.func.sum(db.case([(History.is_correct == True, 1)], else_=0)).label('correct_count')
+        ).filter(
+            History.user_id == user_id
+        ).group_by(
+            History.chapter, History.number
+        ).all()
+        
+        mastered_count = 0
+        for stat in problem_stats:
+            if stat.total_attempts >= 3:  # 最低3回は回答している
+                accuracy = (stat.correct_count / stat.total_attempts) * 100
+                if accuracy >= 80:
+                    mastered_count += 1
+        
+        return mastered_count
+        
+    except Exception as e:
+        print(f"❌ マスター数計算エラー: {str(e)}")
+        return 0
+
+def calculate_coverage_rate(user_id):
+    """網羅率の計算"""
+    try:
+        # 解いた問題の数
+        solved_problems = db.session.query(
+            History.chapter, History.number
+        ).filter(
+            History.user_id == user_id
+        ).distinct().count()
+        
+        # 全問題数（有効な問題のみ）
+        total_problems = db.session.query(
+            Word.chapter, Word.number
+        ).filter(
+            Word.enabled == True
+        ).distinct().count()
+        
+        if total_problems == 0:
+            return 0
+        
+        coverage_rate = (solved_problems / total_problems) * 100
+        return min(coverage_rate, 100)  # 100%を超えないように
+        
+    except Exception as e:
+        print(f"❌ 網羅率計算エラー: {str(e)}")
+        return 0
+
+# 管理者用：全部屋の統計概要取得API
+@app.route('/api/admin/rooms_summary', methods=['GET'])
+def get_rooms_summary():
+    """管理者用：全部屋の統計概要を取得"""
+    try:
+        # 管理者権限チェック
+        if not session.get('admin_logged_in'):
+            return jsonify({'status': 'error', 'message': '管理者権限が必要です'}), 403
+        
+        # 全部屋の統計を取得
+        rooms_summary = db.session.query(
+            User.room_number,
+            db.func.count(User.id).label('user_count'),
+            db.func.count(db.case([(User.last_login.isnot(None), 1)])).label('active_users'),
+            db.func.max(User.last_login).label('last_activity')
+        ).group_by(User.room_number).order_by(User.room_number).all()
+        
+        summary_data = []
+        for room_data in rooms_summary:
+            summary_data.append({
+                'room_number': room_data.room_number,
+                'user_count': room_data.user_count,
+                'active_users': room_data.active_users,
+                'last_activity': room_data.last_activity.isoformat() if room_data.last_activity else None
+            })
+        
+        return jsonify({
+            'status': 'success',
+            'rooms_summary': summary_data,
+            'total_rooms': len(summary_data)
+        })
+        
+    except Exception as e:
+        print(f"❌ 部屋統計取得エラー: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': '部屋統計の取得に失敗しました'
+        }), 500
+
+# 管理者用：特定ユーザーの詳細情報取得API
+@app.route('/api/admin/user_details/<int:user_id>', methods=['GET'])
+def get_user_details(user_id):
+    """管理者用：特定ユーザーの詳細学習情報を取得"""
+    try:
+        # 管理者権限チェック
+        if not session.get('admin_logged_in'):
+            return jsonify({'status': 'error', 'message': '管理者権限が必要です'}), 403
+        
+        # ユーザーを取得
+        user = User.query.get(user_id)
+        if not user:
+            return jsonify({'status': 'error', 'message': 'ユーザーが見つかりません'}), 404
+        
+        # 学習履歴を取得
+        histories = History.query.filter_by(user_id=user_id).order_by(History.created_at.desc()).all()
+        
+        # 章別の統計
+        chapter_stats = db.session.query(
+            History.chapter,
+            db.func.count(History.id).label('total_attempts'),
+            db.func.sum(db.case([(History.is_correct == True, 1)], else_=0)).label('correct_count')
+        ).filter(
+            History.user_id == user_id
+        ).group_by(History.chapter).all()
+        
+        # 最近の学習活動（直近20件）
+        recent_activities = []
+        for history in histories[:20]:
+            recent_activities.append({
+                'chapter': history.chapter,
+                'number': history.number,
+                'question': history.question,
+                'user_answer': history.user_answer,
+                'correct_answer': history.correct_answer,
+                'is_correct': history.is_correct,
+                'created_at': history.created_at.isoformat()
+            })
+        
+        # 章別統計をフォーマット
+        chapter_data = []
+        for stat in chapter_stats:
+            accuracy = (stat.correct_count / stat.total_attempts * 100) if stat.total_attempts > 0 else 0
+            chapter_data.append({
+                'chapter': stat.chapter,
+                'total_attempts': stat.total_attempts,
+                'correct_count': stat.correct_count,
+                'accuracy_rate': accuracy
+            })
+        
+        # 基本統計
+        total_attempts = len(histories)
+        total_correct = sum(1 for h in histories if h.is_correct)
+        accuracy_rate = (total_correct / total_attempts * 100) if total_attempts > 0 else 0
+        
+        # マスター数と網羅率
+        mastered_count = calculate_mastered_problems(user_id)
+        coverage_rate = calculate_coverage_rate(user_id)
+        
+        # 学習パターン分析
+        learning_pattern = analyze_learning_pattern(histories)
+        
+        return jsonify({
+            'status': 'success',
+            'user_info': {
+                'id': user.id,
+                'username': user.username,
+                'room_number': user.room_number,
+                'created_at': user.created_at.isoformat() if user.created_at else None,
+                'last_login': user.last_login.isoformat() if user.last_login else None
+            },
+            'statistics': {
+                'total_attempts': total_attempts,
+                'total_correct': total_correct,
+                'accuracy_rate': accuracy_rate,
+                'mastered_count': mastered_count,
+                'coverage_rate': coverage_rate,
+                'balance_score': calculate_balance_score(mastered_count, accuracy_rate, total_attempts)
+            },
+            'chapter_stats': chapter_data,
+            'recent_activities': recent_activities,
+            'learning_pattern': learning_pattern
+        })
+        
+    except Exception as e:
+        print(f"❌ ユーザー詳細取得エラー: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': 'ユーザー詳細の取得に失敗しました'
+        }), 500
+
+def analyze_learning_pattern(histories):
+    """学習パターンの分析"""
+    try:
+        if not histories:
+            return {
+                'pattern_type': 'none',
+                'description': '学習データがありません',
+                'recommendations': []
+            }
+        
+        # 日付別の学習回数
+        daily_counts = {}
+        for history in histories:
+            date_key = history.created_at.date()
+            daily_counts[date_key] = daily_counts.get(date_key, 0) + 1
+        
+        # 平均学習回数
+        avg_daily_count = sum(daily_counts.values()) / len(daily_counts) if daily_counts else 0
+        
+        # 学習日数
+        learning_days = len(daily_counts)
+        
+        # 最近の学習頻度（過去7日間）
+        recent_days = 0
+        from datetime import datetime, timedelta
+        week_ago = datetime.now().date() - timedelta(days=7)
+        
+        for date_key in daily_counts:
+            if date_key >= week_ago:
+                recent_days += 1
+        
+        # パターン分類
+        pattern_type = 'regular'
+        description = '規則正しい学習パターン'
+        recommendations = []
+        
+        if learning_days < 3:
+            pattern_type = 'beginner'
+            description = '学習を始めたばかり'
+            recommendations = [
+                '毎日少しずつでも継続することが大切です',
+                '最初は5〜10問程度から始めましょう'
+            ]
+        elif recent_days == 0:
+            pattern_type = 'inactive'
+            description = '最近学習していない'
+            recommendations = [
+                '学習を再開しましょう',
+                '以前の復習から始めることをお勧めします'
+            ]
+        elif avg_daily_count > 50:
+            pattern_type = 'intensive'
+            description = '集中的な学習パターン'
+            recommendations = [
+                '素晴らしい学習量です',
+                '復習も忘れずに行いましょう'
+            ]
+        elif avg_daily_count < 10:
+            pattern_type = 'light'
+            description = '軽い学習パターン'
+            recommendations = [
+                '継続は力なりです',
+                '少しずつ学習量を増やしてみましょう'
+            ]
+        
+        return {
+            'pattern_type': pattern_type,
+            'description': description,
+            'recommendations': recommendations,
+            'learning_days': learning_days,
+            'avg_daily_count': round(avg_daily_count, 1),
+            'recent_activity_days': recent_days
+        }
+        
+    except Exception as e:
+        print(f"❌ 学習パターン分析エラー: {str(e)}")
+        return {
+            'pattern_type': 'unknown',
+            'description': '分析できませんでした',
+            'recommendations': []
+        }
+
+# 管理者用：部屋別の学習統計比較API
+@app.route('/api/admin/rooms_comparison', methods=['GET'])
+def get_rooms_comparison():
+    """管理者用：部屋別の学習統計比較データを取得"""
+    try:
+        # 管理者権限チェック
+        if not session.get('admin_logged_in'):
+            return jsonify({'status': 'error', 'message': '管理者権限が必要です'}), 403
+        
+        # 部屋別の詳細統計を取得
+        rooms_comparison = []
+        
+        # 全部屋を取得
+        rooms = db.session.query(User.room_number).distinct().order_by(User.room_number).all()
+        
+        for room_data in rooms:
+            room_number = room_data.room_number
+            
+            # 部屋内のユーザー
+            users_in_room = User.query.filter_by(room_number=room_number).all()
+            
+            # 部屋の統計を計算
+            room_stats = {
+                'room_number': room_number,
+                'user_count': len(users_in_room),
+                'active_users': 0,
+                'total_attempts': 0,
+                'total_correct': 0,
+                'avg_accuracy': 0,
+                'avg_mastered': 0,
+                'avg_coverage': 0,
+                'avg_balance_score': 0,
+                'top_scores': []
+            }
+            
+            user_scores = []
+            
+            for user in users_in_room:
+                # ユーザーの学習履歴
+                histories = History.query.filter_by(user_id=user.id).all()
+                
+                if len(histories) >= 10:
+                    room_stats['active_users'] += 1
+                
+                attempts = len(histories)
+                correct = sum(1 for h in histories if h.is_correct)
+                accuracy = (correct / attempts * 100) if attempts > 0 else 0
+                
+                room_stats['total_attempts'] += attempts
+                room_stats['total_correct'] += correct
+                
+                # 個別スコア
+                mastered = calculate_mastered_problems(user.id)
+                coverage = calculate_coverage_rate(user.id)
+                balance_score = calculate_balance_score(mastered, accuracy, attempts)
+                
+                user_scores.append({
+                    'username': user.username,
+                    'balance_score': balance_score,
+                    'accuracy': accuracy,
+                    'mastered': mastered,
+                    'coverage': coverage
+                })
+            
+            if user_scores:
+                # 平均値を計算
+                room_stats['avg_accuracy'] = sum(u['accuracy'] for u in user_scores) / len(user_scores)
+                room_stats['avg_mastered'] = sum(u['mastered'] for u in user_scores) / len(user_scores)
+                room_stats['avg_coverage'] = sum(u['coverage'] for u in user_scores) / len(user_scores)
+                room_stats['avg_balance_score'] = sum(u['balance_score'] for u in user_scores) / len(user_scores)
+                
+                # トップ3ユーザー
+                user_scores.sort(key=lambda x: x['balance_score'], reverse=True)
+                room_stats['top_scores'] = user_scores[:3]
+            
+            rooms_comparison.append(room_stats)
+        
+        return jsonify({
+            'status': 'success',
+            'rooms_comparison': rooms_comparison,
+            'total_rooms': len(rooms_comparison)
+        })
+        
+    except Exception as e:
+        print(f"❌ 部屋比較データ取得エラー: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': '部屋比較データの取得に失敗しました'
+        }), 500
+
+@app.route('/quiz', methods=['GET', 'POST'])
+def quiz():
+    """クイズページ - 学習履歴を保存"""
+    if request.method == 'POST':
+        try:
+            # フォームデータを取得
+            data = request.get_json() or request.form
+            
+            user_id = session.get('user_id')
+            chapter = int(data.get('chapter', 0))
+            number = int(data.get('number', 0))
+            question = data.get('question', '')
+            correct_answer = data.get('correct_answer', '')
+            user_answer = data.get('user_answer', '')
+            
+            # 回答を処理し、履歴を保存
+            result = process_quiz_answer(
+                user_id=user_id,
+                chapter=chapter,
+                number=number,
+                question=question,
+                correct_answer=correct_answer,
+                user_answer=user_answer
+            )
+            
+            return jsonify({
+                'status': 'success',
+                'is_correct': result['is_correct'],
+                'correct_answer': correct_answer,
+                'saved': result['saved']
+            })
+            
+        except Exception as e:
+            print(f"❌ クイズ処理エラー: {str(e)}")
+            return jsonify({
+                'status': 'error',
+                'message': 'クイズ処理中にエラーが発生しました'
+            }), 500
     
+    # GETリクエストの場合は通常のクイズページを表示
+    return render_template('quiz.html')
+
+@app.route('/api/user_statistics')
+def get_user_statistics():
+    """ユーザーの統計情報を取得"""
+    try:
+        user_id = session.get('user_id')
+        if not user_id:
+            return jsonify({'status': 'error', 'message': 'ログインが必要です'}), 401
+        
+        # 基本統計
+        histories = History.query.filter_by(user_id=user_id).all()
+        total_attempts = len(histories)
+        total_correct = sum(1 for h in histories if h.is_correct)
+        accuracy_rate = (total_correct / total_attempts * 100) if total_attempts > 0 else 0
+        
+        # マスター数計算
+        mastered_count = calculate_mastered_problems(user_id)
+        
+        # 網羅率計算
+        coverage_rate = calculate_coverage_rate(user_id)
+        
+        # 弱点問題
+        weak_problems = get_weak_problems(user_id)
+        
+        # 最近の学習履歴
+        recent_history = get_user_history(user_id, limit=10)
+        
+        return jsonify({
+            'status': 'success',
+            'statistics': {
+                'total_attempts': total_attempts,
+                'total_correct': total_correct,
+                'accuracy_rate': accuracy_rate,
+                'mastered_count': mastered_count,
+                'coverage_rate': coverage_rate
+            },
+            'weak_problems': weak_problems[:10],  # 上位10問
+            'recent_history': [{
+                'chapter': h.chapter,
+                'number': h.number,
+                'question': h.question,
+                'is_correct': h.is_correct,
+                'created_at': h.created_at.isoformat()
+            } for h in recent_history]
+        })
+        
+    except Exception as e:
+        print(f"❌ ユーザー統計取得エラー: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': 'ユーザー統計の取得に失敗しました'
+        }), 500
+
+@app.route('/api/weak_problems')
+def get_user_weak_problems():
+    """ユーザーの弱点問題を取得"""
+    try:
+        user_id = session.get('user_id')
+        if not user_id:
+            return jsonify({'status': 'error', 'message': 'ログインが必要です'}), 401
+        
+        # 弱点問題を取得
+        weak_problems = get_weak_problems(user_id, min_attempts=3, max_accuracy=60)
+        
+        return jsonify({
+            'status': 'success',
+            'weak_problems': weak_problems,
+            'total_weak_problems': len(weak_problems)
+        })
+        
+    except Exception as e:
+        print(f"❌ 弱点問題取得エラー: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': '弱点問題の取得に失敗しました'
+        }), 500
+
+@app.route('/api/practice_weak_problems')
+def practice_weak_problems():
+    """弱点問題を練習用に取得"""
+    try:
+        user_id = session.get('user_id')
+        if not user_id:
+            return jsonify({'status': 'error', 'message': 'ログインが必要です'}), 401
+        
+        # 弱点問題を取得
+        weak_problems = get_weak_problems(user_id, min_attempts=3, max_accuracy=70)
+        
+        if not weak_problems:
+            return jsonify({
+                'status': 'success',
+                'message': '弱点問題はありません！よく頑張っています！',
+                'problems': []
+            })
+        
+        # 問題をランダムに選択（最大10問）
+        selected_problems = random.sample(
+            weak_problems, 
+            min(10, len(weak_problems))
+        )
+        
+        return jsonify({
+            'status': 'success',
+            'problems': selected_problems,
+            'total_available': len(weak_problems)
+        })
+        
+    except Exception as e:
+        print(f"❌ 弱点問題練習取得エラー: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': '弱点問題の取得に失敗しました'
+        }), 500
+
+@app.route('/api/chapter_statistics/<int:chapter>')
+def get_chapter_statistics(chapter):
+    """特定の章の統計情報を取得"""
+    try:
+        user_id = session.get('user_id')
+        if not user_id:
+            return jsonify({'status': 'error', 'message': 'ログインが必要です'}), 401
+        
+        # 章の履歴を取得
+        chapter_histories = History.query.filter_by(
+            user_id=user_id,
+            chapter=chapter
+        ).all()
+        
+        if not chapter_histories:
+            return jsonify({
+                'status': 'success',
+                'chapter': chapter,
+                'statistics': {
+                    'total_attempts': 0,
+                    'total_correct': 0,
+                    'accuracy_rate': 0,
+                    'unique_problems': 0,
+                    'mastered_problems': 0
+                }
+            })
+        
+        # 統計計算
+        total_attempts = len(chapter_histories)
+        total_correct = sum(1 for h in chapter_histories if h.is_correct)
+        accuracy_rate = (total_correct / total_attempts * 100) if total_attempts > 0 else 0
+        
+        # 問題別の統計
+        unique_problems = set((h.chapter, h.number) for h in chapter_histories)
+        
+        # マスター問題数（その章の80%以上正解の問題）
+        mastered_problems = 0
+        for chapter_num, number in unique_problems:
+            problem_histories = [h for h in chapter_histories if h.number == number]
+            if len(problem_histories) >= 3:  # 最低3回回答
+                problem_accuracy = sum(1 for h in problem_histories if h.is_correct) / len(problem_histories) * 100
+                if problem_accuracy >= 80:
+                    mastered_problems += 1
+        
+        return jsonify({
+            'status': 'success',
+            'chapter': chapter,
+            'statistics': {
+                'total_attempts': total_attempts,
+                'total_correct': total_correct,
+                'accuracy_rate': accuracy_rate,
+                'unique_problems': len(unique_problems),
+                'mastered_problems': mastered_problems
+            }
+        })
+        
+    except Exception as e:
+        print(f"❌ 章別統計取得エラー: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': '章別統計の取得に失敗しました'
+        }), 500
+
+@app.route('/api/learning_progress')
+def get_learning_progress():
+    """学習進捗の詳細を取得"""
+    try:
+        user_id = session.get('user_id')
+        if not user_id:
+            return jsonify({'status': 'error', 'message': 'ログインが必要です'}), 401
+        
+        # 章別進捗を取得
+        chapter_progress = {}
+        
+        # 全章の履歴を取得
+        all_histories = History.query.filter_by(user_id=user_id).all()
+        
+        # 章ごとにグループ化
+        for history in all_histories:
+            chapter = history.chapter
+            if chapter not in chapter_progress:
+                chapter_progress[chapter] = {
+                    'histories': [],
+                    'total_attempts': 0,
+                    'total_correct': 0,
+                    'accuracy_rate': 0,
+                    'unique_problems': set(),
+                    'mastered_problems': 0
+                }
+            
+            chapter_progress[chapter]['histories'].append(history)
+            chapter_progress[chapter]['total_attempts'] += 1
+            if history.is_correct:
+                chapter_progress[chapter]['total_correct'] += 1
+            chapter_progress[chapter]['unique_problems'].add(history.number)
+        
+        # 章別統計を計算
+        for chapter, data in chapter_progress.items():
+            if data['total_attempts'] > 0:
+                data['accuracy_rate'] = (data['total_correct'] / data['total_attempts']) * 100
+            
+            # マスター問題数を計算
+            for number in data['unique_problems']:
+                problem_histories = [h for h in data['histories'] if h.number == number]
+                if len(problem_histories) >= 3:
+                    problem_accuracy = sum(1 for h in problem_histories if h.is_correct) / len(problem_histories) * 100
+                    if problem_accuracy >= 80:
+                        data['mastered_problems'] += 1
+            
+            # 不要なデータを削除
+            del data['histories']
+            data['unique_problems'] = len(data['unique_problems'])
+        
+        return jsonify({
+            'status': 'success',
+            'chapter_progress': chapter_progress,
+            'total_chapters': len(chapter_progress)
+        })
+        
+    except Exception as e:
+        print(f"❌ 学習進捗取得エラー: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': '学習進捗の取得に失敗しました'
+        }), 500
+
+# 学習履歴をクリアする管理者用機能
+@app.route('/api/admin/clear_user_history/<int:user_id>', methods=['POST'])
+def clear_user_history(user_id):
+    """特定ユーザーの学習履歴をクリア（管理者用）"""
+    try:
+        # 管理者権限チェック
+        if not session.get('admin_logged_in'):
+            return jsonify({'status': 'error', 'message': '管理者権限が必要です'}), 403
+        
+        # ユーザーの存在確認
+        user = User.query.get(user_id)
+        if not user:
+            return jsonify({'status': 'error', 'message': 'ユーザーが見つかりません'}), 404
+        
+        # 履歴を削除
+        deleted_count = History.query.filter_by(user_id=user_id).delete()
+        db.session.commit()
+        
+        return jsonify({
+            'status': 'success',
+            'message': f'ユーザー {user.username} の学習履歴を削除しました',
+            'deleted_count': deleted_count
+        })
+        
+    except Exception as e:
+        print(f"❌ 学習履歴削除エラー: {str(e)}")
+        db.session.rollback()
+        return jsonify({
+            'status': 'error',
+            'message': '学習履歴の削除に失敗しました'
+        }), 500
+
+# 管理者用：システム統計API
+@app.route('/api/admin/system_stats', methods=['GET'])
+def get_system_stats():
+    """管理者用：システム全体の統計情報を取得"""
+    try:
+        # 管理者権限チェック
+        if not session.get('admin_logged_in'):
+            return jsonify({'status': 'error', 'message': '管理者権限が必要です'}), 403
+        
+        # 基本統計
+        total_users = User.query.count()
+        total_rooms = db.session.query(User.room_number).distinct().count()
+        total_histories = History.query.count()
+        total_words = Word.query.filter_by(enabled=True).count()
+        
+        # 活発なユーザー数（過去7日間にログインしたユーザー）
+        from datetime import datetime, timedelta
+        week_ago = datetime.now() - timedelta(days=7)
+        active_users = User.query.filter(User.last_login >= week_ago).count()
+        
+        # 今日の学習活動
+        today = datetime.now().date()
+        today_histories = History.query.filter(
+            db.func.date(History.created_at) == today
+        ).count()
+        
+        # 最も活発な部屋
+        most_active_room = db.session.query(
+            User.room_number,
+            db.func.count(History.id).label('total_activities')
+        ).join(History).group_by(User.room_number).order_by(
+            db.func.count(History.id).desc()
+        ).first()
+        
+        # 平均正答率
+        avg_accuracy = db.session.query(
+            db.func.avg(db.case([(History.is_correct == True, 100)], else_=0))
+        ).scalar() or 0
+        
+        return jsonify({
+            'status': 'success',
+            'system_stats': {
+                'total_users': total_users,
+                'total_rooms': total_rooms,
+                'total_histories': total_histories,
+                'total_words': total_words,
+                'active_users_week': active_users,
+                'today_activities': today_histories,
+                'most_active_room': most_active_room.room_number if most_active_room else None,
+                'most_active_room_activities': most_active_room.total_activities if most_active_room else 0,
+                'system_avg_accuracy': round(avg_accuracy, 1)
+            }
+        })
+        
+    except Exception as e:
+        print(f"❌ システム統計取得エラー: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': 'システム統計の取得に失敗しました'
+        }), 500
+
 # ===== データ永続化チェック機能 =====
 def check_data_persistence():
     """データの永続化状況をチェック"""
@@ -1351,6 +2472,25 @@ def check_data_persistence():
     except Exception as e:
         print(f"❌ データ永続化チェックエラー: {e}")
         return False
+
+# 既存のアプリケーションに追加する場合
+def migrate_to_history_model():
+    """既存のアプリケーションにHistoryモデルを追加"""
+    try:
+        # テーブルが存在しない場合のみ作成
+        if not db.engine.dialect.has_table(db.engine, 'history'):
+            db.create_all()
+            print("✅ Historyテーブルを作成しました")
+        else:
+            print("ℹ️ Historyテーブルは既に存在します")
+    except Exception as e:
+        print(f"❌ マイグレーションエラー: {str(e)}")
+
+# アプリケーション起動時に実行
+if __name__ == '__main__':
+    with app.app_context():
+        migrate_to_history_model()
+    app.run(debug=True)
 
 # ヘルパー関数
 def generate_reset_token():
