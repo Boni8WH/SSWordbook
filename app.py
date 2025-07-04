@@ -6726,6 +6726,272 @@ def admin_check_user_stats_detailed():
             'message': f'詳細確認エラー: {str(e)}'
         }), 500
 
+# app.py に以下のデバッグ・修正機能を追加してください
+
+@app.route('/admin/debug_user_data_detailed', methods=['POST'])
+def admin_debug_user_data_detailed():
+    """ユーザーデータの詳細デバッグ"""
+    if not session.get('admin_logged_in'):
+        return jsonify({'status': 'error', 'message': '管理者権限が必要です'}), 403
+    
+    try:
+        print("🔍 ユーザーデータ詳細デバッグ開始...")
+        
+        # 最初の3人のユーザーを詳細分析
+        users = User.query.filter(User.username != 'admin').limit(3).all()
+        debug_results = []
+        
+        for user in users:
+            print(f"\n=== {user.username} のデバッグ ===")
+            
+            # 1. データベースの生データを確認
+            raw_problem_history = user.problem_history
+            raw_incorrect_words = user.incorrect_words
+            
+            print(f"生データ - problem_history: {raw_problem_history[:100]}...")
+            print(f"生データ - incorrect_words: {raw_incorrect_words[:100]}...")
+            
+            # 2. パース後のデータを確認
+            try:
+                parsed_history = user.get_problem_history()
+                parsed_incorrect = user.get_incorrect_words()
+                print(f"パース後 - history: {len(parsed_history)}項目")
+                print(f"パース後 - incorrect: {len(parsed_incorrect)}項目")
+            except Exception as parse_error:
+                print(f"パースエラー: {parse_error}")
+                parsed_history = {}
+                parsed_incorrect = []
+            
+            # 3. 学習履歴の詳細
+            history_details = {}
+            total_raw_attempts = 0
+            
+            if parsed_history:
+                # 最初の3件の詳細を見る
+                sample_items = list(parsed_history.items())[:3]
+                for problem_id, history_data in sample_items:
+                    correct = history_data.get('correct_attempts', 0)
+                    incorrect = history_data.get('incorrect_attempts', 0)
+                    total_item_attempts = correct + incorrect
+                    total_raw_attempts += total_item_attempts
+                    
+                    history_details[problem_id] = {
+                        'correct_attempts': correct,
+                        'incorrect_attempts': incorrect,
+                        'total_attempts': total_item_attempts
+                    }
+                    print(f"  {problem_id}: 正解{correct}, 不正解{incorrect}")
+            
+            # 4. Historyテーブルからの確認
+            db_histories = History.query.filter_by(user_id=user.id).all()
+            db_attempts = len(db_histories)
+            db_correct = sum(1 for h in db_histories if h.is_correct)
+            
+            print(f"Historyテーブル: {db_attempts}回答, {db_correct}正解")
+            
+            # 5. 部屋の単語データ確認
+            word_data = load_word_data_for_room(user.room_number)
+            print(f"部屋の単語データ: {len(word_data)}問")
+            
+            # 6. 問題IDのマッチング確認
+            matched_ids = 0
+            if parsed_history and word_data:
+                for problem_id in parsed_history.keys():
+                    for word in word_data:
+                        if get_problem_id(word) == problem_id:
+                            matched_ids += 1
+                            break
+            
+            print(f"IDマッチング: {matched_ids}/{len(parsed_history)}")
+            
+            debug_results.append({
+                'username': user.username,
+                'room_number': user.room_number,
+                'raw_history_length': len(raw_problem_history or ''),
+                'raw_incorrect_length': len(raw_incorrect_words or ''),
+                'parsed_history_count': len(parsed_history),
+                'parsed_incorrect_count': len(parsed_incorrect),
+                'total_raw_attempts': total_raw_attempts,
+                'db_attempts': db_attempts,
+                'db_correct': db_correct,
+                'word_data_count': len(word_data),
+                'matched_ids': matched_ids,
+                'history_details': history_details,
+                'has_problem_data': raw_problem_history is not None and raw_problem_history != '{}',
+                'sample_raw_data': {
+                    'problem_history': raw_problem_history[:200] if raw_problem_history else None,
+                    'incorrect_words': raw_incorrect_words[:200] if raw_incorrect_words else None
+                }
+            })
+        
+        return jsonify({
+            'status': 'success',
+            'debug_results': debug_results,
+            'summary': {
+                'users_analyzed': len(debug_results),
+                'users_with_data': sum(1 for r in debug_results if r['has_problem_data']),
+                'total_attempts_found': sum(r['total_raw_attempts'] for r in debug_results)
+            }
+        })
+        
+    except Exception as e:
+        print(f"❌ デバッグエラー: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'status': 'error',
+            'message': f'デバッグエラー: {str(e)}'
+        }), 500
+
+@app.route('/admin/fix_user_data_columns', methods=['POST'])
+def admin_fix_user_data_columns():
+    """ユーザーデータカラムの修復"""
+    if not session.get('admin_logged_in'):
+        return jsonify({'status': 'error', 'message': '管理者権限が必要です'}), 403
+    
+    try:
+        print("🔧 ユーザーデータカラム修復開始...")
+        
+        # Userテーブルの構造確認
+        with db.engine.connect() as conn:
+            # カラム存在確認
+            result = conn.execute(text("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'user'
+                ORDER BY ordinal_position
+            """))
+            existing_columns = [row[0] for row in result.fetchall()]
+            print(f"既存カラム: {existing_columns}")
+            
+            # 必要なカラムが存在しない場合は追加
+            required_columns = ['problem_history', 'incorrect_words']
+            added_columns = []
+            
+            for col in required_columns:
+                if col not in existing_columns:
+                    print(f"🔧 {col}カラムを追加中...")
+                    if col == 'problem_history':
+                        conn.execute(text('ALTER TABLE "user" ADD COLUMN problem_history TEXT DEFAULT \'{}\''))
+                    elif col == 'incorrect_words':
+                        conn.execute(text('ALTER TABLE "user" ADD COLUMN incorrect_words TEXT DEFAULT \'[]\''))
+                    added_columns.append(col)
+            
+            if added_columns:
+                conn.commit()
+                print(f"✅ カラム追加完了: {added_columns}")
+        
+        # 空のデータを初期化
+        users = User.query.filter(User.username != 'admin').all()
+        fixed_count = 0
+        
+        for user in users:
+            needs_update = False
+            
+            if user.problem_history is None:
+                user.problem_history = '{}'
+                needs_update = True
+                print(f"  {user.username}: problem_history を初期化")
+            
+            if user.incorrect_words is None:
+                user.incorrect_words = '[]'
+                needs_update = True
+                print(f"  {user.username}: incorrect_words を初期化")
+            
+            if needs_update:
+                fixed_count += 1
+        
+        if fixed_count > 0:
+            db.session.commit()
+            print(f"✅ {fixed_count}人のデータを初期化")
+        
+        return jsonify({
+            'status': 'success',
+            'message': f'ユーザーデータカラムを修復しました',
+            'added_columns': added_columns,
+            'fixed_users': fixed_count
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"❌ カラム修復エラー: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': f'修復エラー: {str(e)}'
+        }), 500
+
+@app.route('/admin/create_sample_data', methods=['POST'])
+def admin_create_sample_data():
+    """テスト用のサンプルデータを作成"""
+    if not session.get('admin_logged_in'):
+        return jsonify({'status': 'error', 'message': '管理者権限が必要です'}), 403
+    
+    try:
+        print("🧪 サンプルデータ作成開始...")
+        
+        # 最初のユーザーにサンプルデータを追加
+        user = User.query.filter(User.username != 'admin').first()
+        if not user:
+            return jsonify({
+                'status': 'error',
+                'message': 'テスト用ユーザーが見つかりません'
+            }), 404
+        
+        print(f"📝 {user.username} にサンプルデータを作成...")
+        
+        # サンプル学習履歴を作成
+        sample_history = {
+            "001-001-ファラオの墓として建設された巨大-ピラミッド": {
+                "correct_attempts": 3,
+                "incorrect_attempts": 1,
+                "correct_streak": 2,
+                "last_answered": "2024-01-15T10:30:00"
+            },
+            "001-002-古代エジプトの象形文字を何とい-ヒエログリフ": {
+                "correct_attempts": 2,
+                "incorrect_attempts": 2,
+                "correct_streak": 1,
+                "last_answered": "2024-01-15T11:00:00"
+            },
+            "001-003-シュメール人が発明した文字は-楔形文字": {
+                "correct_attempts": 4,
+                "incorrect_attempts": 0,
+                "correct_streak": 4,
+                "last_answered": "2024-01-15T11:30:00"
+            }
+        }
+        
+        sample_incorrect = [
+            "001-002-古代エジプトの象形文字を何とい-ヒエログリフ"
+        ]
+        
+        # データを保存
+        user.set_problem_history(sample_history)
+        user.set_incorrect_words(sample_incorrect)
+        
+        db.session.commit()
+        
+        print(f"✅ {user.username} にサンプルデータを作成完了")
+        
+        return jsonify({
+            'status': 'success',
+            'message': f'{user.username} にサンプル学習データを作成しました',
+            'sample_data': {
+                'history_count': len(sample_history),
+                'total_attempts': sum(h['correct_attempts'] + h['incorrect_attempts'] for h in sample_history.values()),
+                'total_correct': sum(h['correct_attempts'] for h in sample_history.values()),
+                'incorrect_count': len(sample_incorrect)
+            }
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"❌ サンプルデータ作成エラー: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': f'サンプルデータ作成エラー: {str(e)}'
+        }), 500
+
 # 部屋設定管理
 @app.route('/admin/get_room_setting', methods=['POST'])
 def admin_get_room_setting():
