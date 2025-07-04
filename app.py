@@ -3972,12 +3972,23 @@ def progress_page():
 
         print(f"✅ 進捗計算完了: {len(ranking_data)}人のランキング")
 
+        # JSONシリアライズ可能な形式に変換
+        ranking_data_safe = []
+        for user_data in ranking_data:
+            safe_data = {}
+            for key, value in user_data.items():
+                if isinstance(value, (int, float, str, bool, type(None))):
+                    safe_data[key] = value
+                else:
+                    safe_data[key] = str(value)
+            ranking_data_safe.append(safe_data)
+
         context = get_template_context()
         context.update({
             'current_user': current_user,
             'current_user_stats': current_user_stats,
             'user_progress_by_chapter': user_progress_by_chapter,
-            'ranking_data': ranking_data,
+            'ranking_data': ranking_data_safe,
             'total_questions_for_room': total_questions_for_room_ranking
         })
 
@@ -3989,6 +4000,226 @@ def progress_page():
         traceback.print_exc()
         flash('進捗データの取得中にエラーが発生しました。', 'danger')
         return redirect(url_for('index'))
+
+@app.route('/update_my_progress', methods=['POST'])
+def update_my_progress():
+    """個人の進捗データを手動更新"""
+    try:
+        if 'user_id' not in session:
+            return jsonify(status='error', message='ログインが必要です'), 401
+        
+        current_user = User.query.get(session['user_id'])
+        if not current_user:
+            return jsonify(status='error', message='ユーザーが見つかりません'), 404
+        
+        print(f"📊 {current_user.username}の進捗データを手動更新中...")
+        
+        # 進捗データを再計算（進捗ページと同じロジック）
+        user_problem_history = current_user.get_problem_history()
+        word_data = load_word_data_for_room(current_user.room_number)
+        room_setting = RoomSetting.query.filter_by(room_number=current_user.room_number).first()
+        max_enabled_unit_num_str = room_setting.max_enabled_unit_number if room_setting else "9999"
+        parsed_max_enabled_unit_num = parse_unit_number(max_enabled_unit_num_str)
+
+        # 統計を計算
+        total_attempts = 0
+        total_correct = 0
+        mastered_count = 0
+        total_questions_for_room = 0
+
+        # 有効な問題数をカウント
+        for word in word_data:
+            is_word_enabled_in_csv = word['enabled']
+            is_unit_enabled_by_room_setting = parse_unit_number(word['number']) <= parsed_max_enabled_unit_num
+            if is_word_enabled_in_csv and is_unit_enabled_by_room_setting:
+                total_questions_for_room += 1
+
+        # 学習履歴から統計を計算
+        for problem_id, history in user_problem_history.items():
+            matched_word = None
+            for word in word_data:
+                if get_problem_id(word) == problem_id:
+                    matched_word = word
+                    break
+
+            if matched_word:
+                is_word_enabled_in_csv = matched_word['enabled']
+                is_unit_enabled_by_room_setting = parse_unit_number(matched_word['number']) <= parsed_max_enabled_unit_num
+
+                if is_word_enabled_in_csv and is_unit_enabled_by_room_setting:
+                    correct_attempts = history.get('correct_attempts', 0)
+                    incorrect_attempts = history.get('incorrect_attempts', 0)
+                    problem_total_attempts = correct_attempts + incorrect_attempts
+                    
+                    total_attempts += problem_total_attempts
+                    total_correct += correct_attempts
+                    
+                    if problem_total_attempts > 0:
+                        accuracy_rate = (correct_attempts / problem_total_attempts) * 100
+                        if accuracy_rate >= 80.0:
+                            mastered_count += 1
+
+        # スコア計算
+        coverage_rate = (mastered_count / total_questions_for_room * 100) if total_questions_for_room > 0 else 0
+        accuracy_rate = (total_correct / total_attempts * 100) if total_attempts > 0 else 0
+        
+        EXPECTED_AVG_ACCURACY = 0.7
+        CONFIDENCE_ATTEMPTS = 10
+        PRIOR_CORRECT = EXPECTED_AVG_ACCURACY * CONFIDENCE_ATTEMPTS
+        PRIOR_ATTEMPTS = CONFIDENCE_ATTEMPTS
+        
+        if total_attempts == 0:
+            bayesian_accuracy = 0
+            balance_score = 0
+        else:
+            bayesian_accuracy = (PRIOR_CORRECT + total_correct) / (PRIOR_ATTEMPTS + total_attempts)
+            balance_score = (
+                (mastered_count ** 1.3) * 10 +
+                (bayesian_accuracy ** 2) * 500 +
+                math.log(total_attempts + 1) * 20
+            ) / 100
+
+        print(f"✅ 更新完了: マスター{mastered_count}問, 正答率{accuracy_rate:.1f}%, バランススコア{balance_score:.1f}")
+
+        return jsonify({
+            'status': 'success',
+            'message': '進捗データを更新しました',
+            'stats': {
+                'total_attempts': total_attempts,
+                'total_correct': total_correct,
+                'accuracy_rate': round(accuracy_rate, 1),
+                'coverage_rate': round(coverage_rate, 1),
+                'mastered_count': mastered_count,
+                'balance_score': round(balance_score, 1),
+                'total_questions_for_room': total_questions_for_room
+            }
+        })
+        
+    except Exception as e:
+        print(f"❌ 進捗更新エラー: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify(status='error', message=f'進捗更新エラー: {str(e)}'), 500
+
+@app.route('/api/get_ranking_data')
+def api_get_ranking_data():
+    """ランキングデータをJSON形式で取得"""
+    try:
+        if 'user_id' not in session:
+            return jsonify(status='error', message='ログインが必要です'), 401
+        
+        current_user = User.query.get(session['user_id'])
+        if not current_user:
+            return jsonify(status='error', message='ユーザーが見つかりません'), 404
+        
+        # 進捗ページと同じランキング計算ロジック
+        word_data = load_word_data_for_room(current_user.room_number)
+        room_setting = RoomSetting.query.filter_by(room_number=current_user.room_number).first()
+        max_enabled_unit_num_str = room_setting.max_enabled_unit_number if room_setting else "9999"
+        parsed_max_enabled_unit_num = parse_unit_number(max_enabled_unit_num_str)
+        
+        # 有効な問題数を計算
+        total_questions_for_room = 0
+        for word in word_data:
+            is_word_enabled_in_csv = word['enabled']
+            is_unit_enabled_by_room_setting = parse_unit_number(word['number']) <= parsed_max_enabled_unit_num
+            if is_word_enabled_in_csv and is_unit_enabled_by_room_setting:
+                total_questions_for_room += 1
+        
+        # 同じ部屋のユーザーを取得
+        all_users_for_ranking = User.query.filter_by(room_number=current_user.room_number).all()
+        ranking_data = []
+        
+        for user_obj in all_users_for_ranking:
+            if user_obj.username == 'admin':
+                continue
+                
+            total_attempts = 0
+            total_correct = 0
+            mastered_problem_ids = set()
+
+            user_obj_problem_history = user_obj.get_problem_history()
+
+            if isinstance(user_obj_problem_history, dict):
+                for problem_id, history in user_obj_problem_history.items():
+                    matched_word = None
+                    for word in word_data:
+                        generated_id = get_problem_id(word)
+                        if generated_id == problem_id:
+                            matched_word = word
+                            break
+
+                    if matched_word:
+                        is_word_enabled_in_csv = matched_word['enabled']
+                        is_unit_enabled_by_room_setting = parse_unit_number(matched_word['number']) <= parsed_max_enabled_unit_num
+
+                        if is_word_enabled_in_csv and is_unit_enabled_by_room_setting:
+                            correct_attempts = history.get('correct_attempts', 0)
+                            incorrect_attempts = history.get('incorrect_attempts', 0)
+                            problem_total_attempts = correct_attempts + incorrect_attempts
+                            
+                            total_attempts += problem_total_attempts
+                            total_correct += correct_attempts
+                            
+                            if problem_total_attempts > 0:
+                                accuracy_rate = (correct_attempts / problem_total_attempts) * 100
+                                if accuracy_rate >= 80.0:
+                                    mastered_problem_ids.add(problem_id)
+            
+            user_mastered_count = len(mastered_problem_ids)
+            coverage_rate = (user_mastered_count / total_questions_for_room * 100) if total_questions_for_room > 0 else 0
+            
+            # ベイズ統計によるスコア計算
+            EXPECTED_AVG_ACCURACY = 0.7
+            CONFIDENCE_ATTEMPTS = 10
+            PRIOR_CORRECT = EXPECTED_AVG_ACCURACY * CONFIDENCE_ATTEMPTS
+            PRIOR_ATTEMPTS = CONFIDENCE_ATTEMPTS
+            
+            if total_attempts == 0:
+                bayesian_accuracy = 0
+                balance_score = 0
+            else:
+                bayesian_accuracy = (PRIOR_CORRECT + total_correct) / (PRIOR_ATTEMPTS + total_attempts)
+                balance_score = (
+                    (user_mastered_count ** 1.3) * 10 +
+                    (bayesian_accuracy ** 2) * 500 +
+                    math.log(total_attempts + 1) * 20
+                ) / 100
+            
+            accuracy_rate = (total_correct / total_attempts * 100) if total_attempts > 0 else 0
+
+            user_data = {
+                'username': user_obj.username,
+                'total_attempts': total_attempts,
+                'total_correct': total_correct,
+                'accuracy_rate': round(accuracy_rate, 1),
+                'coverage_rate': round(coverage_rate, 1),
+                'mastered_count': user_mastered_count,
+                'balance_score': round(balance_score, 1),
+                'total_questions_for_room': total_questions_for_room
+            }
+            
+            ranking_data.append(user_data)
+        
+        # ランキングをバランススコア順でソート
+        ranking_data.sort(key=lambda x: x['balance_score'], reverse=True)
+        
+        # 表示人数制限
+        display_count = 10
+        if room_setting and hasattr(room_setting, 'ranking_display_count'):
+            display_count = room_setting.ranking_display_count or 10
+        
+        ranking_data = ranking_data[:display_count]
+        
+        return jsonify({
+            'status': 'success',
+            'ranking_data': ranking_data,
+            'total_questions_for_room': total_questions_for_room
+        })
+        
+    except Exception as e:
+        print(f"❌ ランキングデータ取得エラー: {e}")
+        return jsonify(status='error', message=str(e)), 500
 
 # ====================================================================
 # 管理者ページ
