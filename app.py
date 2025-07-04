@@ -750,7 +750,7 @@ def migrate_database():
                     with db.engine.connect() as conn:
                         conn.execute(text('ALTER TABLE "user" ADD COLUMN is_first_login BOOLEAN DEFAULT TRUE'))
                         # 既存のadminユーザーは初回ログイン完了済みにする
-                        conn.execute(text('UPDATE "user" SET is_first_login = FALSE WHERE username = \'admin\''))
+                        conn.execute(text("UPDATE \"user\" SET is_first_login = FALSE WHERE username = 'admin'"))
                         conn.commit()
                     print("✅ is_first_loginカラムを追加しました。")
                 
@@ -1175,7 +1175,150 @@ def send_password_reset_email(user, email, token):
         
         raise e
 
-# app.py に以下のルートを追加してください
+# app.py に緊急マイグレーション用のルートを追加
+
+@app.route('/admin/add_first_login_columns', methods=['POST'])
+def admin_add_first_login_columns():
+    """初回ログイン用カラムを手動で追加"""
+    if not session.get('admin_logged_in'):
+        return jsonify({'status': 'error', 'message': '管理者権限が必要です'}), 403
+    
+    try:
+        print("🔧 初回ログイン用カラムの追加を開始...")
+        
+        with db.engine.connect() as conn:
+            # 現在のカラムを確認
+            result = conn.execute(text("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'user'
+            """))
+            existing_columns = [row[0] for row in result.fetchall()]
+            print(f"📋 既存カラム: {existing_columns}")
+            
+            added_columns = []
+            
+            # is_first_loginカラムを追加
+            if 'is_first_login' not in existing_columns:
+                print("🔧 is_first_loginカラムを追加中...")
+                conn.execute(text('ALTER TABLE "user" ADD COLUMN is_first_login BOOLEAN DEFAULT TRUE'))
+                # 既存のadminユーザーは初回ログイン完了済みにする
+                conn.execute(text("UPDATE \"user\" SET is_first_login = FALSE WHERE username = 'admin'"))
+                added_columns.append('is_first_login')
+                print("✅ is_first_loginカラムを追加しました")
+            else:
+                print("✅ is_first_loginカラムは既に存在します")
+            
+            # password_changed_atカラムを追加
+            if 'password_changed_at' not in existing_columns:
+                print("🔧 password_changed_atカラムを追加中...")
+                conn.execute(text('ALTER TABLE "user" ADD COLUMN password_changed_at TIMESTAMP'))
+                added_columns.append('password_changed_at')
+                print("✅ password_changed_atカラムを追加しました")
+            else:
+                print("✅ password_changed_atカラムは既に存在します")
+            
+            conn.commit()
+            
+            return jsonify({
+                'status': 'success',
+                'message': f'初回ログイン用カラムの追加が完了しました',
+                'added_columns': added_columns
+            })
+        
+    except Exception as e:
+        print(f"❌ カラム追加エラー: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        return jsonify({
+            'status': 'error',
+            'message': f'カラム追加エラー: {str(e)}'
+        }), 500
+
+# app.py に緊急修復用のルートを追加
+
+@app.route('/emergency_add_first_login_columns')
+def emergency_add_first_login_columns():
+    """緊急修復：初回ログイン用カラムを追加"""
+    try:
+        print("🆘 緊急カラム追加開始...")
+        
+        # 既存のトランザクションをクリア
+        try:
+            db.session.rollback()
+        except:
+            pass
+        
+        with db.engine.connect() as conn:
+            # 現在のuserテーブルの構造を確認
+            try:
+                result = conn.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name = 'user'"))
+                existing_columns = [row[0] for row in result.fetchall()]
+                print(f"既存カラム: {existing_columns}")
+                
+                messages = []
+                
+                # is_first_loginカラムが存在しない場合は追加
+                if 'is_first_login' not in existing_columns:
+                    print("🔧 is_first_loginカラムを追加中...")
+                    conn.execute(text('ALTER TABLE "user" ADD COLUMN is_first_login BOOLEAN DEFAULT TRUE'))
+                    # 既存のadminユーザーは初回ログイン完了済みにする
+                    conn.execute(text("UPDATE \"user\" SET is_first_login = FALSE WHERE username = 'admin'"))
+                    messages.append("✅ is_first_loginカラムを追加しました")
+                else:
+                    messages.append("✅ is_first_loginカラムは既に存在します")
+                
+                # password_changed_atカラムが存在しない場合は追加
+                if 'password_changed_at' not in existing_columns:
+                    print("🔧 password_changed_atカラムを追加中...")
+                    conn.execute(text('ALTER TABLE "user" ADD COLUMN password_changed_at TIMESTAMP'))
+                    messages.append("✅ password_changed_atカラムを追加しました")
+                else:
+                    messages.append("✅ password_changed_atカラムは既に存在します")
+                
+                conn.commit()
+                
+                # 修復後の状態確認
+                result = conn.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name = 'user'"))
+                final_columns = [row[0] for row in result.fetchall()]
+                print(f"修復後のカラム: {final_columns}")
+                
+                return f"""
+                <h1>✅ 緊急修復完了</h1>
+                <p>初回ログイン用カラムの追加が完了しました。</p>
+                <h3>実行結果:</h3>
+                <ul>
+                    {''.join(f'<li>{msg}</li>' for msg in messages)}
+                </ul>
+                <h3>修復前のカラム:</h3>
+                <p>{existing_columns}</p>
+                <h3>修復後のカラム:</h3>
+                <p>{final_columns}</p>
+                <p><a href="/admin">管理者ページに戻る</a></p>
+                <p><a href="/login">ログインページに戻る</a></p>
+                """
+                
+            except Exception as fix_error:
+                print(f"修復エラー: {fix_error}")
+                return f"""
+                <h1>❌ 修復エラー</h1>
+                <p>エラー: {str(fix_error)}</p>
+                <p><a href="/login">ログインページに戻る</a></p>
+                """
+                
+    except Exception as e:
+        print(f"緊急修復失敗: {e}")
+        return f"""
+        <h1>💥 緊急修復失敗</h1>
+        <p>エラー: {str(e)}</p>
+        <p>手動でPostgreSQLにアクセスして以下のSQLを実行してください：</p>
+        <pre>
+ALTER TABLE "user" ADD COLUMN is_first_login BOOLEAN DEFAULT TRUE;
+ALTER TABLE "user" ADD COLUMN password_changed_at TIMESTAMP;
+UPDATE "user" SET is_first_login = FALSE WHERE username = 'admin';
+        </pre>
+        """
 
 @app.route('/admin/fix_progress_issue', methods=['POST'])
 def admin_fix_progress_issue():
