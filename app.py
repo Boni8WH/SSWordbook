@@ -177,9 +177,10 @@ def to_jst_filter(dt):
 
 # app.py の User モデルの定義を以下に置き換え
 class User(db.Model):
+    # 既存のカラム
     id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(80), nullable=False)  # 現在のアカウント名
-    original_username = db.Column(db.String(80), nullable=False)  # 最初に登録したアカウント名（新規追加）
+    username = db.Column(db.String(80), nullable=False)
+    original_username = db.Column(db.String(80), nullable=False)
     room_number = db.Column(db.String(50), nullable=False)
     _room_password_hash = db.Column(db.String(255))
     student_id = db.Column(db.String(50), nullable=False)
@@ -187,9 +188,13 @@ class User(db.Model):
     problem_history = db.Column(db.Text)
     incorrect_words = db.Column(db.Text)
     last_login = db.Column(db.DateTime, default=lambda: datetime.now(JST))
-    username_changed_at = db.Column(db.DateTime)  # アカウント名変更日時（新規追加）
-
-    # 複合ユニーク制約を追加：部屋番号 + 出席番号 + ユーザー名の組み合わせでユニーク
+    username_changed_at = db.Column(db.DateTime)
+    
+    # 🆕 初回ログイン対応で追加するカラム
+    is_first_login = db.Column(db.Boolean, default=True, nullable=False)
+    password_changed_at = db.Column(db.DateTime)
+    
+    # 複合ユニーク制約
     __table_args__ = (
         db.UniqueConstraint('room_number', 'student_id', 'username', 
                           name='unique_room_student_username'),
@@ -233,6 +238,16 @@ class User(db.Model):
         
         self.username = new_username
         self.username_changed_at = datetime.now(JST)
+    
+    def mark_first_login_completed(self):
+        """初回ログインを完了としてマークする"""
+        self.is_first_login = False
+    
+    def change_password_first_time(self, new_password):
+        """初回パスワード変更（個別パスワードのみ）"""
+        self.set_individual_password(new_password)
+        self.password_changed_at = datetime.now(JST)
+        self.mark_first_login_completed()
 
 class RoomSetting(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -729,6 +744,22 @@ def migrate_database():
                         conn.execute(text('ALTER TABLE "user" ADD COLUMN last_login TIMESTAMP'))
                         conn.commit()
                     print("✅ last_loginカラムを追加しました。")
+                
+                if 'is_first_login' not in columns:
+                    print("🔧 is_first_loginカラムを追加します...")
+                    with db.engine.connect() as conn:
+                        conn.execute(text('ALTER TABLE "user" ADD COLUMN is_first_login BOOLEAN DEFAULT TRUE'))
+                        # 既存のadminユーザーは初回ログイン完了済みにする
+                        conn.execute(text('UPDATE "user" SET is_first_login = FALSE WHERE username = \'admin\''))
+                        conn.commit()
+                    print("✅ is_first_loginカラムを追加しました。")
+                
+                if 'password_changed_at' not in columns:
+                    print("🔧 password_changed_atカラムを追加します...")
+                    with db.engine.connect() as conn:
+                        conn.execute(text('ALTER TABLE "user" ADD COLUMN password_changed_at TIMESTAMP'))
+                        conn.commit()
+                    print("✅ password_changed_atカラムを追加しました。")
             
             # 2. RoomSettingテーブルの確認
             if inspector.has_table('room_setting'):
@@ -1350,6 +1381,8 @@ def index():
         traceback.print_exc()
         return f"Internal Server Error: {e}", 500
 
+# app.py の login_page ルートを修正
+
 @app.route('/login', methods=['GET', 'POST'])
 def login_page():
     try:
@@ -1357,6 +1390,7 @@ def login_page():
             login_type = request.form.get('login_type', 'user')
             
             if login_type == 'admin':
+                # 管理者ログイン処理（変更なし）
                 admin_username = request.form.get('admin_username')
                 admin_password = request.form.get('admin_password')
                 
@@ -1378,6 +1412,7 @@ def login_page():
                     flash('管理者のユーザー名またはパスワードが間違っています。', 'danger')
             
             else:
+                # 一般ユーザーログイン処理
                 room_number = request.form.get('room_number')
                 room_password = request.form.get('room_password')
                 student_id = request.form.get('student_id')
@@ -1395,20 +1430,117 @@ def login_page():
                     user.last_login = datetime.now(JST)
                     db.session.commit()
 
+                    # 🆕 初回ログインチェック
+                    if hasattr(user, 'is_first_login') and user.is_first_login:
+                        flash('初回ログインです。セキュリティのためパスワードを変更してください。', 'info')
+                        return redirect(url_for('first_time_password_change'))
+                    
                     flash('ログインしました。', 'success')
                     return redirect(url_for('index'))
                 else:
                     flash('部屋番号、出席番号、またはパスワードが間違っています。', 'danger')
         
-        # フッター用のコンテキストを取得
+        # GET リクエスト時
         context = get_template_context()
-        return render_template('login.html')
+        return render_template('login.html', **context)
         
     except Exception as e:
         print(f"Error in login route: {e}")
         import traceback
         traceback.print_exc()
         return f"Login Error: {e}", 500
+
+# app.py に新しいルートを追加
+
+@app.route('/first_time_password_change', methods=['GET', 'POST'])
+def first_time_password_change():
+    """初回ログイン時の必須パスワード変更"""
+    try:
+        if 'user_id' not in session:
+            flash('ログインが必要です。', 'danger')
+            return redirect(url_for('login_page'))
+        
+        current_user = User.query.get(session['user_id'])
+        if not current_user:
+            flash('ユーザーが見つかりません。', 'danger')
+            return redirect(url_for('logout'))
+        
+        # 既に初回ログインが完了している場合は通常ページにリダイレクト
+        if hasattr(current_user, 'is_first_login') and not current_user.is_first_login:
+            return redirect(url_for('index'))
+        
+        if request.method == 'POST':
+            current_password = request.form.get('current_password')
+            new_password = request.form.get('new_password')
+            confirm_password = request.form.get('confirm_password')
+            
+            # バリデーション
+            if not all([current_password, new_password, confirm_password]):
+                flash('すべての項目を入力してください。', 'danger')
+                context = get_template_context()
+                context['current_user'] = current_user
+                return render_template('first_time_password_change.html', **context)
+            
+            # 現在のパスワード確認
+            if not current_user.check_individual_password(current_password):
+                flash('現在のパスワードが間違っています。', 'danger')
+                context = get_template_context()
+                context['current_user'] = current_user
+                return render_template('first_time_password_change.html', **context)
+            
+            # 新しいパスワードの確認
+            if new_password != confirm_password:
+                flash('新しいパスワードが一致しません。', 'danger')
+                context = get_template_context()
+                context['current_user'] = current_user
+                return render_template('first_time_password_change.html', **context)
+            
+            # パスワードの強度チェック
+            if len(new_password) < 6:
+                flash('新しいパスワードは6文字以上で入力してください。', 'danger')
+                context = get_template_context()
+                context['current_user'] = current_user
+                return render_template('first_time_password_change.html', **context)
+            
+            # 現在のパスワードと同じかチェック
+            if current_user.check_individual_password(new_password):
+                flash('新しいパスワードは現在のパスワードと異なるものにしてください。', 'danger')
+                context = get_template_context()
+                context['current_user'] = current_user
+                return render_template('first_time_password_change.html', **context)
+            
+            # パスワード変更実行
+            try:
+                if hasattr(current_user, 'change_password_first_time'):
+                    current_user.change_password_first_time(new_password)
+                else:
+                    # フォールバック: 古いバージョン対応
+                    current_user.set_individual_password(new_password)
+                    if hasattr(current_user, 'is_first_login'):
+                        current_user.is_first_login = False
+                    if hasattr(current_user, 'password_changed_at'):
+                        current_user.password_changed_at = datetime.now(JST)
+                
+                db.session.commit()
+                
+                flash('パスワードが正常に変更されました。学習を開始できます。', 'success')
+                return redirect(url_for('index'))
+                
+            except Exception as e:
+                db.session.rollback()
+                flash(f'パスワード変更中にエラーが発生しました: {str(e)}', 'danger')
+        
+        # GET リクエスト時
+        context = get_template_context()
+        context['current_user'] = current_user
+        return render_template('first_time_password_change.html', **context)
+        
+    except Exception as e:
+        print(f"Error in first_time_password_change: {e}")
+        import traceback
+        traceback.print_exc()
+        flash('システムエラーが発生しました。', 'danger')
+        return redirect(url_for('index'))
 
 @app.route('/logout')
 def logout():
@@ -3446,6 +3578,8 @@ def admin_app_info_reset():
         flash(f'アプリ情報のリセット中にエラーが発生しました: {str(e)}', 'danger')
         return redirect(url_for('admin_app_info'))
 
+# app.py の admin_add_user ルートを修正
+
 @app.route('/admin/add_user', methods=['POST'])
 def admin_add_user():
     try:
@@ -3463,7 +3597,7 @@ def admin_add_user():
             flash('すべての項目を入力してください。', 'danger')
             return redirect(url_for('admin_page'))
 
-        # 部屋番号 + ユーザー名の組み合わせでの重複チェック
+        # 重複チェック
         existing_user = User.query.filter_by(
             room_number=room_number, 
             username=username
@@ -3473,12 +3607,13 @@ def admin_add_user():
             flash(f'部屋{room_number}にユーザー名{username}は既に存在します。', 'danger')
             return redirect(url_for('admin_page'))
 
-        # ★ 修正: User作成時にoriginal_usernameを明示的に設定
+        # 🆕 新規ユーザー作成（初回ログインフラグ付き）
         new_user = User(
             room_number=room_number,
             student_id=student_id,
             username=username,
-            original_username=username  # ★ この行を追加
+            original_username=username,
+            is_first_login=True  # 🆕 初回ログインフラグを設定
         )
         new_user.set_room_password(room_password)
         new_user.set_individual_password(individual_password)
@@ -3489,15 +3624,16 @@ def admin_add_user():
         db.session.add(new_user)
         db.session.commit()
         
-        # 部屋設定の自動作成（既存のコード）
+        # 部屋設定の自動作成
         if not RoomSetting.query.filter_by(room_number=room_number).first():
             default_room_setting = RoomSetting(room_number=room_number, max_enabled_unit_number="9999", csv_filename="words.csv")
             db.session.add(default_room_setting)
             db.session.commit()
             flash(f'部屋 {room_number} の設定をデフォルトで作成しました。', 'info')
 
-        flash(f'ユーザー {username} (部屋: {room_number}, 出席番号: {student_id}) を登録しました。', 'success')
+        flash(f'ユーザー {username} (部屋: {room_number}, 出席番号: {student_id}) を登録しました。初回ログイン時にパスワード変更が必要です。', 'success')
         return redirect(url_for('admin_page'))
+        
     except Exception as e:
         print(f"Error in admin_add_user: {e}")
         flash(f'ユーザー追加中にエラーが発生しました: {e}', 'danger')
@@ -4062,13 +4198,14 @@ def admin_upload_users():
                     room_number=room_number,
                     student_id=student_id,
                     username=username,
-                    original_username=username
+                    original_username=username,
+                    is_first_login=True  # 🆕 CSV一括追加でも初回ログインフラグを設定
                 )
                 
                 # ★修正: 軽量パスワードハッシュ化
                 new_user._room_password_hash = generate_password_hash(room_password, method='pbkdf2:sha256', salt_length=8)
                 new_user._individual_password_hash = generate_password_hash(individual_password, method='pbkdf2:sha256', salt_length=8)
-                
+
                 new_user.problem_history = "{}"
                 new_user.incorrect_words = "[]"
                 new_user.last_login = datetime.now(JST)
