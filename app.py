@@ -3963,10 +3963,10 @@ def progress_page():
         # ランキングをバランススコア順でソート
         ranking_data.sort(key=lambda x: x['balance_score'], reverse=True)
 
-        # 表示人数制限（デフォルト5人）
-        display_count = 5
+        # 表示人数制限（デフォルト10人）
+        display_count = 10
         if room_setting and hasattr(room_setting, 'ranking_display_count'):
-            display_count = room_setting.ranking_display_count or 5
+            display_count = room_setting.ranking_display_count or 10
 
         ranking_data = ranking_data[:display_count]
 
@@ -3974,6 +3974,7 @@ def progress_page():
 
         context = get_template_context()
         context.update({
+            'current_user': current_user,
             'current_user_stats': current_user_stats,
             'user_progress_by_chapter': user_progress_by_chapter,
             'ranking_data': ranking_data,
