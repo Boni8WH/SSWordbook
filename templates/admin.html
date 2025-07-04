@@ -423,6 +423,37 @@
         </div>
     </div>
 </section>
+<section id="admin-debug-section">
+    <h3>🔍 データ問題診断</h3>
+    <p><strong>ランキングで全員0が表示される問題を診断・修復します</strong></p>
+    
+    <div class="admin-panel" style="background-color: #fff3cd; border-left: 5px solid #ffc107;">
+        <h4>🕵️ 詳細診断</h4>
+        <p>ユーザーの学習データが正しく保存・読み取りできているかを確認します。</p>
+        
+        <div style="margin-top: 15px;">
+            <button type="button" class="btn btn-info" onclick="debugUserDataDetailed()">
+                <i class="fas fa-search"></i> 🔍 ユーザーデータ詳細診断
+            </button>
+            
+            <button type="button" class="btn btn-warning" onclick="fixUserDataColumns()" style="margin-left: 10px;">
+                <i class="fas fa-wrench"></i> 🔧 データカラム修復
+            </button>
+            
+            <button type="button" class="btn btn-success" onclick="createSampleData()" style="margin-left: 10px;">
+                <i class="fas fa-flask"></i> 🧪 サンプルデータ作成
+            </button>
+        </div>
+    </div>
+
+    <!-- 診断結果表示エリア -->
+    <div id="debugResult" style="margin-top: 15px; display: none;">
+        <h5>🔍 診断結果</h5>
+        <div id="debugContent" style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; border: 1px solid #dee2e6;">
+            <!-- 診断結果がここに表示されます -->
+        </div>
+    </div>
+</section>
 
     <hr>
 
@@ -1548,6 +1579,198 @@ function checkUserStatsDetailed() {
                 </div>
             `;
         }
+    })
+    .finally(() => {
+        button.disabled = false;
+        button.textContent = originalText;
+    });
+}
+
+function debugUserDataDetailed() {
+    const button = event.target;
+    const originalText = button.textContent;
+    button.disabled = true;
+    button.textContent = '診断中...';
+    
+    const resultDiv = document.getElementById('debugResult');
+    const contentDiv = document.getElementById('debugContent');
+    
+    if (contentDiv) {
+        contentDiv.innerHTML = '<div class="text-center"><i class="fas fa-spinner fa-spin"></i> ユーザーデータを診断中...</div>';
+        resultDiv.style.display = 'block';
+    }
+    
+    fetch('/admin/debug_user_data_detailed', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            const results = data.debug_results;
+            const summary = data.summary;
+            
+            let html = `
+                <div class="alert alert-info">
+                    <h6>📊 診断サマリー</h6>
+                    <ul>
+                        <li>分析ユーザー数: ${summary.users_analyzed}人</li>
+                        <li>データありユーザー: ${summary.users_with_data}人</li>
+                        <li>発見された回答数: ${summary.total_attempts_found}回</li>
+                    </ul>
+                </div>
+                
+                <h6>👥 ユーザー別詳細</h6>
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped">
+                        <thead>
+                            <tr>
+                                <th>ユーザー</th>
+                                <th>履歴データ</th>
+                                <th>生回答数</th>
+                                <th>DB回答数</th>
+                                <th>IDマッチ</th>
+                                <th>問題</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+            
+            results.forEach(user => {
+                const hasData = user.has_problem_data ? '✅' : '❌';
+                const dataIssue = user.total_raw_attempts === 0 ? '❌ データなし' : 
+                                 user.matched_ids === 0 ? '❌ IDミスマッチ' : '✅ 正常';
+                
+                html += `
+                    <tr>
+                        <td><strong>${user.username}</strong><br><small>${user.room_number}</small></td>
+                        <td>${hasData}<br><small>履歴:${user.parsed_history_count}件</small></td>
+                        <td>${user.total_raw_attempts}</td>
+                        <td>${user.db_attempts}</td>
+                        <td>${user.matched_ids}/${user.parsed_history_count}</td>
+                        <td>${dataIssue}</td>
+                    </tr>
+                `;
+            });
+            
+            html += `
+                        </tbody>
+                    </table>
+                </div>
+                
+                <details style="margin-top: 15px;">
+                    <summary><strong>🔍 詳細データ（クリックで展開）</strong></summary>
+                    <pre style="background-color: #f8f9fa; padding: 10px; border-radius: 3px; font-size: 0.8em; max-height: 300px; overflow-y: auto;">
+${JSON.stringify(results, null, 2)}
+                    </pre>
+                </details>
+            `;
+            
+            if (summary.users_with_data === 0) {
+                html += `
+                    <div class="alert alert-danger mt-3">
+                        <strong>❌ 重大な問題:</strong> 全ユーザーに学習データがありません！<br>
+                        「🔧 データカラム修復」または「🧪 サンプルデータ作成」を実行してください。
+                    </div>
+                `;
+            } else if (summary.total_attempts_found === 0) {
+                html += `
+                    <div class="alert alert-warning mt-3">
+                        <strong>⚠️ 問題:</strong> 学習履歴は存在しますが、回答データが0です。<br>
+                        データ形式または計算ロジックに問題がある可能性があります。
+                    </div>
+                `;
+            }
+            
+            if (contentDiv) {
+                contentDiv.innerHTML = html;
+            }
+        } else {
+            if (contentDiv) {
+                contentDiv.innerHTML = `
+                    <div class="alert alert-danger">
+                        <h6><i class="fas fa-exclamation-triangle"></i> 診断エラー</h6>
+                        <p>${data.message}</p>
+                    </div>
+                `;
+            }
+        }
+    })
+    .catch(error => {
+        console.error('診断エラー:', error);
+        if (contentDiv) {
+            contentDiv.innerHTML = `
+                <div class="alert alert-danger">
+                    <h6><i class="fas fa-exclamation-triangle"></i> 通信エラー</h6>
+                    <p>診断中にエラーが発生しました</p>
+                </div>
+            `;
+        }
+    })
+    .finally(() => {
+        button.disabled = false;
+        button.textContent = originalText;
+    });
+}
+
+function fixUserDataColumns() {
+    if (!confirm('ユーザーデータカラムを修復しますか？\n\n以下の処理を実行します：\n• 不足しているカラムを追加\n• 空のデータを初期化\n\nこの処理は安全です。')) {
+        return;
+    }
+    
+    const button = event.target;
+    const originalText = button.textContent;
+    button.disabled = true;
+    button.textContent = '修復中...';
+    
+    fetch('/admin/fix_user_data_columns', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            alert(`✅ データカラム修復完了！\n\n${data.message}\n追加カラム: ${data.added_columns.join(', ')}\n修復ユーザー: ${data.fixed_users}人`);
+        } else {
+            alert(`❌ 修復エラー: ${data.message}`);
+        }
+    })
+    .catch(error => {
+        console.error('修復エラー:', error);
+        alert('❌ 修復中にエラーが発生しました。');
+    })
+    .finally(() => {
+        button.disabled = false;
+        button.textContent = originalText;
+    });
+}
+
+function createSampleData() {
+    if (!confirm('テスト用のサンプルデータを作成しますか？\n\n最初のユーザーに学習履歴のサンプルデータを追加します。\nこれにより統計機能をテストできます。')) {
+        return;
+    }
+    
+    const button = event.target;
+    const originalText = button.textContent;
+    button.disabled = true;
+    button.textContent = 'データ作成中...';
+    
+    fetch('/admin/create_sample_data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            const sampleData = data.sample_data;
+            alert(`✅ サンプルデータ作成完了！\n\n${data.message}\n\n作成データ:\n• 学習履歴: ${sampleData.history_count}問\n• 総回答数: ${sampleData.total_attempts}回\n• 正解数: ${sampleData.total_correct}回\n• 苦手問題: ${sampleData.incorrect_count}問\n\n統計修復を実行してランキングを確認してください。`);
+        } else {
+            alert(`❌ データ作成エラー: ${data.message}`);
+        }
+    })
+    .catch(error => {
+        console.error('データ作成エラー:', error);
+        alert('❌ データ作成中にエラーが発生しました。');
     })
     .finally(() => {
         button.disabled = false;
