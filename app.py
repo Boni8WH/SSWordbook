@@ -183,22 +183,23 @@ def to_jst_filter(dt):
 # ====================================================================
 
 # app.py の User モデルの定義を以下に置き換え
+# app.py の User モデルの定義を以下に置き換え
 class User(db.Model):
     """ユーザー情報を格納するテーブル"""
     
     __tablename__ = 'user'
     
-    # ★まず確実に存在するカラムだけ定義
-    # id = db.Column(db.Integer, primary_key=True)
-    # room_number = db.Column(db.String(50), nullable=False)
-    # student_id = db.Column(db.String(50), nullable=False)
-    # username = db.Column(db.String(100), nullable=False)
-    # created_at = db.Column(db.DateTime, nullable=True, default=datetime.utcnow)
-    # last_login = db.Column(db.DateTime, nullable=True, default=datetime.utcnow)
-    # room_password_hash = db.Column(db.String(255), nullable=True)
-    # individual_password_hash = db.Column(db.String(255), nullable=True)
-    # problem_history = db.Column(db.Text, nullable=True, default='{}')
-    # incorrect_words = db.Column(db.Text, nullable=True, default='[]')
+    # 基本カラム
+    id = db.Column(db.Integer, primary_key=True)
+    room_number = db.Column(db.String(50), nullable=False)
+    student_id = db.Column(db.String(50), nullable=False)
+    username = db.Column(db.String(100), nullable=False)
+    created_at = db.Column(db.DateTime, nullable=True, default=datetime.utcnow)
+    last_login = db.Column(db.DateTime, nullable=True, default=datetime.utcnow)
+    room_password_hash = db.Column(db.String(255), nullable=True)
+    individual_password_hash = db.Column(db.String(255), nullable=True)
+    problem_history = db.Column(db.Text, nullable=True, default='{}')
+    incorrect_words = db.Column(db.Text, nullable=True, default='[]')
     
     # 機能拡張用カラム
     original_username = db.Column(db.String(80), nullable=True)
@@ -206,44 +207,30 @@ class User(db.Model):
     is_first_login = db.Column(db.Boolean, nullable=True, default=True)
     password_changed_at = db.Column(db.DateTime, nullable=True)
     
-    # 初回ログイン機能用
-    is_first_login = db.Column(db.Boolean, default=True)
-    password_changed_at = db.Column(db.DateTime)
-    
     # 一意性制約
     __table_args__ = (db.UniqueConstraint('room_number', 'student_id', name='unique_user_per_room'),)
     
     def __repr__(self):
         return f'<User {self.id}: {self.username} (Room: {self.room_number})>'
 
-    # パスワード関連メソッド（変更なし）
+    # パスワード関連メソッド
     def set_room_password(self, password):
-        if hasattr(self, 'room_password_hash'):
-            self.room_password_hash = generate_password_hash(password, method='pbkdf2:sha256', salt_length=8)
-        elif hasattr(self, '_room_password_hash'):
-            self._room_password_hash = generate_password_hash(password, method='pbkdf2:sha256', salt_length=8)
+        self.room_password_hash = generate_password_hash(password, method='pbkdf2:sha256', salt_length=8)
 
     def check_room_password(self, password):
-        if hasattr(self, 'room_password_hash') and self.room_password_hash:
+        if self.room_password_hash:
             return check_password_hash(self.room_password_hash, password)
-        elif hasattr(self, '_room_password_hash') and self._room_password_hash:
-            return check_password_hash(self._room_password_hash, password)
         return True
 
     def set_individual_password(self, password):
-        if hasattr(self, 'individual_password_hash'):
-            self.individual_password_hash = generate_password_hash(password, method='pbkdf2:sha256', salt_length=8)
-        elif hasattr(self, '_individual_password_hash'):
-            self._individual_password_hash = generate_password_hash(password, method='pbkdf2:sha256', salt_length=8)
+        self.individual_password_hash = generate_password_hash(password, method='pbkdf2:sha256', salt_length=8)
 
     def check_individual_password(self, password):
-        if hasattr(self, 'individual_password_hash') and self.individual_password_hash:
+        if self.individual_password_hash:
             return check_password_hash(self.individual_password_hash, password)
-        elif hasattr(self, '_individual_password_hash') and self._individual_password_hash:
-            return check_password_hash(self._individual_password_hash, password)
         return True
 
-    # その他のメソッドはそのまま...
+    # その他のメソッド
     def get_problem_history(self):
         if self.problem_history:
             return json.loads(self.problem_history)
@@ -283,6 +270,9 @@ class RoomSetting(db.Model):
     room_number = db.Column(db.String(50), unique=True, nullable=False)
     max_enabled_unit_number = db.Column(db.String(50), default="9999", nullable=False)
     csv_filename = db.Column(db.String(100), default="words.csv", nullable=False)
+    ranking_display_count = db.Column(db.Integer, default=10, nullable=False)  # ★追加
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(JST), onupdate=lambda: datetime.now(JST))
 
 class RoomCsvFile(db.Model):
     """部屋ごとのカスタムCSVファイル情報を管理するモデル"""
@@ -1975,6 +1965,233 @@ def calculate_coverage_rate(user_id):
         print(f"❌ 網羅率計算エラー: {str(e)}")
         return 0
 
+# app.py に以下のルートを追加
+
+@app.route('/emergency_fix_all')
+def emergency_fix_all():
+    """緊急修復：全ての問題を一括修正"""
+    try:
+        print("🆘 緊急修復開始...")
+        
+        results = []
+        
+        # 1. データベーステーブル作成
+        try:
+            db.create_all()
+            results.append("✅ データベーステーブル確認/作成")
+        except Exception as e:
+            results.append(f"❌ テーブル作成エラー: {e}")
+        
+        # 2. 必要なカラムを追加
+        try:
+            with db.engine.connect() as conn:
+                # Userテーブルの必要カラム
+                user_columns = [
+                    ('room_password_hash', 'VARCHAR(255)'),
+                    ('individual_password_hash', 'VARCHAR(255)'),
+                    ('problem_history', "TEXT DEFAULT '{}'"),
+                    ('incorrect_words', "TEXT DEFAULT '[]'"),
+                    ('original_username', 'VARCHAR(80)'),
+                    ('username_changed_at', 'TIMESTAMP'),
+                    ('is_first_login', 'BOOLEAN DEFAULT TRUE'),
+                    ('password_changed_at', 'TIMESTAMP'),
+                    ('last_login', 'TIMESTAMP'),
+                    ('created_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP')
+                ]
+                
+                # 既存カラムを確認
+                result = conn.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name = 'user'"))
+                existing_columns = [row[0] for row in result.fetchall()]
+                
+                added_count = 0
+                for col_name, col_def in user_columns:
+                    if col_name not in existing_columns:
+                        try:
+                            conn.execute(text(f'ALTER TABLE "user" ADD COLUMN {col_name} {col_def}'))
+                            added_count += 1
+                        except Exception as col_error:
+                            results.append(f"⚠️ {col_name}追加エラー: {col_error}")
+                
+                # RoomSettingテーブルの必要カラム
+                room_columns = [
+                    ('ranking_display_count', 'INTEGER DEFAULT 10'),
+                    ('created_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP'),
+                    ('updated_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP')
+                ]
+                
+                result = conn.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name = 'room_setting'"))
+                existing_room_columns = [row[0] for row in result.fetchall()]
+                
+                for col_name, col_def in room_columns:
+                    if col_name not in existing_room_columns:
+                        try:
+                            conn.execute(text(f'ALTER TABLE room_setting ADD COLUMN {col_name} {col_def}'))
+                            added_count += 1
+                        except Exception as col_error:
+                            results.append(f"⚠️ {col_name}追加エラー: {col_error}")
+                
+                conn.commit()
+                results.append(f"✅ 必要カラム追加完了: {added_count}個")
+                
+        except Exception as e:
+            results.append(f"❌ カラム追加エラー: {e}")
+        
+        # 3. 管理者ユーザー確認/作成
+        try:
+            admin_user = User.query.filter_by(username='admin').first()
+            if not admin_user:
+                admin_user = User(
+                    username='admin',
+                    room_number='ADMIN',
+                    student_id='000',
+                    problem_history='{}',
+                    incorrect_words='[]',
+                    is_first_login=False
+                )
+                admin_user.set_room_password('Avignon1309')
+                admin_user.set_individual_password('Avignon1309')
+                db.session.add(admin_user)
+                db.session.commit()
+                results.append("✅ 管理者ユーザー作成完了")
+            else:
+                results.append("✅ 管理者ユーザー確認済み")
+        except Exception as e:
+            results.append(f"❌ 管理者ユーザーエラー: {e}")
+        
+        # 4. AppInfo確認/作成
+        try:
+            app_info = AppInfo.query.first()
+            if not app_info:
+                app_info = AppInfo()
+                db.session.add(app_info)
+                db.session.commit()
+                results.append("✅ AppInfo作成完了")
+            else:
+                results.append("✅ AppInfo確認済み")
+        except Exception as e:
+            results.append(f"❌ AppInfoエラー: {e}")
+        
+        # 5. user_statsテーブル作成
+        try:
+            with db.engine.connect() as conn:
+                result = conn.execute(text("SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'user_stats')"))
+                if not result.fetchone()[0]:
+                    conn.execute(text("""
+                        CREATE TABLE user_stats (
+                            id SERIAL PRIMARY KEY,
+                            user_id INTEGER NOT NULL UNIQUE REFERENCES "user"(id) ON DELETE CASCADE,
+                            room_number VARCHAR(50) NOT NULL,
+                            total_attempts INTEGER DEFAULT 0,
+                            total_correct INTEGER DEFAULT 0,
+                            mastered_count INTEGER DEFAULT 0,
+                            accuracy_rate FLOAT DEFAULT 0.0,
+                            coverage_rate FLOAT DEFAULT 0.0,
+                            balance_score FLOAT DEFAULT 0.0,
+                            mastery_score FLOAT DEFAULT 0.0,
+                            reliability_score FLOAT DEFAULT 0.0,
+                            activity_score FLOAT DEFAULT 0.0,
+                            last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            total_questions_in_room INTEGER DEFAULT 0
+                        )
+                    """))
+                    conn.execute(text("CREATE INDEX idx_user_stats_room_number ON user_stats(room_number)"))
+                    conn.commit()
+                    results.append("✅ user_statsテーブル作成完了")
+                else:
+                    results.append("✅ user_statsテーブル確認済み")
+        except Exception as e:
+            results.append(f"❌ user_statsテーブルエラー: {e}")
+        
+        # 結果をHTMLで表示
+        results_html = "<br>".join(results)
+        
+        return f"""
+        <h1>🆘 緊急修復完了</h1>
+        <div style="font-family: monospace; background-color: #f8f9fa; padding: 20px; border-radius: 5px;">
+            {results_html}
+        </div>
+        <div style="margin-top: 20px;">
+            <a href="/admin" class="btn btn-primary" style="padding: 10px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px;">管理者ページに戻る</a>
+            <a href="/" class="btn btn-secondary" style="padding: 10px 20px; background-color: #6c757d; color: white; text-decoration: none; border-radius: 5px; margin-left: 10px;">ホームページに戻る</a>
+        </div>
+        <style>
+            body {{ font-family: Arial, sans-serif; margin: 40px; }}
+            .btn {{ display: inline-block; padding: 10px 20px; text-decoration: none; border-radius: 5px; }}
+        </style>
+        """
+        
+    except Exception as e:
+        import traceback
+        error_detail = traceback.format_exc()
+        return f"""
+        <h1>💥 緊急修復失敗</h1>
+        <p>エラー: {str(e)}</p>
+        <pre>{error_detail}</pre>
+        <a href="/admin" style="padding: 10px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px;">管理者ページに戻る</a>
+        """
+
+
+@app.route('/check_system_health')
+def check_system_health():
+    """システムの健全性をチェック"""
+    try:
+        health_status = []
+        
+        # データベース接続確認
+        try:
+            db.session.execute(text('SELECT 1'))
+            health_status.append("✅ データベース接続: 正常")
+        except Exception as e:
+            health_status.append(f"❌ データベース接続: {e}")
+        
+        # 主要テーブル確認
+        tables_to_check = ['user', 'room_setting', 'app_info', 'user_stats']
+        for table in tables_to_check:
+            try:
+                result = db.session.execute(text(f'SELECT COUNT(*) FROM {table}')).fetchone()
+                count = result[0] if result else 0
+                health_status.append(f"✅ {table}テーブル: {count}件")
+            except Exception as e:
+                health_status.append(f"❌ {table}テーブル: {e}")
+        
+        # 管理者ユーザー確認
+        try:
+            admin_user = User.query.filter_by(username='admin').first()
+            if admin_user:
+                health_status.append("✅ 管理者ユーザー: 存在")
+            else:
+                health_status.append("❌ 管理者ユーザー: 不在")
+        except Exception as e:
+            health_status.append(f"❌ 管理者ユーザー確認: {e}")
+        
+        # 結果表示
+        status_html = "<br>".join(health_status)
+        
+        return f"""
+        <h1>🔍 システム健全性チェック</h1>
+        <div style="font-family: monospace; background-color: #f8f9fa; padding: 20px; border-radius: 5px;">
+            {status_html}
+        </div>
+        <div style="margin-top: 20px;">
+            <a href="/emergency_fix_all" style="padding: 10px 20px; background-color: #dc3545; color: white; text-decoration: none; border-radius: 5px;">🆘 緊急修復実行</a>
+            <a href="/admin" style="padding: 10px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px; margin-left: 10px;">管理者ページ</a>
+            <a href="/" style="padding: 10px 20px; background-color: #6c757d; color: white; text-decoration: none; border-radius: 5px; margin-left: 10px;">ホーム</a>
+        </div>
+        <style>
+            body {{ font-family: Arial, sans-serif; margin: 40px; }}
+        </style>
+        """
+        
+    except Exception as e:
+        import traceback
+        error_detail = traceback.format_exc()
+        return f"""
+        <h1>💥 システムチェック失敗</h1>
+        <p>エラー: {str(e)}</p>
+        <pre>{error_detail}</pre>
+        <a href="/emergency_fix_all" style="padding: 10px 20px; background-color: #dc3545; color: white; text-decoration: none; border-radius: 5px;">🆘 緊急修復実行</a>
+        """
+
 # 管理者用：全部屋の統計概要取得API
 @app.route('/api/admin/rooms_summary', methods=['GET'])
 def get_rooms_summary():
@@ -2318,6 +2535,116 @@ def quiz():
     
     # GETリクエストの場合は通常のクイズページを表示
     return render_template('quiz.html')
+
+# app.py に以下のデバッグ用ルートを追加
+
+@app.route('/debug/check_apis')
+def debug_check_apis():
+    """APIエンドポイントの動作確認"""
+    try:
+        results = []
+        
+        # 1. /api/rooms のテスト
+        try:
+            users = User.query.all()
+            room_data = {}
+            for user in users:
+                if user.room_number != 'ADMIN':
+                    if user.room_number not in room_data:
+                        room_data[user.room_number] = 0
+                    room_data[user.room_number] += 1
+            
+            results.append(f"✅ /api/rooms: {len(room_data)}個の部屋")
+            results.append(f"   部屋一覧: {list(room_data.keys())}")
+        except Exception as e:
+            results.append(f"❌ /api/rooms エラー: {e}")
+        
+        # 2. データベーステーブル確認
+        try:
+            with db.engine.connect() as conn:
+                tables_result = conn.execute(text("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'"))
+                tables = [row[0] for row in tables_result.fetchall()]
+                results.append(f"✅ データベーステーブル: {', '.join(tables)}")
+        except Exception as e:
+            results.append(f"❌ テーブル確認エラー: {e}")
+        
+        # 3. ユーザー統計テーブル確認
+        try:
+            with db.engine.connect() as conn:
+                result = conn.execute(text("SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'user_stats')"))
+                exists = result.fetchone()[0]
+                if exists:
+                    count_result = conn.execute(text("SELECT COUNT(*) FROM user_stats"))
+                    count = count_result.fetchone()[0]
+                    results.append(f"✅ user_statsテーブル: {count}件")
+                else:
+                    results.append("❌ user_statsテーブル: 存在しない")
+        except Exception as e:
+            results.append(f"❌ user_stats確認エラー: {e}")
+        
+        results_html = "<br>".join(results)
+        
+        return f"""
+        <h1>🔍 API動作確認</h1>
+        <div style="font-family: monospace; background-color: #f8f9fa; padding: 20px; border-radius: 5px;">
+            {results_html}
+        </div>
+        <div style="margin-top: 20px;">
+            <a href="/api/rooms" target="_blank" style="padding: 10px 20px; background-color: #28a745; color: white; text-decoration: none; border-radius: 5px;">🔗 /api/rooms をテスト</a>
+            <a href="/admin" style="padding: 10px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px; margin-left: 10px;">管理者ページ</a>
+        </div>
+        """
+        
+    except Exception as e:
+        import traceback
+        error_detail = traceback.format_exc()
+        return f"""
+        <h1>💥 API確認失敗</h1>
+        <p>エラー: {str(e)}</p>
+        <pre>{error_detail}</pre>
+        """
+
+
+@app.route('/debug/simple_ranking_test')
+def debug_simple_ranking_test():
+    """シンプルなランキングテスト"""
+    try:
+        # 最初の部屋を取得
+        first_user = User.query.filter(User.room_number != 'ADMIN').first()
+        if not first_user:
+            return "テスト用ユーザーが見つかりません"
+        
+        room_number = first_user.room_number
+        
+        # 部屋内のユーザーを取得
+        users_in_room = User.query.filter_by(room_number=room_number).all()
+        
+        result = {
+            'room_number': room_number,
+            'user_count': len(users_in_room),
+            'users': [u.username for u in users_in_room]
+        }
+        
+        return f"""
+        <h1>🧪 シンプルランキングテスト</h1>
+        <p><strong>テスト部屋:</strong> {room_number}</p>
+        <p><strong>ユーザー数:</strong> {len(users_in_room)}</p>
+        <p><strong>ユーザー一覧:</strong> {', '.join(result['users'])}</p>
+        
+        <div style="margin-top: 20px;">
+            <a href="/api/admin/room_ranking/{room_number}" target="_blank" 
+               style="padding: 10px 20px; background-color: #28a745; color: white; text-decoration: none; border-radius: 5px;">
+               🔗 ランキングAPIをテスト
+            </a>
+            <a href="/admin" 
+               style="padding: 10px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px; margin-left: 10px;">
+               管理者ページ
+            </a>
+        </div>
+        """
+        
+    except Exception as e:
+        return f"テストエラー: {e}"
 
 @app.route('/api/user_statistics')
 def get_user_statistics():
