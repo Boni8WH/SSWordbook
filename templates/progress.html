@@ -7,69 +7,34 @@
 
     <!-- ランキングセクション -->
     <div class="ranking-container">
-        <!-- ランキングヘッダー（タイトルと順位を横並び） -->
+        <!-- ランキングヘッダー -->
         <div class="ranking-header">
             <div class="ranking-title-section">
                 <h3>🏆 ランキング (部屋：{{ current_user.room_number }})</h3>
-                <p>同じ部屋のユーザー内での上位5名を表示しています。</p>
+                <p>同じ部屋のユーザー内での上位ランキングを表示しています。</p>
             </div>
             
-            {% if current_user_rank %}
-            <div class="user-rank-section">
+            <!-- ユーザー順位（非同期で更新） -->
+            <div class="user-rank-section" id="user-rank-section" style="display: none;">
                 <h4>あなたの順位</h4>
-                <div class="rank-display{% if current_user_rank == 1 %} rank-1{% elif current_user_rank == 2 %} rank-2{% elif current_user_rank == 3 %} rank-3{% endif %}">
-                    {% if current_user_rank == 1 %}
-                        <span class="rank-icon">👑</span>
-                    {% elif current_user_rank == 2 %}
-                        <span class="rank-icon">🥈</span>
-                    {% elif current_user_rank == 3 %}
-                        <span class="rank-icon">🥉</span>
-                    {% endif %}
-                    <span class="rank-number">{{ current_user_rank }}</span>
-                    <span class="rank-text">位</span>
-                    <span class="rank-total">/ {{ total_users_in_room }}人</span>
+                <div class="rank-display" id="rank-display">
+                    <!-- JavaScript で動的に挿入 -->
                 </div>
             </div>
-            {% endif %}
         </div>
 
-        {% if current_user_stats %}
-        <div class="current-user-stats">
+        <!-- ユーザー統計（非同期で更新） -->
+        <div class="current-user-stats" id="current-user-stats" style="display: none;">
             <h4>📊 あなたのスコア詳細</h4>
-            
-            <div class="stats-grid">
-                <div class="stat-item">
-                    <span class="stat-label">総合スコア</span>
-                    <span class="stat-value main-score">{{ current_user_stats.balance_score|round(1) }}</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">マスタリースコア</span>
-                    <span class="stat-value">{{ current_user_stats.mastery_score|round(1) }}</span>
-                    <small class="stat-description">(マスター数)<sup>1.3</sup> × 0.1</small>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">信頼性スコア</span>
-                    <span class="stat-value">{{ current_user_stats.reliability_score|round(1) }}</span>
-                    <small class="stat-description">(補正正答率)<sup>2</sup> × 5</small>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">活動スコア</span>
-                    <span class="stat-value">{{ current_user_stats.activity_score|round(1) }}</span>
-                    <small class="stat-description">ln(回答数 + 1) × 0.2</small>
-                </div>
+            <div class="stats-grid" id="stats-grid">
+                <!-- JavaScript で動的に挿入 -->
             </div>
-            <div class="basic-stats">
-                <p><strong>基本統計:</strong> 
-                    回答数: {{ current_user_stats.total_attempts }}回 | 
-                    正解数: {{ current_user_stats.total_correct }}回 | 
-                    正答率: {{ current_user_stats.accuracy_rate|round(1) }}% | 
-                    マスター数: {{ current_user_stats.mastered_count }}問 | 
-                    網羅率: {{ current_user_stats.coverage_rate|round(1) }}%
-                </p>
+            <div class="basic-stats" id="basic-stats">
+                <!-- JavaScript で動的に挿入 -->
             </div>
         </div>
-        {% endif %}
 
+        <!-- ランキング説明 -->
         <div class="ranking-criteria">
             <p><strong>📊 ランキング基準:</strong> 信頼性重視の総合学習評価スコアの高い順</p>
             <p><strong>🔢 スコア算出:</strong> ① マスター数重視 + ② 信頼性補正済み正答率 + ③ 適度な学習量</p>
@@ -87,44 +52,51 @@
             <p><small style="color: #6c757d;">※ 質の高い学習（理解+定着）と統計的に信頼できる成績を評価する方式です</small></p>
         </div>
 
-        {% if top_10_ranking %}
-        <div class="table-responsive">
-            <table class="table table-striped table-sm">
-                <thead class="table-dark">
-                    <tr>
-                        <th>順位</th>
-                        <th>名前</th>
-                        <th>回答数</th>
-                        <th>正解数</th>
-                        <th>正答率</th>
-                        <th>総合スコア</th>
-                        <th>網羅率</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for entry in top_10_ranking %}
-                    <tr>
-                        <td>{{ loop.index }}</td>
-                        <td>{{ entry.username }}</td>
-                        <td>{{ entry.total_attempts }}</td>
-                        <td>{{ entry.total_correct }}</td>
-                        <td>{{ entry.accuracy_rate|round(1) }}%</td>
-                        <td><strong>{{ entry.balance_score|round(1) }}</strong></td>
-                        <td>{{ entry.coverage_rate|round(1) }}%</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+        <!-- ランキングローディング表示 -->
+        <div id="ranking-loading" class="text-center py-4">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2 text-muted">ランキングを計算中...</p>
+            <small class="text-muted">初回は数秒かかる場合があります</small>
         </div>
-        {% else %}
-        <p>まだランキングデータがありません。</p>
-        {% endif %}
+
+        <!-- ランキングテーブル（非同期で更新） -->
+        <div id="ranking-table-container" style="display: none;">
+            <div class="table-responsive">
+                <table class="table table-striped table-sm">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>順位</th>
+                            <th>名前</th>
+                            <th>回答数</th>
+                            <th>正解数</th>
+                            <th>正答率</th>
+                            <th>総合スコア</th>
+                            <th>網羅率</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ranking-table-body">
+                        <!-- JavaScript で動的に挿入 -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- エラー表示 -->
+        <div id="ranking-error" class="alert alert-warning" style="display: none;">
+            <i class="fas fa-exclamation-triangle"></i>
+            ランキングの取得に失敗しました。
+            <button class="btn btn-sm btn-outline-primary ms-2" onclick="loadRankingData()">
+                <i class="fas fa-redo"></i> 再試行
+            </button>
+        </div>
     </div>
 
     <!-- セクション間の仕切り -->
     <hr style="margin: 40px 0; border: none; border-top: 2px solid #e0e0e0; border-radius: 1px;">
 
-    <!-- あなたの章別進捗セクション -->
+    <!-- あなたの章別進捗セクション（即座に表示） -->
     <div class="progress-container">
         <h3>あなたの章別進捗</h3>
         {% if user_progress_by_chapter %}
@@ -178,6 +150,7 @@
 </section>
 
 <script>
+// 章別進捗の展開/折りたたみ
 function toggleChapterProgress(chapterNum) {
     const unitsDiv = document.getElementById('units-' + chapterNum);
     const icon = document.getElementById('icon-' + chapterNum);
@@ -190,5 +163,429 @@ function toggleChapterProgress(chapterNum) {
         icon.textContent = '▶';
     }
 }
+
+// ランキングデータの非同期読み込み
+async function loadRankingData() {
+    console.log('🔄 ランキングデータ読み込み開始...');
+    
+    try {
+        // ローディング表示
+        document.getElementById('ranking-loading').style.display = 'block';
+        document.getElementById('ranking-error').style.display = 'none';
+        document.getElementById('ranking-table-container').style.display = 'none';
+        
+        const response = await fetch('/api/ranking_data');
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            console.log(`✅ ランキングデータ取得成功 (${data.calculation_time}秒)`);
+            
+            // ランキングテーブルを更新
+            updateRankingTable(data.ranking_data);
+            
+            // ユーザー統計を更新
+            updateUserStats(data.current_user_stats);
+            
+            // ユーザー順位を更新
+            updateUserRank(data.current_user_rank, data.total_users_in_room);
+            
+            // 表示切り替え
+            document.getElementById('ranking-loading').style.display = 'none';
+            document.getElementById('ranking-table-container').style.display = 'block';
+            document.getElementById('current-user-stats').style.display = 'block';
+            document.getElementById('user-rank-section').style.display = 'block';
+            
+            console.log('✅ ランキング表示完了');
+            
+        } else {
+            throw new Error(data.message || 'ランキングデータの取得に失敗しました');
+        }
+        
+    } catch (error) {
+        console.error('❌ ランキング読み込みエラー:', error);
+        
+        // エラー表示
+        document.getElementById('ranking-loading').style.display = 'none';
+        document.getElementById('ranking-error').style.display = 'block';
+    }
+}
+
+// ランキングテーブルを更新
+function updateRankingTable(rankingData) {
+    const tbody = document.getElementById('ranking-table-body');
+    tbody.innerHTML = '';
+    
+    rankingData.forEach((user, index) => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${index + 1}</td>
+            <td>${user.username}</td>
+            <td>${user.total_attempts}</td>
+            <td>${user.total_correct}</td>
+            <td>${user.accuracy_rate.toFixed(1)}%</td>
+            <td><strong>${user.balance_score.toFixed(1)}</strong></td>
+            <td>${user.coverage_rate.toFixed(1)}%</td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+// ユーザー統計を更新
+function updateUserStats(userStats) {
+    if (!userStats) return;
+    
+    const statsGrid = document.getElementById('stats-grid');
+    statsGrid.innerHTML = `
+        <div class="stat-item">
+            <span class="stat-label">総合スコア</span>
+            <span class="stat-value main-score">${userStats.balance_score.toFixed(1)}</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">マスタリースコア</span>
+            <span class="stat-value">${userStats.mastery_score.toFixed(1)}</span>
+            <small class="stat-description">(マスター数)<sup>1.3</sup> × 0.1</small>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">信頼性スコア</span>
+            <span class="stat-value">${userStats.reliability_score.toFixed(1)}</span>
+            <small class="stat-description">(補正正答率)<sup>2</sup> × 5</small>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">活動スコア</span>
+            <span class="stat-value">${userStats.activity_score.toFixed(1)}</span>
+            <small class="stat-description">ln(回答数 + 1) × 0.2</small>
+        </div>
+    `;
+    
+    const basicStats = document.getElementById('basic-stats');
+    basicStats.innerHTML = `
+        <p><strong>基本統計:</strong> 
+            回答数: ${userStats.total_attempts}回 | 
+            正解数: ${userStats.total_correct}回 | 
+            正答率: ${userStats.accuracy_rate.toFixed(1)}% | 
+            マスター数: ${userStats.mastered_count}問 | 
+            網羅率: ${userStats.coverage_rate.toFixed(1)}%
+        </p>
+    `;
+}
+
+// ユーザー順位を更新
+function updateUserRank(rank, totalUsers) {
+    if (!rank) return;
+    
+    const rankDisplay = document.getElementById('rank-display');
+    let rankClass = '';
+    let rankIcon = '';
+    
+    if (rank === 1) {
+        rankClass = 'rank-1';
+        rankIcon = '<span class="rank-icon">👑</span>';
+    } else if (rank === 2) {
+        rankClass = 'rank-2';
+        rankIcon = '<span class="rank-icon">🥈</span>';
+    } else if (rank === 3) {
+        rankClass = 'rank-3';
+        rankIcon = '<span class="rank-icon">🥉</span>';
+    }
+    
+    rankDisplay.className = `rank-display ${rankClass}`;
+    rankDisplay.innerHTML = `
+        ${rankIcon}
+        <span class="rank-number">${rank}</span>
+        <span class="rank-text">位</span>
+        <span class="rank-total">/ ${totalUsers}人</span>
+    `;
+}
+
+// ページ読み込み時にランキングデータを非同期取得
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('📋 進捗ページ読み込み完了');
+    
+    // 個人進捗は即座に表示済み
+    console.log('✅ 個人進捗表示完了');
+    
+    // ランキングデータを非同期で取得
+    setTimeout(() => {
+        loadRankingData();
+    }, 100); // 100ms後に開始（画面描画完了を待つ）
+});
 </script>
+
+<style>
+/* ローディングスピナーのスタイル */
+.spinner-border {
+    width: 2rem;
+    height: 2rem;
+}
+
+/* 統計グリッドのスタイル */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.stat-item {
+    text-align: center;
+    padding: 15px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    border-left: 4px solid #007bff;
+}
+
+.stat-label {
+    display: block;
+    font-size: 0.9em;
+    color: #6c757d;
+    margin-bottom: 5px;
+}
+
+.stat-value {
+    display: block;
+    font-size: 1.5em;
+    font-weight: bold;
+    color: #2c3e50;
+}
+
+.stat-value.main-score {
+    color: #e74c3c;
+    font-size: 1.8em;
+}
+
+.stat-description {
+    display: block;
+    font-size: 0.7em;
+    color: #95a5a6;
+    margin-top: 3px;
+}
+
+/* 順位表示のスタイル */
+.rank-display {
+    text-align: center;
+    padding: 20px;
+    background-color: #f8f9fa;
+    border-radius: 15px;
+    border: 2px solid #dee2e6;
+    min-width: 150px;
+}
+
+.rank-display.rank-1 {
+    background: linear-gradient(135deg, #ffd700, #ffed4e);
+    border-color: #ffd700;
+    color: #8b4513;
+}
+
+.rank-display.rank-2 {
+    background: linear-gradient(135deg, #c0c0c0, #e8e8e8);
+    border-color: #c0c0c0;
+    color: #4a4a4a;
+}
+
+.rank-display.rank-3 {
+    background: linear-gradient(135deg, #cd7f32, #daa520);
+    border-color: #cd7f32;
+    color: #654321;
+}
+
+.rank-icon {
+    font-size: 1.5em;
+    margin-right: 8px;
+}
+
+.rank-number {
+    font-size: 2.5em;
+    font-weight: bold;
+    line-height: 1;
+}
+
+.rank-text {
+    font-size: 1.2em;
+    margin-left: 5px;
+}
+
+.rank-total {
+    display: block;
+    font-size: 0.9em;
+    opacity: 0.8;
+    margin-top: 5px;
+}
+
+/* ランキングヘッダーのレイアウト */
+.ranking-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 20px;
+    gap: 20px;
+}
+
+.ranking-title-section {
+    flex: 1;
+}
+
+.user-rank-section {
+    flex: 0 0 auto;
+}
+
+.user-rank-section h4 {
+    margin-bottom: 10px;
+    color: #495057;
+    font-size: 1.1em;
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 768px) {
+    .ranking-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .rank-display {
+        margin: 10px auto;
+    }
+}
+
+/* アニメーション効果 */
+.ranking-table-container {
+    animation: fadeIn 0.5s ease-in;
+}
+
+.current-user-stats {
+    animation: slideUp 0.6s ease-out;
+}
+
+.user-rank-section {
+    animation: bounceIn 0.8s ease-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes slideUp {
+    from { 
+        opacity: 0; 
+        transform: translateY(20px); 
+    }
+    to { 
+        opacity: 1; 
+        transform: translateY(0); 
+    }
+}
+
+@keyframes bounceIn {
+    0% { 
+        opacity: 0; 
+        transform: scale(0.8); 
+    }
+    50% { 
+        opacity: 0.8; 
+        transform: scale(1.05); 
+    }
+    100% { 
+        opacity: 1; 
+        transform: scale(1); 
+    }
+}
+
+/* エラー表示のスタイル */
+#ranking-error {
+    text-align: center;
+    margin: 20px 0;
+}
+
+/* 章別進捗のスタイル */
+.chapter-progress-header {
+    cursor: pointer;
+    padding: 15px;
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    transition: background-color 0.2s;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.chapter-progress-header:hover {
+    background-color: #e9ecef;
+}
+
+.chapter-progress-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.chapter-toggle-icon {
+    font-weight: bold;
+    color: #007bff;
+}
+
+.chapter-title {
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+.chapter-summary {
+    font-size: 0.9em;
+    color: #6c757d;
+}
+
+.chapter-progress-bar-container {
+    height: 8px;
+    background-color: #e9ecef;
+    border-radius: 4px;
+    margin: 10px 0 20px 0;
+    overflow: hidden;
+}
+
+.chapter-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #28a745, #20c997);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+
+.unit-details {
+    padding: 0 20px 10px 40px;
+}
+
+.unit-progress-item {
+    margin-bottom: 20px;
+    padding: 15px;
+    background-color: #ffffff;
+    border: 1px solid #e3e6ea;
+    border-radius: 6px;
+}
+
+.unit-progress-item h5 {
+    color: #495057;
+    margin-bottom: 10px;
+    border-bottom: 1px solid #f1f3f4;
+    padding-bottom: 5px;
+}
+
+.unit-progress-bar-container {
+    height: 6px;
+    background-color: #f1f3f4;
+    border-radius: 3px;
+    margin-top: 8px;
+    overflow: hidden;
+}
+
+.unit-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #17a2b8, #6f42c1);
+    border-radius: 3px;
+    transition: width 0.3s ease;
+}
+</style>
 {% endblock %}
