@@ -3234,6 +3234,7 @@ def admin_analyze_invalid_history_detailed():
 
 @app.route('/progress')
 def progress_page():
+    """個人進捗のみを高速表示（ランキングは非同期）"""
     try:
         if 'user_id' not in session:
             flash('進捗を確認するにはログインしてください。', 'info')
@@ -3244,7 +3245,7 @@ def progress_page():
             flash('ユーザーが見つかりません。', 'danger')
             return redirect(url_for('logout'))
 
-        print(f"\n=== 進捗ページ処理開始 ===")
+        print(f"\n=== 進捗ページ（高速版）処理開始 ===")
         print(f"ユーザー: {current_user.username} (部屋: {current_user.room_number})")
 
         user_problem_history = current_user.get_problem_history()
@@ -3259,7 +3260,7 @@ def progress_page():
         parsed_max_enabled_unit_num = parse_unit_number(max_enabled_unit_num_str)
         print(f"最大単元番号: {max_enabled_unit_num_str}")
 
-        # 章ごとに進捗をまとめる
+        # 章ごとに進捗をまとめる（個人のみ、高速化）
         chapter_progress_summary = {}
 
         # 有効な単語データで単元進捗を初期化
@@ -3294,7 +3295,7 @@ def progress_page():
                 chapter_progress_summary[chapter_num]['units'][unit_num]['total_questions_in_unit'] += 1
                 chapter_progress_summary[chapter_num]['total_questions'] += 1
 
-        # 学習履歴を処理
+        # 学習履歴を処理（個人のみ）
         matched_problems = 0
         unmatched_problems = 0
         
@@ -3363,29 +3364,59 @@ def progress_page():
             }
 
         print(f"章別進捗: {len(sorted_chapter_progress)}章")
+        print("=== 進捗ページ（高速版）処理完了 ===\n")
 
-        # =================
-        # ランキング計算
-        # =================
+        context = get_template_context()
+        
+        # ★重要：ランキングデータは空で渡す（Ajax で後から取得）
+        return render_template('progress.html',
+                               current_user=current_user,
+                               user_progress_by_chapter=sorted_chapter_progress,
+                               # ランキング関連は空・None で初期化
+                               top_10_ranking=[],  
+                               current_user_stats=None,
+                               current_user_rank=None,
+                               total_users_in_room=0,
+                               ranking_display_count=5,
+                               # 非同期ローディング用フラグ
+                               async_loading=True,
+                               **context)
+    
+    except Exception as e:
+        print(f"Error in progress_page: {e}")
+        import traceback
+        traceback.print_exc()
+        return f"Progress Error: {e}", 500
+
+
+# 新しいAPIエンドポイント：ランキングデータを非同期取得
+@app.route('/api/ranking_data')
+def api_ranking_data():
+    """ランキングデータを非同期で取得"""
+    try:
+        if 'user_id' not in session:
+            return jsonify(status='error', message='認証されていません。'), 401
+
+        current_user = User.query.get(session['user_id'])
+        if not current_user:
+            return jsonify(status='error', message='ユーザーが見つかりません。'), 404
+
+        print(f"\n=== ランキング計算開始 ({current_user.username}) ===")
+        start_time = time.time()
+
         current_room_number = current_user.room_number
         
-        all_users_for_ranking = User.query.filter_by(room_number=current_room_number).all()
-        ranking_data = []
-
-        room_setting_for_ranking = RoomSetting.query.filter_by(room_number=current_room_number).first()
-        max_enabled_unit_num_str_for_ranking = room_setting_for_ranking.max_enabled_unit_number if room_setting_for_ranking else "9999"
-        parsed_max_enabled_unit_num_for_ranking = parse_unit_number(max_enabled_unit_num_str_for_ranking)
-
-        # ランキング表示人数を取得（エラーハンドリング強化）
-        ranking_display_count = 5  # デフォルト値
-
+        # 部屋の単語データと設定を取得
+        word_data = load_word_data_for_room(current_room_number)
+        room_setting = RoomSetting.query.filter_by(room_number=current_room_number).first()
+        max_enabled_unit_num_str = room_setting.max_enabled_unit_number if room_setting else "9999"
+        parsed_max_enabled_unit_num = parse_unit_number(max_enabled_unit_num_str)
+        
+        # ランキング表示人数を取得
+        ranking_display_count = 5
         try:
-            if room_setting_for_ranking:
-                # hasattr でカラムの存在を確認
-                if hasattr(room_setting_for_ranking, 'ranking_display_count'):
-                    ranking_display_count = room_setting_for_ranking.ranking_display_count or 5  # デフォルト値を5に変更
-                else:
-                    print("⚠️ ranking_display_count カラムが存在しません。デフォルト値5を使用")
+            if room_setting and hasattr(room_setting, 'ranking_display_count'):
+                ranking_display_count = room_setting.ranking_display_count or 5
         except Exception as e:
             print(f"⚠️ ranking_display_count 取得エラー: {e}")
         
@@ -3393,12 +3424,20 @@ def progress_page():
         total_questions_for_room_ranking = 0
         for word in word_data:
             is_word_enabled_in_csv = word['enabled']
-            is_unit_enabled_by_room_setting = parse_unit_number(word['number']) <= parsed_max_enabled_unit_num_for_ranking
+            is_unit_enabled_by_room_setting = parse_unit_number(word['number']) <= parsed_max_enabled_unit_num
             if is_word_enabled_in_csv and is_unit_enabled_by_room_setting:
                 total_questions_for_room_ranking += 1
         
-        # 現在のユーザーのスコア計算用変数
+        # 部屋内の全ユーザーを取得
+        all_users_for_ranking = User.query.filter_by(room_number=current_room_number).all()
+        ranking_data = []
         current_user_stats = None
+
+        # ベイズ統計による正答率補正の設定値
+        EXPECTED_AVG_ACCURACY = 0.7
+        CONFIDENCE_ATTEMPTS = 10
+        PRIOR_CORRECT = EXPECTED_AVG_ACCURACY * CONFIDENCE_ATTEMPTS
+        PRIOR_ATTEMPTS = CONFIDENCE_ATTEMPTS
 
         # 全ユーザーのスコアを計算
         for user_obj in all_users_for_ranking:
@@ -3422,7 +3461,7 @@ def progress_page():
 
                     if matched_word:
                         is_word_enabled_in_csv = matched_word['enabled']
-                        is_unit_enabled_by_room_setting = parse_unit_number(matched_word['number']) <= parsed_max_enabled_unit_num_for_ranking
+                        is_unit_enabled_by_room_setting = parse_unit_number(matched_word['number']) <= parsed_max_enabled_unit_num
 
                         if is_word_enabled_in_csv and is_unit_enabled_by_room_setting:
                             correct_attempts = history.get('correct_attempts', 0)
@@ -3439,12 +3478,6 @@ def progress_page():
             
             user_mastered_count = len(mastered_problem_ids)
             coverage_rate = (user_mastered_count / total_questions_for_room_ranking * 100) if total_questions_for_room_ranking > 0 else 0
-            
-            # ベイズ統計による正答率補正の設定値
-            EXPECTED_AVG_ACCURACY = 0.7
-            CONFIDENCE_ATTEMPTS = 10
-            PRIOR_CORRECT = EXPECTED_AVG_ACCURACY * CONFIDENCE_ATTEMPTS
-            PRIOR_ATTEMPTS = CONFIDENCE_ATTEMPTS
 
             # ベイズ統計による総合評価型スコア計算
             if total_attempts == 0:
@@ -3487,6 +3520,7 @@ def progress_page():
         # バランススコアで降順ソート
         ranking_data.sort(key=lambda x: (x['balance_score'], x['total_attempts']), reverse=True)
 
+        # 現在のユーザーの順位を特定
         current_user_rank = None
         if current_user_stats:
             for index, user_data in enumerate(ranking_data, 1):
@@ -3494,33 +3528,27 @@ def progress_page():
                     current_user_rank = index
                     break
         
-        # ★修正：テンプレートで使用される変数名に統一
-        top_5_ranking = ranking_data[:ranking_display_count]
+        # 上位ランキングを取得
+        top_ranking = ranking_data[:ranking_display_count]
 
-        print(f"ランキング対象ユーザー数: {len(ranking_data)}")
-        print(f"表示ランキング数: {len(top_5_ranking)}")
-        print(f"現在のユーザーのスコア: {current_user_stats}")
-        print(f"現在のユーザーの順位: {current_user_rank}")
-        print("=== 進捗ページ処理完了 ===\n")
+        elapsed_time = time.time() - start_time
+        print(f"=== ランキング計算完了: {elapsed_time:.2f}秒 ===\n")
 
-        context = get_template_context()
+        return jsonify({
+            'status': 'success',
+            'ranking_data': top_ranking,
+            'current_user_stats': current_user_stats,
+            'current_user_rank': current_user_rank,
+            'total_users_in_room': len(ranking_data),
+            'ranking_display_count': ranking_display_count,
+            'calculation_time': round(elapsed_time, 2)
+        })
         
-        # ★修正：テンプレートで使用される変数名に統一
-        return render_template('progress.html',
-                               current_user=current_user,
-                               user_progress_by_chapter=sorted_chapter_progress,
-                               top_10_ranking=top_5_ranking,  # 変数名はテンプレートに合わせる
-                               current_user_stats=current_user_stats,
-                               current_user_rank=current_user_rank,  # ★追加
-                               total_users_in_room=len(ranking_data),  # ★追加
-                               ranking_display_count=ranking_display_count,
-                               **context)
-    
     except Exception as e:
-        print(f"Error in progress_page: {e}")
+        print(f"❌ ランキング計算エラー: {e}")
         import traceback
         traceback.print_exc()
-        return f"Progress Error: {e}", 500
+        return jsonify(status='error', message=str(e)), 500
 
 # ====================================================================
 # 管理者ページ
