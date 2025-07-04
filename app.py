@@ -1119,8 +1119,66 @@ def diagnose_database_environment():
     
     print("========================\n")
 
+def create_user_stats_table_simple():
+    """シンプルなuser_statsテーブル作成"""
+    try:
+        print("🔧 user_statsテーブル作成開始...")
+        
+        # SQLAlchemyを使用してテーブル作成
+        db.create_all()
+        
+        # 手動でテーブル作成も試行
+        with db.engine.connect() as conn:
+            # テーブル存在確認
+            result = conn.execute(text("""
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables 
+                    WHERE table_name = 'user_stats'
+                )
+            """))
+            table_exists = result.fetchone()[0]
+            
+            if not table_exists:
+                print("🔧 SQLで直接テーブル作成...")
+                conn.execute(text("""
+                    CREATE TABLE user_stats (
+                        id SERIAL PRIMARY KEY,
+                        user_id INTEGER NOT NULL UNIQUE,
+                        room_number VARCHAR(50) NOT NULL,
+                        total_attempts INTEGER DEFAULT 0,
+                        total_correct INTEGER DEFAULT 0,
+                        mastered_count INTEGER DEFAULT 0,
+                        accuracy_rate FLOAT DEFAULT 0.0,
+                        coverage_rate FLOAT DEFAULT 0.0,
+                        balance_score FLOAT DEFAULT 0.0,
+                        mastery_score FLOAT DEFAULT 0.0,
+                        reliability_score FLOAT DEFAULT 0.0,
+                        activity_score FLOAT DEFAULT 0.0,
+                        last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        total_questions_in_room INTEGER DEFAULT 0,
+                        FOREIGN KEY (user_id) REFERENCES "user"(id) ON DELETE CASCADE
+                    )
+                """))
+                
+                conn.execute(text("""
+                    CREATE INDEX idx_user_stats_room_number ON user_stats(room_number)
+                """))
+                
+                conn.commit()
+                print("✅ user_statsテーブル作成完了")
+                return True
+            else:
+                print("✅ user_statsテーブルは既に存在します")
+                return True
+                
+    except Exception as e:
+        print(f"❌ テーブル作成エラー: {e}")
+        return False
+
+
+# create_tables_and_admin_user() 関数を修正
 def create_tables_and_admin_user():
-    """データベース初期化関数（マイグレーション付き）"""
+    """データベース初期化関数（UserStats対応版）"""
     try:
         with app.app_context():
             logger.info("🔧 データベース初期化を開始...")
@@ -1138,14 +1196,19 @@ def create_tables_and_admin_user():
             db.create_all()
             logger.info("✅ テーブルを確認/作成しました。")
             
-            # ★ 重要：マイグレーションを強制実行
+            # ★重要：user_statsテーブルを確実に作成
+            try:
+                create_user_stats_table_simple()
+            except Exception as stats_error:
+                logger.error(f"⚠️ user_statsテーブル作成エラー: {stats_error}")
+            
+            # マイグレーション実行
             try:
                 logger.info("🔄 データベースマイグレーションを実行中...")
                 migrate_database()
                 logger.info("✅ マイグレーション完了")
             except Exception as migration_error:
                 logger.error(f"⚠️ マイグレーションエラー: {migration_error}")
-                # マイグレーションが失敗してもアプリは起動を続行
             
             # 管理者ユーザー確認/作成
             try:
@@ -1155,7 +1218,7 @@ def create_tables_and_admin_user():
                     logger.info("👤 管理者ユーザーを作成します...")
                     admin_user = User(
                         username='admin',
-                        original_username='admin',  # ★ 追加
+                        original_username='admin',
                         room_number='ADMIN',
                         student_id='000',
                         problem_history='{}',
@@ -1187,6 +1250,83 @@ def create_tables_and_admin_user():
     except Exception as e:
         logger.error(f"❌ データベース初期化エラー: {e}")
         raise
+
+@app.route('/create_missing_tables')
+def create_missing_tables():
+    """不足しているテーブルを作成"""
+    try:
+        print("🔧 不足テーブル作成開始...")
+        
+        # user_statsテーブル作成
+        success = create_user_stats_table_simple()
+        
+        if success:
+            # 作成後の確認
+            with db.engine.connect() as conn:
+                result = conn.execute(text("SELECT COUNT(*) FROM user_stats"))
+                count = result.fetchone()[0]
+                
+                return f"""
+                <h1>✅ テーブル作成完了</h1>
+                <p>user_statsテーブルが正常に作成されました。</p>
+                <p>現在のレコード数: {count}件</p>
+                
+                <h3>次の手順:</h3>
+                <ol>
+                    <li><a href="/admin">管理者ページに移動</a></li>
+                    <li>「📊 ユーザー統計管理」で「🔄 全統計を強制再初期化」実行</li>
+                    <li><a href="/progress">進捗ページで動作確認</a></li>
+                </ol>
+                
+                <style>
+                    body {{ font-family: Arial, sans-serif; margin: 40px; }}
+                    h1 {{ color: #28a745; }}
+                    h3 {{ color: #495057; }}
+                    ol {{ background: #f8f9fa; padding: 20px; border-radius: 5px; }}
+                    a {{ color: #007bff; text-decoration: none; }}
+                    a:hover {{ text-decoration: underline; }}
+                </style>
+                """
+        else:
+            return """
+            <h1>❌ テーブル作成失敗</h1>
+            <p>user_statsテーブルの作成に失敗しました。</p>
+            <p><a href="/admin">管理者ページに戻る</a></p>
+            """
+            
+    except Exception as e:
+        return f"""
+        <h1>💥 エラー発生</h1>
+        <p>エラー: {str(e)}</p>
+        <p><a href="/admin">管理者ページに戻る</a></p>
+        """
+
+
+@app.route('/admin/manual_create_stats_table', methods=['POST'])
+def admin_manual_create_stats_table():
+    """管理者用：統計テーブル手動作成"""
+    if not session.get('admin_logged_in'):
+        return jsonify({'status': 'error', 'message': '管理者権限が必要です'}), 403
+    
+    try:
+        success = create_user_stats_table_simple()
+        
+        if success:
+            return jsonify({
+                'status': 'success',
+                'message': 'user_statsテーブルを作成しました。統計の初期化を実行してください。'
+            })
+        else:
+            return jsonify({
+                'status': 'error',
+                'message': 'テーブル作成に失敗しました'
+            })
+            
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': f'テーブル作成エラー: {str(e)}'
+        }), 500
     
 # ===== データ永続化チェック機能 =====
 def check_data_persistence():
