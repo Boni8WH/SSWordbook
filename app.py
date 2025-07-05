@@ -7920,6 +7920,98 @@ def admin_upload_room_csv_fixed():
         print(f"❌ CSV アップロードエラー: {e}")
         return jsonify({'status': 'error', 'message': f'ファイルアップロードエラー: {str(e)}'}), 500
 
+# app.pyに以下のルートを追加
+
+@app.route('/emergency_fix_user_stats_table')
+def emergency_fix_user_stats_table():
+    """緊急修復：user_statsテーブルを確実に作成"""
+    try:
+        print("🆘 user_statsテーブル緊急修復開始...")
+        
+        with db.engine.connect() as conn:
+            # 1. テーブル存在確認
+            result = conn.execute(text("""
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables 
+                    WHERE table_name = 'user_stats'
+                )
+            """))
+            table_exists = result.fetchone()[0]
+            
+            if table_exists:
+                return """
+                <h1>✅ user_statsテーブルは既に存在します</h1>
+                <p>テーブルは正常に存在しています。</p>
+                <p><a href="/admin">管理者ページに戻る</a></p>
+                <p><a href="/admin/fix_stats_comprehensive">📊 統計データを修復する</a></p>
+                """
+            
+            print("🔧 user_statsテーブルを作成中...")
+            
+            # 2. テーブル作成
+            conn.execute(text("""
+                CREATE TABLE user_stats (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER NOT NULL UNIQUE REFERENCES "user"(id) ON DELETE CASCADE,
+                    room_number VARCHAR(50) NOT NULL,
+                    total_attempts INTEGER DEFAULT 0 NOT NULL,
+                    total_correct INTEGER DEFAULT 0 NOT NULL,
+                    mastered_count INTEGER DEFAULT 0 NOT NULL,
+                    accuracy_rate FLOAT DEFAULT 0.0 NOT NULL,
+                    coverage_rate FLOAT DEFAULT 0.0 NOT NULL,
+                    balance_score FLOAT DEFAULT 0.0 NOT NULL,
+                    mastery_score FLOAT DEFAULT 0.0 NOT NULL,
+                    reliability_score FLOAT DEFAULT 0.0 NOT NULL,
+                    activity_score FLOAT DEFAULT 0.0 NOT NULL,
+                    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                    total_questions_in_room INTEGER DEFAULT 0 NOT NULL
+                )
+            """))
+            
+            # 3. インデックス作成
+            conn.execute(text("""
+                CREATE INDEX idx_user_stats_room_number ON user_stats(room_number)
+            """))
+            
+            conn.commit()
+            print("✅ user_statsテーブル作成完了")
+            
+            # 4. 作成確認
+            result = conn.execute(text("SELECT COUNT(*) FROM user_stats"))
+            count = result.fetchone()[0]
+            
+            return f"""
+            <h1>✅ 緊急修復完了</h1>
+            <p>user_statsテーブルの作成が完了しました。</p>
+            <p>現在のレコード数: {count}件</p>
+            
+            <h3>次の手順:</h3>
+            <ol>
+                <li><a href="/admin">管理者ページに移動</a></li>
+                <li>「📊 統計データ管理」→「🔧 統計データを完全修復」を実行</li>
+                <li>管理者ページのランキングで部屋を選択して動作確認</li>
+            </ol>
+            
+            <style>
+                body {{ font-family: Arial, sans-serif; margin: 40px; }}
+                h1 {{ color: #28a745; }}
+                h3 {{ color: #495057; }}
+                ol {{ background: #f8f9fa; padding: 20px; border-radius: 5px; }}
+                a {{ color: #007bff; text-decoration: none; }}
+                a:hover {{ text-decoration: underline; }}
+            </style>
+            """
+            
+    except Exception as e:
+        print(f"緊急修復エラー: {e}")
+        import traceback
+        traceback.print_exc()
+        return f"""
+        <h1>❌ 緊急修復失敗</h1>
+        <p>エラー: {str(e)}</p>
+        <p><a href="/admin">管理者ページに戻る</a></p>
+        """
+
 # admin_list_room_csv_filesルートもデバッグ版に修正
 @app.route('/admin/list_room_csv_files')
 def admin_list_room_csv_files():
