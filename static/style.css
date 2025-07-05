@@ -3570,3 +3570,1111 @@ a.nav-link.btn.change-username-button:hover,
         font-size: 1.6em;
     }
 }
+
+.admin-panel {
+    background-color: #f9f9f9;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    border: 1px solid #eee;
+}
+
+.admin-panel h4 {
+    margin-top: 0;
+    margin-bottom: 10px;
+}
+
+.admin-panel p {
+    margin-bottom: 15px;
+    line-height: 1.5;
+}
+
+.download-buttons {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+}
+
+.btn-group-vertical .btn {
+    margin-bottom: 2px;
+}
+
+/* スクロール可能なテーブルコンテナ */
+.scrollable-table-container {
+    max-height: 400px;
+    overflow-y: auto;
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+    margin-bottom: 1rem;
+}
+
+.scrollable-table-container .table {
+    margin-bottom: 0;
+}
+
+/* 固定ヘッダー */
+.sticky-header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background-color: #343a40 !important;
+}
+
+/* テーブル制御要素 */
+.table-controls {
+    background-color: #f8f9fa;
+    padding: 15px;
+    border-radius: 0.375rem;
+    border: 1px solid #dee2e6;
+}
+
+.table-controls label {
+    font-weight: 600;
+    margin-bottom: 5px;
+    display: block;
+}
+
+/* ソートアイコン */
+.sort-icon {
+    margin-left: 5px;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+
+.sort-icon:hover {
+    opacity: 1;
+}
+
+/* バッジスタイル */
+.badge {
+    font-size: 0.8em;
+}
+
+/* ユーザー行のホバー効果 */
+#userTableBody tr:hover {
+    background-color: #f8f9fa;
+}
+
+/* 削除ボタンのスタイル統一 */
+.delete-user-btn {
+    font-size: 0.8rem;
+    padding: 0.25rem 0.5rem;
+}
+
+/* 管理者ランキングセクション専用スタイル */
+.room-selector-container {
+    margin-bottom: 25px;
+}
+
+.room-buttons-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-top: 15px;
+}
+
+.room-button {
+    padding: 15px;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+    border: 2px solid #dee2e6;
+}
+
+.room-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.room-button.btn-primary {
+    background-color: #007bff;
+    border-color: #007bff;
+    color: white;
+}
+
+.room-button small {
+    color: inherit;
+    opacity: 0.8;
+}
+
+.ranking-summary {
+    background-color: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+.summary-card {
+    text-align: center;
+    padding: 15px;
+    background-color: white;
+    border-radius: 6px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.summary-card h5 {
+    font-size: 0.9rem;
+    color: #6c757d;
+    margin-bottom: 10px;
+}
+
+.summary-value {
+    font-size: 1.8rem;
+    font-weight: bold;
+    color: #2c3e50;
+    display: block;
+}
+
+.admin-ranking-actions {
+    padding: 20px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    text-align: center;
+}
+
+.admin-ranking-actions button {
+    margin: 0 5px;
+}
+
+/* テーブルスタイル */
+.table-hover tbody tr:hover {
+    background-color: rgba(0,0,0,0.05);
+}
+
+.table th {
+    border-top: none;
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.table td {
+    vertical-align: middle;
+    font-size: 0.85rem;
+}
+
+/* アイコン */
+.fas.fa-crown {
+    margin-left: 5px;
+}
+
+.fas.fa-medal {
+    margin-left: 5px;
+}
+
+/* フェードイン効果 */
+#invalidHistoryAnalysisResult,
+#userDebugResult,
+#statsCheckResult {
+    margin-top: 15px;
+    animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* 結果表示エリア */
+.table-responsive {
+    margin-top: 10px;
+}
+
+.text-success {
+    color: #28a745 !important;
+}
+
+.text-warning {
+    color: #ffc107 !important;
+}
+
+.text-danger {
+    color: #dc3545 !important;
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 768px) {
+    .download-buttons {
+        flex-direction: column;
+    }
+    
+    .download-buttons .btn {
+        width: 100%;
+        margin-bottom: 5px;
+    }
+    
+    .btn-group-vertical {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+    
+    .btn-group-vertical .btn {
+        font-size: 0.7rem;
+        padding: 4px 8px;
+    }
+    
+    .scrollable-table-container {
+        max-height: 300px;
+    }
+    
+    .table-controls .row {
+        margin-bottom: 0;
+    }
+    
+    .table-controls .col-md-6 {
+        margin-bottom: 10px;
+    }
+    
+    /* スマホでのテーブル表示改善 */
+    .table {
+        font-size: 0.8rem;
+    }
+    
+    .table th,
+    .table td {
+        padding: 0.3rem;
+        white-space: nowrap;
+    }
+    
+    /* 部屋ボタン */
+    .room-buttons-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .ranking-summary .row {
+        text-align: center;
+    }
+    
+    .summary-card {
+        margin-bottom: 15px;
+    }
+    
+    .table-responsive {
+        font-size: 0.8rem;
+    }
+    
+    .admin-ranking-actions {
+        text-align: center;
+    }
+    
+    .admin-ranking-actions button {
+        margin: 5px 2px;
+        font-size: 0.8rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .room-button {
+        padding: 10px;
+        font-size: 0.9rem;
+    }
+    
+    .summary-value {
+        font-size: 1.5rem;
+    }
+    
+    .table {
+        font-size: 0.75rem;
+    }
+}
+
+.room-select-form {
+    display: flex;
+    align-items: end;
+    gap: 15px;
+    margin-bottom: 20px;
+    padding: 20px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+}
+
+.room-select-form .form-group {
+    flex: 1;
+    margin-bottom: 0;
+}
+
+.room-select-form label {
+    font-weight: 600;
+    margin-bottom: 5px;
+    display: block;
+}
+
+.room-select-form select {
+    min-width: 200px;
+}
+
+.quick-access-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.quick-access-btn {
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+}
+
+.room-info-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+.room-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.ranking-summary {
+    background-color: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    border: 1px solid #dee2e6;
+}
+
+.summary-card {
+    text-align: center;
+    padding: 15px;
+    background-color: white;
+    border-radius: 6px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    transition: transform 0.2s ease;
+}
+
+.summary-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+.summary-card h5 {
+    font-size: 0.9rem;
+    color: #6c757d;
+    margin-bottom: 10px;
+    font-weight: 600;
+}
+
+.summary-value {
+    font-size: 2rem;
+    font-weight: bold;
+    color: #2c3e50;
+    display: block;
+}
+
+.ranking-table {
+    font-size: 0.9rem;
+}
+
+.ranking-table th {
+    background-color: #343a40;
+    color: white;
+    font-weight: 600;
+    border: none;
+    padding: 12px 8px;
+}
+
+.ranking-table td {
+    vertical-align: middle;
+    padding: 10px 8px;
+}
+
+.ranking-table tbody tr:hover {
+    background-color: rgba(0,123,255,0.1);
+}
+
+/* 順位に応じた色分け */
+.ranking-table tbody tr:nth-child(1) {
+    background-color: rgba(255,215,0,0.2); /* 金 */
+}
+
+.ranking-table tbody tr:nth-child(2) {
+    background-color: rgba(192,192,192,0.2); /* 銀 */
+}
+
+.ranking-table tbody tr:nth-child(3) {
+    background-color: rgba(205,127,50,0.2); /* 銅 */
+}
+
+.user-name-link {
+    color: #007bff;
+    text-decoration: none;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.user-name-link:hover {
+    text-decoration: underline;
+    color: #0056b3;
+}
+
+.score-badge {
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.score-high {
+    background-color: #d4edda;
+    color: #155724;
+}
+
+.score-medium {
+    background-color: #fff3cd;
+    color: #856404;
+}
+
+.score-low {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 768px) {
+    .room-select-form {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .room-actions {
+        justify-content: center;
+    }
+    
+    .ranking-summary .row > div {
+        margin-bottom: 15px;
+    }
+    
+    .summary-card {
+        margin-bottom: 10px;
+    }
+    
+    .ranking-table {
+        font-size: 0.8rem;
+    }
+    
+    .ranking-table th,
+    .ranking-table td {
+        padding: 6px 4px;
+    }
+}
+
+* 緊急修復セクションのスタイル */
+#admin-emergency-fixes .admin-panel {
+    margin-bottom: 30px;
+}
+
+#admin-emergency-fixes .btn-lg {
+    font-size: 1.2rem;
+    padding: 12px 30px;
+    margin-bottom: 15px;
+}
+
+/* アップロード進捗バーのスタイル */
+.progress {
+    height: 25px;
+    background-color: #e9ecef;
+    border-radius: 15px;
+    overflow: hidden;
+}
+
+.progress-bar {
+    transition: width 0.3s ease;
+    background: linear-gradient(45deg, #007bff, #0056b3);
+}
+
+/* 結果表示のスタイル */
+#uploadResult .alert {
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+#uploadResult .alert-success {
+    border-left: 5px solid #28a745;
+}
+
+#uploadResult .alert-danger {
+    border-left: 5px solid #dc3545;
+}
+
+/* ユーザー名リンクのスタイル改善 */
+.user-name-link {
+    font-weight: 600;
+    transition: all 0.2s ease;
+}
+
+.user-name-link:hover {
+    color: #0056b3 !important;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+}
+
+/* ランキングテーブルの改善 */
+.ranking-table th {
+    position: sticky;
+    top: 0;
+    background-color: #343a40 !important;
+    z-index: 10;
+}
+
+.ranking-table tbody tr:hover {
+    background-color: rgba(0,123,255,0.1);
+    transform: scale(1.005);
+    transition: all 0.2s ease;
+}
+
+/* 統計カードの改善 */
+.summary-card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.summary-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 768px) {
+    #admin-emergency-fixes .btn-lg {
+        width: 100%;
+        margin-bottom: 10px;
+    }
+    
+    .ranking-table {
+        font-size: 0.85rem;
+    }
+    
+    .summary-card {
+        margin-bottom: 15px;
+    }
+}
+
+/* ローディングスピナー */
+.spinner-border {
+    width: 2rem;
+    height: 2rem;
+}
+
+/* ユーザー順位セクション（ランキング枠の外） */
+.progress-user-rank-section {
+    text-align: center;
+    margin-bottom: 30px;
+    padding: 20px;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-radius: 12px;
+    border: 2px solid #dee2e6;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.progress-user-rank-section h4 {
+    margin-bottom: 15px;
+    color: #2c3e50;
+    font-size: 1.3em;
+    font-weight: 600;
+}
+
+/* ユーザー統計セクション（ランキング枠の外） */
+.current-user-stats {
+    background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%);
+    border: 2px solid #2196f3;
+    border-radius: 12px;
+    padding: 25px;
+    margin-bottom: 30px;
+    box-shadow: 0 6px 15px rgba(33, 150, 243, 0.15);
+}
+
+.current-user-stats h4 {
+    color: #1565c0;
+    font-size: 1.4em;
+    margin-bottom: 20px;
+    text-align: center;
+    border-bottom: 2px solid #90caf9;
+    padding-bottom: 10px;
+}
+
+/* ランキングヘッダー（シンプル化） */
+.progress-ranking-header {
+    margin-bottom: 25px;
+}
+
+.progress-ranking-title-section h3 {
+    margin-bottom: 8px;
+    color: #2c3e50;
+    font-size: 1.4em;
+}
+
+.progress-ranking-title-section p {
+    margin-bottom: 0;
+    color: #6c757d;
+    font-size: 0.95em;
+}
+
+/* 統計グリッド（専用クラス名） */
+.progress-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.progress-stat-item {
+    text-align: center;
+    padding: 15px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    border-left: 4px solid #007bff;
+}
+
+.progress-stat-label {
+    display: block;
+    font-size: 0.9em;
+    color: #6c757d;
+    margin-bottom: 5px;
+}
+
+.progress-stat-value {
+    display: block;
+    font-size: 1.5em;
+    font-weight: bold;
+    color: #2c3e50;
+}
+
+.progress-stat-value.progress-main-score {
+    color: #e74c3c;
+    font-size: 1.8em;
+}
+
+.progress-stat-description {
+    display: block;
+    font-size: 0.7em;
+    color: #95a5a6;
+    margin-top: 3px;
+}
+
+/* 順位表示（専用クラス名） */
+.progress-rank-display {
+    text-align: center;
+    padding: 12px 16px;
+    background-color: #f8f9fa;
+    border-radius: 12px;
+    border: 2px solid #dee2e6;
+    min-width: 120px;
+    max-width: 160px;
+    margin: 0 auto;
+}
+
+.progress-rank-display.progress-rank-1 {
+    background: linear-gradient(135deg, #ffd700, #ffed4e);
+    border-color: #ffd700;
+    color: #8b4513;
+}
+
+.progress-rank-display.progress-rank-2 {
+    background: linear-gradient(135deg, #c0c0c0, #e8e8e8);
+    border-color: #c0c0c0;
+    color: #4a4a4a;
+}
+
+.progress-rank-display.progress-rank-3 {
+    background: linear-gradient(135deg, #cd7f32, #daa520);
+    border-color: #cd7f32;
+    color: #654321;
+}
+
+.progress-rank-icon {
+    font-size: 1.1em;
+    margin-right: 6px;
+    display: inline-block;
+}
+
+.progress-rank-number {
+    font-size: 1.8em;
+    font-weight: bold;
+    line-height: 1;
+}
+
+.progress-rank-text {
+    font-size: 1em;
+    margin-left: 3px;
+}
+
+.progress-rank-total {
+    display: block;
+    font-size: 0.75em;
+    opacity: 0.8;
+    margin-top: 3px;
+}
+
+/* 基本統計（専用クラス名） */
+.progress-basic-stats {
+    background-color: rgba(255, 255, 255, 0.8);
+    border-radius: 6px;
+    padding: 12px;
+    margin-top: 15px;
+    border-left: 4px solid #4caf50;
+}
+
+.progress-basic-stats p {
+    margin: 0;
+    font-size: 0.9em;
+    color: #333;
+    line-height: 1.4;
+}
+
+/* エラー表示 */
+#ranking-error {
+    text-align: center;
+    margin: 20px 0;
+}
+
+/* ランキングテーブルのスタイル強化 */
+.table-warning {
+    background-color: rgba(255, 215, 0, 0.2) !important;
+}
+
+.table-secondary {
+    background-color: rgba(192, 192, 192, 0.2) !important;
+}
+
+.table-info {
+    background-color: rgba(205, 127, 50, 0.2) !important;
+}
+
+/* 全体ランキングリンクセクション - 削除 */
+
+/* レスポンシブ対応 */
+@media (max-width: 768px) {
+    .progress-user-rank-section {
+        margin-bottom: 20px;
+        padding: 15px;
+    }
+    
+    .progress-user-rank-section h4 {
+        font-size: 1.2em;
+        margin-bottom: 12px;
+    }
+    
+    .current-user-stats {
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+    
+    .current-user-stats h4 {
+        font-size: 1.2em;
+        margin-bottom: 15px;
+    }
+    
+    .progress-stats-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .progress-rank-display {
+        margin: 0 auto;
+        max-width: 140px;
+    }
+    
+    .progress-rank-number {
+        font-size: 1.6em;
+    }
+    
+    .progress-rank-icon {
+        font-size: 1em;
+    }
+}
+
+@media (max-width: 480px) {
+    .progress-user-rank-section {
+        padding: 12px;
+        margin-bottom: 15px;
+    }
+    
+    .progress-user-rank-section h4 {
+        font-size: 1.1em;
+    }
+    
+    .current-user-stats {
+        padding: 15px;
+        margin-bottom: 15px;
+    }
+    
+    .current-user-stats h4 {
+        font-size: 1.1em;
+    }
+    
+    .progress-rank-display {
+        max-width: 120px;
+    }
+    
+    .progress-rank-number {
+        font-size: 1.4em;
+    }
+}
+
+/* アニメーション効果 */
+#ranking-table-container {
+    animation: progressFadeIn 0.5s ease-in;
+}
+
+.current-user-stats {
+    animation: progressSlideUp 0.6s ease-out;
+}
+
+.progress-user-rank-section {
+    animation: progressBounceIn 0.8s ease-out;
+}
+
+@keyframes progressFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes progressSlideUp {
+    from { 
+        opacity: 0; 
+        transform: translateY(20px); 
+    }
+    to { 
+        opacity: 1; 
+        transform: translateY(0); 
+    }
+}
+
+@keyframes progressBounceIn {
+    0% { 
+        opacity: 0; 
+        transform: scale(0.8); 
+    }
+    50% { 
+        opacity: 0.8; 
+        transform: scale(1.05); 
+    }
+    100% { 
+        opacity: 1; 
+        transform: scale(1); 
+    }
+}
+
+/* 章別進捗のスタイル（既存のstyle.cssからコピー） */
+.progress-accordion {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.chapter-progress-item {
+    background-color: #ffffff;
+    border: 1px solid #e0e0e0;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    transition: box-shadow 0.2s ease;
+}
+
+.chapter-progress-item:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.chapter-progress-header {
+    padding: 20px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-bottom: 1px solid #e0e0e0;
+    transition: background-color 0.2s ease;
+    user-select: none;
+}
+
+.chapter-progress-header:hover {
+    background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%);
+}
+
+.chapter-progress-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.chapter-toggle-icon {
+    font-size: 1.2em;
+    color: #495057;
+    transition: transform 0.2s ease;
+    width: 20px;
+    text-align: center;
+}
+
+.chapter-title {
+    font-size: 1.2em;
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+.chapter-summary {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+}
+
+.mastered-count {
+    font-size: 1.1em;
+    font-weight: 600;
+    color: #27ae60;
+}
+
+.chapter-percentage {
+    font-size: 0.9em;
+    color: #6c757d;
+}
+
+.chapter-progress-bar-container {
+    height: 8px;
+    background-color: #e9ecef;
+    margin: 0 20px 20px 20px;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.chapter-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #28a745 0%, #20c997 100%);
+    border-radius: 4px;
+    transition: width 0.8s ease-in-out;
+}
+
+.unit-details {
+    padding: 0 20px 20px 20px;
+    background-color: #f8f9fa;
+    border-top: 1px solid #e0e0e0;
+}
+
+.unit-progress-item {
+    background-color: #ffffff;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 10px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.unit-progress-item:last-child {
+    margin-bottom: 0;
+}
+
+.unit-progress-item h5 {
+    color: #2c3e50;
+    font-size: 1.1em;
+    margin-bottom: 10px;
+    padding-bottom: 5px;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.unit-progress-item p {
+    margin-bottom: 6px;
+    color: #555;
+    font-size: 0.95em;
+}
+
+.unit-progress-bar-container {
+    background-color: #e9ecef;
+    border-radius: 6px;
+    height: 8px;
+    margin-top: 10px;
+    overflow: hidden;
+}
+
+.unit-progress-bar {
+    background: linear-gradient(90deg, #007bff 0%, #0056b3 100%);
+    height: 100%;
+    border-radius: 6px;
+    transition: width 0.8s ease-in-out;
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 767px) {
+    .chapter-progress-header {
+        padding: 15px;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+    
+    .chapter-progress-info {
+        gap: 8px;
+    }
+    
+    .chapter-title {
+        font-size: 1.0em;
+        line-height: 1.3;
+    }
+    
+    .chapter-summary {
+        align-items: flex-start;
+        width: 100%;
+    }
+    
+    .mastered-count {
+        font-size: 1.0em;
+    }
+    
+    .chapter-percentage {
+        font-size: 0.85em;
+    }
+    
+    .chapter-progress-bar-container {
+        margin: 0 15px 15px 15px;
+    }
+    
+    .unit-details {
+        padding: 0 15px 15px 15px;
+    }
+    
+    .unit-progress-item {
+        padding: 12px;
+    }
+    
+    .unit-progress-item h5 {
+        font-size: 1.0em;
+        line-height: 1.3;
+    }
+    
+    .unit-progress-item p {
+        font-size: 0.9em;
+    }
+}
+
+@media (max-width: 480px) {
+    .chapter-progress-header {
+        padding: 12px;
+    }
+    
+    .chapter-title {
+        font-size: 0.95em;
+    }
+    
+    .mastered-count {
+        font-size: 0.95em;
+    }
+    
+    .chapter-percentage {
+        font-size: 0.8em;
+    }
+    
+    .unit-progress-item {
+        padding: 10px;
+    }
+    
+    .unit-progress-item h5 {
+        font-size: 0.95em;
+    }
+    
+    .unit-progress-item p {
+        font-size: 0.85em;
+    }
+}
