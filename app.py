@@ -2,17 +2,23 @@ import os
 import json
 import csv
 import re
-from io import StringIO
-from datetime import datetime
-import pytz
-import secrets
-import string
-from datetime import datetime, timedelta
-from flask_mail import Mail, Message
 import hashlib
 import logging
 import math
 import time
+import secrets
+import string
+from io import StringIO
+from datetime import datetime, timedelta
+
+# 外部ライブラリ
+import pytz
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, Response
+from flask_sqlalchemy import SQLAlchemy
+from flask_mail import Mail, Message
+from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.utils import secure_filename
+from sqlalchemy import inspect, text, func
 
 log_level = logging.INFO if os.environ.get('RENDER') == 'true' else logging.DEBUG
 logging.basicConfig(
@@ -1958,8 +1964,6 @@ def login_page():
         traceback.print_exc()
         return f"Login Error: {e}", 500
 
-# app.py に新しいルートを追加
-
 @app.route('/first_time_password_change', methods=['GET', 'POST'])
 def first_time_password_change():
     """初回ログイン時の必須パスワード変更"""
@@ -2105,8 +2109,6 @@ def password_change_page():
         traceback.print_exc()
         return f"Password Change Error: {e}", 500
 
-# app.py に以下のルートを追加してください
-
 @app.route('/emergency_fix_db')
 def emergency_fix_db():
     """緊急データベース修復"""
@@ -2180,8 +2182,6 @@ def emergency_fix_db():
         <p>手動でPostgreSQLにアクセスして以下のSQLを実行してください：</p>
         <pre>ALTER TABLE app_info ADD COLUMN school_name VARCHAR(100) DEFAULT '朋優学院';</pre>
         """
-
-# app.py のパスワード再発行リクエストルートを修正
 
 @app.route('/password_reset_request', methods=['GET', 'POST'])
 def password_reset_request():
@@ -2295,8 +2295,6 @@ def admin_cleanup_expired_tokens():
     except Exception as e:
         db.session.rollback()
         return jsonify({'status': 'error', 'message': str(e)}), 500
-
-# app.py に以下のルートを追加してください
 
 @app.route('/admin/force_migration', methods=['POST'])
 def admin_force_migration():
@@ -2534,6 +2532,479 @@ def is_mail_configured():
     
     return True
 
+# app.py の管理者用ランキング機能追加
+# 以下のコードを app.py の適切な位置に追加してください
+
+# ====================================================================
+# 管理者用全員ランキングページ
+# ====================================================================
+
+@app.route('/admin/ranking')
+def admin_ranking_page():
+    """管理者用全員ランキング表示ページ"""
+    try:
+        if not session.get('admin_logged_in'):
+            flash('管理者権限がありません。', 'danger')
+            return redirect(url_for('login_page'))
+
+        print("🏆 管理者用ランキングページ表示開始...")
+
+        # テンプレートに必要な基本情報のみ渡す
+        # 実際のデータは Ajax で後から取得
+        context = get_template_context()
+        
+        return render_template('admin_ranking.html', **context)
+        
+    except Exception as e:
+        print(f"❌ 管理者ランキングページエラー: {e}")
+        import traceback
+        traceback.print_exc()
+        flash('ランキングページの読み込み中にエラーが発生しました。', 'danger')
+        return redirect(url_for('admin_page'))
+
+# ====================================================================
+# 管理者用ランキング API エンドポイント
+# ====================================================================
+
+@app.route('/api/admin/rooms')
+def api_admin_rooms():
+    """管理者用：全部屋の一覧を取得"""
+    try:
+        if not session.get('admin_logged_in'):
+            return jsonify(status='error', message='管理者権限が必要です'), 403
+        
+        print("🔍 管理者用部屋一覧取得開始...")
+        
+        # 部屋別のユーザー数を集計
+        rooms_query = db.session.query(
+            User.room_number,
+            func.count(User.id).label('user_count')
+        ).filter(
+            User.room_number != 'ADMIN'
+        ).group_by(User.room_number).all()
+        
+        rooms = []
+        for room_data in rooms_query:
+            rooms.append({
+                'room_number': room_data.room_number,
+                'user_count': room_data.user_count
+            })
+        
+        # 部屋番号でソート
+        rooms.sort(key=lambda x: int(x['room_number']) if x['room_number'].isdigit() else float('inf'))
+        
+        print(f"✅ 部屋一覧取得完了: {len(rooms)}個の部屋")
+        
+        return jsonify({
+            'status': 'success',
+            'rooms': rooms
+        })
+        
+    except Exception as e:
+        print(f"❌ 部屋一覧取得エラー: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify(status='error', message=str(e)), 500
+
+@app.route('/api/admin/room_ranking/<room_number>')
+def api_admin_room_ranking(room_number):
+    """管理者用：指定した部屋の全ユーザーランキングを取得"""
+    try:
+        if not session.get('admin_logged_in'):
+            return jsonify(status='error', message='管理者権限が必要です'), 403
+        
+        print(f"\n=== 管理者用ランキング取得開始 (部屋: {room_number}) ===")
+        start_time = time.time()
+        
+        # user_statsテーブルの存在確認
+        try:
+            inspector = inspect(db.engine)
+            user_stats_exists = inspector.has_table('user_stats')
+            
+            if not user_stats_exists:
+                print("⚠️ user_statsテーブルが存在しません。従来方式で計算します...")
+                return admin_fallback_ranking_calculation(room_number, start_time)
+            
+            # 事前計算された統計データを高速取得
+            room_stats = UserStats.query.filter_by(room_number=room_number)\
+                                        .join(User)\
+                                        .filter(User.username != 'admin')\
+                                        .order_by(UserStats.balance_score.desc(), UserStats.total_attempts.desc())\
+                                        .all()
+            
+            print(f"📊 事前計算データ取得: {len(room_stats)}人分")
+            
+            # データが空の場合はフォールバック
+            if not room_stats:
+                print("⚠️ 統計データが空です。従来方式で計算します...")
+                return admin_fallback_ranking_calculation(room_number, start_time)
+            
+        except Exception as stats_error:
+            print(f"⚠️ 統計テーブルアクセスエラー: {stats_error}")
+            print("従来方式で計算します...")
+            return admin_fallback_ranking_calculation(room_number, start_time)
+        
+        # ランキングデータを構築（全員取得）
+        ranking_data = []
+        total_attempts = 0
+        total_correct = 0
+        total_scores = []
+        active_users = 0
+        
+        for stats in room_stats:
+            user_data = {
+                'username': stats.user.username,
+                'total_attempts': stats.total_attempts,
+                'total_correct': stats.total_correct,
+                'accuracy_rate': round(stats.accuracy_rate, 1),
+                'coverage_rate': round(stats.coverage_rate, 1),
+                'mastered_count': stats.mastered_count,
+                'total_questions_for_room': stats.total_questions_in_room,
+                'balance_score': round(stats.balance_score, 1),
+                'mastery_score': round(stats.mastery_score, 1),
+                'reliability_score': round(stats.reliability_score, 1),
+                'activity_score': round(stats.activity_score, 1),
+                'last_login': stats.user.last_login.isoformat() if stats.user.last_login else None
+            }
+            
+            ranking_data.append(user_data)
+            
+            # 統計データ集計
+            total_attempts += stats.total_attempts
+            total_correct += stats.total_correct
+            total_scores.append(stats.balance_score)
+            
+            # アクティブユーザー判定（何らかの学習履歴がある）
+            if stats.total_attempts > 0:
+                active_users += 1
+        
+        # 統計情報を計算
+        statistics = {
+            'total_users': len(ranking_data),
+            'active_users': active_users,
+            'average_score': round(sum(total_scores) / len(total_scores), 1) if total_scores else 0,
+            'max_score': round(max(total_scores), 1) if total_scores else 0,
+            'total_attempts': total_attempts,
+            'total_correct': total_correct,
+            'room_accuracy': round((total_correct / total_attempts * 100), 1) if total_attempts > 0 else 0
+        }
+        
+        elapsed_time = time.time() - start_time
+        print(f"=== 管理者用ランキング取得完了: {elapsed_time:.3f}秒 ===\n")
+        
+        return jsonify({
+            'status': 'success',
+            'room_number': room_number,
+            'ranking_data': ranking_data,
+            'statistics': statistics,
+            'calculation_time': round(elapsed_time, 3),
+            'using_precalculated': True,
+            'data_source': 'user_stats_table'
+        })
+        
+    except Exception as e:
+        print(f"❌ 管理者ランキング取得エラー: {e}")
+        import traceback
+        traceback.print_exc()
+        # 最終フォールバック：エラー時は従来方式
+        try:
+            return admin_fallback_ranking_calculation(room_number, time.time())
+        except:
+            return jsonify(status='error', message=f'ランキング取得エラー: {str(e)}'), 500
+
+def admin_fallback_ranking_calculation(room_number, start_time):
+    """管理者用フォールバック：従来方式でランキング計算"""
+    try:
+        print("🔄 管理者用従来方式でランキング計算中...")
+        
+        # 部屋の単語データと設定を取得
+        word_data = load_word_data_for_room(room_number)
+        room_setting = RoomSetting.query.filter_by(room_number=room_number).first()
+        max_enabled_unit_num_str = room_setting.max_enabled_unit_number if room_setting else "9999"
+        parsed_max_enabled_unit_num = parse_unit_number(max_enabled_unit_num_str)
+        
+        # 部屋の総問題数を計算
+        total_questions_for_room_ranking = 0
+        for word in word_data:
+            is_word_enabled_in_csv = word['enabled']
+            is_unit_enabled_by_room_setting = parse_unit_number(word['number']) <= parsed_max_enabled_unit_num
+            if is_word_enabled_in_csv and is_unit_enabled_by_room_setting:
+                total_questions_for_room_ranking += 1
+        
+        # 部屋内の全ユーザーを取得
+        all_users_for_ranking = User.query.filter_by(room_number=room_number).all()
+        ranking_data = []
+        total_attempts = 0
+        total_correct = 0
+        total_scores = []
+        active_users = 0
+
+        # ベイズ統計による正答率補正の設定値
+        EXPECTED_AVG_ACCURACY = 0.7
+        CONFIDENCE_ATTEMPTS = 10
+        PRIOR_CORRECT = EXPECTED_AVG_ACCURACY * CONFIDENCE_ATTEMPTS
+        PRIOR_ATTEMPTS = CONFIDENCE_ATTEMPTS
+
+        # 全ユーザーのスコアを計算
+        for user_obj in all_users_for_ranking:
+            if user_obj.username == 'admin':
+                continue
+                
+            user_total_attempts = 0
+            user_total_correct = 0
+            mastered_problem_ids = set()
+
+            user_obj_problem_history = user_obj.get_problem_history()
+
+            if isinstance(user_obj_problem_history, dict):
+                for problem_id, history in user_obj_problem_history.items():
+                    matched_word = None
+                    for word in word_data:
+                        generated_id = get_problem_id(word)
+                        if generated_id == problem_id:
+                            matched_word = word
+                            break
+
+                    if matched_word:
+                        is_word_enabled_in_csv = matched_word['enabled']
+                        is_unit_enabled_by_room_setting = parse_unit_number(matched_word['number']) <= parsed_max_enabled_unit_num
+
+                        if is_word_enabled_in_csv and is_unit_enabled_by_room_setting:
+                            correct_attempts = history.get('correct_attempts', 0)
+                            incorrect_attempts = history.get('incorrect_attempts', 0)
+                            problem_total_attempts = correct_attempts + incorrect_attempts
+                            
+                            user_total_attempts += problem_total_attempts
+                            user_total_correct += correct_attempts
+                            
+                            if problem_total_attempts > 0:
+                                accuracy_rate = (correct_attempts / problem_total_attempts) * 100
+                                if accuracy_rate >= 80.0:
+                                    mastered_problem_ids.add(problem_id)
+            
+            user_mastered_count = len(mastered_problem_ids)
+            coverage_rate = (user_mastered_count / total_questions_for_room_ranking * 100) if total_questions_for_room_ranking > 0 else 0
+
+            # ベイズ統計による総合評価型スコア計算
+            if user_total_attempts == 0:
+                comprehensive_score = 0
+                bayesian_accuracy = 0
+            else:
+                bayesian_accuracy = (PRIOR_CORRECT + user_total_correct) / (PRIOR_ATTEMPTS + user_total_attempts)
+                
+                comprehensive_score = (
+                    (user_mastered_count ** 1.3) * 10 +
+                    (bayesian_accuracy ** 2) * 500 +
+                    math.log(user_total_attempts + 1) * 20
+                ) / 100
+                active_users += 1
+
+            # 3種類のスコア計算
+            mastery_score = (user_mastered_count ** 1.3) * 10 / 100
+            reliability_score = (bayesian_accuracy ** 2) * 500 / 100
+            activity_score = math.log(user_total_attempts + 1) * 20 / 100
+
+            user_data = {
+                'username': user_obj.username,
+                'total_attempts': user_total_attempts,
+                'total_correct': user_total_correct,
+                'accuracy_rate': round((user_total_correct / user_total_attempts * 100), 1) if user_total_attempts > 0 else 0,
+                'coverage_rate': round(coverage_rate, 1),
+                'mastered_count': user_mastered_count,
+                'total_questions_for_room': total_questions_for_room_ranking,
+                'balance_score': round(comprehensive_score, 1),
+                'mastery_score': round(mastery_score, 1),
+                'reliability_score': round(reliability_score, 1),
+                'activity_score': round(activity_score, 1),
+                'last_login': user_obj.last_login.isoformat() if user_obj.last_login else None
+            }
+
+            ranking_data.append(user_data)
+            
+            # 統計データ集計
+            total_attempts += user_total_attempts
+            total_correct += user_total_correct
+            total_scores.append(comprehensive_score)
+
+        # バランススコアで降順ソート
+        ranking_data.sort(key=lambda x: (x['balance_score'], x['total_attempts']), reverse=True)
+
+        # 統計情報を計算
+        statistics = {
+            'total_users': len(ranking_data),
+            'active_users': active_users,
+            'average_score': round(sum(total_scores) / len(total_scores), 1) if total_scores else 0,
+            'max_score': round(max(total_scores), 1) if total_scores else 0,
+            'total_attempts': total_attempts,
+            'total_correct': total_correct,
+            'room_accuracy': round((total_correct / total_attempts * 100), 1) if total_attempts > 0 else 0
+        }
+
+        elapsed_time = time.time() - start_time
+        print(f"=== 管理者用従来方式ランキング計算完了: {elapsed_time:.2f}秒 ===\n")
+
+        return jsonify({
+            'status': 'success',
+            'room_number': room_number,
+            'ranking_data': ranking_data,
+            'statistics': statistics,
+            'calculation_time': round(elapsed_time, 2),
+            'using_precalculated': False,  # 従来方式使用
+            'data_source': 'realtime_calculation'
+        })
+        
+    except Exception as e:
+        print(f"❌ 管理者用従来方式計算エラー: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify(status='error', message=f'ランキング計算エラー: {str(e)}'), 500
+
+# ====================================================================
+# 管理者用ランキング操作 API
+# ====================================================================
+
+@app.route('/api/admin/export_ranking/<room_number>')
+def api_admin_export_ranking(room_number):
+    """管理者用：指定部屋のランキングをCSVエクスポート"""
+    try:
+        if not session.get('admin_logged_in'):
+            return jsonify(status='error', message='管理者権限が必要です'), 403
+        
+        print(f"📥 CSV エクスポート開始: 部屋{room_number}")
+        
+        # ランキングデータを取得（既存のAPIを再利用）
+        ranking_response = api_admin_room_ranking(room_number)
+        ranking_json = ranking_response.get_json()
+        
+        if ranking_json.get('status') != 'success':
+            return jsonify(status='error', message='ランキングデータの取得に失敗しました'), 500
+        
+        ranking_data = ranking_json.get('ranking_data', [])
+        
+        if not ranking_data:
+            return jsonify(status='error', message='エクスポートするデータがありません'), 404
+        
+        # CSVデータを作成
+        si = StringIO()
+        cw = csv.writer(si)
+        
+        # ヘッダー行（BOM付きでUTF-8エンコード）
+        headers = [
+            '順位', '名前', '最終ログイン', '回答数', '正解数', '正答率(%)', 
+            'マスター数', '総合スコア', '網羅率(%)', 'マスタリー', '信頼性', 'アクティビティ'
+        ]
+        cw.writerow(headers)
+        
+        # データ行
+        for index, user in enumerate(ranking_data, 1):
+            # 最終ログイン時刻のフォーマット
+            last_login = 'なし'
+            if user.get('last_login'):
+                try:
+                    login_time = datetime.fromisoformat(user['last_login'].replace('Z', '+00:00'))
+                    # JSTに変換
+                    login_time_jst = login_time + timedelta(hours=9)
+                    last_login = login_time_jst.strftime('%Y-%m-%d %H:%M')
+                except:
+                    last_login = 'なし'
+            
+            row = [
+                index,  # 順位
+                user.get('username', 'Unknown'),
+                last_login,
+                user.get('total_attempts', 0),
+                user.get('total_correct', 0),
+                user.get('accuracy_rate', 0),
+                user.get('mastered_count', 0),
+                user.get('balance_score', 0),
+                user.get('coverage_rate', 0),
+                user.get('mastery_score', 0),
+                user.get('reliability_score', 0),
+                user.get('activity_score', 0)
+            ]
+            cw.writerow(row)
+        
+        # UTF-8 BOM付きでエンコード
+        csv_content = '\ufeff' + si.getvalue()
+        csv_bytes = csv_content.encode('utf-8')
+        
+        # ファイル名を作成
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f'ranking_room_{room_number}_{timestamp}.csv'
+        
+        response = Response(
+            csv_bytes,
+            mimetype='text/csv; charset=utf-8',
+            headers={
+                'Content-Disposition': f'attachment; filename="{filename}"',
+                'Content-Type': 'text/csv; charset=utf-8'
+            }
+        )
+        
+        print(f"✅ CSV エクスポート完了: {filename} ({len(ranking_data)}人)")
+        return response
+        
+    except Exception as e:
+        print(f"❌ CSV エクスポートエラー: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify(status='error', message=f'CSVエクスポートエラー: {str(e)}'), 500
+
+@app.route('/api/admin/update_ranking_display_count', methods=['POST'])
+def api_admin_update_ranking_display_count():
+    """管理者用：ランキング表示人数設定を更新"""
+    try:
+        if not session.get('admin_logged_in'):
+            return jsonify(status='error', message='管理者権限が必要です'), 403
+        
+        data = request.get_json()
+        room_number = data.get('room_number')
+        display_count = data.get('ranking_display_count', 10)
+        
+        if not room_number:
+            return jsonify(status='error', message='部屋番号が指定されていません'), 400
+        
+        # 表示人数の範囲チェック
+        try:
+            display_count = int(display_count)
+            if display_count < 5 or display_count > 100:
+                return jsonify(status='error', message='表示人数は5〜100の範囲で設定してください'), 400
+        except (ValueError, TypeError):
+            return jsonify(status='error', message='表示人数は数値で入力してください'), 400
+        
+        print(f"🔧 ランキング表示人数更新: 部屋{room_number} -> {display_count}人")
+        
+        # 部屋設定を取得または作成
+        room_setting = RoomSetting.query.filter_by(room_number=room_number).first()
+        
+        if room_setting:
+            room_setting.ranking_display_count = display_count
+            room_setting.updated_at = datetime.now(JST)
+        else:
+            # 新規作成
+            room_setting = RoomSetting(
+                room_number=room_number,
+                max_enabled_unit_number="9999",
+                csv_filename="words.csv",
+                ranking_display_count=display_count
+            )
+            db.session.add(room_setting)
+        
+        db.session.commit()
+        
+        print(f"✅ ランキング表示人数更新完了: 部屋{room_number} = {display_count}人")
+        
+        return jsonify({
+            'status': 'success',
+            'message': f'部屋{room_number}のランキング表示人数を{display_count}人に設定しました',
+            'room_number': room_number,
+            'ranking_display_count': display_count
+        })
+        
+    except Exception as e:
+        print(f"❌ ランキング表示人数更新エラー: {e}")
+        db.session.rollback()
+        return jsonify(status='error', message=f'設定更新エラー: {str(e)}'), 500
 # ====================================================================
 # APIエンドポイント
 # ====================================================================
@@ -4388,8 +4859,7 @@ def admin_force_create_user_stats():
 # ====================================================================
 # 管理者ページ
 # ====================================================================
-
-# app.pyのadmin_pageルートを以下に置き換え
+# app.py の admin_page ルートを以下に置き換えてください
 
 @app.route('/admin')
 def admin_page():
@@ -4406,6 +4876,7 @@ def admin_page():
         # 部屋設定のマッピングを作成
         room_max_unit_settings = {rs.room_number: rs.max_enabled_unit_number for rs in room_settings}
         room_csv_settings = {rs.room_number: rs.csv_filename for rs in room_settings}
+        room_ranking_settings = {rs.room_number: getattr(rs, 'ranking_display_count', 10) for rs in room_settings}
         
         # ユーザー情報を拡張（元のアカウント名と変更履歴を含む）
         user_list_with_details = []
@@ -4435,17 +4906,19 @@ def admin_page():
             if setting.room_number != 'ADMIN':
                 unique_room_numbers.add(setting.room_number)
         
-        # デフォルト設定の作成処理...
+        # デフォルト設定の作成処理
         for room_num in unique_room_numbers:
             if room_num not in room_csv_settings:
                 default_room_setting = RoomSetting(
                     room_number=room_num,
                     max_enabled_unit_number="9999",
-                    csv_filename="words.csv"
+                    csv_filename="words.csv",
+                    ranking_display_count=10  # ★ランキング表示人数のデフォルト値
                 )
                 db.session.add(default_room_setting)
                 room_max_unit_settings[room_num] = "9999"
                 room_csv_settings[room_num] = "words.csv"
+                room_ranking_settings[room_num] = 10
         
         try:
             db.session.commit()
@@ -4453,12 +4926,36 @@ def admin_page():
             print(f"⚠️ デフォルト設定作成エラー: {e}")
             db.session.rollback()
         
+        # 統計情報を取得
+        total_users = len(user_list_with_details)
+        total_rooms = len(unique_room_numbers)
+        
+        # 最近のログイン状況
+        recent_logins = 0
+        for user in user_list_with_details:
+            if user['last_login'] != 'なし':
+                try:
+                    login_time = datetime.strptime(user['last_login'], '%Y-%m-%d %H:%M:%S')
+                    days_ago = (datetime.now() - login_time).days
+                    if days_ago <= 7:  # 1週間以内
+                        recent_logins += 1
+                except:
+                    pass
+        
         context = get_template_context()
         
         template_context = {
             'users': user_list_with_details,
             'room_max_unit_settings': room_max_unit_settings,
-            'room_csv_settings': room_csv_settings
+            'room_csv_settings': room_csv_settings,
+            'room_ranking_settings': room_ranking_settings,  # ★ランキング設定を追加
+            'admin_stats': {  # ★管理者ダッシュボード用統計
+                'total_users': total_users,
+                'total_rooms': total_rooms,
+                'recent_logins': recent_logins,
+                'unique_room_numbers': sorted(list(unique_room_numbers), key=lambda x: int(x) if x.isdigit() else float('inf'))
+            },
+            **context
         }
         
         return render_template('admin.html', **template_context)
@@ -4468,11 +4965,6 @@ def admin_page():
         import traceback
         traceback.print_exc()
         return f"Admin Error: {e}", 500
-
-# アプリ情報管理
-# app.py の admin_app_info 関数を以下に置き換え
-
-# 緊急デバッグ用（問題が続く場合のみ使用）
 
 @app.route('/admin/app_info', methods=['GET', 'POST'])
 def admin_app_info():
@@ -5737,8 +6229,6 @@ def debug_fix_problem_ids():
     except Exception as e:
         db.session.rollback()
         return jsonify(error=str(e)), 500
-
-# app.py に追加する構文エラー修正版
 
 @app.route('/debug/smart_id_fix', methods=['POST'])
 def debug_smart_id_fix():
