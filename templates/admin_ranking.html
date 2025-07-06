@@ -140,7 +140,7 @@
                 <div class="card-body">
                     <div class="ranking-summary mb-4">
                         <div class="row g-3">
-                            <div class="col-md-3">
+                            <div class="col-md-4">
                                 <div class="summary-card">
                                     <div class="summary-icon">
                                         <i class="fas fa-users"></i>
@@ -151,7 +151,7 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-md-3">
+                            <div class="col-md-4">
                                 <div class="summary-card">
                                     <div class="summary-icon">
                                         <i class="fas fa-chart-line"></i>
@@ -162,7 +162,7 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-md-3">
+                            <div class="col-md-4">
                                 <div class="summary-card">
                                     <div class="summary-icon">
                                         <i class="fas fa-crown"></i>
@@ -170,17 +170,6 @@
                                     <div class="summary-content">
                                         <h6>最高スコア</h6>
                                         <span class="summary-value" id="max-score">0.0</span>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="summary-card">
-                                    <div class="summary-icon">
-                                        <i class="fas fa-user-check"></i>
-                                    </div>
-                                    <div class="summary-content">
-                                        <h6>アクティブユーザー</h6>
-                                        <span class="summary-value" id="active-users">0</span>
                                     </div>
                                 </div>
                             </div>
@@ -603,7 +592,6 @@ function displayRanking(rankingData, statistics) {
 function updateStatisticsSummary(statistics) {
     const updates = {
         'total-users': statistics.total_users || 0,
-        'active-users': statistics.active_users || 0,
         'average-score': (statistics.average_score || 0).toFixed(1),
         'max-score': (statistics.max_score || 0).toFixed(1)
     };
