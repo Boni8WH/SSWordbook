@@ -6133,7 +6133,6 @@ def api_admin_room_ranking(room_number):
         total_attempts = 0
         total_correct = 0
         total_scores = []
-        active_users = 0
         
         for stats in room_stats:
             user_data = {
@@ -6157,14 +6156,10 @@ def api_admin_room_ranking(room_number):
             total_attempts += stats.total_attempts
             total_correct += stats.total_correct
             total_scores.append(stats.balance_score)
-            
-            if stats.total_attempts > 0:  # 何かしら活動しているユーザー
-                active_users += 1
         
         # 統計情報を計算
         statistics = {
             'total_users': len(ranking_data),
-            'active_users': active_users,
             'average_score': sum(total_scores) / len(total_scores) if total_scores else 0,
             'max_score': max(total_scores) if total_scores else 0,
             'total_attempts': total_attempts,
@@ -6218,7 +6213,6 @@ def admin_fallback_ranking_calculation(room_number, start_time):
         total_attempts = 0
         total_correct = 0
         total_scores = []
-        active_users = 0
 
         # ベイズ統計による正答率補正の設定値
         EXPECTED_AVG_ACCURACY = 0.7
@@ -6305,9 +6299,6 @@ def admin_fallback_ranking_calculation(room_number, start_time):
             total_attempts += user_total_attempts
             total_correct += user_total_correct
             total_scores.append(comprehensive_score)
-            
-            if user_total_attempts > 0:
-                active_users += 1
 
         # バランススコアで降順ソート
         ranking_data.sort(key=lambda x: (x['balance_score'], x['total_attempts']), reverse=True)
@@ -6315,7 +6306,6 @@ def admin_fallback_ranking_calculation(room_number, start_time):
         # 統計情報を計算
         statistics = {
             'total_users': len(ranking_data),
-            'active_users': active_users,
             'average_score': sum(total_scores) / len(total_scores) if total_scores else 0,
             'max_score': max(total_scores) if total_scores else 0,
             'total_attempts': total_attempts,
