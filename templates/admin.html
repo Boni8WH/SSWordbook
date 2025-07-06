@@ -52,7 +52,29 @@
     <section id="admin-user-management">
         <h3>👥 ユーザー管理</h3>
         <p>登録済みユーザー: {{ users|length }}人</p>
+        <h4>CSV一括ユーザー追加</h4>
+        <div style="background-color: #e8f4fd; border: 1px solid #b3d7ff; border-radius: 5px; padding: 15px; margin-bottom: 20px;">
+            <p><strong>CSVファイル形式要件:</strong></p>
+            <ul>
+                <li>ヘッダー行: 部屋番号,入室パスワード,出席番号,個別パスワード,アカウント名</li>
+                <li>文字エンコーディング: UTF-8</li>
+                <li>例: 101,password123,001,student001,成富兵庫茂安</li>
+                <li>同一アカウント名の登録も可能です（同一人物が複数部屋に参加する場合）</li>
+            </ul>
+            <a href="{{ url_for('download_users_template_csv') }}" class="btn btn-outline-info btn-sm">
+                <i class="fas fa-download"></i> テンプレートをダウンロード
+            </a>
+        </div>
 
+        <form action="{{ url_for('admin_upload_users') }}" method="POST" enctype="multipart/form-data" class="upload-form">
+            <div class="input-group">
+                <label for="users_csv_file">ユーザーCSVファイルを選択:</label>
+                <input type="file" id="users_csv_file" name="file" accept=".csv" required>
+            </div>
+            <button type="submit" class="btn btn-success">
+                <i class="fas fa-upload"></i> CSV一括ユーザー追加
+            </button>
+        </form>
         <h4>個別ユーザー追加</h4>
         <form action="{{ url_for('admin_add_user') }}" method="POST" class="add-user-form">
             <div class="input-group">
@@ -78,31 +100,6 @@
             </div>
             <button type="submit" class="btn btn-primary">ユーザー追加</button>
         </form>
-
-        <h4>CSV一括ユーザー追加</h4>
-        <div style="background-color: #e8f4fd; border: 1px solid #b3d7ff; border-radius: 5px; padding: 15px; margin-bottom: 20px;">
-            <p><strong>CSVファイル形式要件:</strong></p>
-            <ul>
-                <li>ヘッダー行: 部屋番号,入室パスワード,出席番号,個別パスワード,アカウント名</li>
-                <li>文字エンコーディング: UTF-8</li>
-                <li>例: 101,password123,001,student001,成富兵庫茂安</li>
-                <li>同一アカウント名の登録も可能です（同一人物が複数部屋に参加する場合）</li>
-            </ul>
-            <a href="{{ url_for('download_users_template_csv') }}" class="btn btn-outline-info btn-sm">
-                <i class="fas fa-download"></i> テンプレートをダウンロード
-            </a>
-        </div>
-
-        <form action="{{ url_for('admin_upload_users') }}" method="POST" enctype="multipart/form-data" class="upload-form">
-            <div class="input-group">
-                <label for="users_csv_file">ユーザーCSVファイルを選択:</label>
-                <input type="file" id="users_csv_file" name="file" accept=".csv" required>
-            </div>
-            <button type="submit" class="btn btn-success">
-                <i class="fas fa-upload"></i> CSV一括ユーザー追加
-            </button>
-        </form>
-
         <h4>登録済みユーザー一覧</h4>
         <!-- ソート機能付きユーザーリスト -->
         <div class="table-controls mb-3">
@@ -203,18 +200,7 @@
             <small class="text-muted d-block mt-2">
                 ※ ファイル形式：chapter, number, category, question, answer, enabled
             </small>
-        </div>
-        <h4>CSVファイルアップロード</h4>
-        <div style="background-color: #e8f4fd; border: 1px solid #b3d7ff; border-radius: 5px; padding: 15px; margin-bottom: 20px;">
-            <p><strong>CSVファイル形式要件:</strong></p>
-            <ul>
-                <li>ヘッダー行: chapter, number, category, question, answer, enabled</li>
-                <li>enabled列: 1（有効）または0（無効）</li>
-                <li>文字エンコーディング: UTF-8</li>
-                <li>ファイル名は元の名前のまま保存されます</li>
-            </ul>
-        </div>
-        
+        </div>        
         <form action="{{ url_for('admin_upload_room_csv') }}" method="POST" enctype="multipart/form-data" class="upload-form">
             <div class="input-group">
                 <label for="room_csv_file">CSVファイルを選択:</label>
