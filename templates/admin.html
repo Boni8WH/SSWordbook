@@ -1615,6 +1615,375 @@ document.querySelectorAll('.save-room-setting-btn').forEach(button => {
 });
 
 console.log('🎉 admin.html スクリプト読み込み完了');
+
+// admin.html の管理者ランキング機能のJavaScript（完全版）
+// 既存のscriptタグ内のランキング関数部分を以下で置き換えてください
+
+// 管理者ランキング機能の変数
+let selectedRoom = null;
+let currentRankingData = null;
+
+// ページ読み込み時に部屋一覧を取得
+document.addEventListener('DOMContentLoaded', function() {
+    // 既存の初期化処理...
+    
+    // 部屋一覧を取得（管理者ランキング用）
+    loadRoomList();
+});
+
+// 部屋一覧を取得して表示
+async function loadRoomList() {
+    try {
+        console.log('🔍 部屋一覧取得開始...');
+        const response = await fetch('/api/rooms');
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            console.log(`✅ 部屋一覧取得成功: ${data.rooms.length}部屋`);
+            displayRoomButtons(data.rooms);
+        } else {
+            console.error('❌ 部屋一覧取得失敗:', data.message);
+            displayRoomError('部屋一覧の取得に失敗しました。');
+        }
+    } catch (error) {
+        console.error('❌ 部屋一覧取得エラー:', error);
+        displayRoomError('部屋一覧の取得中にエラーが発生しました。');
+    }
+}
+
+// 部屋ボタンを表示
+function displayRoomButtons(rooms) {
+    const container = document.getElementById('room-buttons');
+    if (!container) {
+        console.error('❌ room-buttons コンテナが見つかりません');
+        return;
+    }
+    
+    container.innerHTML = '';
+    
+    if (rooms.length === 0) {
+        container.innerHTML = '<p class="text-muted">登録されている部屋がありません。</p>';
+        return;
+    }
+    
+    rooms.forEach(room => {
+        const button = document.createElement('button');
+        button.className = 'btn btn-outline-primary room-button';
+        button.setAttribute('data-room-number', room.room_number);
+        button.innerHTML = `
+            <i class="fas fa-door-open"></i>
+            <span class="room-number">部屋 ${room.room_number}</span>
+            <small class="room-user-count">(${room.user_count}人)</small>
+        `;
+        button.onclick = () => selectRoom(room.room_number);
+        container.appendChild(button);
+    });
+    
+    console.log(`✅ ${rooms.length}個の部屋ボタンを表示しました`);
+}
+
+// 部屋選択エラーを表示
+function displayRoomError(message) {
+    const container = document.getElementById('room-buttons');
+    if (container) {
+        container.innerHTML = `
+            <div class="alert alert-warning">
+                <i class="fas fa-exclamation-triangle"></i>
+                ${message}
+                <button class="btn btn-sm btn-outline-primary ms-2" onclick="loadRoomList()">
+                    <i class="fas fa-redo"></i> 再試行
+                </button>
+            </div>
+        `;
+    }
+}
+
+// 部屋を選択
+function selectRoom(roomNumber) {
+    console.log(`🏠 部屋選択: ${roomNumber}`);
+    selectedRoom = roomNumber;
+    
+    // 選択状態を更新
+    document.querySelectorAll('.room-button').forEach(btn => {
+        btn.classList.remove('btn-primary');
+        btn.classList.add('btn-outline-primary');
+    });
+    
+    const selectedButton = document.querySelector(`[data-room-number="${roomNumber}"]`);
+    if (selectedButton) {
+        selectedButton.classList.remove('btn-outline-primary');
+        selectedButton.classList.add('btn-primary');
+    }
+    
+    // 選択中の部屋情報を表示
+    const selectedRoomInfo = document.getElementById('selected-room-info');
+    const selectedRoomName = document.getElementById('selected-room-name');
+    if (selectedRoomInfo && selectedRoomName) {
+        selectedRoomName.textContent = roomNumber;
+        selectedRoomInfo.style.display = 'block';
+    }
+    
+    // ランキングを取得
+    loadRankingForRoom(roomNumber);
+}
+
+// 特定の部屋のランキングを取得
+async function loadRankingForRoom(roomNumber) {
+    try {
+        console.log(`📊 部屋${roomNumber}のランキング取得開始...`);
+        
+        // 表示をリセット
+        showRankingSection('loading');
+        
+        const startTime = performance.now();
+        
+        // APIを呼び出し（管理者用の全員取得）
+        const response = await fetch(`/api/admin/room_ranking/${roomNumber}`);
+        const data = await response.json();
+        
+        const endTime = performance.now();
+        const clientTime = endTime - startTime;
+        
+        if (data.status === 'success') {
+            console.log(`✅ ランキング取得成功: ${data.ranking_data.length}人 (${clientTime.toFixed(1)}ms)`);
+            
+            currentRankingData = data.ranking_data;
+            displayAdminRanking(data.ranking_data, data.statistics);
+            
+            // 表示を更新
+            showRankingSection('table');
+            
+        } else {
+            throw new Error(data.message || 'ランキングの取得に失敗しました');
+        }
+        
+    } catch (error) {
+        console.error('❌ ランキング取得エラー:', error);
+        
+        // エラー表示
+        showRankingSection('error');
+        const errorMessage = document.getElementById('admin-ranking-error-message');
+        if (errorMessage) {
+            errorMessage.textContent = error.message;
+        }
+    }
+}
+
+// ランキングセクションの表示切り替え
+function showRankingSection(section) {
+    const sections = {
+        'initial': document.getElementById('admin-ranking-initial'),
+        'loading': document.getElementById('admin-ranking-loading'),
+        'table': document.getElementById('admin-ranking-table-container'),
+        'error': document.getElementById('admin-ranking-error'),
+        'actions': document.getElementById('admin-ranking-actions')
+    };
+    
+    // 全セクションを非表示
+    Object.values(sections).forEach(element => {
+        if (element) element.style.display = 'none';
+    });
+    
+    // 指定されたセクションを表示
+    if (sections[section]) {
+        sections[section].style.display = 'block';
+    }
+    
+    // アクションボタンの表示制御
+    if (section === 'table' && sections['actions']) {
+        sections['actions'].style.display = 'block';
+    }
+}
+
+// ランキングテーブルを表示
+function displayAdminRanking(rankingData, statistics) {
+    console.log(`📊 ランキング表示開始: ${rankingData.length}人`);
+    
+    // 統計情報を更新
+    updateStatisticsSummary(statistics);
+    
+    // テーブルを更新
+    const tbody = document.getElementById('admin-ranking-table-body');
+    if (!tbody) {
+        console.error('❌ admin-ranking-table-body が見つかりません');
+        return;
+    }
+    
+    tbody.innerHTML = '';
+    
+    rankingData.forEach((user, index) => {
+        const row = document.createElement('tr');
+        
+        // 順位に応じてスタイルを適用
+        if (index === 0) {
+            row.classList.add('table-warning'); // 1位
+        } else if (index === 1) {
+            row.classList.add('table-secondary'); // 2位
+        } else if (index === 2) {
+            row.classList.add('table-info'); // 3位
+        }
+        
+        // 最終ログイン時刻をフォーマット
+        const lastLogin = formatLastLogin(user.last_login);
+        
+        // 各値の安全な取得
+        const rank = index + 1;
+        const username = user.username || 'Unknown';
+        const totalAttempts = user.total_attempts || 0;
+        const totalCorrect = user.total_correct || 0;
+        const accuracyRate = (user.accuracy_rate || 0).toFixed(1);
+        const masteredCount = user.mastered_count || 0;
+        const balanceScore = (user.balance_score || 0).toFixed(1);
+        const coverageRate = (user.coverage_rate || 0).toFixed(1);
+        
+        row.innerHTML = `
+            <td>
+                ${rank}
+                ${index === 0 ? '<i class="fas fa-crown text-warning ms-1"></i>' : ''}
+                ${index === 1 ? '<i class="fas fa-medal text-secondary ms-1"></i>' : ''}
+                ${index === 2 ? '<i class="fas fa-medal text-info ms-1"></i>' : ''}
+            </td>
+            <td><strong>${username}</strong></td>
+            <td><small class="text-muted">${lastLogin}</small></td>
+            <td>${totalAttempts}</td>
+            <td>${totalCorrect}</td>
+            <td>${accuracyRate}%</td>
+            <td>${masteredCount}</td>
+            <td><strong class="text-primary">${balanceScore}</strong></td>
+            <td>${coverageRate}%</td>
+        `;
+        
+        tbody.appendChild(row);
+    });
+    
+    console.log(`✅ ランキングテーブル表示完了: ${rankingData.length}行`);
+}
+
+// 統計サマリーを更新
+function updateStatisticsSummary(statistics) {
+    const updates = {
+        'total-users': statistics.total_users || 0,
+        'active-users': statistics.active_users || 0,
+        'average-score': (statistics.average_score || 0).toFixed(1),
+        'max-score': (statistics.max_score || 0).toFixed(1)
+    };
+    
+    Object.entries(updates).forEach(([id, value]) => {
+        const element = document.getElementById(id);
+        if (element) {
+            element.textContent = value;
+        }
+    });
+}
+
+// 最終ログイン時刻のフォーマット
+function formatLastLogin(loginTime) {
+    if (!loginTime) return 'なし';
+    
+    try {
+        const date = new Date(loginTime);
+        return date.toLocaleString('ja-JP', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    } catch (error) {
+        console.warn('日時フォーマットエラー:', error);
+        return 'なし';
+    }
+}
+
+// ランキングを再取得
+function refreshRanking() {
+    if (selectedRoom) {
+        console.log(`🔄 ランキング再取得: 部屋${selectedRoom}`);
+        loadRankingForRoom(selectedRoom);
+    } else {
+        console.warn('⚠️ 部屋が選択されていません');
+        alert('部屋を選択してください。');
+    }
+}
+
+// 再試行
+function retryLoadRanking() {
+    refreshRanking();
+}
+
+// 表示をクリア
+function clearRankingView() {
+    console.log('🗑️ ランキング表示をクリア');
+    
+    selectedRoom = null;
+    currentRankingData = null;
+    
+    // 選択状態をリセット
+    document.querySelectorAll('.room-button').forEach(btn => {
+        btn.classList.remove('btn-primary');
+        btn.classList.add('btn-outline-primary');
+    });
+    
+    // 表示をリセット
+    const selectedRoomInfo = document.getElementById('selected-room-info');
+    if (selectedRoomInfo) {
+        selectedRoomInfo.style.display = 'none';
+    }
+    
+    showRankingSection('initial');
+}
+
+// CSVエクスポート
+function exportRankingData() {
+    if (!currentRankingData || !selectedRoom) {
+        alert('エクスポートするデータがありません。');
+        return;
+    }
+    
+    console.log(`📥 CSVエクスポート開始: 部屋${selectedRoom}`);
+    
+    try {
+        // CSVデータを作成
+        const csvHeader = 'BOM' + '順位,名前,最終ログイン,回答数,正解数,正答率,マスター数,総合スコア,網羅率\n';
+        const csvRows = currentRankingData.map((user, index) => {
+            const lastLogin = formatLastLogin(user.last_login);
+            
+            return [
+                index + 1,
+                `"${user.username || 'Unknown'}"`, // ダブルクォートで囲む
+                `"${lastLogin}"`,
+                user.total_attempts || 0,
+                user.total_correct || 0,
+                (user.accuracy_rate || 0).toFixed(1) + '%',
+                user.mastered_count || 0,
+                (user.balance_score || 0).toFixed(1),
+                (user.coverage_rate || 0).toFixed(1) + '%'
+            ].join(',');
+        });
+        
+        const csvData = csvHeader + csvRows.join('\n');
+        
+        // ファイルをダウンロード
+        const bom = '\uFEFF'; // UTF-8 BOM
+        const blob = new Blob([bom + csvData], { type: 'text/csv;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `ranking_room_${selectedRoom}_${new Date().toISOString().split('T')[0]}.csv`;
+        link.style.display = 'none';
+        
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        
+        console.log(`✅ CSVエクスポート完了: ranking_room_${selectedRoom}`);
+        
+    } catch (error) {
+        console.error('❌ CSVエクスポートエラー:', error);
+        alert('CSVエクスポート中にエラーが発生しました。');
+    }
+}
 </script>
 
 <style>
@@ -1743,228 +2112,7 @@ console.log('🎉 admin.html スクリプト読み込み完了');
         white-space: nowrap;
     }
 }
-</style>
 
-<script>
-// 管理者ランキング機能の変数
-let selectedRoom = null;
-let currentRankingData = null;
-
-// ページ読み込み時に部屋一覧を取得
-document.addEventListener('DOMContentLoaded', function() {
-    loadRoomList();
-});
-
-// 部屋一覧を取得して表示
-async function loadRoomList() {
-    try {
-        const response = await fetch('/api/rooms');
-        const data = await response.json();
-        
-        if (data.status === 'success') {
-            displayRoomButtons(data.rooms);
-        } else {
-            console.error('部屋一覧の取得に失敗:', data.message);
-        }
-    } catch (error) {
-        console.error('部屋一覧の取得エラー:', error);
-    }
-}
-
-// 部屋ボタンを表示
-function displayRoomButtons(rooms) {
-    const container = document.getElementById('room-buttons');
-    container.innerHTML = '';
-    
-    rooms.forEach(room => {
-        const button = document.createElement('button');
-        button.className = 'btn btn-outline-primary room-button';
-        button.innerHTML = `
-            <i class="fas fa-door-open"></i>
-            部屋: ${room.room_number}
-            <small class="d-block">(${room.user_count}人)</small>
-        `;
-        button.onclick = () => selectRoom(room.room_number);
-        container.appendChild(button);
-    });
-}
-
-// 部屋を選択
-function selectRoom(roomNumber) {
-    selectedRoom = roomNumber;
-    
-    // 選択状態を更新
-    document.querySelectorAll('.room-button').forEach(btn => {
-        btn.classList.remove('btn-primary');
-        btn.classList.add('btn-outline-primary');
-    });
-    
-    event.target.classList.remove('btn-outline-primary');
-    event.target.classList.add('btn-primary');
-    
-    // 選択中の部屋情報を表示
-    document.getElementById('selected-room-name').textContent = roomNumber;
-    document.getElementById('selected-room-info').style.display = 'block';
-    
-    // ランキングを取得
-    loadRankingForRoom(roomNumber);
-}
-
-// 特定の部屋のランキングを取得
-async function loadRankingForRoom(roomNumber) {
-    try {
-        // 表示をリセット
-        document.getElementById('admin-ranking-initial').style.display = 'none';
-        document.getElementById('admin-ranking-loading').style.display = 'block';
-        document.getElementById('admin-ranking-table-container').style.display = 'none';
-        document.getElementById('admin-ranking-error').style.display = 'none';
-        document.getElementById('admin-ranking-actions').style.display = 'none';
-        
-        // APIを呼び出し（管理者用の全員取得）
-        const response = await fetch(`/api/admin/room_ranking/${roomNumber}`);
-        const data = await response.json();
-        
-        if (data.status === 'success') {
-            currentRankingData = data.ranking_data;
-            displayAdminRanking(data.ranking_data, data.statistics);
-            
-            // 表示を更新
-            document.getElementById('admin-ranking-loading').style.display = 'none';
-            document.getElementById('admin-ranking-table-container').style.display = 'block';
-            document.getElementById('admin-ranking-actions').style.display = 'block';
-            
-        } else {
-            throw new Error(data.message || 'ランキングの取得に失敗しました');
-        }
-        
-    } catch (error) {
-        console.error('ランキング取得エラー:', error);
-        
-        // エラー表示
-        document.getElementById('admin-ranking-loading').style.display = 'none';
-        document.getElementById('admin-ranking-error').style.display = 'block';
-        document.getElementById('admin-ranking-error-message').textContent = error.message;
-    }
-}
-
-// ランキングテーブルを表示
-function displayAdminRanking(rankingData, statistics) {
-    // 統計情報を更新
-    document.getElementById('total-users').textContent = statistics.total_users;
-    document.getElementById('active-users').textContent = statistics.active_users;
-    document.getElementById('average-score').textContent = statistics.average_score.toFixed(1);
-    document.getElementById('max-score').textContent = statistics.max_score.toFixed(1);
-    
-    // テーブルを更新
-    const tbody = document.getElementById('admin-ranking-table-body');
-    tbody.innerHTML = '';
-    
-    rankingData.forEach((user, index) => {
-        const row = document.createElement('tr');
-        
-        // 順位に応じてスタイルを適用
-        if (index === 0) row.classList.add('table-warning'); // 1位
-        else if (index === 1) row.classList.add('table-secondary'); // 2位
-        else if (index === 2) row.classList.add('table-info'); // 3位
-        
-        // 最終ログイン時刻をフォーマット
-        const lastLogin = user.last_login ? 
-            new Date(user.last_login).toLocaleString('ja-JP') : 
-            'なし';
-        
-        row.innerHTML = `
-            <td>
-                ${index + 1}
-                ${index === 0 ? '<i class="fas fa-crown text-warning"></i>' : ''}
-                ${index === 1 ? '<i class="fas fa-medal text-secondary"></i>' : ''}
-                ${index === 2 ? '<i class="fas fa-medal text-info"></i>' : ''}
-            </td>
-            <td><strong>${user.username}</strong></td>
-            <td><small>${lastLogin}</small></td>
-            <td>${user.total_attempts}</td>
-            <td>${user.total_correct}</td>
-            <td>${user.accuracy_rate.toFixed(1)}%</td>
-            <td>${user.mastered_count}</td>
-            <td><strong>${user.balance_score.toFixed(1)}</strong></td>
-            <td>${user.coverage_rate.toFixed(1)}%</td>
-        `;
-        
-        tbody.appendChild(row);
-    });
-}
-
-// ランキングを再取得
-function refreshRanking() {
-    if (selectedRoom) {
-        loadRankingForRoom(selectedRoom);
-    }
-}
-
-// 再試行
-function retryLoadRanking() {
-    if (selectedRoom) {
-        loadRankingForRoom(selectedRoom);
-    }
-}
-
-// 表示をクリア
-function clearRankingView() {
-    selectedRoom = null;
-    currentRankingData = null;
-    
-    // 選択状態をリセット
-    document.querySelectorAll('.room-button').forEach(btn => {
-        btn.classList.remove('btn-primary');
-        btn.classList.add('btn-outline-primary');
-    });
-    
-    // 表示をリセット
-    document.getElementById('selected-room-info').style.display = 'none';
-    document.getElementById('admin-ranking-initial').style.display = 'block';
-    document.getElementById('admin-ranking-table-container').style.display = 'none';
-    document.getElementById('admin-ranking-error').style.display = 'none';
-    document.getElementById('admin-ranking-actions').style.display = 'none';
-}
-
-// CSVエクスポート
-function exportRankingData() {
-    if (!currentRankingData || !selectedRoom) {
-        alert('エクスポートするデータがありません。');
-        return;
-    }
-    
-    // CSVデータを作成
-    const csvHeader = '順位,名前,最終ログイン,回答数,正解数,正答率,マスター数,総合スコア,網羅率\n';
-    const csvRows = currentRankingData.map((user, index) => {
-        const lastLogin = user.last_login ? 
-            new Date(user.last_login).toLocaleString('ja-JP') : 
-            'なし';
-        
-        return [
-            index + 1,
-            user.username,
-            lastLogin,
-            user.total_attempts,
-            user.total_correct,
-            user.accuracy_rate.toFixed(1) + '%',
-            user.mastered_count,
-            user.balance_score.toFixed(1),
-            user.coverage_rate.toFixed(1) + '%'
-        ].join(',');
-    });
-    
-    const csvData = csvHeader + csvRows.join('\n');
-    
-    // ファイルをダウンロード
-    const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `ranking_room_${selectedRoom}_${new Date().toISOString().split('T')[0]}.csv`;
-    link.click();
-}
-</script>
-
-<style>
 /* 管理者ランキングセクション専用スタイル */
 .room-selector-container {
     margin-bottom: 25px;
