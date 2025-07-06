@@ -190,9 +190,7 @@
                             <div class="col-md-6">
                                 <div class="d-flex gap-2">
                                     <select id="ranking-sort" class="form-select">
-                                        <option value="rank">順位順</option>
-                                        <option value="name">名前順</option>
-                                        <option value="score">スコア順</option>
+                                        <option value="score" selected>スコア順</option>
                                         <option value="accuracy">正答率順</option>
                                         <option value="attempts">回答数順</option>
                                     </select>
@@ -252,7 +250,7 @@
 let selectedRoom = null;
 let currentRankingData = null;
 let currentViewMode = 'dropdown';
-let currentSortOrder = 'asc';
+let currentSortOrder = 'desc';
 let allRooms = [];
 
 // ========================================
@@ -699,14 +697,6 @@ function sortRankingTable() {
     let sortedData = [...currentRankingData];
     
     switch(sortBy) {
-        case 'name':
-            sortedData.sort((a, b) => {
-                const nameA = a.username || '';
-                const nameB = b.username || '';
-                return currentSortOrder === 'asc' ? 
-                    nameA.localeCompare(nameB) : nameB.localeCompare(nameA);
-            });
-            break;
         case 'score':
             sortedData.sort((a, b) => {
                 const scoreA = a.balance_score || 0;
@@ -728,8 +718,13 @@ function sortRankingTable() {
                 return currentSortOrder === 'asc' ? attA - attB : attB - attA;
             });
             break;
-        default: // rank
-            // デフォルトのランキング順序を維持
+        default:
+            // デフォルトはスコア順（降順）
+            sortedData.sort((a, b) => {
+                const scoreA = a.balance_score || 0;
+                const scoreB = b.balance_score || 0;
+                return scoreB - scoreA;
+            });
             break;
     }
     
@@ -1094,17 +1089,26 @@ console.log('🎉 全員ランキングページスクリプト読み込み完�
 
 /* アイコン */
 .fas.fa-crown {
-    animation: pulse 2s infinite;
+    animation: crown-glow 2s ease-in-out infinite;
 }
 
 .fas.fa-medal {
     animation: bounce 2s infinite;
 }
 
-@keyframes pulse {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.05); }
-    100% { transform: scale(1); }
+@keyframes crown-glow {
+    0% { 
+        transform: scale(1);
+        text-shadow: 0 0 5px rgba(255, 193, 7, 0.5);
+    }
+    50% { 
+        transform: scale(1.1);
+        text-shadow: 0 0 15px rgba(255, 193, 7, 0.8), 0 0 25px rgba(255, 193, 7, 0.6);
+    }
+    100% { 
+        transform: scale(1);
+        text-shadow: 0 0 5px rgba(255, 193, 7, 0.5);
+    }
 }
 
 @keyframes bounce {
