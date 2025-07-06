@@ -321,15 +321,41 @@
     <!-- 部屋選択 -->
     <div class="room-selector-container">
         <h4>部屋選択</h4>
-        <div class="room-buttons-grid" id="room-buttons">
-            <!-- JavaScript で動的に部屋ボタンを生成 -->
+    
+        <!-- オプション1: ドロップダウン形式（最も省スペース） -->
+        <div class="room-selector-dropdown">
+            <select id="room-select" class="form-control">
+                <option value="">-- 部屋を選択してください --</option>
+                <!-- JavaScript で動的に生成 -->
+            </select>
+            <button class="btn btn-primary ms-2" onclick="selectRoomFromDropdown()">
+                <i class="fas fa-chart-bar"></i> ランキング表示
+            </button>
+        </div>
+        
+        <!-- オプション2: コンパクトボタン（2行表示、スクロール対応） -->
+        <div class="room-buttons-compact" id="room-buttons-compact" style="display: none;">
+            <!-- JavaScript で動的に生成 -->
+        </div>
+        
+        <!-- 表示切り替えボタン -->
+        <div class="view-toggle mt-2">
+            <button class="btn btn-sm btn-outline-secondary" onclick="toggleRoomView()">
+                <i class="fas fa-th-large"></i> <span id="toggle-text">ボタン表示に切り替え</span>
+            </button>
         </div>
     </div>
     
-    <!-- 選択中の部屋表示 -->
+    <!-- 選択中の部屋情報（コンパクト化） -->
     <div id="selected-room-info" style="display: none;">
-        <h4>選択中の部屋: <span id="selected-room-name"></span></h4>
-        <p>この部屋の全ユーザーのランキングを表示しています。</p>
+        <div class="selected-room-badge">
+            <i class="fas fa-door-open"></i>
+            <span>選択中: </span>
+            <strong id="selected-room-name"></strong>
+            <button class="btn btn-sm btn-outline-secondary ms-2" onclick="clearRoomSelection()">
+                <i class="fas fa-times"></i> 選択解除
+            </button>
+        </div>
     </div>
     
     <!-- ランキング表示エリア -->
@@ -356,12 +382,6 @@
                         <div class="summary-card">
                             <h5>総参加者数</h5>
                             <span class="summary-value" id="total-users">0</span>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="summary-card">
-                            <h5>活発なユーザー</h5>
-                            <span class="summary-value" id="active-users">0</span>
                         </div>
                     </div>
                     <div class="col-md-3">
@@ -1651,53 +1671,6 @@ async function loadRoomList() {
     }
 }
 
-// 部屋ボタンを表示
-function displayRoomButtons(rooms) {
-    const container = document.getElementById('room-buttons');
-    if (!container) {
-        console.error('❌ room-buttons コンテナが見つかりません');
-        return;
-    }
-    
-    container.innerHTML = '';
-    
-    if (rooms.length === 0) {
-        container.innerHTML = '<p class="text-muted">登録されている部屋がありません。</p>';
-        return;
-    }
-    
-    rooms.forEach(room => {
-        const button = document.createElement('button');
-        button.className = 'btn btn-outline-primary room-button';
-        button.setAttribute('data-room-number', room.room_number);
-        button.innerHTML = `
-            <i class="fas fa-door-open"></i>
-            <span class="room-number">部屋 ${room.room_number}</span>
-            <small class="room-user-count">(${room.user_count}人)</small>
-        `;
-        button.onclick = () => selectRoom(room.room_number);
-        container.appendChild(button);
-    });
-    
-    console.log(`✅ ${rooms.length}個の部屋ボタンを表示しました`);
-}
-
-// 部屋選択エラーを表示
-function displayRoomError(message) {
-    const container = document.getElementById('room-buttons');
-    if (container) {
-        container.innerHTML = `
-            <div class="alert alert-warning">
-                <i class="fas fa-exclamation-triangle"></i>
-                ${message}
-                <button class="btn btn-sm btn-outline-primary ms-2" onclick="loadRoomList()">
-                    <i class="fas fa-redo"></i> 再試行
-                </button>
-            </div>
-        `;
-    }
-}
-
 // 部屋を選択
 function selectRoom(roomNumber) {
     console.log(`🏠 部屋選択: ${roomNumber}`);
@@ -1982,6 +1955,203 @@ function exportRankingData() {
     } catch (error) {
         console.error('❌ CSVエクスポートエラー:', error);
         alert('CSVエクスポート中にエラーが発生しました。');
+    }
+}
+
+// admin.html の部屋選択関連JavaScript（省スペース版）
+
+// 表示モード管理
+let roomViewMode = 'dropdown'; // 'dropdown' または 'buttons'
+
+// 部屋一覧を取得して表示（省スペース版）
+async function loadRoomList() {
+    try {
+        console.log('🔍 部屋一覧取得開始...');
+        const response = await fetch('/api/rooms');
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            console.log(`✅ 部屋一覧取得成功: ${data.rooms.length}部屋`);
+            displayRoomOptions(data.rooms);
+        } else {
+            console.error('❌ 部屋一覧取得失敗:', data.message);
+            displayRoomError('部屋一覧の取得に失敗しました。');
+        }
+    } catch (error) {
+        console.error('❌ 部屋一覧取得エラー:', error);
+        displayRoomError('部屋一覧の取得中にエラーが発生しました。');
+    }
+}
+
+// 部屋選択肢を表示（ドロップダウン + コンパクトボタン）
+function displayRoomOptions(rooms) {
+    if (rooms.length === 0) {
+        displayRoomError('登録されている部屋がありません。');
+        return;
+    }
+    
+    // ドロップダウンを更新
+    updateRoomDropdown(rooms);
+    
+    // コンパクトボタンを更新
+    updateCompactButtons(rooms);
+    
+    console.log(`✅ ${rooms.length}個の部屋選択肢を表示しました`);
+}
+
+// ドロップダウン更新
+function updateRoomDropdown(rooms) {
+    const select = document.getElementById('room-select');
+    if (!select) return;
+    
+    // 既存のオプションをクリア（最初のデフォルトオプション以外）
+    while (select.children.length > 1) {
+        select.removeChild(select.lastChild);
+    }
+    
+    // 部屋オプションを追加
+    rooms.forEach(room => {
+        const option = document.createElement('option');
+        option.value = room.room_number;
+        option.textContent = `部屋 ${room.room_number} (${room.user_count}人)`;
+        select.appendChild(option);
+    });
+}
+
+// コンパクトボタン更新
+function updateCompactButtons(rooms) {
+    const container = document.getElementById('room-buttons-compact');
+    if (!container) return;
+    
+    container.innerHTML = '';
+    
+    rooms.forEach(room => {
+        const button = document.createElement('button');
+        button.className = 'btn btn-sm btn-outline-primary room-button-compact';
+        button.setAttribute('data-room-number', room.room_number);
+        button.innerHTML = `
+            <span class="room-text">部屋 ${room.room_number}</span>
+            <small class="user-count">(${room.user_count}人)</small>
+        `;
+        button.onclick = () => selectRoom(room.room_number);
+        container.appendChild(button);
+    });
+}
+
+// ドロップダウンから部屋選択
+function selectRoomFromDropdown() {
+    const select = document.getElementById('room-select');
+    const roomNumber = select.value;
+    
+    if (!roomNumber) {
+        alert('部屋を選択してください。');
+        return;
+    }
+    
+    selectRoom(roomNumber);
+}
+
+// 表示モード切り替え
+function toggleRoomView() {
+    const dropdown = document.querySelector('.room-selector-dropdown');
+    const buttons = document.getElementById('room-buttons-compact');
+    const toggleText = document.getElementById('toggle-text');
+    
+    if (roomViewMode === 'dropdown') {
+        // ボタン表示に切り替え
+        roomViewMode = 'buttons';
+        dropdown.style.display = 'none';
+        buttons.style.display = 'block';
+        toggleText.textContent = 'ドロップダウンに切り替え';
+    } else {
+        // ドロップダウンに切り替え
+        roomViewMode = 'dropdown';
+        dropdown.style.display = 'block';
+        buttons.style.display = 'none';
+        toggleText.textContent = 'ボタン表示に切り替え';
+    }
+}
+
+// 部屋選択（共通処理）
+function selectRoom(roomNumber) {
+    console.log(`🏠 部屋選択: ${roomNumber}`);
+    selectedRoom = roomNumber;
+    
+    // ドロップダウンの選択状態を更新
+    const select = document.getElementById('room-select');
+    if (select) {
+        select.value = roomNumber;
+    }
+    
+    // ボタンの選択状態を更新
+    document.querySelectorAll('.room-button-compact').forEach(btn => {
+        btn.classList.remove('btn-primary');
+        btn.classList.add('btn-outline-primary');
+    });
+    
+    const selectedButton = document.querySelector(`[data-room-number="${roomNumber}"]`);
+    if (selectedButton) {
+        selectedButton.classList.remove('btn-outline-primary');
+        selectedButton.classList.add('btn-primary');
+    }
+    
+    // 選択中の部屋情報を表示
+    showSelectedRoom(roomNumber);
+    
+    // ランキングを取得
+    loadRankingForRoom(roomNumber);
+}
+
+// 選択中の部屋を表示
+function showSelectedRoom(roomNumber) {
+    const selectedRoomInfo = document.getElementById('selected-room-info');
+    const selectedRoomName = document.getElementById('selected-room-name');
+    
+    if (selectedRoomInfo && selectedRoomName) {
+        selectedRoomName.textContent = `部屋 ${roomNumber}`;
+        selectedRoomInfo.style.display = 'block';
+    }
+}
+
+// 部屋選択をクリア
+function clearRoomSelection() {
+    selectedRoom = null;
+    
+    // ドロップダウンをリセット
+    const select = document.getElementById('room-select');
+    if (select) {
+        select.value = '';
+    }
+    
+    // ボタンの選択状態をリセット
+    document.querySelectorAll('.room-button-compact').forEach(btn => {
+        btn.classList.remove('btn-primary');
+        btn.classList.add('btn-outline-primary');
+    });
+    
+    // 選択中の部屋情報を非表示
+    const selectedRoomInfo = document.getElementById('selected-room-info');
+    if (selectedRoomInfo) {
+        selectedRoomInfo.style.display = 'none';
+    }
+    
+    // ランキング表示をクリア
+    clearRankingView();
+}
+
+// 部屋選択エラーを表示
+function displayRoomError(message) {
+    const dropdown = document.querySelector('.room-selector-dropdown');
+    if (dropdown) {
+        dropdown.innerHTML = `
+            <div class="alert alert-warning">
+                <i class="fas fa-exclamation-triangle"></i>
+                ${message}
+                <button class="btn btn-sm btn-outline-primary ms-2" onclick="loadRoomList()">
+                    <i class="fas fa-redo"></i> 再試行
+                </button>
+            </div>
+        `;
     }
 }
 </script>
