@@ -1,0 +1,1311 @@
+{% extends "base.html" %}
+{% block title %}全員ランキング表示 - {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="ranking-container">
+    <!-- ヘッダー -->
+    <div class="ranking-header d-flex justify-content-between align-items-center mb-4">
+        <div class="d-flex align-items-center">
+            <a href="{{ url_for('admin_page') }}" class="btn btn-outline-secondary me-3">
+                <i class="fas fa-arrow-left"></i> 管理者ページに戻る
+            </a>
+            <h2 class="mb-0"><i class="fas fa-trophy text-warning"></i> 全員ランキング表示</h2>
+        </div>
+        <div class="header-actions">
+            <button class="btn btn-info btn-sm" onclick="refreshAllData()">
+                <i class="fas fa-sync-alt"></i> 全データ更新
+            </button>
+        </div>
+    </div>
+
+    <!-- 部屋選択セクション -->
+    <div class="room-selection-section">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-door-open"></i> 部屋選択
+                </h5>
+            </div>
+            <div class="card-body">
+                <!-- 表示モード切り替え -->
+                <div class="view-toggle-section mb-3">
+                    <div class="btn-group" role="group">
+                        <input type="radio" class="btn-check" name="viewMode" id="dropdownMode" checked>
+                        <label class="btn btn-outline-primary btn-sm" for="dropdownMode">
+                            <i class="fas fa-list"></i> ドロップダウン
+                        </label>
+                        
+                        <input type="radio" class="btn-check" name="viewMode" id="gridMode">
+                        <label class="btn btn-outline-primary btn-sm" for="gridMode">
+                            <i class="fas fa-th"></i> グリッド表示
+                        </label>
+                        
+                        <input type="radio" class="btn-check" name="viewMode" id="compactMode">
+                        <label class="btn btn-outline-primary btn-sm" for="compactMode">
+                            <i class="fas fa-grip-horizontal"></i> コンパクト
+                        </label>
+                    </div>
+                </div>
+
+                <!-- ドロップダウン選択 -->
+                <div id="dropdown-selector" class="room-selector">
+                    <div class="row align-items-end">
+                        <div class="col-md-8">
+                            <label for="room-select-dropdown" class="form-label">部屋を選択</label>
+                            <select id="room-select-dropdown" class="form-select">
+                                <option value="">-- 部屋を選択してください --</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <button class="btn btn-primary w-100" onclick="selectRoomFromDropdown()">
+                                <i class="fas fa-chart-bar"></i> ランキング表示
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- グリッド表示 -->
+                <div id="grid-selector" class="room-selector" style="display: none;">
+                    <div class="rooms-grid" id="rooms-grid">
+                        <!-- JavaScript で動的生成 -->
+                    </div>
+                </div>
+
+                <!-- コンパクト表示 -->
+                <div id="compact-selector" class="room-selector" style="display: none;">
+                    <div class="rooms-compact" id="rooms-compact">
+                        <!-- JavaScript で動的生成 -->
+                    </div>
+                </div>
+
+                <!-- 選択中の部屋情報 -->
+                <div id="selected-room-info" class="selected-room-info mt-3" style="display: none;">
+                    <div class="alert alert-info d-flex justify-content-between align-items-center">
+                        <div>
+                            <i class="fas fa-door-open"></i>
+                            <strong>選択中: <span id="selected-room-name"></span></strong>
+                            <small class="text-muted ms-2">(<span id="selected-room-users"></span>人)</small>
+                        </div>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="clearRoomSelection()">
+                            <i class="fas fa-times"></i> 選択解除
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ランキング表示エリア -->
+    <div class="ranking-display-section mt-4">
+        <!-- 初期メッセージ -->
+        <div id="ranking-initial" class="text-center py-5">
+            <div class="empty-state">
+                <i class="fas fa-trophy fa-4x text-muted mb-3"></i>
+                <h4 class="text-muted">部屋を選択してランキングを表示</h4>
+                <p class="text-muted">上記から部屋を選択すると、その部屋の全員のランキングが表示されます</p>
+            </div>
+        </div>
+
+        <!-- ローディング表示 -->
+        <div id="ranking-loading" class="text-center py-5" style="display: none;">
+            <div class="loading-state">
+                <div class="spinner-border text-primary mb-3" role="status" style="width: 3rem; height: 3rem;">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <h5 class="text-muted">ランキングを取得中...</h5>
+                <p class="text-muted">しばらくお待ちください</p>
+            </div>
+        </div>
+
+        <!-- ランキングテーブル -->
+        <div id="ranking-table-section" style="display: none;">
+            <div class="card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-trophy"></i> ランキング結果
+                        </h5>
+                        <div class="ranking-actions">
+                            <button class="btn btn-success btn-sm" onclick="exportRankingData()">
+                                <i class="fas fa-download"></i> CSVエクスポート
+                            </button>
+                            <button class="btn btn-info btn-sm" onclick="refreshRanking()">
+                                <i class="fas fa-sync"></i> 更新
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 統計サマリー -->
+                <div class="card-body">
+                    <div class="ranking-summary mb-4">
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <div class="summary-card">
+                                    <div class="summary-icon">
+                                        <i class="fas fa-users"></i>
+                                    </div>
+                                    <div class="summary-content">
+                                        <h6>総参加者数</h6>
+                                        <span class="summary-value" id="total-users">0</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="summary-card">
+                                    <div class="summary-icon">
+                                        <i class="fas fa-chart-line"></i>
+                                    </div>
+                                    <div class="summary-content">
+                                        <h6>平均スコア</h6>
+                                        <span class="summary-value" id="average-score">0.0</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="summary-card">
+                                    <div class="summary-icon">
+                                        <i class="fas fa-crown"></i>
+                                    </div>
+                                    <div class="summary-content">
+                                        <h6>最高スコア</h6>
+                                        <span class="summary-value" id="max-score">0.0</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- テーブル制御 -->
+                    <div class="table-controls mb-3">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="input-group">
+                                    <span class="input-group-text">
+                                        <i class="fas fa-search"></i>
+                                    </span>
+                                    <input type="text" id="ranking-search" class="form-control" placeholder="ユーザー名で検索...">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="d-flex gap-2">
+                                    <select id="ranking-sort" class="form-select">
+                                        <option value="rank">順位順</option>
+                                        <option value="name">名前順</option>
+                                        <option value="score">スコア順</option>
+                                        <option value="accuracy">正答率順</option>
+                                        <option value="attempts">回答数順</option>
+                                    </select>
+                                    <button class="btn btn-outline-secondary" onclick="toggleSortOrder()">
+                                        <i class="fas fa-sort-amount-down" id="sort-icon"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ランキングテーブル -->
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>順位</th>
+                                    <th>名前</th>
+                                    <th>最終ログイン</th>
+                                    <th>回答数</th>
+                                    <th>正解数</th>
+                                    <th>正答率</th>
+                                    <th>マスター数</th>
+                                    <th>総合スコア</th>
+                                    <th>網羅率</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ranking-table-body">
+                                <!-- JavaScript で動的挿入 -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- エラー表示 -->
+        <div id="ranking-error" class="alert alert-danger" style="display: none;">
+            <div class="d-flex align-items-center">
+                <i class="fas fa-exclamation-triangle fa-2x me-3"></i>
+                <div class="flex-grow-1">
+                    <h5 class="alert-heading mb-1">ランキング取得エラー</h5>
+                    <p class="mb-0" id="ranking-error-message">ランキングの取得に失敗しました。</p>
+                </div>
+                <button class="btn btn-outline-danger" onclick="retryLoadRanking()">
+                    <i class="fas fa-redo"></i> 再試行
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// ========================================
+// 1. グローバル変数とアプリケーション状態
+// ========================================
+let selectedRoom = null;
+let currentRankingData = null;
+let currentViewMode = 'dropdown';
+let currentSortOrder = 'asc';
+let allRooms = [];
+
+// ========================================
+// 2. ページ初期化
+// ========================================
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🏆 全員ランキングページ初期化開始');
+    
+    // 表示モード切り替えイベントリスナー
+    initializeViewModeToggle();
+    
+    // 検索・ソート機能初期化
+    initializeTableControls();
+    
+    // 部屋一覧を取得
+    loadRoomList();
+});
+
+// ========================================
+// 3. 表示モード管理
+// ========================================
+function initializeViewModeToggle() {
+    document.querySelectorAll('input[name="viewMode"]').forEach(radio => {
+        radio.addEventListener('change', function() {
+            if (this.checked) {
+                switchViewMode(this.id.replace('Mode', ''));
+            }
+        });
+    });
+}
+
+function switchViewMode(mode) {
+    currentViewMode = mode;
+    
+    // 全セレクターを非表示
+    document.querySelectorAll('.room-selector').forEach(selector => {
+        selector.style.display = 'none';
+    });
+    
+    // 選択されたセレクターを表示
+    const targetSelector = document.getElementById(`${mode}-selector`);
+    if (targetSelector) {
+        targetSelector.style.display = 'block';
+    }
+    
+    console.log(`🔄 表示モード切り替え: ${mode}`);
+}
+
+// ========================================
+// 4. 部屋データの取得と表示
+// ========================================
+async function loadRoomList() {
+    try {
+        console.log('🔍 部屋一覧取得開始...');
+        const response = await fetch('/api/rooms');
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            allRooms = data.rooms;
+            console.log(`✅ 部屋一覧取得成功: ${allRooms.length}部屋`);
+            displayRoomOptions(allRooms);
+        } else {
+            throw new Error(data.message || '部屋一覧の取得に失敗しました');
+        }
+    } catch (error) {
+        console.error('❌ 部屋一覧取得エラー:', error);
+        displayRoomError(error.message);
+    }
+}
+
+function displayRoomOptions(rooms) {
+    if (rooms.length === 0) {
+        displayRoomError('登録されている部屋がありません。');
+        return;
+    }
+    
+    // 各表示モードを更新
+    updateDropdownSelector(rooms);
+    updateGridSelector(rooms);
+    updateCompactSelector(rooms);
+    
+    console.log(`✅ ${rooms.length}個の部屋選択肢を表示しました`);
+}
+
+function updateDropdownSelector(rooms) {
+    const select = document.getElementById('room-select-dropdown');
+    if (!select) return;
+    
+    // 既存のオプションをクリア（最初のデフォルトオプション以外）
+    while (select.children.length > 1) {
+        select.removeChild(select.lastChild);
+    }
+    
+    // 部屋オプションを追加
+    rooms.forEach(room => {
+        const option = document.createElement('option');
+        option.value = room.room_number;
+        option.textContent = `部屋 ${room.room_number} (${room.user_count}人)`;
+        select.appendChild(option);
+    });
+}
+
+function updateGridSelector(rooms) {
+    const container = document.getElementById('rooms-grid');
+    if (!container) return;
+    
+    container.innerHTML = '';
+    
+    rooms.forEach(room => {
+        const roomCard = document.createElement('div');
+        roomCard.className = 'room-card';
+        roomCard.setAttribute('data-room-number', room.room_number);
+        roomCard.innerHTML = `
+            <div class="room-card-content">
+                <div class="room-number">部屋 ${room.room_number}</div>
+                <div class="room-users">${room.user_count}人</div>
+                <div class="room-status">
+                    <i class="fas fa-users"></i> アクティブ
+                </div>
+            </div>
+        `;
+        roomCard.onclick = () => selectRoom(room.room_number, room.user_count);
+        container.appendChild(roomCard);
+    });
+}
+
+function updateCompactSelector(rooms) {
+    const container = document.getElementById('rooms-compact');
+    if (!container) return;
+    
+    container.innerHTML = '';
+    
+    rooms.forEach(room => {
+        const button = document.createElement('button');
+        button.className = 'btn btn-outline-primary room-button-compact';
+        button.setAttribute('data-room-number', room.room_number);
+        button.innerHTML = `
+            部屋 ${room.room_number} <small>(${room.user_count}人)</small>
+        `;
+        button.onclick = () => selectRoom(room.room_number, room.user_count);
+        container.appendChild(button);
+    });
+}
+
+function displayRoomError(message) {
+    const errorHtml = `
+        <div class="alert alert-warning">
+            <i class="fas fa-exclamation-triangle"></i>
+            ${message}
+            <button class="btn btn-sm btn-outline-primary ms-2" onclick="loadRoomList()">
+                <i class="fas fa-redo"></i> 再試行
+            </button>
+        </div>
+    `;
+    
+    // 全セレクターにエラーを表示
+    document.querySelectorAll('.room-selector').forEach(selector => {
+        selector.innerHTML = errorHtml;
+    });
+}
+
+// ========================================
+// 5. 部屋選択とランキング取得
+// ========================================
+function selectRoomFromDropdown() {
+    const select = document.getElementById('room-select-dropdown');
+    const roomNumber = select.value;
+    
+    if (!roomNumber) {
+        alert('部屋を選択してください。');
+        return;
+    }
+    
+    const room = allRooms.find(r => r.room_number === roomNumber);
+    const userCount = room ? room.user_count : 0;
+    
+    selectRoom(roomNumber, userCount);
+}
+
+function selectRoom(roomNumber, userCount = 0) {
+    console.log(`🏠 部屋選択: ${roomNumber}`);
+    selectedRoom = roomNumber;
+    
+    // 全選択状態をリセット
+    resetAllSelections();
+    
+    // 選択状態を更新
+    updateSelectionState(roomNumber);
+    
+    // 選択中の部屋情報を表示
+    showSelectedRoom(roomNumber, userCount);
+    
+    // ランキングを取得
+    loadRankingForRoom(roomNumber);
+}
+
+function resetAllSelections() {
+    // ドロップダウンをリセット
+    const select = document.getElementById('room-select-dropdown');
+    if (select) select.value = '';
+    
+    // グリッドの選択状態をリセット
+    document.querySelectorAll('.room-card').forEach(card => {
+        card.classList.remove('selected');
+    });
+    
+    // コンパクトボタンの選択状態をリセット
+    document.querySelectorAll('.room-button-compact').forEach(btn => {
+        btn.classList.remove('btn-primary');
+        btn.classList.add('btn-outline-primary');
+    });
+}
+
+function updateSelectionState(roomNumber) {
+    // ドロップダウンの選択状態を更新
+    const select = document.getElementById('room-select-dropdown');
+    if (select) select.value = roomNumber;
+    
+    // グリッドの選択状態を更新
+    const selectedCard = document.querySelector(`[data-room-number="${roomNumber}"].room-card`);
+    if (selectedCard) selectedCard.classList.add('selected');
+    
+    // コンパクトボタンの選択状態を更新
+    const selectedButton = document.querySelector(`[data-room-number="${roomNumber}"].room-button-compact`);
+    if (selectedButton) {
+        selectedButton.classList.remove('btn-outline-primary');
+        selectedButton.classList.add('btn-primary');
+    }
+}
+
+function showSelectedRoom(roomNumber, userCount) {
+    const selectedRoomInfo = document.getElementById('selected-room-info');
+    const selectedRoomName = document.getElementById('selected-room-name');
+    const selectedRoomUsers = document.getElementById('selected-room-users');
+    
+    if (selectedRoomInfo && selectedRoomName && selectedRoomUsers) {
+        selectedRoomName.textContent = `部屋 ${roomNumber}`;
+        selectedRoomUsers.textContent = userCount || '不明';
+        selectedRoomInfo.style.display = 'block';
+    }
+}
+
+function clearRoomSelection() {
+    selectedRoom = null;
+    currentRankingData = null;
+    
+    // 選択状態をリセット
+    resetAllSelections();
+    
+    // 選択中の部屋情報を非表示
+    const selectedRoomInfo = document.getElementById('selected-room-info');
+    if (selectedRoomInfo) {
+        selectedRoomInfo.style.display = 'none';
+    }
+    
+    // 表示をリセット
+    showRankingSection('initial');
+    
+    console.log('🗑️ 部屋選択をクリア');
+}
+
+// ========================================
+// 6. ランキングデータの取得と表示
+// ========================================
+async function loadRankingForRoom(roomNumber) {
+    try {
+        console.log(`📊 部屋${roomNumber}のランキング取得開始...`);
+        
+        // 表示をリセット
+        showRankingSection('loading');
+        
+        const startTime = performance.now();
+        
+        // APIを呼び出し（管理者用の全員取得）
+        const response = await fetch(`/api/admin/room_ranking/${roomNumber}`);
+        const data = await response.json();
+        
+        const endTime = performance.now();
+        const clientTime = endTime - startTime;
+        
+        if (data.status === 'success') {
+            console.log(`✅ ランキング取得成功: ${data.ranking_data.length}人 (${clientTime.toFixed(1)}ms)`);
+            
+            currentRankingData = data.ranking_data;
+            displayRanking(data.ranking_data, data.statistics);
+            
+            // 表示を更新
+            showRankingSection('table');
+            
+        } else {
+            throw new Error(data.message || 'ランキングの取得に失敗しました');
+        }
+        
+    } catch (error) {
+        console.error('❌ ランキング取得エラー:', error);
+        
+        // エラー表示
+        showRankingSection('error');
+        const errorMessage = document.getElementById('ranking-error-message');
+        if (errorMessage) {
+            errorMessage.textContent = error.message;
+        }
+    }
+}
+
+function showRankingSection(section) {
+    const sections = {
+        'initial': document.getElementById('ranking-initial'),
+        'loading': document.getElementById('ranking-loading'),
+        'table': document.getElementById('ranking-table-section'),
+        'error': document.getElementById('ranking-error')
+    };
+    
+    // 全セクションを非表示
+    Object.values(sections).forEach(element => {
+        if (element) element.style.display = 'none';
+    });
+    
+    // 指定されたセクションを表示
+    if (sections[section]) {
+        sections[section].style.display = 'block';
+    }
+}
+
+function displayRanking(rankingData, statistics) {
+    console.log(`📊 ランキング表示開始: ${rankingData.length}人`);
+    
+    // 統計情報を更新
+    updateStatisticsSummary(statistics);
+    
+    // テーブルを更新
+    updateRankingTable(rankingData);
+    
+    console.log(`✅ ランキング表示完了`);
+}
+
+function updateStatisticsSummary(statistics) {
+    const updates = {
+        'total-users': statistics.total_users || 0,
+        'average-score': (statistics.average_score || 0).toFixed(1),
+        'max-score': (statistics.max_score || 0).toFixed(1)
+    };
+    
+    Object.entries(updates).forEach(([id, value]) => {
+        const element = document.getElementById(id);
+        if (element) {
+            element.textContent = value;
+        }
+    });
+}
+
+function updateRankingTable(rankingData) {
+    const tbody = document.getElementById('ranking-table-body');
+    if (!tbody) {
+        console.error('❌ ranking-table-body が見つかりません');
+        return;
+    }
+    
+    tbody.innerHTML = '';
+    
+    rankingData.forEach((user, index) => {
+        const row = document.createElement('tr');
+        
+        // 順位に応じてスタイルを適用
+        if (index === 0) {
+            row.classList.add('table-warning'); // 1位
+        } else if (index === 1) {
+            row.classList.add('table-secondary'); // 2位  
+        } else if (index === 2) {
+            row.classList.add('table-info'); // 3位
+        }
+        
+        // 最終ログイン時刻をフォーマット
+        const lastLogin = formatLastLogin(user.last_login);
+        
+        // 各値の安全な取得
+        const rank = index + 1;
+        const username = user.username || 'Unknown';
+        const totalAttempts = user.total_attempts || 0;
+        const totalCorrect = user.total_correct || 0;
+        const accuracyRate = (user.accuracy_rate || 0).toFixed(1);
+        const masteredCount = user.mastered_count || 0;
+        const balanceScore = (user.balance_score || 0).toFixed(1);
+        const coverageRate = (user.coverage_rate || 0).toFixed(1);
+        
+        row.innerHTML = `
+            <td>
+                <span class="rank-badge">${rank}</span>
+                ${index === 0 ? '<i class="fas fa-crown text-warning ms-1"></i>' : ''}
+                ${index === 1 ? '<i class="fas fa-medal text-secondary ms-1"></i>' : ''}
+                ${index === 2 ? '<i class="fas fa-medal text-info ms-1"></i>' : ''}
+            </td>
+            <td><strong>${username}</strong></td>
+            <td><small class="text-muted">${lastLogin}</small></td>
+            <td><span class="badge bg-primary">${totalAttempts}</span></td>
+            <td><span class="badge bg-success">${totalCorrect}</span></td>
+            <td>${accuracyRate}%</td>
+            <td><span class="badge bg-info">${masteredCount}</span></td>
+            <td><strong class="text-primary">${balanceScore}</strong></td>
+            <td>${coverageRate}%</td>
+        `;
+        
+        tbody.appendChild(row);
+    });
+}
+
+// ========================================
+// 7. テーブル制御機能（検索・ソート）
+// ========================================
+function initializeTableControls() {
+    // 検索機能
+    const searchInput = document.getElementById('ranking-search');
+    if (searchInput) {
+        searchInput.addEventListener('input', filterRankingTable);
+    }
+    
+    // ソート機能
+    const sortSelect = document.getElementById('ranking-sort');
+    if (sortSelect) {
+        sortSelect.addEventListener('change', sortRankingTable);
+    }
+}
+
+function filterRankingTable() {
+    const searchTerm = document.getElementById('ranking-search').value.toLowerCase();
+    const tbody = document.getElementById('ranking-table-body');
+    
+    if (!tbody) return;
+    
+    const rows = tbody.querySelectorAll('tr');
+    
+    rows.forEach(row => {
+        const username = row.cells[1].textContent.toLowerCase();
+        const isMatch = username.includes(searchTerm);
+        row.style.display = isMatch ? '' : 'none';
+    });
+}
+
+function sortRankingTable() {
+    const sortBy = document.getElementById('ranking-sort').value;
+    
+    if (!currentRankingData) return;
+    
+    let sortedData = [...currentRankingData];
+    
+    switch(sortBy) {
+        case 'name':
+            sortedData.sort((a, b) => {
+                const nameA = a.username || '';
+                const nameB = b.username || '';
+                return currentSortOrder === 'asc' ? 
+                    nameA.localeCompare(nameB) : nameB.localeCompare(nameA);
+            });
+            break;
+        case 'score':
+            sortedData.sort((a, b) => {
+                const scoreA = a.balance_score || 0;
+                const scoreB = b.balance_score || 0;
+                return currentSortOrder === 'asc' ? scoreA - scoreB : scoreB - scoreA;
+            });
+            break;
+        case 'accuracy':
+            sortedData.sort((a, b) => {
+                const accA = a.accuracy_rate || 0;
+                const accB = b.accuracy_rate || 0;
+                return currentSortOrder === 'asc' ? accA - accB : accB - accA;
+            });
+            break;
+        case 'attempts':
+            sortedData.sort((a, b) => {
+                const attA = a.total_attempts || 0;
+                const attB = b.total_attempts || 0;
+                return currentSortOrder === 'asc' ? attA - attB : attB - attA;
+            });
+            break;
+        default: // rank
+            // デフォルトのランキング順序を維持
+            break;
+    }
+    
+    updateRankingTable(sortedData);
+}
+
+function toggleSortOrder() {
+    currentSortOrder = currentSortOrder === 'asc' ? 'desc' : 'asc';
+    
+    const sortIcon = document.getElementById('sort-icon');
+    if (sortIcon) {
+        sortIcon.className = currentSortOrder === 'asc' ? 
+            'fas fa-sort-amount-down' : 'fas fa-sort-amount-up';
+    }
+    
+    sortRankingTable();
+}
+
+// ========================================
+// 8. ユーティリティ関数
+// ========================================
+function formatLastLogin(loginTime) {
+    if (!loginTime) return 'なし';
+    
+    try {
+        const date = new Date(loginTime);
+        return date.toLocaleString('ja-JP', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    } catch (error) {
+        console.warn('日時フォーマットエラー:', error);
+        return 'なし';
+    }
+}
+
+// ========================================
+// 9. アクション関数
+// ========================================
+function refreshRanking() {
+    if (selectedRoom) {
+        console.log(`🔄 ランキング再取得: 部屋${selectedRoom}`);
+        loadRankingForRoom(selectedRoom);
+    } else {
+        console.warn('⚠️ 部屋が選択されていません');
+        alert('部屋を選択してください。');
+    }
+}
+
+function refreshAllData() {
+    console.log('🔄 全データ更新開始');
+    
+    // 部屋一覧を再取得
+    loadRoomList();
+    
+    // 選択中の部屋があればランキングも更新
+    if (selectedRoom) {
+        setTimeout(() => {
+            loadRankingForRoom(selectedRoom);
+        }, 500);
+    }
+}
+
+function retryLoadRanking() {
+    refreshRanking();
+}
+
+function exportRankingData() {
+    if (!currentRankingData || !selectedRoom) {
+        alert('エクスポートするデータがありません。');
+        return;
+    }
+    
+    console.log(`📥 CSVエクスポート開始: 部屋${selectedRoom}`);
+    
+    try {
+        // CSVデータを作成
+        const csvHeader = '\uFEFF' + '順位,名前,最終ログイン,回答数,正解数,正答率,マスター数,総合スコア,網羅率\n';
+        const csvRows = currentRankingData.map((user, index) => {
+            const lastLogin = formatLastLogin(user.last_login);
+            
+            return [
+                index + 1,
+                `"${user.username || 'Unknown'}"`, // ダブルクォートで囲む
+                `"${lastLogin}"`,
+                user.total_attempts || 0,
+                user.total_correct || 0,
+                (user.accuracy_rate || 0).toFixed(1) + '%',
+                user.mastered_count || 0,
+                (user.balance_score || 0).toFixed(1),
+                (user.coverage_rate || 0).toFixed(1) + '%'
+            ].join(',');
+        });
+        
+        const csvData = csvHeader + csvRows.join('\n');
+        
+        // ファイルをダウンロード
+        const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `ranking_room_${selectedRoom}_${new Date().toISOString().split('T')[0]}.csv`;
+        link.style.display = 'none';
+        
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        
+        console.log(`✅ CSVエクスポート完了: ranking_room_${selectedRoom}`);
+        
+    } catch (error) {
+        console.error('❌ CSVエクスポートエラー:', error);
+        alert('CSVエクスポート中にエラーが発生しました。');
+    }
+}
+
+console.log('🎉 全員ランキングページスクリプト読み込み完了');
+</script>
+
+<style>
+/* ========================================
+   1. 基本レイアウト
+   ======================================== */
+.ranking-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.ranking-header {
+    border-bottom: 2px solid #dee2e6;
+    padding-bottom: 15px;
+    margin-bottom: 25px;
+}
+
+.ranking-header h2 {
+    margin: 0;
+    color: #343a40;
+}
+
+/* ========================================
+   2. 部屋選択セクション
+   ======================================== */
+.room-selection-section {
+    margin-bottom: 30px;
+}
+
+.view-toggle-section {
+    text-align: center;
+    border-bottom: 1px solid #dee2e6;
+    padding-bottom: 15px;
+}
+
+.room-selector {
+    margin-top: 20px;
+}
+
+/* グリッド表示 */
+.rooms-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 15px;
+    margin-top: 15px;
+}
+
+.room-card {
+    border: 2px solid #dee2e6;
+    border-radius: 8px;
+    padding: 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+}
+
+.room-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+    border-color: #007bff;
+}
+
+.room-card.selected {
+    border-color: #007bff;
+    background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+    transform: translateY(-3px);
+    box-shadow: 0 6px 20px rgba(0,123,255,0.3);
+}
+
+.room-card-content .room-number {
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: #343a40;
+    margin-bottom: 8px;
+}
+
+.room-card-content .room-users {
+    font-size: 1.4rem;
+    color: #007bff;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+.room-card-content .room-status {
+    font-size: 0.8rem;
+    color: #6c757d;
+}
+
+/* コンパクト表示 */
+.rooms-compact {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+.room-button-compact {
+    min-width: 120px;
+    transition: all 0.3s ease;
+}
+
+.room-button-compact:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+/* 選択中の部屋情報 */
+.selected-room-info {
+    animation: slideInDown 0.3s ease;
+}
+
+@keyframes slideInDown {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ========================================
+   3. ランキング表示セクション
+   ======================================== */
+.ranking-display-section {
+    min-height: 500px;
+}
+
+.empty-state, .loading-state {
+    padding: 60px 20px;
+}
+
+.empty-state i, .loading-state i {
+    opacity: 0.6;
+}
+
+/* 統計サマリー */
+.ranking-summary {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-radius: 10px;
+    padding: 25px;
+    margin-bottom: 25px;
+}
+
+.summary-card {
+    background: white;
+    border-radius: 8px;
+    padding: 20px;
+    text-align: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    transition: transform 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.summary-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+}
+
+.summary-icon {
+    font-size: 2rem;
+    color: #007bff;
+    opacity: 0.8;
+}
+
+.summary-content {
+    flex: 1;
+    text-align: left;
+}
+
+.summary-content h6 {
+    font-size: 0.9rem;
+    color: #6c757d;
+    margin-bottom: 5px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.summary-value {
+    font-size: 1.8rem;
+    font-weight: bold;
+    color: #2c3e50;
+    display: block;
+}
+
+/* テーブル制御 */
+.table-controls {
+    background-color: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+/* ランキングテーブル */
+.table-hover tbody tr:hover {
+    background-color: rgba(0,0,0,0.05);
+}
+
+.table th {
+    border-top: none;
+    font-weight: 600;
+    font-size: 0.9rem;
+    background-color: #343a40;
+    color: white;
+}
+
+.table td {
+    vertical-align: middle;
+    font-size: 0.9rem;
+}
+
+.rank-badge {
+    display: inline-block;
+    min-width: 30px;
+    height: 30px;
+    line-height: 30px;
+    background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
+    color: white;
+    border-radius: 50%;
+    font-weight: bold;
+    font-size: 0.9rem;
+}
+
+.table-warning .rank-badge {
+    background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%);
+    color: #212529;
+}
+
+.table-secondary .rank-badge {
+    background: linear-gradient(135deg, #6c757d 0%, #545b62 100%);
+}
+
+.table-info .rank-badge {
+    background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+}
+
+/* アイコン */
+.fas.fa-crown {
+    animation: pulse 2s infinite;
+}
+
+.fas.fa-medal {
+    animation: bounce 2s infinite;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+@keyframes bounce {
+    0%, 20%, 53%, 80%, 100% { transform: translateY(0); }
+    40%, 43% { transform: translateY(-3px); }
+    70% { transform: translateY(-2px); }
+    90% { transform: translateY(-1px); }
+}
+
+/* ========================================
+   4. レスポンシブデザイン
+   ======================================== */
+@media (max-width: 768px) {
+    .ranking-container {
+        padding: 15px;
+    }
+    
+    .ranking-header {
+        flex-direction: column;
+        gap: 15px;
+        text-align: center;
+    }
+    
+    .rooms-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .rooms-compact {
+        justify-content: center;
+    }
+    
+    .summary-card {
+        flex-direction: column;
+        text-align: center;
+        gap: 10px;
+    }
+    
+    .summary-content {
+        text-align: center;
+    }
+    
+    .table-controls .row {
+        flex-direction: column;
+        gap: 15px;
+    }
+    
+    .table {
+        font-size: 0.8rem;
+    }
+    
+    .ranking-actions {
+        flex-direction: column;
+        gap: 5px;
+    }
+}
+
+@media (max-width: 480px) {
+    .room-card {
+        padding: 15px;
+    }
+    
+    .summary-value {
+        font-size: 1.5rem;
+    }
+    
+    .table {
+        font-size: 0.75rem;
+    }
+    
+    .rank-badge {
+        min-width: 25px;
+        height: 25px;
+        line-height: 25px;
+        font-size: 0.8rem;
+    }
+}
+
+/* ========================================
+   5. カードとボタンのアクセシビリティ
+   ======================================== */
+.room-card:focus,
+.room-button-compact:focus {
+    outline: 2px solid #007bff;
+    outline-offset: 2px;
+}
+
+.btn:focus {
+    box-shadow: 0 0 0 0.2rem rgba(0,123,255,0.25);
+}
+
+/* ========================================
+   6. ローディングとエラー状態
+   ======================================== */
+.loading-state .spinner-border {
+    border-width: 0.3em;
+}
+
+.alert {
+    border-radius: 8px;
+}
+
+.alert .fas {
+    margin-right: 10px;
+}
+
+/* ========================================
+   7. カスタムバッジとラベル
+   ======================================== */
+.badge {
+    font-size: 0.75rem;
+    padding: 0.35em 0.65em;
+}
+
+.badge.bg-primary {
+    background-color: #007bff !important;
+}
+
+.badge.bg-success {
+    background-color: #28a745 !important;
+}
+
+.badge.bg-info {
+    background-color: #17a2b8 !important;
+}
+
+/* ========================================
+   8. 特殊効果とアニメーション
+   ======================================== */
+.card {
+    transition: all 0.3s ease;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.card:hover {
+    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+}
+
+.btn {
+    transition: all 0.3s ease;
+}
+
+.btn:hover {
+    transform: translateY(-1px);
+}
+
+.table tbody tr {
+    transition: background-color 0.2s ease;
+}
+
+/* ========================================
+   9. ユーティリティクラス
+   ======================================== */
+.text-primary {
+    color: #007bff !important;
+}
+
+.text-success {
+    color: #28a745 !important;
+}
+
+.text-warning {
+    color: #ffc107 !important;
+}
+
+.text-danger {
+    color: #dc3545 !important;
+}
+
+.text-info {
+    color: #17a2b8 !important;
+}
+
+.text-muted {
+    color: #6c757d !important;
+}
+
+/* ========================================
+   10. プリント用スタイル
+   ======================================== */
+@media print {
+    .ranking-header .header-actions,
+    .view-toggle-section,
+    .room-selection-section,
+    .ranking-actions {
+        display: none !important;
+    }
+    
+    .card {
+        border: 1px solid #dee2e6 !important;
+        box-shadow: none !important;
+    }
+    
+    .table {
+        font-size: 0.8rem;
+    }
+    
+    .summary-card {
+        break-inside: avoid;
+    }
+}
+</style>
+
+{% endblock %}
