@@ -275,7 +275,7 @@
                             <thead class="table-dark sticky-header">
                                 <tr>
                                     <th>部屋番号</th>
-                                    <th>最大単元番号</th>
+                                    <th>有効単元設定</th>
                                     <th>使用CSVファイル</th>
                                     <th>操作</th>
                                 </tr>
@@ -298,12 +298,27 @@
                                 <tr>
                                     <td><strong>{{ room_num }}</strong></td>
                                     <td>
-                                        <input type="text"
-                                            id="maxUnit_{{ room_num }}"
-                                            value="{{ room_max_unit_settings.get(room_num, '9999') }}"
-                                            class="form-control unit-setting-input"
-                                            data-room-number="{{ room_num }}"
-                                            placeholder="例: 34 または 9999（全て）">
+                                        <div class="unit-setting-container" id="unitContainer_{{ room_num }}">
+                                            <div class="unit-controls mb-2">
+                                                <button type="button" class="btn btn-outline-primary btn-sm" onclick="loadAvailableUnits('{{ room_num }}')">
+                                                    <i class="fas fa-sync"></i> 単元一覧読み込み
+                                                </button>
+                                                <button type="button" class="btn btn-outline-success btn-sm" onclick="selectAllUnits('{{ room_num }}')">
+                                                    <i class="fas fa-check-double"></i> 全て選択
+                                                </button>
+                                                <button type="button" class="btn btn-outline-warning btn-sm" onclick="clearAllUnits('{{ room_num }}')">
+                                                    <i class="fas fa-times"></i> 全て解除
+                                                </button>
+                                            </div>
+                                            <div class="unit-checkboxes" id="unitCheckboxes_{{ room_num }}">
+                                                <p class="text-muted">「単元一覧読み込み」をクリックして利用可能な単元を表示してください</p>
+                                            </div>
+                                            <div class="selected-units-display mt-2">
+                                                <small class="text-info">
+                                                    選択中: <span id="selectedCount_{{ room_num }}">0</span>個の単元
+                                                </small>
+                                            </div>
+                                        </div>
                                     </td>
                                     <td>
                                         <select id="csvFile_{{ room_num }}" 
@@ -1275,6 +1290,220 @@ function initializeAllStats() {
 }
 
 console.log('🎉 admin.html スクリプト読み込み完了');
+
+// ========================================
+// 単元選択管理機能
+// ========================================
+
+// 利用可能な単元一覧を読み込む
+function loadAvailableUnits(roomNumber) {
+    console.log(`🔍 単元一覧読み込み: 部屋${roomNumber}`);
+    
+    const container = document.getElementById(`unitCheckboxes_${roomNumber}`);
+    if (!container) return;
+    
+    container.innerHTML = '<p class="text-info">読み込み中...</p>';
+    
+    fetch(`/admin/get_available_units/${roomNumber}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                displayUnitCheckboxes(roomNumber, data.available_units);
+                loadCurrentUnitSettings(roomNumber);
+            } else {
+                container.innerHTML = '<p class="text-danger">エラー: ' + data.message + '</p>';
+            }
+        })
+        .catch(error => {
+            console.error('単元一覧取得エラー:', error);
+            container.innerHTML = '<p class="text-danger">単元一覧の取得に失敗しました</p>';
+        });
+}
+
+// 単元チェックボックスを表示
+function displayUnitCheckboxes(roomNumber, availableUnits) {
+    const container = document.getElementById(`unitCheckboxes_${roomNumber}`);
+    if (!container) return;
+    
+    if (availableUnits.length === 0) {
+        container.innerHTML = '<p class="text-muted">利用可能な単元がありません</p>';
+        return;
+    }
+    
+    let html = '<div class="units-grid">';
+    
+    availableUnits.forEach(unit => {
+        html += `
+            <div class="form-check form-check-inline unit-checkbox">
+                <input class="form-check-input" type="checkbox" 
+                       id="unit_${roomNumber}_${unit}" 
+                       value="${unit}"
+                       onchange="updateSelectedCount('${roomNumber}')">
+                <label class="form-check-label" for="unit_${roomNumber}_${unit}">
+                    ${unit}
+                </label>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    container.innerHTML = html;
+    
+    console.log(`✅ 単元チェックボックス表示完了: ${availableUnits.length}個`);
+}
+
+// 現在の単元設定を読み込み
+function loadCurrentUnitSettings(roomNumber) {
+    fetch('/admin/get_room_setting', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ room_number: roomNumber })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success' && data.enabled_units) {
+            const enabledUnits = data.enabled_units;
+            
+            // チェックボックスの状態を更新
+            enabledUnits.forEach(unit => {
+                const checkbox = document.getElementById(`unit_${roomNumber}_${unit}`);
+                if (checkbox) {
+                    checkbox.checked = true;
+                }
+            });
+            
+            updateSelectedCount(roomNumber);
+            console.log(`✅ 現在の設定適用: ${enabledUnits.length}個の単元が有効`);
+        }
+    })
+    .catch(error => {
+        console.error('現在設定の取得エラー:', error);
+    });
+}
+
+// 選択された単元数を更新
+function updateSelectedCount(roomNumber) {
+    const checkboxes = document.querySelectorAll(`#unitCheckboxes_${roomNumber} input[type="checkbox"]:checked`);
+    const countElement = document.getElementById(`selectedCount_${roomNumber}`);
+    
+    if (countElement) {
+        countElement.textContent = checkboxes.length;
+    }
+}
+
+// 全ての単元を選択
+function selectAllUnits(roomNumber) {
+    const checkboxes = document.querySelectorAll(`#unitCheckboxes_${roomNumber} input[type="checkbox"]`);
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = true;
+    });
+    updateSelectedCount(roomNumber);
+    console.log(`✅ 全単元選択: 部屋${roomNumber}`);
+}
+
+// 全ての単元選択を解除
+function clearAllUnits(roomNumber) {
+    const checkboxes = document.querySelectorAll(`#unitCheckboxes_${roomNumber} input[type="checkbox"]`);
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = false;
+    });
+    updateSelectedCount(roomNumber);
+    console.log(`🔄 全単元解除: 部屋${roomNumber}`);
+}
+
+// 選択された単元のリストを取得
+function getSelectedUnits(roomNumber) {
+    const checkboxes = document.querySelectorAll(`#unitCheckboxes_${roomNumber} input[type="checkbox"]:checked`);
+    return Array.from(checkboxes).map(cb => cb.value);
+}
+
+// 部屋設定保存ボタンのイベントリスナーを修正
+document.addEventListener('DOMContentLoaded', function() {
+    // 既存のイベントリスナーを削除して新しいものに置き換え
+    document.querySelectorAll('.save-room-setting-btn').forEach(button => {
+        // 既存のイベントリスナーを削除
+        button.replaceWith(button.cloneNode(true));
+    });
+    
+    // 新しいイベントリスナーを追加
+    document.querySelectorAll('.save-room-setting-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const roomNumber = this.dataset.roomNumber;
+            const csvFileSelect = document.getElementById('csvFile_' + roomNumber);
+            
+            console.log(`🔧 部屋設定保存開始: ${roomNumber}`);
+            
+            if (!csvFileSelect) {
+                alert('設定要素が見つかりません。');
+                return;
+            }
+            
+            // 選択された単元を取得
+            const selectedUnits = getSelectedUnits(roomNumber);
+            const csvFilename = csvFileSelect.value;
+            
+            console.log(`📝 保存する設定:`, {
+                roomNumber: roomNumber,
+                selectedUnits: selectedUnits,
+                csvFilename: csvFilename
+            });
+
+            // ボタンを無効化して重複実行を防ぐ
+            this.disabled = true;
+            this.textContent = '保存中...';
+
+            // 単元設定、CSVファイル設定を同時に更新
+            Promise.all([
+                fetch('/admin/update_room_units_setting', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        room_number: roomNumber,
+                        enabled_units: selectedUnits
+                    })
+                }),
+                fetch('/admin/update_room_csv_setting', {
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        room_number: roomNumber,
+                        csv_filename: csvFilename
+                    })
+                })
+            ])
+            .then(responses => {
+                console.log('📡 サーバーレスポンス受信:', responses.map(r => r.status));
+                return Promise.all(responses.map(r => r.json()));
+            })
+            .then(results => {
+                const unitResult = results[0];
+                const csvResult = results[1];
+                
+                console.log('📊 保存結果:', { unitResult, csvResult });
+                
+                if (unitResult.status === 'success' && csvResult.status === 'success') {
+                    alert(`✅ 部屋 ${roomNumber} の設定を更新しました:\n・有効単元: ${selectedUnits.length}個\n・CSVファイル: ${csvFilename}`);
+                    
+                    // 設定を再読み込み
+                    loadRoomSettings();
+                } else {
+                    const errorMsg = (unitResult.message || csvResult.message || '不明なエラー');
+                    alert('❌ 設定の保存中にエラーが発生しました: ' + errorMsg);
+                    console.error('❌ 保存エラー:', { unitResult, csvResult });
+                }
+            })
+            .catch(error => {
+                console.error('❌ 保存処理中にエラー:', error);
+                alert('❌ 設定の保存中にエラーが発生しました: ' + error.message);
+            })
+            .finally(() => {
+                // ボタンを元に戻す
+                this.disabled = false;
+                this.textContent = '保存';
+            });
+        });
+    });
+});
 </script>
 
 <style>
@@ -1634,6 +1863,52 @@ console.log('🎉 admin.html スクリプト読み込み完了');
     background-color: #d1ecf1;
     border-left-color: #17a2b8;
     color: #0c5460;
+}
+
+/* 単元選択用のスタイル */
+.unit-setting-container {
+    max-width: 400px;
+}
+
+.units-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+    gap: 8px;
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    padding: 10px;
+    background-color: #f8f9fa;
+}
+
+.unit-checkbox {
+    margin: 0 !important;
+    font-size: 0.9em;
+}
+
+.unit-checkbox .form-check-input {
+    margin-right: 4px;
+}
+
+.unit-controls .btn {
+    margin-right: 5px;
+    margin-bottom: 5px;
+}
+
+.selected-units-display {
+    font-weight: 500;
+}
+
+@media (max-width: 768px) {
+    .units-grid {
+        grid-template-columns: repeat(auto-fill, minmax(50px, 1fr));
+        gap: 6px;
+    }
+    
+    .unit-setting-container {
+        max-width: 100%;
+    }
 }
 </style>
 
