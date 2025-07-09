@@ -36,20 +36,16 @@
 
         <!-- ランキング説明 -->
         <div class="ranking-criteria">
-            <p><strong>📊 ランキング基準:</strong> 信頼性重視の総合学習評価スコアの高い順</p>
-            <p><strong>🔢 スコア算出:</strong> ① マスター数重視 + ② 信頼性補正済み正答率 + ③ 適度な学習量</p>
-            <p><strong>⚖️ 公平性の仕組み:</strong></p>
+            <p><strong>📊 ランキング基準:</strong> 動的学習評価スコアの高い順</p>
+            <p><strong>🔢 スコア算出:</strong> ① マスタースコア + ② 正答率スコア + ③ 継続性スコア + ④ 精度ボーナス</p>
+            <p><strong>⚖️ 動的評価の特徴:</strong></p>
             <ul style="font-size: 0.85em; margin: 8px 0; padding-left: 20px; color: #495057;">
-                <li>少ない回答数での高正答率は統計的に補正されます</li>
-                <li>大量回答でも低正答率では高スコアになりません</li>
-                <li>80%以上正解した問題数（マスター数）を最重視</li>
+                <li>マスター数100問ごとに大幅スコアアップ（段階的評価）</li>
+                <li>正答率80%以上で急激にスコア上昇（段階的連続計算）</li>
+                <li>継続的学習で着実にスコア積み上げ（√回答数×3）</li>
+                <li>95%以上の高精度でボーナス獲得</li>
             </ul>
-            <p style="margin-top: 15px;">
-                <a href="{{ url_for('score_details') }}" class="btn btn-outline-info btn-sm">
-                    <i class="fas fa-calculator"></i> 詳細な算出方法を見る
-                </a>
-            </p>
-            <p><small style="color: #6c757d;">※ 質の高い学習（理解+定着）と統計的に信頼できる成績を評価する方式です</small></p>
+            <p><small style="color: #6c757d;">※ 学習行動に応じてリアルタイムで変動する公平な評価システムです</small></p>
         </div>
 
         <!-- ランキングローディング表示 -->
@@ -241,19 +237,19 @@ function updateUserStats(userStats) {
             <span class="progress-stat-value progress-main-score">${userStats.balance_score.toFixed(1)}</span>
         </div>
         <div class="progress-stat-item">
-            <span class="progress-stat-label">マスタリースコア</span>
+            <span class="progress-stat-label">マスタースコア</span>
             <span class="progress-stat-value">${userStats.mastery_score.toFixed(1)}</span>
-            <small class="progress-stat-description">(マスター数)<sup>1.3</sup> × 0.1</small>
+            <small class="progress-stat-description">段階的評価 100問毎+250pt</small>
         </div>
         <div class="progress-stat-item">
-            <span class="progress-stat-label">信頼性スコア</span>
+            <span class="progress-stat-label">正答率スコア</span>
             <span class="progress-stat-value">${userStats.reliability_score.toFixed(1)}</span>
-            <small class="progress-stat-description">(補正正答率)<sup>2</sup> × 5</small>
+            <small class="progress-stat-description">段階的連続計算 80%以上で急上昇</small>
         </div>
         <div class="progress-stat-item">
-            <span class="progress-stat-label">活動スコア</span>
+            <span class="progress-stat-label">継続性スコア</span>
             <span class="progress-stat-value">${userStats.activity_score.toFixed(1)}</span>
-            <small class="progress-stat-description">ln(回答数 + 1) × 0.2</small>
+            <small class="progress-stat-description">√回答数 × 3</small>
         </div>
     `;
     

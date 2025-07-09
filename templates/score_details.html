@@ -18,8 +18,8 @@
         <h3>🔢 基本式</h3>
         <div class="formula-box">
             <div class="formula-main">
-                総合スコア = <span class="condition">{ 0 (回答数 = 0の場合) | (A + B + C) ÷ 100 (回答数 > 0の場合) }</span>
-            </div>
+            総合スコア = <span class="condition">マスタースコア + 正答率スコア + 継続性スコア + 精度ボーナス</span>
+        </div>
         </div>
     </div>
 
@@ -27,61 +27,87 @@
     <div class="components-section">
         <h3>📊 各要素の計算</h3>
         
-        <!-- A. マスター数評価 -->
+        <!-- 1. マスタースコア -->
         <div class="component-card mastery-card">
             <div class="component-header">
-                <h4><span class="component-label">A</span> マスター数評価</h4>
-                <span class="weight-badge">最重要</span>
+                <h4><span class="component-label">1</span> マスタースコア（段階的評価）</h4>
+                <span class="weight-badge">段階式</span>
             </div>
             <div class="formula-detail">
-                <code>A = (マスター数)<sup>1.3</sup> × 10</code>
+                <code>マスタースコア = floor(マスター数 ÷ 100) × 250 + (マスター数 % 100 ÷ 100) × 125</code>
             </div>
             <ul class="explanation-list">
                 <li><strong>マスター数</strong> = 正答率80%以上の問題数</li>
-                <li><strong>1.3乗</strong>により、多くマスターするほど指数的に高評価</li>
-                <li><strong>狙い</strong>：深い理解と定着を最重視</li>
+                <li><strong>段階評価</strong>：100問達成ごとに250点の大幅アップ</li>
+                <li><strong>連続評価</strong>：途中進捗も125点満点で評価</li>
             </ul>
             <div class="example-box">
-                <strong>例：</strong> 15問マスター → 15<sup>1.3</sup> × 10 = <strong>274ポイント</strong>
+                <strong>例：</strong> 350問マスター → floor(350÷100)×250 + (50÷100)×125 = 750 + 62.5 = <strong>812.5点</strong>
             </div>
         </div>
 
-        <!-- B. 信頼性補正済み正答率評価 -->
+        <!-- 2. 正答率スコア -->
         <div class="component-card accuracy-card">
             <div class="component-header">
-                <h4><span class="component-label">B</span> 信頼性補正済み正答率評価</h4>
-                <span class="feature-badge">統計補正</span>
+                <h4><span class="component-label">2</span> 正答率スコア（段階的連続計算）</h4>
+                <span class="feature-badge">急上昇式</span>
             </div>
             <div class="formula-detail">
-                <code>補正正答率 = (7 + 実際の正解数) ÷ (10 + 実際の回答数)</code><br>
-                <code>B = (補正正答率)<sup>2</sup> × 500</code>
+                <code>90%以上: 500 + (正答率 - 0.9) × 800</code><br>
+                <code>80-89%: 350 + (正答率 - 0.8) × 1500</code><br>
+                <code>70-79%: 200 + (正答率 - 0.7) × 1500</code><br>
+                <code>60-69%: 100 + (正答率 - 0.6) × 1000</code><br>
+                <code>60%未満: 正答率 × 166.67</code>
             </div>
             <ul class="explanation-list">
-                <li><strong>ベイズ統計</strong>による信頼性補正を適用</li>
-                <li>回答数が少ない場合、想定正答率70%に引っ張られる</li>
-                <li><strong>2乗</strong>により高正答率に大きな報酬</li>
+                <li><strong>段階設定</strong>：正答率の区間ごとに異なる傾斜</li>
+                <li><strong>80%の壁</strong>：80%以上で大幅スコアアップ</li>
+                <li><strong>連続計算</strong>：区間内でも細かく評価</li>
             </ul>
             <div class="example-box">
-                <strong>例：</strong> 80/100回正解 → ((7+80)÷(10+100))<sup>2</sup> × 500 = <strong>312ポイント</strong>
+                <strong>例：</strong> 正答率85% → 350 + (0.85 - 0.8) × 1500 = 350 + 75 = <strong>425点</strong>
             </div>
         </div>
 
-        <!-- C. 学習量評価 -->
+        <!-- 3. 継続性スコア -->
         <div class="component-card effort-card">
             <div class="component-header">
-                <h4><span class="component-label">C</span> 学習量評価</h4>
-                <span class="balance-badge">適度な評価</span>
+                <h4><span class="component-label">3</span> 継続性スコア（活動量評価）</h4>
+                <span class="balance-badge">積み上げ式</span>
             </div>
             <div class="formula-detail">
-                <code>C = ln(回答数 + 1) × 20</code>
+                <code>継続性スコア = √(総回答数) × 3</code>
             </div>
             <ul class="explanation-list">
-                <li><strong>自然対数</strong>により、努力するほど伸びるが過度な優遇なし</li>
-                <li>大量回答による力技を適切に抑制</li>
-                <li>継続的な学習を適度に評価</li>
+                <li><strong>平方根関数</strong>：回答数が増えるほど緩やかに上昇</li>
+                <li><strong>継続重視</strong>：コツコツ学習を着実に評価</li>
+                <li><strong>適度な評価</strong>：過度な量産を抑制</li>
             </ul>
             <div class="example-box">
-                <strong>例：</strong> 100回答 → ln(101) × 20 = <strong>92ポイント</strong>
+                <strong>例：</strong> 400回答 → √400 × 3 = 20 × 3 = <strong>60点</strong>
+            </div>
+        </div>
+
+        <!-- 4. 精度ボーナス -->
+        <div class="component-card" style="border-left-color: #e74c3c;">
+            <div class="component-header">
+                <h4><span class="component-label">4</span> 精度ボーナス（高正答率への追加評価）</h4>
+                <span class="feature-badge" style="background: #e74c3c;">ボーナス</span>
+            </div>
+            <div class="formula-detail">
+                <code>95%以上: 150 + (正答率 - 0.95) × 1000</code><br>
+                <code>90-94%: 100 + (正答率 - 0.9) × 1000</code><br>
+                <code>85-89%: 50 + (正答率 - 0.85) × 1000</code><br>
+                <code>80-84%: (正答率 - 0.8) × 1000</code><br>
+                <code>80%未満: 0</code>
+            </div>
+            <ul class="explanation-list">
+                <li><strong>高精度報酬</strong>：80%以上の正答率で発動</li>
+                <li><strong>段階ボーナス</strong>：95%以上で最大ボーナス</li>
+                <li><strong>品質重視</strong>：正確性への特別評価</li>
+            </ul>
+            <div class="example-box">
+                <strong>例：</strong> 正答率92% → 100 + (0.92 - 0.9) × 1000 = 100 + 20 = <strong>120点</strong>
             </div>
         </div>
     </div>
@@ -90,23 +116,27 @@
     <div class="example-section">
         <h3>🎯 具体的な計算例</h3>
         <div class="calculation-example">
-            <div class="example-title">マスター15問、正解80回/100回答の学習者の場合</div>
+            <div class="example-title">マスター250問、正解850回/1000回答の学習者の場合</div>
             <div class="calculation-steps">
                 <div class="step">
-                    <span class="step-label">A</span>
-                    <span class="step-calc">15<sup>1.3</sup> × 10 = <strong>274ポイント</strong></span>
+                    <span class="step-label">1</span>
+                    <span class="step-calc">マスタースコア: floor(250÷100)×250 + (50÷100)×125 = 500 + 62.5 = <strong>562.5点</strong></span>
                 </div>
                 <div class="step">
-                    <span class="step-label">B</span>
-                    <span class="step-calc">((7+80)÷(10+100))<sup>2</sup> × 500 = 0.79<sup>2</sup> × 500 = <strong>312ポイント</strong></span>
+                    <span class="step-label">2</span>
+                    <span class="step-calc">正答率スコア: 350 + (0.85-0.8)×1500 = 350 + 75 = <strong>425点</strong></span>
                 </div>
                 <div class="step">
-                    <span class="step-label">C</span>
-                    <span class="step-calc">ln(101) × 20 = <strong>92ポイント</strong></span>
+                    <span class="step-label">3</span>
+                    <span class="step-calc">継続性スコア: √1000 × 3 = 31.6 × 3 = <strong>94.8点</strong></span>
+                </div>
+                <div class="step">
+                    <span class="step-label">4</span>
+                    <span class="step-calc">精度ボーナス: 50 + (0.85-0.85)×1000 = <strong>50点</strong></span>
                 </div>
                 <div class="final-result">
                     <span class="result-label">総合スコア</span>
-                    <span class="result-calc">(274 + 312 + 92) ÷ 100 = <strong>6.78ポイント</strong></span>
+                    <span class="result-calc">562.5 + 425 + 94.8 + 50 = <strong>1132.3点</strong></span>
                 </div>
             </div>
         </div>
@@ -117,21 +147,21 @@
         <h3>⚖️ 設計思想</h3>
         <div class="philosophy-content">
             <p class="philosophy-main">
-                質の高い学習（理解+定着）を統計的信頼性とともに評価し、
-                「少数回答での偶然高得点」や「大量回答での力技」を適切に補正する公平な評価システム
+                学習行動に応じてリアルタイムで変動する動的評価システム。
+                段階的評価により明確な目標設定を促し、継続的な学習と高い正答率を両立して評価
             </p>
             <div class="fairness-features">
                 <div class="feature-item">
-                    <i class="fas fa-shield-alt text-success"></i>
-                    <span>少ない回答数での高正答率は統計的に補正</span>
+                    <i class="fas fa-chart-line text-success"></i>
+                    <span>100問マスターごとの段階的大幅スコアアップ</span>
                 </div>
                 <div class="feature-item">
-                    <i class="fas fa-balance-scale text-warning"></i>
-                    <span>大量回答でも低正答率では高スコアにならない</span>
+                    <i class="fas fa-rocket text-warning"></i>
+                    <span>80%以上の正答率で急激なスコア上昇</span>
                 </div>
                 <div class="feature-item">
-                    <i class="fas fa-trophy text-primary"></i>
-                    <span>真の理解と定着を最も高く評価</span>
+                    <i class="fas fa-award text-primary"></i>
+                    <span>95%以上の高精度学習にボーナス付与</span>
                 </div>
             </div>
         </div>
