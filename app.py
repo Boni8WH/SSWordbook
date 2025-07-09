@@ -931,35 +931,15 @@ def migrate_database():
                 columns = [col['name'] for col in inspector.get_columns('room_setting')]
                 print(f"📋 既存のRoomSettingテーブルカラム: {columns}")
                 
-                if 'csv_filename' not in columns:
-                    print("🔧 csv_filenameカラムを追加します...")
+                # max_enabled_unit_number カラムが存在しない場合は追加
+                if 'max_enabled_unit_number' not in columns:
+                    print("🔧 max_enabled_unit_numberカラムを追加します...")
                     with db.engine.connect() as conn:
-                        conn.execute(text('ALTER TABLE room_setting ADD COLUMN csv_filename VARCHAR(100) DEFAULT \'words.csv\''))
+                        conn.execute(text('ALTER TABLE room_setting ADD COLUMN max_enabled_unit_number VARCHAR(50) DEFAULT \'9999\''))
                         conn.commit()
-                    print("✅ csv_filenameカラムを追加しました。")
+                    print("✅ max_enabled_unit_numberカラムを追加しました。")
                 
-                # ★重要：ranking_display_count カラムを追加
-                if 'ranking_display_count' not in columns:
-                    print("🔧 ranking_display_countカラムを追加します...")
-                    with db.engine.connect() as conn:
-                        conn.execute(text('ALTER TABLE room_setting ADD COLUMN ranking_display_count INTEGER DEFAULT 10'))
-                        conn.commit()
-                    print("✅ ranking_display_countカラムを追加しました。")
-                
-                missing_columns = []
-                for col_name in ['created_at', 'updated_at']:
-                    if col_name not in columns:
-                        missing_columns.append(col_name)
-                
-                if missing_columns:
-                    with db.engine.connect() as conn:
-                        for col_name in missing_columns:
-                            print(f"🔧 {col_name}カラムを追加します...")
-                            conn.execute(text(f'ALTER TABLE room_setting ADD COLUMN {col_name} TIMESTAMP'))
-                            print(f"✅ {col_name}カラムを追加しました。")
-                        conn.commit()
-                
-                # enabled_unitsカラムを追加
+                # enabled_units カラムが存在しない場合は追加
                 if 'enabled_units' not in columns:
                     print("🔧 enabled_unitsカラムを追加します...")
                     with db.engine.connect() as conn:
@@ -970,7 +950,7 @@ def migrate_database():
                             UPDATE room_setting 
                             SET enabled_units = CASE 
                                 WHEN max_enabled_unit_number = '9999' THEN '[]'
-                                ELSE '[' || max_enabled_unit_number || ']'
+                                ELSE '["' || max_enabled_unit_number || '"]'
                             END
                         """))
                         conn.commit()
@@ -6634,10 +6614,87 @@ def enhanced_startup_check():
     except Exception as e:
         print(f"❌ 起動チェックエラー: {e}")
 
+@app.route('/emergency_fix_room_setting')
+def emergency_fix_room_setting():
+    """緊急修復：room_settingテーブルのカラムを修正"""
+    try:
+        print("🆘 緊急room_setting修復開始...")
+        
+        # 既存のトランザクションをクリア
+        try:
+            db.session.rollback()
+        except:
+            pass
+        
+        with db.engine.connect() as conn:
+            # 現在のroom_settingテーブルの構造を確認
+            try:
+                result = conn.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name = 'room_setting'"))
+                existing_columns = [row[0] for row in result.fetchall()]
+                print(f"既存カラム: {existing_columns}")
+                
+                messages = []
+                
+                # max_enabled_unit_numberカラムが存在しない場合は追加
+                if 'max_enabled_unit_number' not in existing_columns:
+                    print("🔧 max_enabled_unit_numberカラムを追加中...")
+                    conn.execute(text('ALTER TABLE room_setting ADD COLUMN max_enabled_unit_number VARCHAR(50) DEFAULT \'9999\''))
+                    messages.append("✅ max_enabled_unit_numberカラムを追加しました")
+                else:
+                    messages.append("✅ max_enabled_unit_numberカラムは既に存在します")
+                
+                # enabled_unitsカラムが存在しない場合は追加
+                if 'enabled_units' not in existing_columns:
+                    print("🔧 enabled_unitsカラムを追加中...")
+                    conn.execute(text('ALTER TABLE room_setting ADD COLUMN enabled_units TEXT DEFAULT \'[]\''))
+                    messages.append("✅ enabled_unitsカラムを追加しました")
+                else:
+                    messages.append("✅ enabled_unitsカラムは既に存在します")
+                
+                conn.commit()
+                
+                # 修復後の状態確認
+                result = conn.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name = 'room_setting'"))
+                final_columns = [row[0] for row in result.fetchall()]
+                print(f"修復後のカラム: {final_columns}")
+                
+                return f"""
+                <h1>✅ 緊急修復完了</h1>
+                <p>room_settingテーブルの修復が完了しました。</p>
+                <h3>実行結果:</h3>
+                <ul>
+                    {''.join(f'<li>{msg}</li>' for msg in messages)}
+                </ul>
+                <h3>修復前のカラム:</h3>
+                <p>{existing_columns}</p>
+                <h3>修復後のカラム:</h3>
+                <p>{final_columns}</p>
+                <p><a href="/admin">管理者ページに戻る</a></p>
+                <p><a href="/login">ログインページに戻る</a></p>
+                """
+                
+            except Exception as fix_error:
+                print(f"修復エラー: {fix_error}")
+                return f"""
+                <h1>❌ 修復エラー</h1>
+                <p>エラー: {str(fix_error)}</p>
+                <p><a href="/admin">管理者ページに戻る</a></p>
+                """
+                
+    except Exception as e:
+        print(f"緊急修復失敗: {e}")
+        return f"""
+        <h1>💥 緊急修復失敗</h1>
+        <p>エラー: {str(e)}</p>
+        <p>手動でPostgreSQLにアクセスして以下のSQLを実行してください：</p>
+        <pre>
+ALTER TABLE room_setting ADD COLUMN max_enabled_unit_number VARCHAR(50) DEFAULT '9999';
+ALTER TABLE room_setting ADD COLUMN enabled_units TEXT DEFAULT '[]';
+        </pre>
+        """
+
+
 # app.py に追加する管理者用全員ランキング機能
-
-# 管理者ページの既存のスクリプト部分を以下で置き換えてください
-
 @app.route('/api/rooms')
 def api_rooms():
     """管理者用：全部屋の一覧を取得"""
