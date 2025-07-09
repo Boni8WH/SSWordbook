@@ -1911,38 +1911,4 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 }
 </style>
-
-<!-- 緊急修復用ボタン（一時的） -->
-<div class="alert alert-warning">
-    <h5>🔧 緊急修復</h5>
-    <p>部屋設定に問題がある場合は、以下のボタンを押してください：</p>
-    <button type="button" class="btn btn-warning" onclick="fixRoomSettingsAttributes()">
-        部屋設定属性を修復
-    </button>
-</div>
-
-<script>
-function fixRoomSettingsAttributes() {
-    if (confirm('部屋設定の属性を修復しますか？')) {
-        fetch('/admin/fix_room_settings_attributes', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.status === 'success') {
-                alert(`✅ ${data.message}`);
-                location.reload(); // ページを再読み込み
-            } else {
-                alert(`❌ エラー: ${data.message}`);
-            }
-        })
-        .catch(error => {
-            alert('❌ 修復中にエラーが発生しました');
-            console.error(error);
-        });
-    }
-}
-</script>
-
 {% endblock %}
