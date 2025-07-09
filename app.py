@@ -19,6 +19,16 @@ from flask_mail import Mail, Message
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from sqlalchemy import inspect, text, func
+from functools import wraps
+
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not session.get('admin_logged_in'):
+            flash('管理者権限がありません。', 'danger')
+            return redirect(url_for('login_page'))
+        return f(*args, **kwargs)
+    return decorated_function
 
 log_level = logging.INFO if os.environ.get('RENDER') == 'true' else logging.DEBUG
 logging.basicConfig(
@@ -256,7 +266,8 @@ class RoomSetting(db.Model):
     room_number = db.Column(db.String(50), unique=True, nullable=False)
     enabled_units = db.Column(db.Text, default="[]", nullable=False)  # ← JSON形式で単元リストを保存
     csv_filename = db.Column(db.String(100), default="words.csv", nullable=False)
-    
+    max_enabled_unit_number = db.Column(db.String(50), default="9999", nullable=False)
+
     def get_enabled_units(self):
         """有効な単元のリストを取得"""
         try:
@@ -591,28 +602,58 @@ def load_default_word_data():
 
 # 単元番号の比較を数値で行うためのヘルパー関数
 def parse_unit_number(unit_str):
+    """
+    単元文字列を解析して数値に変換するヘルパー関数
+    例: "10" -> 10, "2-5" -> 5 (最大値), "all" -> 9999 (大きな数値)
+    """
+    if isinstance(unit_str, int):
+        return unit_str
     if not isinstance(unit_str, str):
-        return float('inf')
+        return 9999 # デフォルト値
+
+    unit_str = unit_str.strip().lower()
+    if unit_str == 'all':
+        return 9999 # 全単元を意味する大きな数値
+
+    if '-' in unit_str:
+        try:
+            parts = unit_str.split('-')
+            if len(parts) == 2:
+                return int(parts[1]) # 範囲指定の場合、上限を返す
+        except ValueError:
+            pass
     
-    parts = unit_str.split('-')
-    if len(parts) == 2 and parts[0].isdigit() and parts[1].isdigit():
-        return int(parts[0]) * 10000 + int(parts[1])
-    elif unit_str.isdigit():
-        return int(unit_str) * 1000000 
-    return float('inf')
+    try:
+        return int(unit_str)
+    except ValueError:
+        return 9999 # 解析できない場合は全単元
 
 def is_unit_enabled_by_room_setting(unit_number, room_setting):
-    """部屋設定で単元が有効かチェック"""
+    """部屋設定で単元が有効かチェック（後方互換性対応）"""
     if not room_setting:
         return True
     
-    enabled_units = room_setting.get_enabled_units()
-    if not enabled_units:  # 空の場合は全て有効
+    try:
+        # 新しい方式：enabled_unitsを使用
+        if hasattr(room_setting, 'get_enabled_units'):
+            enabled_units = room_setting.get_enabled_units()
+            if enabled_units:  # リストが空でない場合
+                unit_str = str(unit_number)
+                return unit_str in enabled_units
+        
+        # 従来の方式：max_enabled_unit_numberを使用（フォールバック）
+        if hasattr(room_setting, 'max_enabled_unit_number'):
+            max_unit_str = room_setting.max_enabled_unit_number
+            parsed_max_unit = parse_unit_number(max_unit_str)
+            parsed_current_unit = parse_unit_number(str(unit_number))
+            return parsed_current_unit <= parsed_max_unit
+        
+        # どちらもない場合はデフォルトで全て有効
         return True
-    
-    # 単元番号を文字列として比較
-    unit_str = str(unit_number)
-    return unit_str in enabled_units
+        
+    except Exception as e:
+        print(f"⚠️ 単元有効性チェックエラー: {e}")
+        return True  # エラー時は安全のため有効とする
 
 # 問題IDを生成するヘルパー関数
 def get_problem_id(word):
@@ -929,11 +970,8 @@ def migrate_database():
             # 2. RoomSettingテーブルの確認
             if inspector.has_table('room_setting'):
                 columns = [col['name'] for col in inspector.get_columns('room_setting')]
-                print(f"📋 既存のRoomSettingテーブルカラム: {columns}")
-                
-                # max_enabled_unit_number カラムが存在しない場合は追加
                 if 'max_enabled_unit_number' not in columns:
-                    print("🔧 max_enabled_unit_numberカラムを追加します...")
+                    print("🔧 room_settingテーブルにmax_enabled_unit_numberカラムを追加します...")
                     with db.engine.connect() as conn:
                         conn.execute(text('ALTER TABLE room_setting ADD COLUMN max_enabled_unit_number VARCHAR(50) DEFAULT \'9999\''))
                         conn.commit()
@@ -1199,8 +1237,6 @@ def create_user_stats_table_simple():
         print(f"❌ テーブル作成エラー: {e}")
         return False
 
-
-# create_tables_and_admin_user() 関数を修正
 def create_tables_and_admin_user():
     """データベース初期化関数（UserStats対応版）"""
     try:
@@ -3039,16 +3075,15 @@ def api_word_data():
         word_data = load_word_data_for_room(current_user.room_number)
         
         room_setting = RoomSetting.query.filter_by(room_number=current_user.room_number).first()
-        max_enabled_unit_num_str = room_setting.max_enabled_unit_number if room_setting else "9999"
-        parsed_max_enabled_unit_num = parse_unit_number(max_enabled_unit_num_str)
 
         filtered_word_data = []
         for word in word_data:
             unit_num = word['number']
             is_word_enabled_in_csv = word['enabled']
-            is_unit_enabled_by_room_setting = is_unit_enabled_by_room_setting(unit_num, room_setting)
+            # 修正：新しい関数を使用
+            is_unit_enabled_by_room = is_unit_enabled_by_room_setting(unit_num, room_setting)
 
-            if is_word_enabled_in_csv and is_unit_enabled_by_room_setting:
+            if is_word_enabled_in_csv and is_unit_enabled_by_room:
                 filtered_word_data.append(word)
         
         return jsonify(filtered_word_data)
@@ -5205,6 +5240,23 @@ def admin_delete_user(user_id):
 
 # 部屋設定管理
 @app.route('/admin/get_room_setting', methods=['POST'])
+@admin_required # <- 追加
+def get_room_setting():
+    room_number = request.json.get('room_number')
+    if not room_number:
+        return jsonify(status='error', message='部屋番号が必要です'), 400
+    
+    room_setting = RoomSetting.query.filter_by(room_number=room_number).first()
+    if not room_setting:
+        return jsonify(status='success', csv_filename='words.csv', enabled_units=[], max_enabled_unit_number="9999")
+    
+    return jsonify({
+        'status': 'success',
+        'csv_filename': room_setting.csv_filename,
+        'enabled_units': room_setting.get_enabled_units(),
+        'max_enabled_unit_number': room_setting.max_enabled_unit_number # 追加
+    })
+
 def admin_get_room_setting():
     """部屋設定を取得するAPI（ランキング表示人数を含む）"""
     try:
@@ -5254,6 +5306,59 @@ def admin_get_room_setting():
         
     except Exception as e:
         print(f"❌ 部屋設定取得エラー: {e}")
+        return jsonify(status='error', message=str(e)), 500
+
+# app.py
+
+@app.route('/admin/update_room_setting', methods=['POST'])
+@admin_required
+def update_room_setting():
+    data = request.get_json()
+    room_number = data.get('room_number')
+    csv_filename = data.get('csv_filename')
+    max_enabled_unit_number = data.get('max_enabled_unit_number')
+
+    if not room_number:
+        return jsonify(status='error', message='部屋番号が必要です'), 400
+
+    room_setting = RoomSetting.query.filter_by(room_number=room_number).first()
+    if not room_setting:
+        room_setting = RoomSetting(room_number=room_number)
+        db.session.add(room_setting)
+
+    if csv_filename is not None:
+        room_setting.csv_filename = secure_filename(csv_filename)
+    
+    if max_enabled_unit_number is not None:
+        room_setting.max_enabled_unit_number = max_enabled_unit_number
+
+    try:
+        db.session.commit()
+        # 統計を更新
+        users_in_room = User.query.filter_by(room_number=room_number).all()
+        for user in users_in_room:
+            if user.stats:
+                user.stats.update_stats()
+        db.session.commit()
+        
+        return jsonify(status='success', message=f'部屋 {room_number} の設定を更新しました')
+    except Exception as e:
+        db.session.rollback()
+        print(f"❌ 部屋設定更新エラー: {e}")
+        return jsonify(status='error', message=str(e)), 500
+
+@app.route('/admin/get_csv_files')
+@admin_required
+def get_csv_files():
+    try:
+        csv_files = RoomCsvFile.query.all()
+        file_list = [{
+            'filename': f.filename,
+            'original_filename': f.original_filename,
+            'word_count': f.word_count
+        } for f in csv_files]
+        return jsonify(status='success', csv_files=file_list)
+    except Exception as e:
         return jsonify(status='error', message=str(e)), 500
 
 @app.route('/admin/update_room_units_setting', methods=['POST'])
