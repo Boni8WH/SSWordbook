@@ -139,7 +139,7 @@
                 <!-- 統計サマリー -->
                 <div class="card-body">
                     <div class="ranking-summary mb-4">
-                        <div class="row g-3">
+                        <div class="row g-2">
                             <div class="col-md-4">
                                 <div class="summary-card">
                                     <div class="summary-icon">
@@ -201,7 +201,8 @@
                             </div>
                         </div>
                     </div>  
-                    <!-- ランキングテーブル -->
+                <!-- ランキングテーブル -->
+                <div class="table-container">
                     <div class="table-responsive" style="overflow-x: auto;">
                         <table class="table table-striped table-hover" style="min-width: 800px;">
                             <thead class="table-dark">
@@ -990,6 +991,9 @@ console.log('🎉 全員ランキングページスクリプト読み込み完�
     border-radius: 10px;
     padding: 25px;
     margin-bottom: 25px;
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden;
 }
 
 .summary-card {
@@ -1002,7 +1006,10 @@ console.log('🎉 全員ランキングページスクリプト読み込み完�
     display: flex;
     align-items: center;
     gap: 15px;
-    min-height: 80px; /* 最小高さを設定 */
+    min-height: 80px;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
 }
 
 .summary-card:hover {
@@ -1020,6 +1027,7 @@ console.log('🎉 全員ランキングページスクリプト読み込み完�
 .summary-content {
     flex: 1;
     text-align: left;
+    min-width: 0;
 }
 
 .summary-content h6 {
@@ -1044,6 +1052,9 @@ console.log('🎉 全員ランキングページスクリプト読み込み完�
     padding: 20px;
     border-radius: 8px;
     margin-bottom: 20px;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
 }
 
 /* ランキングテーブル */
@@ -1131,6 +1142,18 @@ console.log('🎉 全員ランキングページスクリプト読み込み完�
     90% { transform: translateY(-1px); }
 }
 
+/* テーブルコンテナ（順位表のみ横スクロール） */
+.table-container {
+    margin-bottom: 20px;
+}
+
+.table-container .table-responsive {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+}
+
 /* ========================================
    4. レスポンシブデザイン
    ======================================== */
@@ -1171,6 +1194,8 @@ console.log('🎉 全員ランキングページスクリプト読み込み完�
 @media (max-width: 768px) {
     .ranking-container {
         padding: 10px;
+        width: 100%;
+        max-width: 100%;
     }
     
     .ranking-header {
@@ -1212,64 +1237,93 @@ console.log('🎉 全員ランキングページスクリプト読み込み完�
         font-size: 0.8rem;
     }
     
-    /* 統計サマリー - コンパクト化 */
+    /* 統計サマリー - 横スクロール対象外 */
     .ranking-summary {
-        padding: 10px;
+        padding: 12px;
         margin-bottom: 15px;
+        width: 100%;
+        max-width: 100%;
+    }
+    
+    .ranking-summary .row {
+        margin: 0;
+        width: 100%;
     }
     
     .summary-card {
-        padding: 8px 12px;
-        gap: 8px;
+        padding: 10px;
+        gap: 10px;
         min-height: auto;
+        margin-bottom: 8px;
     }
     
     .summary-icon {
-        font-size: 1.2rem;
+        font-size: 1.3rem;
         flex-shrink: 0;
     }
     
     .summary-content h6 {
-        font-size: 0.7rem;
+        font-size: 0.75rem;
         margin-bottom: 2px;
     }
     
     .summary-value {
-        font-size: 1rem;
+        font-size: 1.2rem;
         line-height: 1.2;
     }
     
-    /* テーブル制御 - コンパクト化 */
+    /* テーブル制御 - 横スクロール対象外 */
     .table-controls {
-        padding: 10px;
+        padding: 12px;
         margin-bottom: 15px;
+        width: 100%;
+        max-width: 100%;
     }
     
     .table-controls .row {
         flex-direction: column;
         gap: 10px;
+        margin: 0;
+        width: 100%;
     }
     
     .table-controls .col-md-6 {
         width: 100%;
-    }
-    
-    .table-controls .input-group {
-        margin-bottom: 0;
+        max-width: 100%;
+        padding: 0;
     }
     
     .table-controls .form-select,
     .table-controls .form-control {
-        font-size: 0.8rem;
+        font-size: 0.85rem;
         padding: 0.5rem 0.75rem;
+        width: 100%;
     }
     
     .table-controls .btn {
         padding: 0.5rem 0.75rem;
-        font-size: 0.8rem;
+        font-size: 0.85rem;
     }
     
-    /* ランキングテーブル */
+    .table-controls .input-group {
+        width: 100%;
+    }
+    
+    .table-controls .d-flex {
+        width: 100%;
+    }
+    
+    /* ランキングテーブル - 横スクロール対象 */
+    .table-container {
+        width: 100%;
+        margin-bottom: 15px;
+    }
+    
+    .table-container .table-responsive {
+        width: 100%;
+        max-width: 100%;
+    }
+    
     .table {
         font-size: 0.75rem;
         min-width: 700px;
@@ -1278,6 +1332,7 @@ console.log('🎉 全員ランキングページスクリプト読み込み完�
     .table th,
     .table td {
         padding: 0.5rem 0.3rem;
+        white-space: nowrap;
     }
     
     .rank-badge {
@@ -1295,13 +1350,15 @@ console.log('🎉 全員ランキングページスクリプト読み込み完�
     
     .ranking-actions .btn {
         width: 100%;
-        font-size: 0.8rem;
+        font-size: 0.85rem;
         padding: 0.5rem;
     }
     
     /* カード */
     .card-body {
         padding: 0.75rem;
+        width: 100%;
+        max-width: 100%;
     }
     
     .card-header {
@@ -1319,73 +1376,53 @@ console.log('🎉 全員ランキングページスクリプト読み込み完�
         padding: 8px;
     }
     
-    .ranking-header {
-        padding-bottom: 8px;
-        margin-bottom: 12px;
-    }
-    
-    .room-card {
-        padding: 12px;
-    }
-    
-    .room-card-content .room-number {
-        font-size: 1rem;
-    }
-    
-    .room-card-content .room-users {
-        font-size: 1.2rem;
-    }
-    
-    /* 統計サマリー - さらにコンパクト */
+    /* 統計サマリー - さらにコンパクト、横スクロール対象外 */
     .ranking-summary {
         padding: 8px;
         margin-bottom: 12px;
     }
     
     .summary-card {
-        padding: 6px 10px;
-        gap: 6px;
+        padding: 8px;
+        gap: 8px;
     }
     
     .summary-icon {
-        font-size: 1rem;
+        font-size: 1.1rem;
     }
     
     .summary-content h6 {
-        font-size: 0.65rem;
+        font-size: 0.7rem;
         margin-bottom: 1px;
     }
     
     .summary-value {
-        font-size: 0.9rem;
+        font-size: 1rem;
     }
     
-    /* テーブル制御 - さらにコンパクト */
+    /* テーブル制御 - さらにコンパクト、横スクロール対象外 */
     .table-controls {
         padding: 8px;
         margin-bottom: 12px;
     }
     
-    .table-controls .row {
-        gap: 8px;
-    }
-    
     .table-controls .form-select,
     .table-controls .form-control {
-        font-size: 0.75rem;
+        font-size: 0.8rem;
         padding: 0.4rem 0.6rem;
     }
     
     .table-controls .btn {
         padding: 0.4rem 0.6rem;
-        font-size: 0.75rem;
+        font-size: 0.8rem;
     }
     
     .table-controls .input-group-text {
-        font-size: 0.75rem;
+        font-size: 0.8rem;
         padding: 0.4rem 0.6rem;
     }
     
+    /* ランキングテーブル - 横スクロール対象 */
     .table {
         font-size: 0.7rem;
         min-width: 650px;
@@ -1418,11 +1455,6 @@ console.log('🎉 全員ランキングページスクリプト読み込み完�
     
     .card-title {
         font-size: 0.9rem;
-    }
-    
-    .alert {
-        padding: 0.5rem;
-        font-size: 0.8rem;
     }
 }
 
