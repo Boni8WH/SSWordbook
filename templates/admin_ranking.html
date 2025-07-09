@@ -200,22 +200,21 @@
                                 </div>
                             </div>
                         </div>
-                    </div>
-
+                    </div>  
                     <!-- ランキングテーブル -->
-                    <div class="table-responsive">
-                        <table class="table table-striped table-hover">
+                    <div class="table-responsive" style="overflow-x: auto;">
+                        <table class="table table-striped table-hover" style="min-width: 800px;">
                             <thead class="table-dark">
                                 <tr>
-                                    <th>順位</th>
-                                    <th>名前</th>
-                                    <th>最終ログイン</th>
-                                    <th>回答数</th>
-                                    <th>正解数</th>
-                                    <th>正答率</th>
-                                    <th>マスター数</th>
-                                    <th>総合スコア</th>
-                                    <th>網羅率</th>
+                                    <th style="min-width: 60px;">順位</th>
+                                    <th style="min-width: 100px;">名前</th>
+                                    <th style="min-width: 120px;">最終ログイン</th>
+                                    <th style="min-width: 80px;">回答数</th>
+                                    <th style="min-width: 80px;">正解数</th>
+                                    <th style="min-width: 80px;">正答率</th>
+                                    <th style="min-width: 90px;">マスター数</th>
+                                    <th style="min-width: 100px;">総合スコア</th>
+                                    <th style="min-width: 80px;">網羅率</th>
                                 </tr>
                             </thead>
                             <tbody id="ranking-table-body">
@@ -1045,6 +1044,11 @@ console.log('🎉 全員ランキングページスクリプト読み込み完�
 }
 
 /* ランキングテーブル */
+.table-responsive {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+}
+
 .table-hover tbody tr:hover {
     background-color: rgba(0,0,0,0.05);
 }
@@ -1055,11 +1059,17 @@ console.log('🎉 全員ランキングページスクリプト読み込み完�
     font-size: 0.9rem;
     background-color: #343a40;
     color: white;
+    white-space: nowrap;
+    position: sticky;
+    top: 0;
+    z-index: 10;
 }
 
 .table td {
     vertical-align: middle;
     font-size: 0.9rem;
+    white-space: nowrap;
+    padding: 0.75rem 0.5rem;
 }
 
 .rank-badge {
@@ -1121,15 +1131,69 @@ console.log('🎉 全員ランキングページスクリプト読み込み完�
 /* ========================================
    4. レスポンシブデザイン
    ======================================== */
-@media (max-width: 768px) {
+
+/* タブレット対応 */
+@media (max-width: 992px) {
     .ranking-container {
         padding: 15px;
+    }
+    
+    .rooms-grid {
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        gap: 12px;
+    }
+    
+    .room-card {
+        padding: 15px;
+    }
+    
+    .summary-card {
+        padding: 15px;
+    }
+    
+    .summary-icon {
+        font-size: 1.5rem;
+    }
+    
+    .summary-value {
+        font-size: 1.5rem;
+    }
+    
+    .table-controls {
+        padding: 15px;
+    }
+}
+
+/* スマホ対応 */
+@media (max-width: 768px) {
+    .ranking-container {
+        padding: 10px;
     }
     
     .ranking-header {
         flex-direction: column;
         gap: 15px;
         text-align: center;
+    }
+    
+    .ranking-header h2 {
+        font-size: 1.3rem;
+    }
+    
+    .header-actions {
+        width: 100%;
+        text-align: center;
+    }
+    
+    /* 部屋選択セクション */
+    .view-toggle-section .btn-group {
+        flex-direction: column;
+        width: 100%;
+    }
+    
+    .view-toggle-section .btn {
+        border-radius: 0.375rem !important;
+        margin-bottom: 2px;
     }
     
     .rooms-grid {
@@ -1140,14 +1204,38 @@ console.log('🎉 全員ランキングページスクリプト読み込み完�
         justify-content: center;
     }
     
+    .room-button-compact {
+        min-width: 100px;
+        font-size: 0.8rem;
+    }
+    
+    /* 統計サマリー */
+    .ranking-summary {
+        padding: 15px;
+    }
+    
     .summary-card {
         flex-direction: column;
         text-align: center;
         gap: 10px;
+        padding: 15px;
     }
     
     .summary-content {
         text-align: center;
+    }
+    
+    .summary-icon {
+        font-size: 1.8rem;
+    }
+    
+    .summary-value {
+        font-size: 1.4rem;
+    }
+    
+    /* テーブル制御 */
+    .table-controls {
+        padding: 15px;
     }
     
     .table-controls .row {
@@ -1155,39 +1243,151 @@ console.log('🎉 全員ランキングページスクリプト読み込み完�
         gap: 15px;
     }
     
-    .table {
-        font-size: 0.8rem;
+    .table-controls .col-md-6 {
+        width: 100%;
     }
     
-    .ranking-actions {
-        flex-direction: column;
-        gap: 5px;
-    }
-}
-
-@media (max-width: 480px) {
-    .room-card {
-        padding: 15px;
-    }
-    
-    .summary-value {
-        font-size: 1.5rem;
-    }
-    
+    /* ランキングテーブル */
     .table {
         font-size: 0.75rem;
+        min-width: 700px;
+    }
+    
+    .table th,
+    .table td {
+        padding: 0.5rem 0.3rem;
     }
     
     .rank-badge {
         min-width: 25px;
         height: 25px;
         line-height: 25px;
+        font-size: 0.7rem;
+    }
+    
+    .ranking-actions {
+        flex-direction: column;
+        gap: 5px;
+        width: 100%;
+    }
+    
+    .ranking-actions .btn {
+        width: 100%;
         font-size: 0.8rem;
+    }
+    
+    /* カード */
+    .card-body {
+        padding: 1rem;
+    }
+    
+    .card-header {
+        padding: 0.75rem 1rem;
+    }
+    
+    .card-title {
+        font-size: 1.1rem;
+    }
+}
+
+/* 小さいスマホ対応 */
+@media (max-width: 480px) {
+    .ranking-container {
+        padding: 5px;
+    }
+    
+    .ranking-header {
+        padding-bottom: 10px;
+        margin-bottom: 15px;
+    }
+    
+    .room-card {
+        padding: 12px;
+    }
+    
+    .room-card-content .room-number {
+        font-size: 1rem;
+    }
+    
+    .room-card-content .room-users {
+        font-size: 1.2rem;
+    }
+    
+    .summary-card {
+        padding: 12px;
+    }
+    
+    .summary-value {
+        font-size: 1.2rem;
+    }
+    
+    .table {
+        font-size: 0.7rem;
+        min-width: 650px;
+    }
+    
+    .table th,
+    .table td {
+        padding: 0.4rem 0.2rem;
+    }
+    
+    .rank-badge {
+        min-width: 20px;
+        height: 20px;
+        line-height: 20px;
+        font-size: 0.6rem;
+    }
+    
+    .badge {
+        font-size: 0.6rem;
+        padding: 0.2em 0.4em;
+    }
+    
+    .card-body {
+        padding: 0.75rem;
+    }
+    
+    .card-header {
+        padding: 0.5rem 0.75rem;
+    }
+    
+    .alert {
+        padding: 0.75rem;
     }
 }
 
 /* ========================================
-   5. カードとボタンのアクセシビリティ
+   5. 横向き表示対応
+   ======================================== */
+@media (max-width: 768px) and (orientation: landscape) {
+    .ranking-summary {
+        padding: 10px;
+    }
+    
+    .summary-card {
+        flex-direction: row;
+        padding: 10px;
+    }
+    
+    .summary-content {
+        text-align: left;
+    }
+    
+    .summary-icon {
+        font-size: 1.2rem;
+    }
+    
+    .summary-value {
+        font-size: 1.1rem;
+    }
+    
+    .table {
+        font-size: 0.7rem;
+    }
+}
+
+/* ========================================
+   6. カードとボタンのアクセシビリティ
    ======================================== */
 .room-card:focus,
 .room-button-compact:focus {
@@ -1200,7 +1400,7 @@ console.log('🎉 全員ランキングページスクリプト読み込み完�
 }
 
 /* ========================================
-   6. ローディングとエラー状態
+   7. ローディングとエラー状態
    ======================================== */
 .loading-state .spinner-border {
     border-width: 0.3em;
@@ -1215,7 +1415,7 @@ console.log('🎉 全員ランキングページスクリプト読み込み完�
 }
 
 /* ========================================
-   7. カスタムバッジとラベル
+   8. カスタムバッジとラベル
    ======================================== */
 .badge {
     font-size: 0.75rem;
@@ -1235,7 +1435,7 @@ console.log('🎉 全員ランキングページスクリプト読み込み完�
 }
 
 /* ========================================
-   8. 特殊効果とアニメーション
+   9. 特殊効果とアニメーション
    ======================================== */
 .card {
     transition: all 0.3s ease;
@@ -1260,7 +1460,7 @@ console.log('🎉 全員ランキングページスクリプト読み込み完�
 }
 
 /* ========================================
-   9. ユーティリティクラス
+   10. ユーティリティクラス
    ======================================== */
 .text-primary {
     color: #007bff !important;
@@ -1287,7 +1487,7 @@ console.log('🎉 全員ランキングページスクリプト読み込み完�
 }
 
 /* ========================================
-   10. プリント用スタイル
+   11. プリント用スタイル
    ======================================== */
 @media print {
     .ranking-header .header-actions,
