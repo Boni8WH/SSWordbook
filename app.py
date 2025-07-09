@@ -4163,8 +4163,6 @@ def admin_analyze_invalid_history_detailed():
 # ====================================================================
 # 進捗ページ
 # ====================================================================
-# app.py の progress_page ルートを以下に置き換えてください
-
 @app.route('/progress')
 def progress_page():
     """個人進捗のみを高速表示（ランキングは非同期）"""
@@ -4247,7 +4245,7 @@ def progress_page():
                 unit_number = matched_word['number']
                 
                 is_word_enabled_in_csv = matched_word['enabled']
-                is_unit_enabled_by_room_setting = parse_unit_number(unit_number) <= parsed_max_enabled_unit_num
+                is_unit_enabled_by_room = parse_unit_number(unit_number) <= parsed_max_enabled_unit_num
 
                 if (is_word_enabled_in_csv and is_unit_enabled_by_room_setting and 
                     chapter_number in chapter_progress_summary and
@@ -4320,9 +4318,6 @@ def progress_page():
         import traceback
         traceback.print_exc()
         return f"Progress Error: {e}", 500
-
-
-# app.py の api_ranking_data ルートを以下のフォールバック対応版に置き換えてください
 
 @app.route('/api/ranking_data')
 def api_ranking_data():
