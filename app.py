@@ -1917,8 +1917,8 @@ def index():
             category_name = word.get('category', '未分類')
             
             is_word_enabled_in_csv = word['enabled']
-            is_unit_enabled_by_room_setting = is_unit_enabled_by_room_setting(unit_num, room_setting)
-            is_unit_globally_enabled = is_word_enabled_in_csv and is_unit_enabled_by_room_setting
+            is_unit_enabled_by_room = is_unit_enabled_by_room_setting(unit_num, room_setting)  # ←変数名を変更
+            is_unit_globally_enabled = is_word_enabled_in_csv and is_unit_enabled_by_room 
 
             if chapter_num not in all_chapter_unit_status:
                 all_chapter_unit_status[chapter_num] = {'units': {}, 'name': f'第{chapter_num}章'}
@@ -6163,8 +6163,6 @@ def admin_debug_progress():
         import traceback
         traceback.print_exc()
         return f"Debug Error: {e}", 500
-
-
 
 # 1. 共通のapp_info取得関数を定義
 @app.context_processor
