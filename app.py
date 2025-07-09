@@ -489,19 +489,49 @@ class UserStats(db.Model):
             PRIOR_CORRECT = EXPECTED_AVG_ACCURACY * CONFIDENCE_ATTEMPTS
             PRIOR_ATTEMPTS = CONFIDENCE_ATTEMPTS
             
+            # 動的スコアシステムによる計算
             if total_attempts == 0:
-                bayesian_accuracy = 0
                 self.balance_score = 0
+                self.mastery_score = 0
+                self.reliability_score = 0
+                self.activity_score = 0
             else:
-                bayesian_accuracy = (PRIOR_CORRECT + total_correct) / (PRIOR_ATTEMPTS + total_attempts)
+                # 正答率を計算
+                accuracy_rate = total_correct / total_attempts
                 
-                # 各種スコア計算
-                self.mastery_score = (self.mastered_count ** 1.3) * 10 / 100
-                self.reliability_score = (bayesian_accuracy ** 2) * 500 / 100
-                self.activity_score = math.log(total_attempts + 1) * 20 / 100
+                # 1. マスタースコア（段階的 + 連続的）
+                mastery_base = (self.mastered_count // 100) * 250
+                mastery_progress = ((self.mastered_count % 100) / 100) * 125
+                self.mastery_score = mastery_base + mastery_progress
                 
-                # 総合スコア
-                self.balance_score = self.mastery_score + self.reliability_score + self.activity_score
+                # 2. 正答率スコア（段階的連続計算）
+                if accuracy_rate >= 0.9:
+                    self.reliability_score = 500 + (accuracy_rate - 0.9) * 800
+                elif accuracy_rate >= 0.8:
+                    self.reliability_score = 350 + (accuracy_rate - 0.8) * 1500
+                elif accuracy_rate >= 0.7:
+                    self.reliability_score = 200 + (accuracy_rate - 0.7) * 1500
+                elif accuracy_rate >= 0.6:
+                    self.reliability_score = 100 + (accuracy_rate - 0.6) * 1000
+                else:
+                    self.reliability_score = accuracy_rate * 166.67
+                
+                # 3. 継続性スコア（活動量評価）
+                self.activity_score = math.sqrt(total_attempts) * 3
+                
+                # 4. 精度ボーナス（高正答率への追加評価）
+                precision_bonus = 0
+                if accuracy_rate >= 0.95:
+                    precision_bonus = 150 + (accuracy_rate - 0.95) * 1000
+                elif accuracy_rate >= 0.9:
+                    precision_bonus = 100 + (accuracy_rate - 0.9) * 1000
+                elif accuracy_rate >= 0.85:
+                    precision_bonus = 50 + (accuracy_rate - 0.85) * 1000
+                elif accuracy_rate >= 0.8:
+                    precision_bonus = (accuracy_rate - 0.8) * 1000
+                
+                # 総合スコア = マスタースコア + 正答率スコア + 継続性スコア + 精度ボーナス
+                self.balance_score = self.mastery_score + self.reliability_score + self.activity_score + precision_bonus
             
             # 更新日時
             self.last_updated = datetime.now(JST)
@@ -2836,24 +2866,49 @@ def admin_fallback_ranking_calculation(room_number, start_time):
             user_mastered_count = len(mastered_problem_ids)
             coverage_rate = (user_mastered_count / total_questions_for_room_ranking * 100) if total_questions_for_room_ranking > 0 else 0
 
-            # ベイズ統計による総合評価型スコア計算
-            if user_total_attempts == 0:
+            # 動的スコアシステムによる計算
+            if total_attempts == 0:
                 comprehensive_score = 0
-                bayesian_accuracy = 0
+                mastery_score = 0
+                reliability_score = 0
+                activity_score = 0
             else:
-                bayesian_accuracy = (PRIOR_CORRECT + user_total_correct) / (PRIOR_ATTEMPTS + user_total_attempts)
+                # 正答率を計算
+                accuracy_rate = total_correct / total_attempts
                 
-                comprehensive_score = (
-                    (user_mastered_count ** 1.3) * 10 +
-                    (bayesian_accuracy ** 2) * 500 +
-                    math.log(user_total_attempts + 1) * 20
-                ) / 100
-                active_users += 1
-
-            # 3種類のスコア計算
-            mastery_score = (user_mastered_count ** 1.3) * 10 / 100
-            reliability_score = (bayesian_accuracy ** 2) * 500 / 100
-            activity_score = math.log(user_total_attempts + 1) * 20 / 100
+                # 1. マスタースコア（段階的 + 連続的）
+                mastery_base = (user_mastered_count // 100) * 250
+                mastery_progress = ((user_mastered_count % 100) / 100) * 125
+                mastery_score = mastery_base + mastery_progress
+                
+                # 2. 正答率スコア（段階的連続計算）
+                if accuracy_rate >= 0.9:
+                    reliability_score = 500 + (accuracy_rate - 0.9) * 800
+                elif accuracy_rate >= 0.8:
+                    reliability_score = 350 + (accuracy_rate - 0.8) * 1500
+                elif accuracy_rate >= 0.7:
+                    reliability_score = 200 + (accuracy_rate - 0.7) * 1500
+                elif accuracy_rate >= 0.6:
+                    reliability_score = 100 + (accuracy_rate - 0.6) * 1000
+                else:
+                    reliability_score = accuracy_rate * 166.67
+                
+                # 3. 継続性スコア（活動量評価）
+                activity_score = math.sqrt(total_attempts) * 3
+                
+                # 4. 精度ボーナス（高正答率への追加評価）
+                precision_bonus = 0
+                if accuracy_rate >= 0.95:
+                    precision_bonus = 150 + (accuracy_rate - 0.95) * 1000
+                elif accuracy_rate >= 0.9:
+                    precision_bonus = 100 + (accuracy_rate - 0.9) * 1000
+                elif accuracy_rate >= 0.85:
+                    precision_bonus = 50 + (accuracy_rate - 0.85) * 1000
+                elif accuracy_rate >= 0.8:
+                    precision_bonus = (accuracy_rate - 0.8) * 1000
+                
+                # 総合スコア
+                comprehensive_score = mastery_score + reliability_score + activity_score + precision_bonus
 
             user_data = {
                 'username': user_obj.username,
@@ -4531,23 +4586,49 @@ def fallback_ranking_calculation(current_user, start_time):
             user_mastered_count = len(mastered_problem_ids)
             coverage_rate = (user_mastered_count / total_questions_for_room_ranking * 100) if total_questions_for_room_ranking > 0 else 0
 
-            # ベイズ統計による総合評価型スコア計算
+            # 動的スコアシステムによる計算
             if total_attempts == 0:
                 comprehensive_score = 0
-                bayesian_accuracy = 0
+                mastery_score = 0
+                reliability_score = 0
+                activity_score = 0
             else:
-                bayesian_accuracy = (PRIOR_CORRECT + total_correct) / (PRIOR_ATTEMPTS + total_attempts)
+                # 正答率を計算
+                accuracy_rate = total_correct / total_attempts
                 
-                comprehensive_score = (
-                    (user_mastered_count ** 1.3) * 10 +
-                    (bayesian_accuracy ** 2) * 500 +
-                    math.log(total_attempts + 1) * 20
-                ) / 100
-
-            # 3種類のスコア計算
-            mastery_score = (user_mastered_count ** 1.3) * 10 / 100
-            reliability_score = (bayesian_accuracy ** 2) * 500 / 100
-            activity_score = math.log(total_attempts + 1) * 20 / 100
+                # 1. マスタースコア（段階的 + 連続的）
+                mastery_base = (user_mastered_count // 100) * 250
+                mastery_progress = ((user_mastered_count % 100) / 100) * 125
+                mastery_score = mastery_base + mastery_progress
+                
+                # 2. 正答率スコア（段階的連続計算）
+                if accuracy_rate >= 0.9:
+                    reliability_score = 500 + (accuracy_rate - 0.9) * 800
+                elif accuracy_rate >= 0.8:
+                    reliability_score = 350 + (accuracy_rate - 0.8) * 1500
+                elif accuracy_rate >= 0.7:
+                    reliability_score = 200 + (accuracy_rate - 0.7) * 1500
+                elif accuracy_rate >= 0.6:
+                    reliability_score = 100 + (accuracy_rate - 0.6) * 1000
+                else:
+                    reliability_score = accuracy_rate * 166.67
+                
+                # 3. 継続性スコア（活動量評価）
+                activity_score = math.sqrt(total_attempts) * 3
+                
+                # 4. 精度ボーナス（高正答率への追加評価）
+                precision_bonus = 0
+                if accuracy_rate >= 0.95:
+                    precision_bonus = 150 + (accuracy_rate - 0.95) * 1000
+                elif accuracy_rate >= 0.9:
+                    precision_bonus = 100 + (accuracy_rate - 0.9) * 1000
+                elif accuracy_rate >= 0.85:
+                    precision_bonus = 50 + (accuracy_rate - 0.85) * 1000
+                elif accuracy_rate >= 0.8:
+                    precision_bonus = (accuracy_rate - 0.8) * 1000
+                
+                # 総合スコア
+                comprehensive_score = mastery_score + reliability_score + activity_score + precision_bonus
 
             user_data = {
                 'username': user_obj.username,
