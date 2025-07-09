@@ -155,8 +155,8 @@
 
                 <!-- スクロール可能なテーブルコンテナ -->
                 <div class="scrollable-table-container">
-                    <div class="table-responsive">
-                        <table class="table table-striped user-list-table" id="userTable">
+                    <div class="table-responsive" style="overflow-x: auto;">
+                        <table class="table table-striped user-list-table" id="userTable" style="min-width: 800px;">
                             <thead class="table-dark sticky-header">
                                 <tr>
                                     <th>ID</th>
@@ -250,7 +250,7 @@
                     </div>
                     <!-- スクロール可能なCSVファイルリスト -->
                     <div class="scrollable-table-container">
-                        <div id="csv-files-container" style="margin-top: 15px;">
+                        <div id="csv-files-container" style="margin-top: 15px; overflow-x: auto;">
                             <p class="text-info">📋 ファイル一覧を読み込み中...</p>
                         </div>
                     </div>
@@ -270,8 +270,8 @@
 
                 <!-- スクロール可能な部屋設定テーブル -->
                 <div class="scrollable-table-container">
-                    <div class="table-responsive">
-                        <table class="table table-striped room-setting-table">
+                    <div class="table-responsive" style="overflow-x: auto;">
+                        <table class="table table-striped room-setting-table" style="min-width: 700px;">
                             <thead class="table-dark sticky-header">
                                 <tr>
                                     <th>部屋番号</th>
@@ -1908,6 +1908,40 @@ document.addEventListener('DOMContentLoaded', function() {
     
     .unit-setting-container {
         max-width: 100%;
+    }
+}
+
+/* 横スクロール対応の追加 */
+.scrollable-table-container {
+    max-height: 400px;
+    overflow-y: auto;
+    overflow-x: auto; /* 横スクロール追加 */
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+    margin-bottom: 1rem;
+}
+
+.table-responsive {
+    overflow-x: auto !important;
+}
+
+/* スマホ対応の追加 */
+@media (max-width: 768px) {
+    .scrollable-table-container {
+        max-height: 300px;
+        overflow-x: auto;
+    }
+    
+    .table {
+        font-size: 0.75rem;
+        min-width: 600px; /* 最小幅を保証 */
+    }
+    
+    .table th,
+    .table td {
+        padding: 0.3rem;
+        white-space: nowrap;
+        min-width: 80px; /* 各セルの最小幅 */
     }
 }
 </style>
