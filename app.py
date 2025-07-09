@@ -4889,7 +4889,12 @@ def admin_page():
         room_settings = RoomSetting.query.all()
         
         # 部屋設定のマッピングを作成
-        room_max_unit_settings = {rs.room_number: rs.max_enabled_unit_number for rs in room_settings}
+        room_max_unit_settings = {}
+        for rs in room_settings:
+            if hasattr(rs, 'max_enabled_unit_number'):
+                room_max_unit_settings[rs.room_number] = rs.max_enabled_unit_number
+            else:
+                room_max_unit_settings[rs.room_number] = "9999"  # デフォルト値
         room_csv_settings = {rs.room_number: rs.csv_filename for rs in room_settings}
         room_ranking_settings = {rs.room_number: getattr(rs, 'ranking_display_count', 10) for rs in room_settings}
         
@@ -5218,20 +5223,28 @@ def admin_get_room_setting():
         room_setting = RoomSetting.query.filter_by(room_number=room_number).first()
 
         if room_setting:
+            # 安全に属性にアクセス
+            max_unit = getattr(room_setting, 'max_enabled_unit_number', '9999')
+            csv_filename = getattr(room_setting, 'csv_filename', 'words.csv')
+            ranking_count = getattr(room_setting, 'ranking_display_count', 10)
+            enabled_units = room_setting.get_enabled_units() if hasattr(room_setting, 'get_enabled_units') else []
+            
             result = {
                 'status': 'success',
                 'room_number': room_setting.room_number,
-                'enabled_units': room_setting.get_enabled_units(),  # ← 追加
-                'csv_filename': room_setting.csv_filename,
-                'ranking_display_count': room_setting.ranking_display_count
+                'max_enabled_unit_number': max_unit,
+                'enabled_units': enabled_units,
+                'csv_filename': csv_filename,
+                'ranking_display_count': ranking_count
             }
-            print(f"✅ 部屋設定取得成功: ランキング表示{room_setting.ranking_display_count}人")
+            print(f"✅ 部屋設定取得成功: ランキング表示{ranking_count}人")
         else:
             # デフォルト設定を返す
             result = {
                 'status': 'success',
                 'room_number': room_number,
                 'max_enabled_unit_number': '9999',
+                'enabled_units': [],
                 'csv_filename': 'words.csv',
                 'ranking_display_count': 10
             }
@@ -6693,6 +6706,61 @@ ALTER TABLE room_setting ADD COLUMN enabled_units TEXT DEFAULT '[]';
         </pre>
         """
 
+@app.route('/admin/fix_room_settings_attributes', methods=['POST'])
+def admin_fix_room_settings_attributes():
+    """部屋設定の属性不整合を修復"""
+    if not session.get('admin_logged_in'):
+        return jsonify({'status': 'error', 'message': '管理者権限が必要です'}), 403
+    
+    try:
+        print("🔧 部屋設定属性修復開始...")
+        
+        # 全ての部屋設定を取得
+        room_settings = RoomSetting.query.all()
+        fixed_count = 0
+        
+        with db.engine.connect() as conn:
+            for setting in room_settings:
+                try:
+                    # 必要な属性が存在するかチェック
+                    if not hasattr(setting, 'max_enabled_unit_number'):
+                        # SQLで直接更新
+                        conn.execute(text(f"""
+                            UPDATE room_setting 
+                            SET max_enabled_unit_number = '9999' 
+                            WHERE room_number = '{setting.room_number}'
+                        """))
+                        fixed_count += 1
+                        
+                    if not hasattr(setting, 'enabled_units'):
+                        # SQLで直接更新
+                        conn.execute(text(f"""
+                            UPDATE room_setting 
+                            SET enabled_units = '[]' 
+                            WHERE room_number = '{setting.room_number}'
+                        """))
+                        
+                except Exception as setting_error:
+                    print(f"⚠️ 設定修復エラー ({setting.room_number}): {setting_error}")
+                    continue
+            
+            conn.commit()
+        
+        # SQLAlchemyのセッションをリフレッシュ
+        db.session.expire_all()
+        
+        return jsonify({
+            'status': 'success',
+            'message': f'{fixed_count}個の部屋設定を修復しました',
+            'fixed_count': fixed_count
+        })
+        
+    except Exception as e:
+        print(f"❌ 属性修復エラー: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': f'修復エラー: {str(e)}'
+        }), 500
 
 # app.py に追加する管理者用全員ランキング機能
 @app.route('/api/rooms')
