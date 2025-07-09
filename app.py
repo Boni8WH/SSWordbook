@@ -4203,9 +4203,9 @@ def progress_page():
             category_name = word.get('category', '未分類')
             
             is_word_enabled_in_csv = word['enabled']
-            is_unit_enabled_by_room_setting = is_unit_enabled_by_room_setting(unit_num, room_setting)
+            is_unit_enabled_by_room = is_unit_enabled_by_room_setting(unit_num, room_setting)  # ←変数名を変更
 
-            if is_word_enabled_in_csv and is_unit_enabled_by_room_setting:
+            if is_word_enabled_in_csv and is_unit_enabled_by_room:
                 # 章の初期化
                 if chapter_num not in chapter_progress_summary:
                     chapter_progress_summary[chapter_num] = {
