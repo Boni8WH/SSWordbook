@@ -203,27 +203,29 @@
                     </div>  
                 <!-- ランキングテーブル -->
                 <div class="table-container">
-                    <div class="table-responsive" style="overflow-x: auto;">
-                        <table class="table table-striped table-hover" style="min-width: 800px;">
-                            <thead class="table-dark">
-                                <tr>
-                                    <th style="min-width: 60px;">順位</th>
-                                    <th style="min-width: 100px;">名前</th>
-                                    <th style="min-width: 120px;">最終ログイン</th>
-                                    <th style="min-width: 80px;">回答数</th>
-                                    <th style="min-width: 80px;">正解数</th>
-                                    <th style="min-width: 80px;">正答率</th>
-                                    <th style="min-width: 90px;">マスター数</th>
-                                    <th style="min-width: 100px;">総合スコア</th>
-                                    <th style="min-width: 80px;">網羅率</th>
-                                    <th style="min-width: 80px;">苦手問題</th>
-                                </tr>
-                            </thead>
-                            <tbody id="ranking-table-body">
-                                <!-- JavaScript で動的挿入 -->
-                            </tbody>
-                        </table>
-                    </div>
+                    <div class="table-responsive-wrapper">
+                        <div class="table-responsive" style="overflow-x: auto; -webkit-overflow-scrolling: touch;">
+                            <table class="table table-striped table-hover ranking-table">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th style="min-width: 60px;">順位</th>
+                                        <th style="min-width: 100px;">名前</th>
+                                        <th style="min-width: 120px;">最終ログイン</th>
+                                        <th style="min-width: 80px;">回答数</th>
+                                        <th style="min-width: 80px;">正解数</th>
+                                        <th style="min-width: 80px;">正答率</th>
+                                        <th style="min-width: 90px;">マスター数</th>
+                                        <th style="min-width: 100px;">総合スコア</th>
+                                        <th style="min-width: 80px;">網羅率</th>
+                                        <th style="min-width: 80px;">苦手問題</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="ranking-table-body">
+                                    <!-- JavaScript で動的挿入 -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>   
                 </div>
             </div>
         </div>
@@ -1060,12 +1062,6 @@ console.log('🎉 全員ランキングページスクリプト読み込み完�
     box-sizing: border-box;
 }
 
-/* ランキングテーブル */
-.table-responsive {
-    overflow-x: auto !important;
-    -webkit-overflow-scrolling: touch;
-}
-
 .table-hover tbody tr:hover {
     background-color: rgba(0,0,0,0.05);
 }
@@ -1082,11 +1078,120 @@ console.log('🎉 全員ランキングページスクリプト読み込み完�
     z-index: 10;
 }
 
-.table td {
-    vertical-align: middle;
-    font-size: 0.9rem;
+/* ========================================
+   ランキングテーブル専用スタイル
+   ======================================== */
+
+/* テーブルラッパー */
+.table-responsive-wrapper {
+    width: 100%;
+    margin-bottom: 20px;
+}
+
+/* ランキングテーブル */
+.ranking-table {
+    min-width: 900px; /* 苦手問題列追加により幅を拡張 */
+    margin-bottom: 0;
     white-space: nowrap;
+}
+
+.ranking-table th,
+.ranking-table td {
     padding: 0.75rem 0.5rem;
+    vertical-align: middle;
+    border-top: 1px solid #dee2e6;
+    white-space: nowrap;
+}
+
+.ranking-table th {
+    background-color: #343a40;
+    color: white;
+    font-weight: 600;
+    font-size: 0.9rem;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+/* 列幅の調整 */
+.ranking-table th:nth-child(1) { min-width: 80px; }  /* 順位 */
+.ranking-table th:nth-child(2) { min-width: 120px; } /* 名前 */
+.ranking-table th:nth-child(3) { min-width: 140px; } /* 最終ログイン */
+.ranking-table th:nth-child(4) { min-width: 80px; }  /* 回答数 */
+.ranking-table th:nth-child(5) { min-width: 80px; }  /* 正解数 */
+.ranking-table th:nth-child(6) { min-width: 80px; }  /* 正答率 */
+.ranking-table th:nth-child(7) { min-width: 90px; }  /* マスター数 */
+.ranking-table th:nth-child(8) { min-width: 100px; } /* 総合スコア */
+.ranking-table th:nth-child(9) { min-width: 80px; }  /* 網羅率 */
+.ranking-table th:nth-child(10) { min-width: 90px; } /* 苦手問題 */
+
+/* スマホ対応 */
+@media (max-width: 768px) {
+    .table-responsive-wrapper {
+        border-radius: 8px;
+        border: 1px solid #dee2e6;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .ranking-table {
+        min-width: 800px;
+        font-size: 0.8rem;
+    }
+    
+    .ranking-table th,
+    .ranking-table td {
+        padding: 0.5rem 0.3rem;
+    }
+    
+    .rank-badge {
+        min-width: 25px;
+        height: 25px;
+        line-height: 25px;
+        font-size: 0.7rem;
+    }
+    
+    .badge {
+        font-size: 0.7rem;
+        padding: 0.2em 0.4em;
+    }
+}
+
+@media (max-width: 480px) {
+    .ranking-table {
+        min-width: 750px;
+        font-size: 0.75rem;
+    }
+    
+    .ranking-table th,
+    .ranking-table td {
+        padding: 0.4rem 0.2rem;
+    }
+    
+    .rank-badge {
+        min-width: 22px;
+        height: 22px;
+        line-height: 22px;
+        font-size: 0.65rem;
+    }
+}
+
+/* 横スクロールバーのスタイリング */
+.table-responsive::-webkit-scrollbar {
+    height: 8px;
+}
+
+.table-responsive::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.table-responsive::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+.table-responsive::-webkit-scrollbar-thumb:hover {
+    background: #555;
 }
 
 .rank-badge {
@@ -1370,6 +1475,29 @@ console.log('🎉 全員ランキングページスクリプト読み込み完�
     
     .card-title {
         font-size: 1rem;
+    }
+}
+
+/* スマホでの横スクロール改善 */
+@media (max-width: 768px) {
+    .ranking-display-section {
+        padding: 0;
+    }
+    
+    .card-body {
+        padding: 0.5rem;
+    }
+    
+    /* 横スクロールのヒント表示 */
+    .table-responsive-wrapper::after {
+        content: "← 横にスクロールできます →";
+        display: block;
+        text-align: center;
+        font-size: 0.75rem;
+        color: #6c757d;
+        padding: 0.5rem;
+        background: #f8f9fa;
+        border-top: 1px solid #dee2e6;
     }
 }
 
