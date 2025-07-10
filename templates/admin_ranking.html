@@ -857,10 +857,20 @@ console.log('🎉 全員ランキングページスクリプト読み込み完�
 /* ========================================
    1. 基本レイアウト
    ======================================== */
+/* ページ全体の横スクロール防止 */
+body {
+    overflow-x: hidden !important;
+}
+
+html {
+    overflow-x: hidden !important;
+}
+
 .ranking-container {
     max-width: 1400px;
     margin: 0 auto;
     padding: 20px;
+    overflow-x: hidden; /* 追加：ページ全体の横スクロールを防ぐ */
 }
 
 .ranking-header {
@@ -1086,13 +1096,15 @@ console.log('🎉 全員ランキングページスクリプト読み込み完�
 .table-responsive-wrapper {
     width: 100%;
     margin-bottom: 20px;
+    overflow: hidden; /* 追加 */
 }
 
 /* ランキングテーブル */
 .ranking-table {
-    min-width: 900px; /* 苦手問題列追加により幅を拡張 */
+    min-width: 800px; /* 幅を縮小 */
     margin-bottom: 0;
     white-space: nowrap;
+    width: 100%; /* 追加 */
 }
 
 .ranking-table th,
@@ -1114,16 +1126,16 @@ console.log('🎉 全員ランキングページスクリプト読み込み完�
 }
 
 /* 列幅の調整 */
-.ranking-table th:nth-child(1) { min-width: 80px; }  /* 順位 */
-.ranking-table th:nth-child(2) { min-width: 120px; } /* 名前 */
-.ranking-table th:nth-child(3) { min-width: 140px; } /* 最終ログイン */
-.ranking-table th:nth-child(4) { min-width: 80px; }  /* 回答数 */
-.ranking-table th:nth-child(5) { min-width: 80px; }  /* 正解数 */
-.ranking-table th:nth-child(6) { min-width: 80px; }  /* 正答率 */
-.ranking-table th:nth-child(7) { min-width: 90px; }  /* マスター数 */
-.ranking-table th:nth-child(8) { min-width: 100px; } /* 総合スコア */
-.ranking-table th:nth-child(9) { min-width: 80px; }  /* 網羅率 */
-.ranking-table th:nth-child(10) { min-width: 90px; } /* 苦手問題 */
+.ranking-table th:nth-child(1) { min-width: 60px; }  /* 順位 */
+.ranking-table th:nth-child(2) { min-width: 100px; } /* 名前 */
+.ranking-table th:nth-child(3) { min-width: 120px; } /* 最終ログイン */
+.ranking-table th:nth-child(4) { min-width: 70px; }  /* 回答数 */
+.ranking-table th:nth-child(5) { min-width: 70px; }  /* 正解数 */
+.ranking-table th:nth-child(6) { min-width: 70px; }  /* 正答率 */
+.ranking-table th:nth-child(7) { min-width: 80px; }  /* マスター数 */
+.ranking-table th:nth-child(8) { min-width: 90px; }  /* 総合スコア */
+.ranking-table th:nth-child(9) { min-width: 70px; }  /* 網羅率 */
+.ranking-table th:nth-child(10) { min-width: 80px; } /* 苦手問題 */
 
 /* スマホ対応 */
 @media (max-width: 768px) {
@@ -1255,11 +1267,12 @@ console.log('🎉 全員ランキングページスクリプト読み込み完�
     margin-bottom: 20px;
 }
 
-.table-container .table-responsive {
+.table-responsive {
     overflow-x: auto !important;
     -webkit-overflow-scrolling: touch;
     border-radius: 8px;
     border: 1px solid #dee2e6;
+    max-width: 100%; /* 追加 */
 }
 
 /* ========================================
