@@ -136,9 +136,10 @@ function initializeMobileOptimizations() {
         });
         
         // テーブルにラッパーを追加してスクロール対応
-        const tables = document.querySelectorAll('.ranking-container table, .progress-container table, .user-list-table');
+        const tables = document.querySelectorAll('.progress-container table, .user-list-table');
         tables.forEach(table => {
-            if (!table.closest('.table-responsive')) {
+            // ランキングテーブルでないことを確認
+            if (!table.classList.contains('ranking-table') && !table.closest('.table-responsive')) {
                 const wrapper = document.createElement('div');
                 wrapper.className = 'table-responsive';
                 table.parentNode.insertBefore(wrapper, table);
