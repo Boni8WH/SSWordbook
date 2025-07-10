@@ -216,6 +216,7 @@
                                     <th style="min-width: 90px;">マスター数</th>
                                     <th style="min-width: 100px;">総合スコア</th>
                                     <th style="min-width: 80px;">網羅率</th>
+                                    <th style="min-width: 80px;">苦手問題</th>
                                 </tr>
                             </thead>
                             <tbody id="ranking-table-body">
@@ -635,6 +636,7 @@ function updateRankingTable(rankingData) {
         const masteredCount = user.mastered_count || 0;
         const balanceScore = (user.balance_score || 0).toFixed(1);
         const coverageRate = (user.coverage_rate || 0).toFixed(1);
+        const incorrectCount = user.incorrect_count || 0; 
         
         row.innerHTML = `
             <td>
@@ -651,6 +653,7 @@ function updateRankingTable(rankingData) {
             <td><span class="badge bg-info">${masteredCount}</span></td>
             <td><strong class="text-primary">${balanceScore}</strong></td>
             <td>${coverageRate}%</td>
+            <td><span class="badge bg-warning">${user.incorrect_count || 0}</span></td>
         `;
         
         tbody.appendChild(row);
