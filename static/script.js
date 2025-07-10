@@ -363,13 +363,15 @@ function updateUnitCheckboxStates() {
     for (const chapterNum in window.chapterDataFromFlask) {
         if (window.chapterDataFromFlask.hasOwnProperty(chapterNum)) {
             const chapter = window.chapterDataFromFlask[chapterNum];
+            let hasEnabledUnits = false; // 章内に利用可能な単元があるかフラグ
+            
             for (const unitNum in chapter.units) {
                 if (chapter.units.hasOwnProperty(unitNum)) {
                     const unit = chapter.units[unitNum];
                     const checkbox = document.getElementById(`unit-${chapterNum}-${unitNum}`);
                     if (checkbox) {
                         if (!unit.enabled) {
-                            // 利用不可の場合は親要素ごと非表示にする
+                            // 利用不可の場合は単元を非表示
                             const unitItem = checkbox.closest('.unit-item');
                             if (unitItem) {
                                 unitItem.style.display = 'none';
@@ -380,12 +382,24 @@ function updateUnitCheckboxStates() {
                             if (unitItem) {
                                 unitItem.style.display = 'block';
                             }
+                            hasEnabledUnits = true; // 利用可能な単元が見つかった
                         }
                         checkbox.disabled = !unit.enabled;
                         if (checkbox.disabled && checkbox.checked) {
                             checkbox.checked = false;
                         }
                     }
+                }
+            }
+            
+            // ★新機能：章内に利用可能な単元がない場合は章全体を非表示
+            const chapterItem = document.querySelector(`.chapter-item[data-chapter="${chapterNum}"]`);
+            if (chapterItem) {
+                if (hasEnabledUnits) {
+                    chapterItem.style.display = 'block'; // 章を表示
+                } else {
+                    chapterItem.style.display = 'none';  // 章を非表示
+                    console.log(`第${chapterNum}章は全単元が利用不可のため非表示にしました`);
                 }
             }
         }
