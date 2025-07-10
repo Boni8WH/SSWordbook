@@ -1094,15 +1094,18 @@ html {
 .table-responsive-wrapper {
     width: 100%;
     margin-bottom: 20px;
-    overflow: hidden; /* 追加 */
+    overflow: hidden;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
 }
 
 /* ランキングテーブル */
 .ranking-table {
-    min-width: 650px; /* 幅を縮小 */
+    min-width: 650px;
     margin-bottom: 0;
     white-space: nowrap;
-    width: 100%; /* 追加 */
+    width: 100%;
+    position: relative;
 }
 
 .ranking-table th,
@@ -1124,126 +1127,54 @@ html {
 }
 
 /* 列幅の調整 */
-.ranking-table th:nth-child(1) { min-width: 60px; }  /* 順位 */
-.ranking-table th:nth-child(2) { min-width: 100px; position: sticky; left: 0; background-color: #343a40; z-index: 20; } /* 名前（固定） */
-.ranking-table th:nth-child(3) { min-width: 70px; }  /* 回答数 */
-.ranking-table th:nth-child(4) { min-width: 70px; }  /* 正解数 */
-.ranking-table th:nth-child(5) { min-width: 70px; }  /* 正答率 */
-.ranking-table th:nth-child(6) { min-width: 80px; }  /* マスター数 */
-.ranking-table th:nth-child(7) { min-width: 90px; }  /* 総合スコア */
-.ranking-table th:nth-child(8) { min-width: 70px; }  /* 網羅率 */
-.ranking-table th:nth-child(9) { min-width: 80px; } /* 苦手問題 */
+.ranking-table th:nth-child(1) { min-width: 70px; }  /* 順位 */
+.ranking-table th:nth-child(2) { 
+    min-width: 120px; 
+    position: sticky; 
+    left: 0; 
+    background-color: #343a40 !important; 
+    z-index: 20;
+    box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+}
+.ranking-table th:nth-child(3) { min-width: 80px; }  /* 回答数 */
+.ranking-table th:nth-child(4) { min-width: 80px; }  /* 正解数 */
+.ranking-table th:nth-child(5) { min-width: 80px; }  /* 正答率 */
+.ranking-table th:nth-child(6) { min-width: 90px; }  /* マスター数 */
+.ranking-table th:nth-child(7) { min-width: 100px; } /* 総合スコア */
+.ranking-table th:nth-child(8) { min-width: 80px; }  /* 網羅率 */
+.ranking-table th:nth-child(9) { min-width: 90px; }  /* 苦手問題 */
 
-/* 名前列（2列目）を固定 */
+/* 名前列のセル固定 */
 .ranking-table td:nth-child(2) {
-    position: sticky;
-    left: 0;
-    background-color: white;
-    z-index: 15;
-    font-weight: bold;
-    border-right: 2px solid #dee2e6;
+    position: sticky !important;
+    left: 0 !important;
+    background-color: white !important;
+    z-index: 15 !important;
+    font-weight: bold !important;
+    box-shadow: 2px 0 5px rgba(0,0,0,0.1) !important;
+    border-right: 2px solid #dee2e6 !important;
+    min-width: 120px;
+    max-width: 120px;
 }
 
-/* スマホ対応 */
-@media (max-width: 768px) {
-    .table-responsive-wrapper {
-        border-radius: 8px;
-        border: 1px solid #dee2e6;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    
-    .ranking-table {
-        min-width: 800px;
-        font-size: 0.8rem;
-    }
-    
-    .ranking-table th,
-    .ranking-table td {
-        padding: 0.5rem 0.3rem;
-    }
-    
-    .rank-badge {
-        min-width: 25px;
-        height: 25px;
-        line-height: 25px;
-        font-size: 0.7rem;
-    }
-    
-    .badge {
-        font-size: 0.7rem;
-        padding: 0.2em 0.4em;
-    }
-
-    /* 名前列の固定スタイルをスマホでも維持 */
-    .ranking-table td:nth-child(2) {
-        min-width: 100px;
-        max-width: 100px;
-        word-break: break-word;
-    }
+/* 1位の行の名前列 */
+.table-warning td:nth-child(2) {
+    background-color: #fff3cd !important;
 }
 
-@media (min-width: 769px) {
-    .table-responsive-wrapper::before {
-        display: none;
-    }
+/* 2位の行の名前列 */
+.table-secondary td:nth-child(2) {
+    background-color: #f8f9fa !important;
 }
 
-/* 横スクロール時の名前列強調 */
-.table-responsive::-webkit-scrollbar {
-    height: 10px;
-}
-
-.table-responsive-wrapper::before {
-    content: "名前は固定表示されます";
-    display: block;
-    text-align: center;
-    font-size: 0.7rem;
-    color: #007bff;
-    padding: 0.25rem;
-    background: #e3f2fd;
-    border-bottom: 1px solid #90caf9;
-}
-
-@media (max-width: 480px) {
-    .ranking-table {
-        min-width: 550px;
-        font-size: 0.8rem;
-    }
-    
-    .ranking-table th,
-    .ranking-table td {
-        padding: 0.5rem 0.25rem;
-    }
-    
-    .rank-badge {
-        min-width: 22px;
-        height: 22px;
-        line-height: 22px;
-        font-size: 0.65rem;
-    }
-
-    /* 名前列の固定スタイルをスマホでも維持 */
-    .ranking-table td:nth-child(2) {
-        min-width: 100px;
-        max-width: 100px;
-        word-break: break-word;
-    }
-
-    .ranking-table {
-        min-width: 500px;
-        font-size: 0.75rem;
-    }
-    
-    .ranking-table th:nth-child(2),
-    .ranking-table td:nth-child(2) {
-        min-width: 90px;
-        max-width: 90px;
-    }
+/* 3位の行の名前列 */
+.table-info td:nth-child(2) {
+    background-color: #d1ecf1 !important;
 }
 
 /* 横スクロールバーのスタイリング */
 .table-responsive::-webkit-scrollbar {
-    height: 8px;
+    height: 10px;
 }
 
 .table-responsive::-webkit-scrollbar-track {
@@ -1258,6 +1189,24 @@ html {
 
 .table-responsive::-webkit-scrollbar-thumb:hover {
     background: #555;
+}
+
+/* 横スクロール時の名前列説明 */
+.table-responsive-wrapper::before {
+    content: "← 名前は固定表示、横スクロール可能 →";
+    display: block;
+    text-align: center;
+    font-size: 0.7rem;
+    color: #007bff;
+    padding: 0.25rem;
+    background: linear-gradient(135deg, #e3f2fd 0%, #f8f9fa 100%);
+    border-bottom: 1px solid #90caf9;
+}
+
+@media (min-width: 993px) {
+    .table-responsive-wrapper::before {
+        display: none;
+    }
 }
 
 .rank-badge {
@@ -1324,49 +1273,105 @@ html {
 .table-responsive {
     overflow-x: auto !important;
     -webkit-overflow-scrolling: touch;
-    border-radius: 8px;
-    border: 1px solid #dee2e6;
-    max-width: 100%; /* 追加 */
+    max-width: 100%;
+    border: none;
 }
 
 /* ========================================
    4. レスポンシブデザイン
    ======================================== */
 
-/* タブレット対応 */
+/* タブレット対応の改善 */
 @media (max-width: 992px) {
     .ranking-container {
-        padding: 15px;
+        padding: 10px;
         max-width: 100%;
+        overflow-x: hidden;
     }
     
-    .ranking-summary {
-        padding: 15px;
-    }
-    
-    .summary-card {
-        padding: 12px;
+    .rooms-grid {
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
         gap: 12px;
     }
     
+    .room-card {
+        padding: 15px;
+    }
+    
+    .ranking-summary {
+        padding: 12px;
+        margin-bottom: 20px;
+    }
+    
+    .summary-card {
+        padding: 10px;
+        gap: 10px;
+        margin-bottom: 10px;
+    }
+    
     .summary-icon {
-        font-size: 1.4rem;
+        font-size: 1.3rem;
     }
     
     .summary-value {
-        font-size: 1.4rem;
+        font-size: 1.3rem;
+    }
+    
+    .table-controls {
+        padding: 12px;
+        margin-bottom: 15px;
     }
     
     .ranking-table {
-        min-width: 600px;
+        min-width: 580px;
         font-size: 0.85rem;
+    }
+    
+    .ranking-table th,
+    .ranking-table td {
+        padding: 0.5rem 0.3rem;
+    }
+    
+    .ranking-table th:nth-child(2),
+    .ranking-table td:nth-child(2) {
+        min-width: 100px;
+        max-width: 100px;
+    }
+}
+
+/* iPad Air サイズ特別対応 */
+@media (max-width: 820px) and (min-width: 769px) {
+    .ranking-container {
+        padding: 8px;
+    }
+    
+    .ranking-summary {
+        padding: 10px;
+    }
+    
+    .summary-card {
+        padding: 8px;
+        gap: 8px;
+    }
+    
+    .ranking-table {
+        min-width: 560px;
+        font-size: 0.8rem;
+    }
+    
+    .ranking-table th:nth-child(2),
+    .ranking-table td:nth-child(2) {
+        min-width: 90px;
+        max-width: 90px;
     }
 }
 
 /* スマホ対応 */
 @media (max-width: 768px) {
     .ranking-container {
-        padding: 8px;
+        padding: 6px;
+        width: 100%;
+        max-width: 100%;
         overflow-x: hidden;
     }
     
@@ -1496,15 +1501,21 @@ html {
         max-width: 100%;
     }
     
-    .table {
-        font-size: 0.75rem;
-        min-width: 700px;
+    .ranking-table {
+        min-width: 520px;
+        font-size: 0.8rem;
     }
     
-    .table th,
-    .table td {
-        padding: 0.5rem 0.3rem;
-        white-space: nowrap;
+    .ranking-table th,
+    .ranking-table td {
+        padding: 0.4rem 0.2rem;
+    }
+    
+    .ranking-table th:nth-child(2),
+    .ranking-table td:nth-child(2) {
+        min-width: 85px;
+        max-width: 85px;
+        font-size: 0.75rem;
     }
     
     .rank-badge {
@@ -1542,33 +1553,10 @@ html {
     }
 }
 
-/* スマホでの横スクロール改善 */
-@media (max-width: 768px) {
-    .ranking-display-section {
-        padding: 0;
-    }
-    
-    .card-body {
-        padding: 0.5rem;
-    }
-    
-    /* 横スクロールのヒント表示 */
-    .table-responsive-wrapper::after {
-        content: "← 横にスクロールできます →";
-        display: block;
-        text-align: center;
-        font-size: 0.75rem;
-        color: #6c757d;
-        padding: 0.5rem;
-        background: #f8f9fa;
-        border-top: 1px solid #dee2e6;
-    }
-}
-
 /* 小さいスマホ対応 */
 @media (max-width: 480px) {
     .ranking-container {
-        padding: 8px;
+        padding: 4px;
     }
     
     /* 統計サマリー - さらにコンパクト、横スクロール対象外 */
@@ -1618,14 +1606,21 @@ html {
     }
     
     /* ランキングテーブル - 横スクロール対象 */
-    .table {
-        font-size: 0.7rem;
-        min-width: 650px;
+    .ranking-table {
+        min-width: 480px;
+        font-size: 0.75rem;
     }
     
-    .table th,
-    .table td {
-        padding: 0.4rem 0.2rem;
+    .ranking-table th,
+    .ranking-table td {
+        padding: 0.3rem 0.15rem;
+    }
+    
+    .ranking-table th:nth-child(2),
+    .ranking-table td:nth-child(2) {
+        min-width: 75px;
+        max-width: 75px;
+        font-size: 0.7rem;
     }
     
     .rank-badge {
@@ -1678,7 +1673,7 @@ html {
         font-size: 1.1rem;
     }
     
-    .table {
+    .ranking-table {
         font-size: 0.7rem;
     }
 }
@@ -1729,6 +1724,10 @@ html {
 
 .badge.bg-info {
     background-color: #17a2b8 !important;
+}
+
+.badge.bg-warning {
+    background-color: #ffc107 !important;
 }
 
 /* ========================================
@@ -1799,7 +1798,7 @@ html {
         box-shadow: none !important;
     }
     
-    .table {
+    .ranking-table {
         font-size: 0.8rem;
     }
     
