@@ -1947,22 +1947,27 @@ def index():
             category_name = word.get('category', '未分類')
             
             is_word_enabled_in_csv = word['enabled']
-            is_unit_enabled_by_room = is_unit_enabled_by_room_setting(unit_num, room_setting)  # ←変数名を変更
+            is_unit_enabled_by_room = is_unit_enabled_by_room_setting(unit_num, room_setting)
             is_unit_globally_enabled = is_word_enabled_in_csv and is_unit_enabled_by_room 
 
-            if chapter_num not in all_chapter_unit_status:
-                all_chapter_unit_status[chapter_num] = {'units': {}, 'name': f'第{chapter_num}章'}
-            
-            if unit_num not in all_chapter_unit_status[chapter_num]['units']:
-                all_chapter_unit_status[chapter_num]['units'][unit_num] = {
-                    'categoryName': category_name,
-                    'enabled': is_unit_globally_enabled
-                }
-            else:
-                if is_unit_globally_enabled:
-                    all_chapter_unit_status[chapter_num]['units'][unit_num]['enabled'] = True
+            # 利用可能な単元のみを章データに追加
+            if is_unit_globally_enabled:
+                if chapter_num not in all_chapter_unit_status:
+                    all_chapter_unit_status[chapter_num] = {'units': {}, 'name': f'第{chapter_num}章'}
+                
+                if unit_num not in all_chapter_unit_status[chapter_num]['units']:
+                    all_chapter_unit_status[chapter_num]['units'][unit_num] = {
+                        'categoryName': category_name,
+                        'enabled': True  # 利用可能な単元のみ追加するのでenabled=True
+                    }
 
-        sorted_all_chapter_unit_status = dict(sorted(all_chapter_unit_status.items(), 
+        # ★新機能：空の章（利用可能な単元がない章）を除外
+        filtered_chapter_unit_status = {}
+        for chapter_num, chapter_data in all_chapter_unit_status.items():
+            if chapter_data['units']:  # 章に利用可能な単元がある場合のみ含める
+                filtered_chapter_unit_status[chapter_num] = chapter_data
+
+        sorted_all_chapter_unit_status = dict(sorted(filtered_chapter_unit_status.items(), 
                                                     key=lambda item: int(item[0]) if item[0].isdigit() else float('inf')))
 
         # フッター用のコンテキストを取得
