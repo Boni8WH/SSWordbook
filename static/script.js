@@ -16,6 +16,8 @@ let totalQuestions = 0; // 出題する総問題数
 let problemHistory = {}; // ユーザーの全問題履歴（永続化されるもの）
 let incorrectWords = []; // ユーザーの苦手な単語リスト（永続化されるもの）
 let quizStartTime; // クイズ開始時刻
+let isAnswerButtonDisabled = false; // 答えを見るボタンの無効化フラグ
+let answerButtonTimeout = null; // タイムアウト管理用
 
 // DOM要素
 const startButton = document.getElementById('startButton');
@@ -514,7 +516,20 @@ function setupEventListeners() {
     
     try {
         if (startButton) startButton.addEventListener('click', startQuiz);
-        if (showAnswerButton) showAnswerButton.addEventListener('click', showAnswer);
+        if (showAnswerButton) {
+            showAnswerButton.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                // 無効化中はクリックを無視
+                if (isAnswerButtonDisabled) {
+                    console.log('答えを見るボタンは無効化中です（イベントリスナーレベル）');
+                    return false;
+                }
+                
+                showAnswer();
+            });
+        }
         if (correctButton) correctButton.addEventListener('click', () => handleAnswer(true));
         if (incorrectButton) incorrectButton.addEventListener('click', () => handleAnswer(false));
         if (backToSelectionButton) backToSelectionButton.addEventListener('click', backToSelectionScreen);
@@ -891,6 +906,36 @@ function showNextQuestion() {
     if (correctButton) correctButton.classList.add('hidden');
     if (incorrectButton) incorrectButton.classList.add('hidden');
 
+    // ★新機能：答えを見るボタンを2秒間無効化
+    if (currentQuestionIndex > 0) { // 最初の問題以外で無効化
+        isAnswerButtonDisabled = true;
+        if (showAnswerButton) {
+            showAnswerButton.disabled = true;
+            showAnswerButton.style.opacity = '0.5';
+            showAnswerButton.style.cursor = 'not-allowed';
+            showAnswerButton.style.pointerEvents = 'none'; // ★追加：完全にクリックを無効化
+        }
+        
+        // 既存のタイムアウトがあればクリア
+        if (answerButtonTimeout) {
+            clearTimeout(answerButtonTimeout);
+        }
+        
+        // 2秒後に有効化
+        answerButtonTimeout = setTimeout(() => {
+            isAnswerButtonDisabled = false;
+            if (showAnswerButton) {
+                showAnswerButton.disabled = false;
+                showAnswerButton.style.opacity = '1';
+                showAnswerButton.style.cursor = 'pointer';
+                showAnswerButton.style.pointerEvents = 'auto'; // ★追加：クリックを再有効化
+            }
+            console.log('答えを見るボタンが有効化されました');
+        }, 2000);
+        
+        console.log('答えを見るボタンを2秒間無効化しました');
+    }
+
     if (currentQuestionIndex < totalQuestions) {
         const currentWord = currentQuizData[currentQuestionIndex];
         if (questionElement) questionElement.textContent = currentWord.question;
@@ -901,6 +946,12 @@ function showNextQuestion() {
 }
 
 function showAnswer() {
+    // ★新機能：無効化中は処理を停止
+    if (isAnswerButtonDisabled) {
+        console.log('答えを見るボタンは無効化中です');
+        return;
+    }
+    
     if (answerElement) answerElement.classList.remove('hidden');
     if (showAnswerButton) showAnswerButton.classList.add('hidden');
     if (correctButton) correctButton.classList.remove('hidden');
@@ -1157,6 +1208,13 @@ function backToSelectionScreen() {
     
     // ★ボタンテキストをデフォルトにリセット
     resetRestartButtonToDefault();
+    
+    // ★新機能：タイムアウトをクリア
+    if (answerButtonTimeout) {
+        clearTimeout(answerButtonTimeout);
+        answerButtonTimeout = null;
+    }
+    isAnswerButtonDisabled = false;
     
     if (selectionArea) selectionArea.classList.remove('hidden');
     if (cardArea) cardArea.classList.add('hidden');

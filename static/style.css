@@ -4075,3 +4075,21 @@ a.nav-link.btn.change-username-button:hover,
         transform: translateX(0);
     }
 }
+
+/* 答えを見るボタンの無効化スタイル */
+.show-answer-button:disabled {
+    opacity: 0.5 !important;
+    cursor: not-allowed !important;
+    pointer-events: none !important;
+    background-color: #6c757d !important;
+}
+
+.show-answer-button:disabled:hover {
+    background-color: #6c757d !important;
+    transform: none !important;
+}
+
+/* pointer-events無効化の確実な適用 */
+.show-answer-button[style*="pointer-events: none"] {
+    pointer-events: none !important;
+}
