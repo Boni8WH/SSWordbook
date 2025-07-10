@@ -2772,7 +2772,7 @@ def api_admin_room_ranking(room_number):
                 'reliability_score': round(stats.reliability_score, 1),
                 'activity_score': round(stats.activity_score, 1),
                 'last_login': stats.user.last_login.isoformat() if stats.user.last_login else None,
-                'incorrect_count': getattr(stats, 'incorrect_count', 0)  # 👈 この行を追加
+                'incorrect_count': len(stats.user.get_incorrect_words()) if stats.user else 0
             }
             
             ranking_data.append(user_data)
