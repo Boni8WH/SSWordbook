@@ -658,6 +658,54 @@ function updateRankingTable(rankingData) {
         
         tbody.appendChild(row);
     });
+
+    // 固定列を強制的に適用
+    setTimeout(() => {
+        forceApplyStickyColumns();
+    }, 100);
+}
+
+// ★新規追加：固定列強制適用関数
+function forceApplyStickyColumns() {
+    const table = document.querySelector('.ranking-table');
+    if (!table) return;
+    
+    // 順位列（1列目）を強制固定
+    const firstCells = table.querySelectorAll('th:first-child, td:first-child');
+    firstCells.forEach(cell => {
+        cell.style.position = 'sticky';
+        cell.style.left = '0px';
+        cell.style.zIndex = '100';
+        cell.style.borderRight = '2px solid #dee2e6';
+        cell.style.minWidth = '70px';
+        cell.style.maxWidth = '70px';
+        cell.style.boxShadow = '2px 0 5px rgba(0,0,0,0.1)';
+        
+        if (cell.tagName === 'TH') {
+            cell.style.backgroundColor = '#343a40';
+            cell.style.color = 'white';
+        }
+    });
+    
+    // 名前列（2列目）を強制固定
+    const secondCells = table.querySelectorAll('th:nth-child(2), td:nth-child(2)');
+    secondCells.forEach(cell => {
+        cell.style.position = 'sticky';
+        cell.style.left = '70px';
+        cell.style.zIndex = '100';
+        cell.style.borderRight = '2px solid #dee2e6';
+        cell.style.minWidth = '120px';
+        cell.style.maxWidth = '120px';
+        cell.style.fontWeight = 'bold';
+        cell.style.boxShadow = '2px 0 5px rgba(0,0,0,0.15)';
+        
+        if (cell.tagName === 'TH') {
+            cell.style.backgroundColor = '#343a40';
+            cell.style.color = 'white';
+        }
+    });
+    
+    console.log('✅ 固定列を強制適用しました');
 }
 
 // ========================================
@@ -1913,6 +1961,77 @@ html {
 .table-info td:nth-child(1),
 .table-info td:nth-child(2) {
     background-color: #d1ecf1 !important;
+}
+
+/* 固定列の最終解決CSS - 最高優先度 */
+.ranking-table {
+    position: relative !important;
+    border-collapse: separate !important;
+    border-spacing: 0 !important;
+}
+
+.table-responsive {
+    position: relative !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+}
+
+/* 順位列の完全固定 */
+.ranking-table th:first-child,
+.ranking-table td:first-child {
+    position: sticky !important;
+    position: -webkit-sticky !important;
+    left: 0 !important;
+    z-index: 100 !important;
+    background-color: inherit !important;
+    border-right: 2px solid #dee2e6 !important;
+    min-width: 70px !important;
+    max-width: 70px !important;
+    box-shadow: 2px 0 5px rgba(0,0,0,0.1) !important;
+}
+
+/* 名前列の完全固定 */
+.ranking-table th:nth-child(2),
+.ranking-table td:nth-child(2) {
+    position: sticky !important;
+    position: -webkit-sticky !important;
+    left: 70px !important;
+    z-index: 100 !important;
+    background-color: inherit !important;
+    border-right: 2px solid #dee2e6 !important;
+    min-width: 120px !important;
+    max-width: 120px !important;
+    font-weight: bold !important;
+    box-shadow: 2px 0 5px rgba(0,0,0,0.15) !important;
+}
+
+/* ヘッダーの背景色を強制設定 */
+.ranking-table th:first-child,
+.ranking-table th:nth-child(2) {
+    background-color: #343a40 !important;
+    color: white !important;
+}
+
+/* ランキング別の背景色 */
+.table-warning td:first-child,
+.table-warning td:nth-child(2) {
+    background-color: #fff3cd !important;
+}
+
+.table-secondary td:first-child,
+.table-secondary td:nth-child(2) {
+    background-color: #f8f9fa !important;
+}
+
+.table-info td:first-child,
+.table-info td:nth-child(2) {
+    background-color: #d1ecf1 !important;
+}
+
+/* 通常行の背景色 */
+.ranking-table tbody tr td:first-child,
+.ranking-table tbody tr td:nth-child(2) {
+    background-color: white !important;
 }
 </style>
 
