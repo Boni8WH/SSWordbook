@@ -4882,6 +4882,7 @@ def emergency_create_user_stats():
                         activity_score FLOAT DEFAULT 0.0 NOT NULL,
                         last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
                         total_questions_in_room INTEGER DEFAULT 0 NOT NULL
+                        incorrect_count INTEGER DEFAULT 0 NOT NULL,
                     )
                 """))
                 
