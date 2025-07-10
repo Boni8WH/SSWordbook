@@ -368,6 +368,19 @@ function updateUnitCheckboxStates() {
                     const unit = chapter.units[unitNum];
                     const checkbox = document.getElementById(`unit-${chapterNum}-${unitNum}`);
                     if (checkbox) {
+                        if (!unit.enabled) {
+                            // 利用不可の場合は親要素ごと非表示にする
+                            const unitItem = checkbox.closest('.unit-item');
+                            if (unitItem) {
+                                unitItem.style.display = 'none';
+                            }
+                        } else {
+                            // 利用可能な場合は表示
+                            const unitItem = checkbox.closest('.unit-item');
+                            if (unitItem) {
+                                unitItem.style.display = 'block';
+                            }
+                        }
                         checkbox.disabled = !unit.enabled;
                         if (checkbox.disabled && checkbox.checked) {
                             checkbox.checked = false;

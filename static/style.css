@@ -536,9 +536,12 @@ hr {
 }
 
 .unit-item input[type="checkbox"]:disabled + label {
-    opacity: 0.6;
-    cursor: not-allowed;
-    text-decoration: line-through;
+    display: none; /* 完全に非表示にする */
+}
+
+/* または、親要素ごと非表示にする場合 */
+.unit-item:has(input[type="checkbox"]:disabled) {
+    display: none;
 }
 
 .bottom-controls {
