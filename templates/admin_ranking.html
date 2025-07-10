@@ -1126,25 +1126,6 @@ html {
     z-index: 10;
 }
 
-/* 列幅の調整 */
-.ranking-table th:nth-child(1) { 
-    position: sticky;
-    left: 0;
-    z-index: 30;
-    background-color: #343a40 !important;
-    min-width: 70px;
-    max-width: 70px;
-}
-.ranking-table th:nth-child(2) { 
-    position: sticky;
-    left: 70px;
-    z-index: 30;
-    background-color: #343a40 !important;
-    min-width: 120px;
-    max-width: 120px;
-    box-shadow: 2px 0 5px rgba(0,0,0,0.1);
-}
-
 .ranking-table th:nth-child(3) { min-width: 80px; }  /* 回答数 */
 .ranking-table th:nth-child(4) { min-width: 80px; }  /* 正解数 */
 .ranking-table th:nth-child(5) { min-width: 80px; }  /* 正答率 */
@@ -1152,44 +1133,6 @@ html {
 .ranking-table th:nth-child(7) { min-width: 100px; } /* 総合スコア */
 .ranking-table th:nth-child(8) { min-width: 80px; }  /* 網羅率 */
 .ranking-table th:nth-child(9) { min-width: 90px; }  /* 苦手問題 */
-
-/* 名前列のセル固定 */
-/* 順位列のセル固定 */
-.ranking-table td:nth-child(1) {
-    position: sticky;
-    left: 0;
-    z-index: 20;
-    background-color: inherit;
-    min-width: 70px;
-    max-width: 70px;
-}
-
-.ranking-table td:nth-child(2) {
-    position: sticky;
-    left: 70px;
-    z-index: 20;
-    background-color: inherit;
-    font-weight: bold;
-    box-shadow: 2px 0 5px rgba(0,0,0,0.1);
-    border-right: 2px solid #dee2e6;
-    min-width: 120px;
-    max-width: 120px;
-}
-/* ランク別背景色の修正 */
-.table-warning td:nth-child(1),
-.table-warning td:nth-child(2) {
-    background-color: #fff3cd !important;
-}
-
-.table-secondary td:nth-child(1),
-.table-secondary td:nth-child(2) {
-    background-color: #f8f9fa !important;
-}
-
-.table-info td:nth-child(1),
-.table-info td:nth-child(2) {
-    background-color: #d1ecf1 !important;
-}
 
 .table-secondary td:nth-child(1) {
     background-color: #f8f9fa !important;
@@ -1201,6 +1144,64 @@ html {
 .table-info td:nth-child(1) {
     background-color: #d1ecf1 !important;
 }
+.table-info td:nth-child(2) {
+    background-color: #d1ecf1 !important;
+}
+
+/* 固定列の設定 - シンプル版 */
+.table-responsive {
+    position: relative;
+}
+
+.ranking-table {
+    position: relative;
+}
+
+/* 順位列（1列目）の固定 */
+.ranking-table th:nth-child(1),
+.ranking-table td:nth-child(1) {
+    position: sticky;
+    left: 0;
+    z-index: 10;
+    background-color: white;
+    border-right: 2px solid #dee2e6;
+    min-width: 70px;
+    max-width: 70px;
+}
+
+/* 名前列（2列目）の固定 */
+.ranking-table th:nth-child(2),
+.ranking-table td:nth-child(2) {
+    position: sticky;
+    left: 70px;
+    z-index: 10;
+    background-color: white;
+    border-right: 2px solid #dee2e6;
+    min-width: 120px;
+    max-width: 120px;
+    font-weight: bold;
+    box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+}
+
+/* ヘッダーの背景色を維持 */
+.ranking-table th:nth-child(1),
+.ranking-table th:nth-child(2) {
+    background-color: #343a40 !important;
+    color: white;
+}
+
+/* ランキング色の固定列対応 */
+.table-warning td:nth-child(1),
+.table-warning td:nth-child(2) {
+    background-color: #fff3cd !important;
+}
+
+.table-secondary td:nth-child(1),
+.table-secondary td:nth-child(2) {
+    background-color: #f8f9fa !important;
+}
+
+.table-info td:nth-child(1),
 .table-info td:nth-child(2) {
     background-color: #d1ecf1 !important;
 }
