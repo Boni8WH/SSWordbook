@@ -379,6 +379,7 @@ class UserStats(db.Model):
     total_attempts = db.Column(db.Integer, default=0, nullable=False)
     total_correct = db.Column(db.Integer, default=0, nullable=False)
     mastered_count = db.Column(db.Integer, default=0, nullable=False)
+    incorrect_count = db.Column(db.Integer, default=0, nullable=False)
     
     # 計算済みスコア
     accuracy_rate = db.Column(db.Float, default=0.0, nullable=False)
@@ -441,6 +442,7 @@ class UserStats(db.Model):
             
             # 学習履歴を分析
             user_history = user.get_problem_history()
+            user_incorrect = user.get_incorrect_words()
             total_attempts = 0
             total_correct = 0
             mastered_problem_ids = set()
@@ -476,6 +478,7 @@ class UserStats(db.Model):
             self.total_correct = total_correct
             self.mastered_count = len(mastered_problem_ids)
             self.total_questions_in_room = total_questions_for_room
+            self.incorrect_count = len(user_incorrect)
             
             # 正答率計算
             self.accuracy_rate = (total_correct / total_attempts * 100) if total_attempts > 0 else 0
@@ -1111,6 +1114,23 @@ def migrate_database():
                                 conn.execute(text('ALTER TABLE user_stats ADD COLUMN last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP'))
                             print(f"✅ {col_name}カラムを追加しました。")
                         conn.commit()
+            
+            # 5. UserStatsテーブルのincorrect_countカラム追加  👈 この部分を追加
+            if inspector.has_table('user_stats'):
+                columns = [col['name'] for col in inspector.get_columns('user_stats')]
+                if 'incorrect_count' not in columns:
+                    print("🔧 user_statsテーブルにincorrect_countカラムを追加します...")
+                    try:
+                        with db.engine.connect() as conn:
+                            conn.execute(text('ALTER TABLE user_stats ADD COLUMN incorrect_count INTEGER DEFAULT 0'))
+                            conn.commit()
+                        print("✅ incorrect_countカラムを追加しました")
+                    except Exception as e:
+                        print(f"⚠️ カラム追加エラー: {e}")
+                else:
+                    print("✅ incorrect_countカラムは既に存在します")
+            
+            fix_foreign_key_constraints()
                 
             print("✅ UserStats関連のマイグレーション完了")
                 
@@ -2737,6 +2757,7 @@ def api_admin_room_ranking(room_number):
         total_scores = []
         active_users = 0
         
+        # ランキングデータを構築（全員取得）
         for stats in room_stats:
             user_data = {
                 'username': stats.user.username,
@@ -2750,7 +2771,8 @@ def api_admin_room_ranking(room_number):
                 'mastery_score': round(stats.mastery_score, 1),
                 'reliability_score': round(stats.reliability_score, 1),
                 'activity_score': round(stats.activity_score, 1),
-                'last_login': stats.user.last_login.isoformat() if stats.user.last_login else None
+                'last_login': stats.user.last_login.isoformat() if stats.user.last_login else None,
+                'incorrect_count': getattr(stats, 'incorrect_count', 0)  # 👈 この行を追加
             }
             
             ranking_data.append(user_data)
