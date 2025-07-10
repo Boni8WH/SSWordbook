@@ -210,7 +210,6 @@
                                     <tr>
                                         <th style="min-width: 60px;">順位</th>
                                         <th style="min-width: 100px;">名前</th>
-                                        <th style="min-width: 120px;">最終ログイン</th>
                                         <th style="min-width: 80px;">回答数</th>
                                         <th style="min-width: 80px;">正解数</th>
                                         <th style="min-width: 80px;">正答率</th>
@@ -648,7 +647,6 @@ function updateRankingTable(rankingData) {
                 ${index === 2 ? '<i class="fas fa-medal text-info ms-1"></i>' : ''}
             </td>
             <td><strong>${username}</strong></td>
-            <td><small class="text-muted">${lastLogin}</small></td>
             <td><span class="badge bg-primary">${totalAttempts}</span></td>
             <td><span class="badge bg-success">${totalCorrect}</span></td>
             <td>${accuracyRate}%</td>
@@ -1101,7 +1099,7 @@ html {
 
 /* ランキングテーブル */
 .ranking-table {
-    min-width: 800px; /* 幅を縮小 */
+    min-width: 650px; /* 幅を縮小 */
     margin-bottom: 0;
     white-space: nowrap;
     width: 100%; /* 追加 */
@@ -1127,15 +1125,24 @@ html {
 
 /* 列幅の調整 */
 .ranking-table th:nth-child(1) { min-width: 60px; }  /* 順位 */
-.ranking-table th:nth-child(2) { min-width: 100px; } /* 名前 */
-.ranking-table th:nth-child(3) { min-width: 120px; } /* 最終ログイン */
-.ranking-table th:nth-child(4) { min-width: 70px; }  /* 回答数 */
-.ranking-table th:nth-child(5) { min-width: 70px; }  /* 正解数 */
-.ranking-table th:nth-child(6) { min-width: 70px; }  /* 正答率 */
-.ranking-table th:nth-child(7) { min-width: 80px; }  /* マスター数 */
-.ranking-table th:nth-child(8) { min-width: 90px; }  /* 総合スコア */
-.ranking-table th:nth-child(9) { min-width: 70px; }  /* 網羅率 */
-.ranking-table th:nth-child(10) { min-width: 80px; } /* 苦手問題 */
+.ranking-table th:nth-child(2) { min-width: 100px; position: sticky; left: 0; background-color: #343a40; z-index: 20; } /* 名前（固定） */
+.ranking-table th:nth-child(3) { min-width: 70px; }  /* 回答数 */
+.ranking-table th:nth-child(4) { min-width: 70px; }  /* 正解数 */
+.ranking-table th:nth-child(5) { min-width: 70px; }  /* 正答率 */
+.ranking-table th:nth-child(6) { min-width: 80px; }  /* マスター数 */
+.ranking-table th:nth-child(7) { min-width: 90px; }  /* 総合スコア */
+.ranking-table th:nth-child(8) { min-width: 70px; }  /* 網羅率 */
+.ranking-table th:nth-child(9) { min-width: 80px; } /* 苦手問題 */
+
+/* 名前列（2列目）を固定 */
+.ranking-table td:nth-child(2) {
+    position: sticky;
+    left: 0;
+    background-color: white;
+    z-index: 15;
+    font-weight: bold;
+    border-right: 2px solid #dee2e6;
+}
 
 /* スマホ対応 */
 @media (max-width: 768px) {
@@ -1166,17 +1173,46 @@ html {
         font-size: 0.7rem;
         padding: 0.2em 0.4em;
     }
+
+    /* 名前列の固定スタイルをスマホでも維持 */
+    .ranking-table td:nth-child(2) {
+        min-width: 100px;
+        max-width: 100px;
+        word-break: break-word;
+    }
+}
+
+@media (min-width: 769px) {
+    .table-responsive-wrapper::before {
+        display: none;
+    }
+}
+
+/* 横スクロール時の名前列強調 */
+.table-responsive::-webkit-scrollbar {
+    height: 10px;
+}
+
+.table-responsive-wrapper::before {
+    content: "名前は固定表示されます";
+    display: block;
+    text-align: center;
+    font-size: 0.7rem;
+    color: #007bff;
+    padding: 0.25rem;
+    background: #e3f2fd;
+    border-bottom: 1px solid #90caf9;
 }
 
 @media (max-width: 480px) {
     .ranking-table {
-        min-width: 750px;
-        font-size: 0.75rem;
+        min-width: 550px;
+        font-size: 0.8rem;
     }
     
     .ranking-table th,
     .ranking-table td {
-        padding: 0.4rem 0.2rem;
+        padding: 0.5rem 0.25rem;
     }
     
     .rank-badge {
@@ -1184,6 +1220,24 @@ html {
         height: 22px;
         line-height: 22px;
         font-size: 0.65rem;
+    }
+
+    /* 名前列の固定スタイルをスマホでも維持 */
+    .ranking-table td:nth-child(2) {
+        min-width: 100px;
+        max-width: 100px;
+        word-break: break-word;
+    }
+
+    .ranking-table {
+        min-width: 500px;
+        font-size: 0.75rem;
+    }
+    
+    .ranking-table th:nth-child(2),
+    .ranking-table td:nth-child(2) {
+        min-width: 90px;
+        max-width: 90px;
     }
 }
 
@@ -1283,40 +1337,37 @@ html {
 @media (max-width: 992px) {
     .ranking-container {
         padding: 15px;
+        max-width: 100%;
     }
     
-    .rooms-grid {
-        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-        gap: 12px;
-    }
-    
-    .room-card {
+    .ranking-summary {
         padding: 15px;
     }
     
     .summary-card {
-        padding: 15px;
+        padding: 12px;
+        gap: 12px;
     }
     
     .summary-icon {
-        font-size: 1.5rem;
+        font-size: 1.4rem;
     }
     
     .summary-value {
-        font-size: 1.5rem;
+        font-size: 1.4rem;
     }
     
-    .table-controls {
-        padding: 15px;
+    .ranking-table {
+        min-width: 600px;
+        font-size: 0.85rem;
     }
 }
 
 /* スマホ対応 */
 @media (max-width: 768px) {
     .ranking-container {
-        padding: 10px;
-        width: 100%;
-        max-width: 100%;
+        padding: 8px;
+        overflow-x: hidden;
     }
     
     .ranking-header {
