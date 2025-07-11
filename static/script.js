@@ -311,7 +311,7 @@ document.addEventListener('DOMContentLoaded', () => {
             console.log('📍 初期化完了後の制限状態最終チェック');
             updateIncorrectOnlySelection();
         }, 1500);
-        
+
         if (noWeakWordsMessage) {
             noWeakWordsMessage.classList.add('hidden');
         }
@@ -515,24 +515,33 @@ function updateIncorrectOnlySelection() {
     
     const weakProblemCount = incorrectWords.length;
     
-    // ★修正：制限発動は20問以上で確実に実行
-    if (weakProblemCount >= 20 && !hasBeenRestricted) {
+    // ★シンプルな制限ロジック：苦手問題数のみで判定
+    let isCurrentlyRestricted = false;
+    
+    if (weakProblemCount >= 20) {
+        // 20問以上：制限発動
+        isCurrentlyRestricted = true;
         hasBeenRestricted = true;
         restrictionReleased = false;
         console.log('🔒 制限発動: 苦手問題', weakProblemCount, '問');
+    } else if (weakProblemCount >= 11) {
+        // 11問以上19問以下：前回制限されていた場合は継続
+        if (hasBeenRestricted && !restrictionReleased) {
+            isCurrentlyRestricted = true;
+            console.log('🔒 制限継続: 苦手問題', weakProblemCount, '問');
+        }
+    } else if (weakProblemCount <= 10) {
+        // 10問以下：制限解除
+        isCurrentlyRestricted = false;
+        if (hasBeenRestricted && !restrictionReleased) {
+            restrictionReleased = true;
+            console.log('🔓 制限解除: 苦手問題', weakProblemCount, '問（10問以下達成）');
+        }
     }
-    
-    // ★修正：制限解除は10問以下かつ制限中の場合のみ
-    if (hasBeenRestricted && !restrictionReleased && weakProblemCount <= 10) {
-        restrictionReleased = true;
-        console.log('🔓 制限解除: 苦手問題', weakProblemCount, '問（10問以下達成）');
-    }
-    
-    // ★修正：現在の制限状態をシンプルに判定
-    const isCurrentlyRestricted = hasBeenRestricted && !restrictionReleased;
     
     console.log(`制限状態: 苦手${weakProblemCount}問, 制限中=${isCurrentlyRestricted}, hasBeenRestricted=${hasBeenRestricted}, restrictionReleased=${restrictionReleased}`);
     
+    // 以下のUI制御部分は既存のままでOK
     if (isCurrentlyRestricted) {
     // ★制限発動中（最優先で処理）
     console.log('🔒 制限適用中 - UIを制限モードに変更');
@@ -2196,9 +2205,6 @@ function showIntermediateWeakProblemWarning(count) {
             </p>
             <p style="margin: 15px 0 0 0; font-size: 1em; color: #d68910; background-color: #fcf3cd; padding: 10px; border-radius: 5px;">
                 🎯 あと <strong style="color: #f39c12;">${count - 10}問</strong> 克服すれば制限解除です！
-            </p>
-            <p style="margin: 10px 0 0 0; font-size: 0.9em; color: #b7950b; font-style: italic;">
-                ※ 一度制限がかかると、必ず10問以下になるまで継続します
             </p>
         </div>
     `;
