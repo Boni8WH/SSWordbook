@@ -512,33 +512,18 @@ function updateIncorrectOnlySelection() {
     
     const weakProblemCount = incorrectWords.length;
     
-    // ★修正：制限状態の更新ロジック
-    // 20問以上で制限発動
-    if (weakProblemCount >= 20 && !hasBeenRestricted) {
-        hasBeenRestricted = true;
-        restrictionReleased = false;
-        console.log('🔒 制限発動: 苦手問題', weakProblemCount, '問（20問以上）');
-    }
-    
-    // 10問以下で制限解除
-    if (hasBeenRestricted && !restrictionReleased && weakProblemCount <= 10) {
-        restrictionReleased = true;
-        console.log('🔓 制限解除: 苦手問題', weakProblemCount, '問（10問以下達成）');
-    }
-    
-    // ★現在の制限状態判定
+    // ★シンプルな制限判定：苦手問題数のみで決定（元に戻す）
     let isCurrentlyRestricted = false;
     
-    if (hasBeenRestricted && !restrictionReleased) {
-        // 一度制限されて、まだ解除されていない場合のみ制限
+    if (weakProblemCount >= 11) {
         isCurrentlyRestricted = true;
-        console.log('🔒 制限継続中: 苦手問題', weakProblemCount, '問');
+        console.log('🔒 制限中: 苦手問題', weakProblemCount, '問（11問以上）');
     } else {
         isCurrentlyRestricted = false;
-        console.log('🔓 制限なし: 苦手問題', weakProblemCount, '問');
+        console.log('🔓 制限解除: 苦手問題', weakProblemCount, '問（10問以下）');
     }
     
-    console.log(`制限状態: 苦手${weakProblemCount}問, 制限中=${isCurrentlyRestricted}, hasBeenRestricted=${hasBeenRestricted}, restrictionReleased=${restrictionReleased}`);
+    console.log(`制限状態: 苦手${weakProblemCount}問, 制限中=${isCurrentlyRestricted}`);
     
     if (isCurrentlyRestricted) {
         // ★制限発動中（最優先で処理）
