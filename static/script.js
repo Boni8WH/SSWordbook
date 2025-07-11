@@ -301,18 +301,26 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => {
             loadSelectionState();
             initializeSelectAllButtons();
-            updateIncorrectOnlySelection(); // 苦手問題選択状態の視覚的フィードバックを初期化
+            updateIncorrectOnlySelection(); 
             initializeMobileOptimizations(); // スマホ最適化
             improveTouchExperience(); // タッチ操作改善
             optimizeScrolling(); // スクロール最適化
         }, 1000);
-
+        
+        setTimeout(() => {
+            console.log('📍 初期化完了後の制限状態最終チェック');
+            updateIncorrectOnlySelection();
+        }, 1500);
+        
         if (noWeakWordsMessage) {
             noWeakWordsMessage.classList.add('hidden');
         }
     } catch (error) {
         console.error('Error during initialization:', error);
     }
+
+    // ESCキーでの閉じる機能を追加
+    document.addEventListener('keydown', handleEscapeKey);
 });
 
 function loadUserData() {
@@ -1366,6 +1374,10 @@ function backToSelectionScreen() {
     if (quizResultArea) quizResultArea.classList.add('hidden');
     if (weakWordsListSection) weakWordsListSection.classList.add('hidden');
     if (noWeakWordsMessage) noWeakWordsMessage.classList.add('hidden');
+    
+    // ★重要：範囲選択画面に戻った時に制限状態を更新
+    console.log('📍 範囲選択画面に戻る - 制限状態を再確認');
+    updateIncorrectOnlySelection();
 }
 
 function debugCelebrationMessages() {
@@ -2102,12 +2114,6 @@ function monitorPerformance() {
         }, 30000);
     }
 }
-
-// パフォーマンス監視の開始
-document.addEventListener('DOMContentLoaded', () => {
-    // ESCキーでの閉じる機能を追加
-    document.addEventListener('keydown', handleEscapeKey);
-});
 
 // タッチデバイス対応（追加）
 function handleTouchOutside(event) {
