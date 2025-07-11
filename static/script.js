@@ -515,63 +515,52 @@ function updateIncorrectOnlySelection() {
     
     const weakProblemCount = incorrectWords.length;
     
-    // ★シンプルな制限ロジック：苦手問題数のみで判定
+    // ★シンプルな制限判定：苦手問題数のみで決定
     let isCurrentlyRestricted = false;
     
     if (weakProblemCount >= 20) {
-        // 20問以上：制限発動
         isCurrentlyRestricted = true;
-        hasBeenRestricted = true;
-        restrictionReleased = false;
-        console.log('🔒 制限発動: 苦手問題', weakProblemCount, '問');
+        console.log('🔒 制限発動: 苦手問題', weakProblemCount, '問（20問以上）');
     } else if (weakProblemCount >= 11) {
-        // 11問以上19問以下：前回制限されていた場合は継続
-        if (hasBeenRestricted && !restrictionReleased) {
-            isCurrentlyRestricted = true;
-            console.log('🔒 制限継続: 苦手問題', weakProblemCount, '問');
-        }
-    } else if (weakProblemCount <= 10) {
-        // 10問以下：制限解除
+        isCurrentlyRestricted = true;
+        console.log('🔒 制限継続: 苦手問題', weakProblemCount, '問（11問以上）');
+    } else {
         isCurrentlyRestricted = false;
-        if (hasBeenRestricted && !restrictionReleased) {
-            restrictionReleased = true;
-            console.log('🔓 制限解除: 苦手問題', weakProblemCount, '問（10問以下達成）');
-        }
+        console.log('🔓 制限解除: 苦手問題', weakProblemCount, '問（10問以下）');
     }
     
-    console.log(`制限状態: 苦手${weakProblemCount}問, 制限中=${isCurrentlyRestricted}, hasBeenRestricted=${hasBeenRestricted}, restrictionReleased=${restrictionReleased}`);
+    console.log(`制限状態: 苦手${weakProblemCount}問, 制限中=${isCurrentlyRestricted}`);
     
-    // 以下のUI制御部分は既存のままでOK
     if (isCurrentlyRestricted) {
-    // ★制限発動中（最優先で処理）
-    console.log('🔒 制限適用中 - UIを制限モードに変更');
-    
-    // 苦手問題ラジオボタンを強制選択
-    if (incorrectOnlyRadio) {
-        incorrectOnlyRadio.checked = true;
-    }
-    
-    // 他の選択肢を無効化
-    questionCountRadios.forEach(radio => {
-        radio.disabled = true;
-        radio.parentElement.style.opacity = '0.5';
-    });
-    
-    // 出題範囲選択を完全に非表示
-    if (rangeSelectionArea) {
-        rangeSelectionArea.style.display = 'none';
-    }
-    if (chaptersContainer) {
-        chaptersContainer.style.display = 'none';
-    }
-    
-    // 制限状態に応じた警告メッセージ
-    if (weakProblemCount >= 20) {
-        showWeakProblemWarning(weakProblemCount);
-    } else if (weakProblemCount > 10) {
-        showIntermediateWeakProblemWarning(weakProblemCount);
-    }
-    
+        // ★制限発動中（最優先で処理）
+        console.log('🔒 制限適用中 - UIを制限モードに変更');
+        
+        // 苦手問題ラジオボタンを強制選択
+        if (incorrectOnlyRadio) {
+            incorrectOnlyRadio.checked = true;
+        }
+        
+        // 他の選択肢を無効化
+        questionCountRadios.forEach(radio => {
+            radio.disabled = true;
+            radio.parentElement.style.opacity = '0.5';
+        });
+        
+        // 出題範囲選択を完全に非表示
+        if (rangeSelectionArea) {
+            rangeSelectionArea.style.display = 'none';
+        }
+        if (chaptersContainer) {
+            chaptersContainer.style.display = 'none';
+        }
+        
+        // 制限状態に応じた警告メッセージ
+        if (weakProblemCount >= 20) {
+            showWeakProblemWarning(weakProblemCount);
+        } else if (weakProblemCount > 10) {
+            showIntermediateWeakProblemWarning(weakProblemCount);
+        }
+        
     } else if (incorrectOnlyRadio && incorrectOnlyRadio.checked) {
         // 手動で苦手問題が選択されている場合（制限なし）
         if (rangeSelectionArea) {
