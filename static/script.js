@@ -484,17 +484,16 @@ function loadSelectionState() {
 // =========================================================
 // 苦手問題選択時の視覚的フィードバック
 // =========================================================
-
 function updateIncorrectOnlySelection() {
     const incorrectOnlyRadio = document.getElementById('incorrectOnlyRadio');
     const chaptersContainer = document.querySelector('.chapters-container');
     const rangeSelectionTitle = document.querySelector('.selection-area h3');
     const questionCountRadios = document.querySelectorAll('input[name="questionCount"]:not(#incorrectOnlyRadio)');
     
-    // 苦手問題数をチェック
+    // ★修正：条件を明確に分離
     const weakProblemCount = incorrectWords.length;
-    const isForceWeakMode = weakProblemCount > 20;
-    const isWeakModeDisabled = weakProblemCount > 10;
+    const isForceWeakMode = weakProblemCount >= 20;  // 20問以上で制限発動
+    const canUseNormalMode = weakProblemCount <= 10;  // 10問以下で制限解除
     
     if (incorrectOnlyRadio && incorrectOnlyRadio.checked) {
         // 苦手問題が選択されている場合
@@ -507,7 +506,7 @@ function updateIncorrectOnlySelection() {
             rangeSelectionTitle.style.color = '#95a5a6';
         }
     } else if (isForceWeakMode) {
-        // 苦手問題が20問を超えている場合は強制的に苦手問題モードに切り替え
+        // ★修正：20問以上の場合は強制的に苦手問題モードに切り替え
         incorrectOnlyRadio.checked = true;
         
         // 他の選択肢を無効化
@@ -528,8 +527,8 @@ function updateIncorrectOnlySelection() {
         
         // 警告メッセージを表示
         showWeakProblemWarning(weakProblemCount);
-    } else {
-        // 通常モードの場合
+    } else if (canUseNormalMode) {
+        // ★修正：10問以下の場合のみ通常モードを許可
         questionCountRadios.forEach(radio => {
             radio.disabled = false;
             radio.parentElement.style.opacity = '1';
@@ -546,6 +545,26 @@ function updateIncorrectOnlySelection() {
         
         // 警告メッセージを削除
         removeWeakProblemWarning();
+    } else {
+        // ★新規追加：11～19問の中間状態（制限は継続）
+        incorrectOnlyRadio.checked = true;
+        
+        questionCountRadios.forEach(radio => {
+            radio.disabled = true;
+            radio.parentElement.style.opacity = '0.5';
+        });
+        
+        if (chaptersContainer) {
+            chaptersContainer.style.opacity = '0.3';
+            chaptersContainer.style.pointerEvents = 'none';
+        }
+        if (rangeSelectionTitle) {
+            rangeSelectionTitle.textContent = '苦手問題を10問以下にしてください（制限継続中）';
+            rangeSelectionTitle.style.color = '#f39c12';
+        }
+        
+        // 中間状態の警告メッセージを表示
+        showIntermediateWeakProblemWarning(weakProblemCount);
     }
 }
 
@@ -714,15 +733,23 @@ let lastQuizSettings = {
 };
 
 function startQuiz() {
-    // ★新機能：苦手問題数による制限チェック
+    // ★修正：苦手問題数による制限チェック
     const weakProblemCount = incorrectWords.length;
     const selectedQuestionCount = getSelectedQuestionCount();
     
-    if (weakProblemCount > 20 && selectedQuestionCount !== 'incorrectOnly') {
-        flashMessage('苦手問題が20問を超えています。まず苦手問題モードで学習してください。', 'danger');
+    // ★修正：20問以上で制限、10問以下で解除
+    if (weakProblemCount >= 20 && selectedQuestionCount !== 'incorrectOnly') {
+        flashMessage('苦手問題が20問以上あります。まず苦手問題モードで学習してください。', 'danger');
         return;
     }
     
+    // ★新規追加：11～19問の中間状態でも制限
+    if (weakProblemCount > 10 && weakProblemCount < 20 && selectedQuestionCount !== 'incorrectOnly') {
+        flashMessage('苦手問題を10問以下に減らすまで、苦手問題モードで学習してください。', 'warning');
+        return;
+    }
+    
+    // 既存のstartQuiz処理を続行...
     const selectedQuestions = getSelectedQuestions();
 
     // 苦手問題モードの場合は範囲選択チェックをスキップ
@@ -1154,19 +1181,24 @@ function showQuizResult() {
     setTimeout(() => {
         const currentWeakCount = incorrectWords.length;
         
-        // 制限解除チェック（苦手問題が10問以下になった場合）
+        // ★修正：制限解除チェック（苦手問題が10問以下になった場合のみ）
         if (currentWeakCount <= 10) {
             updateIncorrectOnlySelection(); // UI制限を解除
             
             // 制限解除メッセージ
             if (currentWeakCount === 0) {
                 flashMessage('🎉 すべての苦手問題を克服しました！通常学習が利用できます。', 'success');
-            } else if (lastQuizSettings.isIncorrectOnly && currentWeakCount <= 10) {
+            } else if (lastQuizSettings.isIncorrectOnly) {
                 flashMessage(`✨ 苦手問題が${currentWeakCount}問になりました。通常学習が利用できます。`, 'success');
             }
-        } else if (currentWeakCount > 20) {
-            // まだ制限が必要な場合は制限を維持
+        } else {
+            // ★修正：11問以上の場合は制限を維持
             updateIncorrectOnlySelection();
+            
+            // 進捗メッセージ
+            if (lastQuizSettings.isIncorrectOnly && currentWeakCount < 20) {
+                flashMessage(`📈 苦手問題が${currentWeakCount}問に減りました。あと${currentWeakCount - 10}問克服で制限解除です。`, 'info');
+            }
         }
         
         updateRestartButtonText();
@@ -2055,6 +2087,34 @@ function closeInfoPanelWithTouch() {
     closeInfoPanel();
     if ('ontouchstart' in window) {
         document.removeEventListener('touchstart', handleTouchOutside);
+    }
+}
+
+function showIntermediateWeakProblemWarning(count) {
+    // 既存の警告を削除
+    removeWeakProblemWarning();
+    
+    const warningDiv = document.createElement('div');
+    warningDiv.id = 'weakProblemWarning';
+    warningDiv.className = 'weak-problem-warning';
+    warningDiv.innerHTML = `
+        <div style="background-color: #fef9e7; border: 2px solid #f39c12; border-radius: 8px; padding: 15px; margin: 15px 0; text-align: center;">
+            <h4 style="color: #f39c12; margin: 0 0 10px 0;">
+                <i class="fas fa-clock"></i> 制限継続中
+            </h4>
+            <p style="margin: 5px 0; color: #b7950b;">
+                苦手問題が <strong>${count}問</strong> あります。<br>
+                <strong>10問以下</strong> に減らすまで苦手問題モードで学習を続けてください。
+            </p>
+            <p style="margin: 10px 0 0 0; font-size: 0.9em; color: #d68910;">
+                あと <strong>${count - 10}問</strong> 克服すれば通常モードが利用できます。
+            </p>
+        </div>
+    `;
+    
+    const selectionArea = document.querySelector('.selection-area .controls-area');
+    if (selectionArea) {
+        selectionArea.insertBefore(warningDiv, selectionArea.firstChild);
     }
 }
 
