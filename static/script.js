@@ -1134,50 +1134,12 @@ function handleAnswer(isCorrect) {
         }
     }
 
-    console.log(`苦手問題?: ${incorrectWords.includes(wordIdentifier)}`);
-    console.log('===========================\n');
-
-    // ★修正：制限状態チェック部分を簡潔に
-    const beforeRestricted = hasBeenRestricted && !restrictionReleased;
-    console.log(`\n🔍 回答後の制限状態チェック:`);
-    console.log(`  苦手問題数: ${incorrectWords.length}`);
-    console.log(`  制限前の状態: hasBeenRestricted=${hasBeenRestricted}, restrictionReleased=${restrictionReleased}`);
-    console.log(`  制限前の判定: ${beforeRestricted ? '制限中' : '制限なし'}`);
-
-    // 進捗をサーバーに保存
+    // ★修正：正解・不正解判定直後に即座に保存
     saveQuizProgressToServer();
 
     // 次の問題へ進む
     currentQuestionIndex++;
     updateProgressBar();
-
-    // ★修正：制限状態の更新を即座に実行
-    const currentWeakCount = incorrectWords.length;
-    
-    // 制限発動チェック
-    if (currentWeakCount >= 20 && !hasBeenRestricted) {
-        hasBeenRestricted = true;
-        restrictionReleased = false;
-        console.log(`🔒 制限発動: 苦手問題 ${currentWeakCount}問`);
-    }
-    
-    // 制限解除チェック
-    if (hasBeenRestricted && !restrictionReleased && currentWeakCount <= 10) {
-        restrictionReleased = true;
-        console.log(`🔓 制限解除: 苦手問題 ${currentWeakCount}問`);
-        
-        // 制限解除メッセージ
-        if (currentWeakCount === 0) {
-            flashMessage('🎉 すべての苦手問題を克服！制限が解除されました。', 'success');
-        } else {
-            flashMessage(`✨ 苦手問題が${currentWeakCount}問に！制限が解除されました。`, 'success');
-        }
-    }
-    
-    const afterRestricted = hasBeenRestricted && !restrictionReleased;
-    console.log(`  制限後の状態: hasBeenRestricted=${hasBeenRestricted}, restrictionReleased=${restrictionReleased}`);
-    console.log(`  制限後の判定: ${afterRestricted ? '制限中' : '制限なし'}`);
-    console.log(`🔍 制限状態チェック完了\n`);
 
     if (currentQuestionIndex < totalQuestions) {
         showNextQuestion();
@@ -1387,9 +1349,10 @@ function backToSelectionScreen() {
     if (weakWordsListSection) weakWordsListSection.classList.add('hidden');
     if (noWeakWordsMessage) noWeakWordsMessage.classList.add('hidden');
     
-    // ★重要：範囲選択画面に戻った時に制限状態を更新
-    console.log('📍 範囲選択画面に戻る - 制限状態を再確認');
-    updateIncorrectOnlySelection();
+    setTimeout(() => {
+        console.log('📍 範囲選択画面に戻る - 制限状態を再確認');
+        updateIncorrectOnlySelection();
+    }, 100);
 }
 
 function debugCelebrationMessages() {
