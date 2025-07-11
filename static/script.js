@@ -1381,10 +1381,54 @@ function backToSelectionScreen() {
     if (weakWordsListSection) weakWordsListSection.classList.add('hidden');
     if (noWeakWordsMessage) noWeakWordsMessage.classList.add('hidden');
     
+    // ★重要：範囲選択画面に戻った時に制限状態を更新（少し遅延）
     setTimeout(() => {
         console.log('📍 範囲選択画面に戻る - 制限状態を再確認');
         updateIncorrectOnlySelection();
-    }, 100);
+        
+        // ★条件付きリセット：制限解除されている場合のみUIをリセット
+        const currentWeakCount = incorrectWords.length;
+        const isCurrentlyRestricted = hasBeenRestricted && !restrictionReleased;
+        
+        console.log(`🔍 backToSelection制限チェック: 苦手${currentWeakCount}問, 制限中=${isCurrentlyRestricted}`);
+        
+        // ★重要：制限解除されている場合のみリセット
+        if (!isCurrentlyRestricted && currentWeakCount <= 10 && restrictionReleased) {
+            console.log('🔧 制限解除済み - UIを強制リセット');
+            
+            // DOM要素を強制的にリセット
+            const questionCountRadios = document.querySelectorAll('input[name="questionCount"]:not(#incorrectOnlyRadio)');
+            const rangeSelectionArea = document.querySelector('.range-selection-area');
+            const chaptersContainer = document.querySelector('.chapters-container');
+            const rangeSelectionTitle = document.querySelector('.selection-area h3');
+            
+            // ラジオボタンを有効化
+            questionCountRadios.forEach(radio => {
+                radio.disabled = false;
+                radio.parentElement.style.opacity = '1';
+            });
+            
+            // 範囲選択エリアを表示
+            if (rangeSelectionArea) {
+                rangeSelectionArea.style.display = 'block';
+            }
+            if (chaptersContainer) {
+                chaptersContainer.style.display = 'block';
+                chaptersContainer.style.opacity = '1';
+                chaptersContainer.style.pointerEvents = 'auto';
+            }
+            if (rangeSelectionTitle) {
+                rangeSelectionTitle.textContent = '出題数を選択';
+                rangeSelectionTitle.style.color = '#34495e';
+            }
+            
+            // 警告メッセージを削除
+            removeWeakProblemWarning();
+        } else if (isCurrentlyRestricted) {
+            console.log('🔒 制限継続中 - 制限状態を維持');
+            // 制限中の場合は何もしない（updateIncorrectOnlySelectionが適切に処理）
+        }
+    }, 200);
 }
 
 function debugCelebrationMessages() {
