@@ -2433,12 +2433,57 @@ def admin_cleanup_expired_tokens():
         db.session.rollback()
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
-@app.route('/admin/force_migration', methods=['POST'])
+# app.py の admin_force_migration ルートを修正（約1750行目付近）
+@app.route('/admin/force_migration', methods=['GET', 'POST'])
 def admin_force_migration():
     """手動でデータベースマイグレーションを実行"""
     if not session.get('admin_logged_in'):
+        if request.method == 'GET':
+            flash('管理者権限が必要です。', 'danger')
+            return redirect(url_for('login_page'))
         return jsonify({'status': 'error', 'message': '管理者権限が必要です'}), 403
     
+    if request.method == 'GET':
+        # GET リクエストの場合は確認ページを表示
+        return """
+        <html>
+        <head>
+            <title>データベースマイグレーション</title>
+            <style>
+                body { font-family: Arial, sans-serif; margin: 40px; }
+                .container { max-width: 600px; margin: 0 auto; }
+                .warning { background: #fff3cd; border: 1px solid #ffeaa7; padding: 20px; border-radius: 5px; margin: 20px 0; }
+                .btn { padding: 12px 20px; margin: 10px; border: none; border-radius: 5px; cursor: pointer; text-decoration: none; display: inline-block; }
+                .btn-primary { background: #007bff; color: white; }
+                .btn-secondary { background: #6c757d; color: white; }
+                .btn:hover { opacity: 0.8; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>🔧 データベースマイグレーション</h1>
+                <div class="warning">
+                    <h3>⚠️ 注意事項</h3>
+                    <p>この操作は以下を実行します：</p>
+                    <ul>
+                        <li>Userテーブルに制限状態管理用カラムを追加</li>
+                        <li>その他の不足カラムを追加</li>
+                        <li>外部キー制約を修正</li>
+                    </ul>
+                    <p><strong>本番環境での実行のため、慎重に行ってください。</strong></p>
+                </div>
+                
+                <form method="POST" onsubmit="return confirm('本当にマイグレーションを実行しますか？');">
+                    <button type="submit" class="btn btn-primary">🚀 マイグレーションを実行</button>
+                </form>
+                
+                <a href="/admin" class="btn btn-secondary">← 管理者ページに戻る</a>
+            </div>
+        </body>
+        </html>
+        """
+    
+    # POST リクエストの場合は実際にマイグレーションを実行
     try:
         print("🔧 手動マイグレーション開始...")
         
@@ -2452,20 +2497,68 @@ def admin_force_migration():
         migrate_database()
         
         # 成功時のレスポンス
-        return jsonify({
-            'status': 'success',
-            'message': 'データベースマイグレーションが完了しました'
-        })
+        return """
+        <html>
+        <head>
+            <title>マイグレーション完了</title>
+            <style>
+                body { font-family: Arial, sans-serif; margin: 40px; }
+                .container { max-width: 600px; margin: 0 auto; }
+                .success { background: #d4edda; border: 1px solid #c3e6cb; padding: 20px; border-radius: 5px; margin: 20px 0; }
+                .btn { padding: 12px 20px; margin: 10px; border: none; border-radius: 5px; cursor: pointer; text-decoration: none; display: inline-block; }
+                .btn-success { background: #28a745; color: white; }
+                .btn:hover { opacity: 0.8; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>✅ マイグレーション完了</h1>
+                <div class="success">
+                    <h3>成功！</h3>
+                    <p>データベースマイグレーションが正常に完了しました。</p>
+                    <p>制限状態管理用のカラムが追加され、アプリケーションが正常に動作するはずです。</p>
+                </div>
+                
+                <a href="/admin" class="btn btn-success">← 管理者ページに戻る</a>
+                <a href="/" class="btn btn-success">🏠 メインページに移動</a>
+            </div>
+        </body>
+        </html>
+        """
         
     except Exception as e:
         print(f"❌ 手動マイグレーションエラー: {e}")
         import traceback
         traceback.print_exc()
         
-        return jsonify({
-            'status': 'error',
-            'message': f'マイグレーションエラー: {str(e)}'
-        }), 500
+        return f"""
+        <html>
+        <head>
+            <title>マイグレーションエラー</title>
+            <style>
+                body {{ font-family: Arial, sans-serif; margin: 40px; }}
+                .container {{ max-width: 600px; margin: 0 auto; }}
+                .error {{ background: #f8d7da; border: 1px solid #f5c6cb; padding: 20px; border-radius: 5px; margin: 20px 0; }}
+                .btn {{ padding: 12px 20px; margin: 10px; border: none; border-radius: 5px; cursor: pointer; text-decoration: none; display: inline-block; }}
+                .btn-danger {{ background: #dc3545; color: white; }}
+                .btn:hover {{ opacity: 0.8; }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>❌ マイグレーションエラー</h1>
+                <div class="error">
+                    <h3>エラーが発生しました</h3>
+                    <p><strong>エラー内容:</strong> {str(e)}</p>
+                    <p>管理者に連絡するか、緊急修復ページを試してください。</p>
+                </div>
+                
+                <a href="/emergency_add_restriction_columns" class="btn btn-danger">🆘 緊急修復を試す</a>
+                <a href="/admin" class="btn btn-danger">← 管理者ページに戻る</a>
+            </div>
+        </body>
+        </html>
+        """
 
 def fix_foreign_key_constraints():
     """外部キー制約を修正してCASCADEを追加"""
@@ -2515,6 +2608,113 @@ def fix_foreign_key_constraints():
         print(f"❌ 外部キー制約修正エラー: {e}")
         import traceback
         traceback.print_exc()
+
+# app.py に追加（admin_force_migration の後に）
+@app.route('/emergency_add_restriction_columns')
+def emergency_add_restriction_columns():
+    """緊急修復：制限状態用カラムを追加"""
+    try:
+        print("🆘 緊急制限状態カラム追加開始...")
+        
+        # 既存のトランザクションをクリア
+        try:
+            db.session.rollback()
+        except:
+            pass
+        
+        with db.engine.connect() as conn:
+            # 現在のuserテーブルの構造を確認
+            try:
+                result = conn.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name = 'user'"))
+                existing_columns = [row[0] for row in result.fetchall()]
+                print(f"既存カラム: {existing_columns}")
+                
+                messages = []
+                
+                # restriction_triggeredカラムが存在しない場合は追加
+                if 'restriction_triggered' not in existing_columns:
+                    print("🔧 restriction_triggeredカラムを追加中...")
+                    conn.execute(text('ALTER TABLE "user" ADD COLUMN restriction_triggered BOOLEAN DEFAULT FALSE'))
+                    messages.append("✅ restriction_triggeredカラムを追加しました")
+                else:
+                    messages.append("✅ restriction_triggeredカラムは既に存在します")
+                
+                # restriction_releasedカラムが存在しない場合は追加
+                if 'restriction_released' not in existing_columns:
+                    print("🔧 restriction_releasedカラムを追加中...")
+                    conn.execute(text('ALTER TABLE "user" ADD COLUMN restriction_released BOOLEAN DEFAULT FALSE'))
+                    messages.append("✅ restriction_releasedカラムを追加しました")
+                else:
+                    messages.append("✅ restriction_releasedカラムは既に存在します")
+                
+                conn.commit()
+                
+                # 修復後の状態確認
+                result = conn.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name = 'user'"))
+                final_columns = [row[0] for row in result.fetchall()]
+                print(f"修復後のカラム: {final_columns}")
+                
+                return f"""
+                <html>
+                <head>
+                    <title>緊急修復完了</title>
+                    <style>
+                        body {{ font-family: Arial, sans-serif; margin: 40px; }}
+                        .container {{ max-width: 600px; margin: 0 auto; }}
+                        .success {{ background: #d4edda; border: 1px solid #c3e6cb; padding: 20px; border-radius: 5px; margin: 20px 0; }}
+                        .btn {{ padding: 12px 20px; margin: 10px; border: none; border-radius: 5px; cursor: pointer; text-decoration: none; display: inline-block; }}
+                        .btn-success {{ background: #28a745; color: white; }}
+                        .btn:hover {{ opacity: 0.8; }}
+                    </style>
+                </head>
+                <body>
+                    <div class="container">
+                        <h1>✅ 緊急修復完了</h1>
+                        <div class="success">
+                            <h3>制限状態カラムの追加が完了しました</h3>
+                            <ul>
+                                {''.join(f'<li>{msg}</li>' for msg in messages)}
+                            </ul>
+                            <p><strong>修復前のカラム:</strong> {len(existing_columns)}個</p>
+                            <p><strong>修復後のカラム:</strong> {len(final_columns)}個</p>
+                        </div>
+                        
+                        <a href="/admin" class="btn btn-success">← 管理者ページに戻る</a>
+                        <a href="/" class="btn btn-success">🏠 メインページに移動</a>
+                    </div>
+                </body>
+                </html>
+                """
+                
+            except Exception as fix_error:
+                print(f"修復エラー: {fix_error}")
+                return f"""
+                <html>
+                <head><title>修復エラー</title></head>
+                <body>
+                    <h1>❌ 修復エラー</h1>
+                    <p>エラー: {str(fix_error)}</p>
+                    <p><a href="/admin">管理者ページに戻る</a></p>
+                </body>
+                </html>
+                """
+                
+    except Exception as e:
+        print(f"緊急修復失敗: {e}")
+        return f"""
+        <html>
+        <head><title>緊急修復失敗</title></head>
+        <body>
+            <h1>💥 緊急修復失敗</h1>
+            <p>エラー: {str(e)}</p>
+            <p>手動でPostgreSQLにアクセスして以下のSQLを実行してください：</p>
+            <pre>
+ALTER TABLE "user" ADD COLUMN restriction_triggered BOOLEAN DEFAULT FALSE;
+ALTER TABLE "user" ADD COLUMN restriction_released BOOLEAN DEFAULT FALSE;
+            </pre>
+        </body>
+        </html>
+        """
 
 @app.route('/admin/check_database_status')
 def admin_check_database_status():
