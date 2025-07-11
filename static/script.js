@@ -301,17 +301,15 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => {
             loadSelectionState();
             initializeSelectAllButtons();
-            updateIncorrectOnlySelection(); 
-            initializeMobileOptimizations(); // スマホ最適化
-            improveTouchExperience(); // タッチ操作改善
-            optimizeScrolling(); // スクロール最適化
-        }, 1000);
-        
-        setTimeout(() => {
-            console.log('📍 初期化完了後の制限状態最終チェック');
+            initializeMobileOptimizations();
+            improveTouchExperience();
+            optimizeScrolling();
+            
+            // ★制限状態チェックを最後に1回だけ実行
+            console.log('📍 初期化完了 - 制限状態をチェック');
             updateIncorrectOnlySelection();
-        }, 1500);
-
+        }, 1500); // 1.5秒後に1回だけ
+        
         if (noWeakWordsMessage) {
             noWeakWordsMessage.classList.add('hidden');
         }
@@ -319,7 +317,6 @@ document.addEventListener('DOMContentLoaded', () => {
         console.error('Error during initialization:', error);
     }
 
-    // ESCキーでの閉じる機能を追加
     document.addEventListener('keydown', handleEscapeKey);
 });
 
@@ -1161,9 +1158,6 @@ function handleAnswer(isCorrect) {
     console.log(`  制限後の状態: hasBeenRestricted=${hasBeenRestricted}, restrictionReleased=${restrictionReleased}`);
     console.log(`  制限後の判定: ${afterRestricted ? '制限中' : '制限なし'}`);
     console.log(`🔍 制限状態チェック完了\n`);
-    
-    // UI更新
-    updateIncorrectOnlySelection();
 
     if (currentQuestionIndex < totalQuestions) {
         showNextQuestion();
@@ -2140,28 +2134,19 @@ function closeInfoPanelWithTouch() {
     }
 }
 
-function showWeakProblemWarning(count, isReactivation = false) {
+function showWeakProblemWarning(count) {
     removeWeakProblemWarning();
     
     const warningDiv = document.createElement('div');
     warningDiv.id = 'weakProblemWarning';
     warningDiv.className = 'weak-problem-warning';
     
-    const title = isReactivation ? 
-        '<i class="fas fa-redo"></i> 苦手問題が再蓄積されました' : 
-        '<i class="fas fa-exclamation-triangle"></i> 苦手問題が蓄積されています';
-        
-    const description = isReactivation ?
-        '再び苦手問題が増えました。' :
-        '苦手問題が多く蓄積されています。';
-    
     warningDiv.innerHTML = `
         <div style="background-color: #fdf2f2; border: 2px solid #e74c3c; border-radius: 8px; padding: 20px; margin: 20px 0; text-align: center; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
             <h4 style="color: #e74c3c; margin: 0 0 15px 0; font-size: 1.3em;">
-                ${title}
+                <i class="fas fa-exclamation-triangle"></i> 苦手問題が蓄積されています
             </h4>
             <p style="margin: 10px 0; color: #721c24; font-size: 1.1em; line-height: 1.6;">
-                ${description}<br>
                 現在 <strong style="font-size: 1.2em; color: #e74c3c;">${count}問</strong> の苦手問題があります。<br>
                 まず苦手問題を <strong style="color: #e74c3c;">10問以下</strong> に減らしてから通常学習に戻りましょう。
             </p>
