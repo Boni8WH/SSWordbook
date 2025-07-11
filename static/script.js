@@ -525,7 +525,37 @@ function updateIncorrectOnlySelection() {
     
     console.log(`制限状態: 苦手${weakProblemCount}問, 制限中=${isCurrentlyRestricted}, hasBeenRestricted=${hasBeenRestricted}, restrictionReleased=${restrictionReleased}`);
     
-    if (incorrectOnlyRadio && incorrectOnlyRadio.checked && !isCurrentlyRestricted) {
+    if (isCurrentlyRestricted) {
+    // ★制限発動中（最優先で処理）
+    console.log('🔒 制限適用中 - UIを制限モードに変更');
+    
+    // 苦手問題ラジオボタンを強制選択
+    if (incorrectOnlyRadio) {
+        incorrectOnlyRadio.checked = true;
+    }
+    
+    // 他の選択肢を無効化
+    questionCountRadios.forEach(radio => {
+        radio.disabled = true;
+        radio.parentElement.style.opacity = '0.5';
+    });
+    
+    // 出題範囲選択を完全に非表示
+    if (rangeSelectionArea) {
+        rangeSelectionArea.style.display = 'none';
+    }
+    if (chaptersContainer) {
+        chaptersContainer.style.display = 'none';
+    }
+    
+    // 制限状態に応じた警告メッセージ
+    if (weakProblemCount >= 20) {
+        showWeakProblemWarning(weakProblemCount);
+    } else if (weakProblemCount > 10) {
+        showIntermediateWeakProblemWarning(weakProblemCount);
+    }
+    
+    } else if (incorrectOnlyRadio && incorrectOnlyRadio.checked) {
         // 手動で苦手問題が選択されている場合（制限なし）
         if (rangeSelectionArea) {
             rangeSelectionArea.style.display = 'none';
@@ -534,32 +564,6 @@ function updateIncorrectOnlySelection() {
             rangeSelectionTitle.textContent = '出題数を選択（苦手問題モードでは無効）';
             rangeSelectionTitle.style.color = '#95a5a6';
         }
-    } else if (isCurrentlyRestricted) {
-        // ★制限発動中（苦手問題が何問でも10問以下になるまで継続）
-        incorrectOnlyRadio.checked = true;
-        
-        // 他の選択肢を無効化
-        questionCountRadios.forEach(radio => {
-            radio.disabled = true;
-            radio.parentElement.style.opacity = '0.5';
-        });
-        
-        // 出題範囲選択を完全に非表示
-        if (rangeSelectionArea) {
-            rangeSelectionArea.style.display = 'none';
-        }
-        if (chaptersContainer) {
-            chaptersContainer.style.display = 'none';
-        }
-        
-        // 制限状態に応じた警告メッセージ
-        if (weakProblemCount >= 20) {
-            showWeakProblemWarning(weakProblemCount);
-        } else if (weakProblemCount > 10) {
-            // 11～19問：制限継続中
-            showIntermediateWeakProblemWarning(weakProblemCount);
-        }
-        // 注意：10問以下の場合は上記の解除条件でrestrictionReleasedがtrueになるため、ここには来ない
     } else {
         // ★制限なし（通常モード）
         questionCountRadios.forEach(radio => {
