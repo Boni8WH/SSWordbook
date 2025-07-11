@@ -8,16 +8,18 @@ if (typeof window === 'undefined') {
 }
 
 // グローバル変数
-let currentQuizData = []; // 現在のクイズの問題リスト
-let currentQuestionIndex = 0; // 現在表示している問題のインデックス
-let correctCount = 0; // 正解数
-let incorrectCount = 0; // 不正解数
-let totalQuestions = 0; // 出題する総問題数
-let problemHistory = {}; // ユーザーの全問題履歴（永続化されるもの）
-let incorrectWords = []; // ユーザーの苦手な単語リスト（永続化されるもの）
-let quizStartTime; // クイズ開始時刻
-let isAnswerButtonDisabled = false; // 答えを見るボタンの無効化フラグ
-let answerButtonTimeout = null; // タイムアウト管理用
+let currentQuizData = [];
+let currentQuestionIndex = 0;
+let correctCount = 0;
+let incorrectCount = 0;
+let totalQuestions = 0;
+let problemHistory = {};
+let incorrectWords = [];
+let quizStartTime;
+let isAnswerButtonDisabled = false;
+let answerButtonTimeout = null;
+let hasBeenRestricted = false; // 一度でも制限されたかのフラグ
+let restrictionReleased = false; // 制限が解除されたかのフラグ
 
 // DOM要素
 const startButton = document.getElementById('startButton');
@@ -320,9 +322,21 @@ function loadUserData() {
             if (data.status === 'success') {
                 problemHistory = data.problemHistory || {};
                 incorrectWords = data.incorrectWords || [];
-                console.log(`ユーザーデータロード完了: 苦手問題 ${incorrectWords.length}個`);
                 
-                // ロード完了後に制限チェック
+                // ★制限状態の初期化
+                const weakCount = incorrectWords.length;
+                if (weakCount >= 20) {
+                    hasBeenRestricted = true;
+                    restrictionReleased = false;
+                } else if (weakCount <= 10) {
+                    // 苦手問題が少ない場合は制限なし状態として開始
+                    hasBeenRestricted = false;
+                    restrictionReleased = false;
+                }
+                
+                console.log(`ユーザーデータロード完了: 苦手問題 ${incorrectWords.length}個`);
+                console.log(`制限状態: hasBeenRestricted=${hasBeenRestricted}, restrictionReleased=${restrictionReleased}`);
+                
                 setTimeout(() => {
                     updateIncorrectOnlySelection();
                 }, 500);
@@ -487,30 +501,52 @@ function loadSelectionState() {
 function updateIncorrectOnlySelection() {
     const incorrectOnlyRadio = document.getElementById('incorrectOnlyRadio');
     const chaptersContainer = document.querySelector('.chapters-container');
-    const rangeSelectionArea = document.querySelector('.range-selection-area'); // ★新規追加
+    const rangeSelectionArea = document.querySelector('.range-selection-area');
     const rangeSelectionTitle = document.querySelector('.selection-area h3');
     const questionCountRadios = document.querySelectorAll('input[name="questionCount"]:not(#incorrectOnlyRadio)');
     
-    // ★修正：条件を明確に分離
     const weakProblemCount = incorrectWords.length;
-    const isForceWeakMode = weakProblemCount >= 20;  // 20問以上で制限発動
-    const canUseNormalMode = weakProblemCount <= 10;  // 10問以下で制限解除
     
-    if (incorrectOnlyRadio && incorrectOnlyRadio.checked) {
-        // 苦手問題が選択されている場合
-        if (chaptersContainer) {
-            chaptersContainer.style.opacity = '0.5';
-            chaptersContainer.style.pointerEvents = 'none';
+    // ★修正：制限条件の判定ロジック
+    let shouldRestrict = false;
+    
+    if (!hasBeenRestricted) {
+        // まだ一度も制限されていない場合：20問以上で制限
+        shouldRestrict = weakProblemCount >= 20;
+        if (shouldRestrict) {
+            hasBeenRestricted = true;
+            restrictionReleased = false;
+            console.log('🔒 初回制限発動: 苦手問題', weakProblemCount, '問');
         }
+    } else if (!restrictionReleased) {
+        // 制限中で未解除の場合：10問以下で解除
+        if (weakProblemCount <= 10) {
+            restrictionReleased = true;
+            shouldRestrict = false;
+            console.log('🔓 制限解除: 苦手問題', weakProblemCount, '問');
+        } else {
+            shouldRestrict = true; // 制限継続
+        }
+    } else {
+        // 一度解除された後：20問以上で再制限
+        if (weakProblemCount >= 20) {
+            shouldRestrict = true;
+            restrictionReleased = false;
+            console.log('🔒 再制限発動: 苦手問題', weakProblemCount, '問');
+        }
+    }
+    
+    if (incorrectOnlyRadio && incorrectOnlyRadio.checked && !shouldRestrict) {
+        // 手動で苦手問題が選択されている場合（制限なし）
         if (rangeSelectionArea) {
-            rangeSelectionArea.style.display = 'none'; // ★完全に非表示
+            rangeSelectionArea.style.display = 'none';
         }
         if (rangeSelectionTitle) {
             rangeSelectionTitle.textContent = '出題数を選択（苦手問題モードでは無効）';
             rangeSelectionTitle.style.color = '#95a5a6';
         }
-    } else if (isForceWeakMode) {
-        // ★修正：20問以上の場合は強制的に苦手問題モードに切り替え
+    } else if (shouldRestrict) {
+        // ★制限発動中
         incorrectOnlyRadio.checked = true;
         
         // 他の選択肢を無効化
@@ -519,24 +555,27 @@ function updateIncorrectOnlySelection() {
             radio.parentElement.style.opacity = '0.5';
         });
         
-        // ★新機能：出題範囲選択を完全に非表示
+        // 出題範囲選択を完全に非表示
         if (rangeSelectionArea) {
             rangeSelectionArea.style.display = 'none';
         }
         if (chaptersContainer) {
-            chaptersContainer.style.display = 'none'; // ★完全に非表示
+            chaptersContainer.style.display = 'none';
         }
         
-        // 警告メッセージを表示
-        showWeakProblemWarning(weakProblemCount);
-    } else if (canUseNormalMode) {
-        // ★修正：10問以下の場合のみ通常モードを許可
+        // 制限状態に応じた警告メッセージ
+        if (weakProblemCount >= 20) {
+            showWeakProblemWarning(weakProblemCount, restrictionReleased);
+        } else {
+            showIntermediateWeakProblemWarning(weakProblemCount);
+        }
+    } else {
+        // ★制限なし（通常モード）
         questionCountRadios.forEach(radio => {
             radio.disabled = false;
             radio.parentElement.style.opacity = '1';
         });
         
-        // ★修正：出題範囲選択を表示・有効化
         if (rangeSelectionArea) {
             rangeSelectionArea.style.display = 'block';
         }
@@ -550,27 +589,7 @@ function updateIncorrectOnlySelection() {
             rangeSelectionTitle.style.color = '#34495e';
         }
         
-        // 警告メッセージを削除
         removeWeakProblemWarning();
-    } else {
-        // ★新規追加：11～19問の中間状態（制限は継続）
-        incorrectOnlyRadio.checked = true;
-        
-        questionCountRadios.forEach(radio => {
-            radio.disabled = true;
-            radio.parentElement.style.opacity = '0.5';
-        });
-        
-        // ★新機能：出題範囲選択を完全に非表示
-        if (rangeSelectionArea) {
-            rangeSelectionArea.style.display = 'none';
-        }
-        if (chaptersContainer) {
-            chaptersContainer.style.display = 'none'; // ★完全に非表示
-        }
-        
-        // 中間状態の警告メッセージを表示
-        showIntermediateWeakProblemWarning(weakProblemCount);
     }
 }
 
@@ -739,19 +758,26 @@ let lastQuizSettings = {
 };
 
 function startQuiz() {
-    // ★修正：苦手問題数による制限チェック
     const weakProblemCount = incorrectWords.length;
     const selectedQuestionCount = getSelectedQuestionCount();
     
-    // ★修正：20問以上で制限、10問以下で解除
-    if (weakProblemCount >= 20 && selectedQuestionCount !== 'incorrectOnly') {
-        flashMessage('苦手問題が20問以上あります。まず苦手問題モードで学習してください。', 'danger');
-        return;
+    // ★修正：制限状態に基づくチェック
+    let isRestricted = false;
+    
+    if (!hasBeenRestricted) {
+        isRestricted = weakProblemCount >= 20;
+    } else if (!restrictionReleased) {
+        isRestricted = weakProblemCount > 10;
+    } else {
+        isRestricted = weakProblemCount >= 20;
     }
     
-    // ★新規追加：11～19問の中間状態でも制限
-    if (weakProblemCount > 10 && weakProblemCount < 20 && selectedQuestionCount !== 'incorrectOnly') {
-        flashMessage('苦手問題を10問以下に減らすまで、苦手問題モードで学習してください。', 'warning');
+    if (isRestricted && selectedQuestionCount !== 'incorrectOnly') {
+        if (weakProblemCount >= 20) {
+            flashMessage('苦手問題が20問以上あります。まず苦手問題モードで学習してください。', 'danger');
+        } else {
+            flashMessage('苦手問題を10問以下に減らすまで、苦手問題モードで学習してください。', 'warning');
+        }
         return;
     }
     
@@ -1116,6 +1142,23 @@ function handleAnswer(isCorrect) {
     // 次の問題へ進む
     currentQuestionIndex++;
     updateProgressBar();
+
+    // ★新機能：即座に制限状態をチェック
+    setTimeout(() => {
+        const currentWeakCount = incorrectWords.length;
+        
+        // 制限解除チェック（10問以下になった瞬間）
+        if (currentWeakCount <= 10) {
+            updateIncorrectOnlySelection();
+            
+            // 制限解除メッセージ（学習中）
+            if (currentWeakCount === 0) {
+                flashMessage('🎉 すべての苦手問題を克服！通常学習が利用可能になりました。', 'success');
+            } else if (currentWeakCount <= 10) {
+                flashMessage(`✨ 苦手問題が${currentWeakCount}問に！通常学習が利用可能になりました。`, 'success');
+            }
+        }
+    }, 100);
 
     if (currentQuestionIndex < totalQuestions) {
         showNextQuestion();
@@ -2096,19 +2139,28 @@ function closeInfoPanelWithTouch() {
     }
 }
 
-function showWeakProblemWarning(count) {
-    // 既存の警告を削除
+function showWeakProblemWarning(count, isReactivation = false) {
     removeWeakProblemWarning();
     
     const warningDiv = document.createElement('div');
     warningDiv.id = 'weakProblemWarning';
     warningDiv.className = 'weak-problem-warning';
+    
+    const title = isReactivation ? 
+        '<i class="fas fa-redo"></i> 苦手問題が再蓄積されました' : 
+        '<i class="fas fa-exclamation-triangle"></i> 苦手問題が蓄積されています';
+        
+    const description = isReactivation ?
+        '再び苦手問題が増えました。' :
+        '苦手問題が多く蓄積されています。';
+    
     warningDiv.innerHTML = `
         <div style="background-color: #fdf2f2; border: 2px solid #e74c3c; border-radius: 8px; padding: 20px; margin: 20px 0; text-align: center; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
             <h4 style="color: #e74c3c; margin: 0 0 15px 0; font-size: 1.3em;">
-                <i class="fas fa-exclamation-triangle"></i> 苦手問題が蓄積されています
+                ${title}
             </h4>
             <p style="margin: 10px 0; color: #721c24; font-size: 1.1em; line-height: 1.6;">
+                ${description}<br>
                 現在 <strong style="font-size: 1.2em; color: #e74c3c;">${count}問</strong> の苦手問題があります。<br>
                 まず苦手問題を <strong style="color: #e74c3c;">10問以下</strong> に減らしてから通常学習に戻りましょう。
             </p>
