@@ -131,8 +131,9 @@
     </div>
     
     <div class="text-center">
-        <a href="{{ url_for('admin_detailed_storage_analysis') }}" class="btn btn-outline-secondary">← 基本分析に戻る</a>
-        <a href="{{ url_for('admin_page') }}" class="btn btn-secondary">管理者ページに戻る</a>
+        <a href="{{ url_for('admin_page') }}" class="btn btn-secondary">← 管理者ページに戻る</a>
+        <button type="button" onclick="location.reload()" class="btn btn-outline-info">🔄 再分析</button>
+        <button type="button" onclick="window.print()" class="btn btn-outline-primary">🖨️ 分析結果を印刷</button>
     </div>
 </div>
 {% endblock %}
