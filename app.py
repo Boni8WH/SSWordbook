@@ -204,9 +204,10 @@ class User(db.Model):
     incorrect_words = db.Column(db.Text)
     last_login = db.Column(db.DateTime, default=lambda: datetime.now(JST))
     username_changed_at = db.Column(db.DateTime)
-    
     is_first_login = db.Column(db.Boolean, default=True, nullable=False)
     password_changed_at = db.Column(db.DateTime)
+    restriction_triggered = db.Column(db.Boolean, default=False, nullable=False)  # 制限が発動したことがあるか
+    restriction_released = db.Column(db.Boolean, default=False, nullable=False)   # 制限が解除されたか
     
     # 複合ユニーク制約
     __table_args__ = (
@@ -260,6 +261,18 @@ class User(db.Model):
         self.set_individual_password(new_password)
         self.password_changed_at = datetime.now(JST)
         self.mark_first_login_completed()
+    
+    def set_restriction_state(self, triggered, released):
+        """制限状態を設定"""
+        self.restriction_triggered = triggered
+        self.restriction_released = released
+    
+    def get_restriction_state(self):
+        """制限状態を取得"""
+        return {
+            'hasBeenRestricted': self.restriction_triggered,
+            'restrictionReleased': self.restriction_released
+        }
 
 class RoomSetting(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -933,9 +946,9 @@ def change_username_page():
 
 # データベースマイグレーション関数
 def migrate_database():
-    """データベーススキーマの変更を処理する（UserStats対応版）"""
+    """データベーススキーマの変更を処理する"""
     with app.app_context():
-        print("🔄 データベースマイグレーション（UserStats対応）を開始...")
+        print("🔄 データベースマイグレーション開始...")
         
         try:
             inspector = inspect(db.engine)
@@ -944,6 +957,21 @@ def migrate_database():
             if inspector.has_table('user'):
                 columns = [col['name'] for col in inspector.get_columns('user')]
                 print(f"📋 既存のUserテーブルカラム: {columns}")
+                
+                # 🆕 制限状態管理用カラムを追加
+                if 'restriction_triggered' not in columns:
+                    print("🔧 restriction_triggeredカラムを追加します...")
+                    with db.engine.connect() as conn:
+                        conn.execute(text('ALTER TABLE "user" ADD COLUMN restriction_triggered BOOLEAN DEFAULT FALSE'))
+                        conn.commit()
+                    print("✅ restriction_triggeredカラムを追加しました。")
+                
+                if 'restriction_released' not in columns:
+                    print("🔧 restriction_releasedカラムを追加します...")
+                    with db.engine.connect() as conn:
+                        conn.execute(text('ALTER TABLE "user" ADD COLUMN restriction_released BOOLEAN DEFAULT FALSE'))
+                        conn.commit()
+                    print("✅ restriction_releasedカラムを追加しました。")
                 
                 # アカウント名変更機能用のカラムを追加
                 if 'original_username' not in columns:
@@ -3184,10 +3212,16 @@ def api_load_quiz_progress():
         if not current_user:
             return jsonify(status='error', message='ユーザーが見つかりません。'), 404
 
-        return jsonify(status='success', 
-                       problemHistory=current_user.get_problem_history(),
-                       incorrectWords=current_user.get_incorrect_words(),
-                       quizProgress={})
+        # 🆕 制限状態も含めて返す
+        restriction_state = current_user.get_restriction_state()
+        
+        return jsonify(
+            status='success', 
+            problemHistory=current_user.get_problem_history(),
+            incorrectWords=current_user.get_incorrect_words(),
+            quizProgress={},
+            restrictionState=restriction_state  # 🆕 制限状態を追加
+        )
     except Exception as e:
         print(f"Error in api_load_quiz_progress: {e}")
         return jsonify(status='error', message=str(e)), 500
@@ -3239,6 +3273,34 @@ def save_quiz_progress():
         print(f"❌ 進捗保存エラー: {e}")
         db.session.rollback()
         return jsonify(status='error', message=f'進捗の保存中にエラーが発生しました: {str(e)}'), 500
+
+@app.route('/api/update_restriction_state', methods=['POST'])
+def update_restriction_state():
+    """制限状態を更新"""
+    try:
+        if 'user_id' not in session:
+            return jsonify(status='error', message='ログインしていません。'), 401
+        
+        data = request.get_json()
+        has_been_restricted = data.get('hasBeenRestricted', False)
+        restriction_released = data.get('restrictionReleased', False)
+
+        current_user = User.query.get(session['user_id'])
+        if not current_user:
+            return jsonify(status='error', message='ユーザーが見つかりません。'), 404
+
+        print(f"🔄 制限状態更新: {current_user.username} - triggered={has_been_restricted}, released={restriction_released}")
+
+        # 制限状態を保存
+        current_user.set_restriction_state(has_been_restricted, restriction_released)
+        db.session.commit()
+
+        return jsonify(status='success', message='制限状態を更新しました。')
+        
+    except Exception as e:
+        print(f"❌ 制限状態更新エラー: {e}")
+        db.session.rollback()
+        return jsonify(status='error', message=f'制限状態更新エラー: {str(e)}'), 500
 
 @app.route('/api/save_progress_debug', methods=['POST'])
 def save_quiz_progress_debug():
