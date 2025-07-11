@@ -776,6 +776,20 @@ let lastQuizSettings = {
 };
 
 function startQuiz() {
+    // ★重要：クイズ開始時に答えを見るボタンの状態を確実にリセット
+    isAnswerButtonDisabled = false;
+    if (answerButtonTimeout) {
+        clearTimeout(answerButtonTimeout);
+        answerButtonTimeout = null;
+    }
+    if (showAnswerButton) {
+        showAnswerButton.disabled = false;
+        showAnswerButton.style.opacity = '1';
+        showAnswerButton.style.cursor = 'pointer';
+        showAnswerButton.style.pointerEvents = 'auto';
+    }
+    console.log('📍 クイズ開始 - 答えを見るボタンの状態をリセット');
+    
     const weakProblemCount = incorrectWords.length;
     const selectedQuestionCount = getSelectedQuestionCount();
     
