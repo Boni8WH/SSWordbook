@@ -321,6 +321,11 @@ function loadUserData() {
                 problemHistory = data.problemHistory || {};
                 incorrectWords = data.incorrectWords || [];
                 console.log(`ユーザーデータロード完了: 苦手問題 ${incorrectWords.length}個`);
+                
+                // ロード完了後に制限チェック
+                setTimeout(() => {
+                    updateIncorrectOnlySelection();
+                }, 500);
             } else {
                 console.error('Failed to load user data:', data.message);
             }
@@ -484,6 +489,12 @@ function updateIncorrectOnlySelection() {
     const incorrectOnlyRadio = document.getElementById('incorrectOnlyRadio');
     const chaptersContainer = document.querySelector('.chapters-container');
     const rangeSelectionTitle = document.querySelector('.selection-area h3');
+    const questionCountRadios = document.querySelectorAll('input[name="questionCount"]:not(#incorrectOnlyRadio)');
+    
+    // 苦手問題数をチェック
+    const weakProblemCount = incorrectWords.length;
+    const isForceWeakMode = weakProblemCount > 20;
+    const isWeakModeDisabled = weakProblemCount > 10;
     
     if (incorrectOnlyRadio && incorrectOnlyRadio.checked) {
         // 苦手問題が選択されている場合
@@ -495,8 +506,35 @@ function updateIncorrectOnlySelection() {
             rangeSelectionTitle.textContent = '出題数を選択（苦手問題モードでは無効）';
             rangeSelectionTitle.style.color = '#95a5a6';
         }
+    } else if (isForceWeakMode) {
+        // 苦手問題が20問を超えている場合は強制的に苦手問題モードに切り替え
+        incorrectOnlyRadio.checked = true;
+        
+        // 他の選択肢を無効化
+        questionCountRadios.forEach(radio => {
+            radio.disabled = true;
+            radio.parentElement.style.opacity = '0.5';
+        });
+        
+        // 範囲選択も無効化
+        if (chaptersContainer) {
+            chaptersContainer.style.opacity = '0.3';
+            chaptersContainer.style.pointerEvents = 'none';
+        }
+        if (rangeSelectionTitle) {
+            rangeSelectionTitle.textContent = '苦手問題が多すぎます（苦手問題モード必須）';
+            rangeSelectionTitle.style.color = '#e74c3c';
+        }
+        
+        // 警告メッセージを表示
+        showWeakProblemWarning(weakProblemCount);
     } else {
         // 通常モードの場合
+        questionCountRadios.forEach(radio => {
+            radio.disabled = false;
+            radio.parentElement.style.opacity = '1';
+        });
+        
         if (chaptersContainer) {
             chaptersContainer.style.opacity = '1';
             chaptersContainer.style.pointerEvents = 'auto';
@@ -505,6 +543,9 @@ function updateIncorrectOnlySelection() {
             rangeSelectionTitle.textContent = '出題数を選択';
             rangeSelectionTitle.style.color = '#34495e';
         }
+        
+        // 警告メッセージを削除
+        removeWeakProblemWarning();
     }
 }
 
@@ -673,8 +714,16 @@ let lastQuizSettings = {
 };
 
 function startQuiz() {
-    const selectedQuestions = getSelectedQuestions();
+    // ★新機能：苦手問題数による制限チェック
+    const weakProblemCount = incorrectWords.length;
     const selectedQuestionCount = getSelectedQuestionCount();
+    
+    if (weakProblemCount > 20 && selectedQuestionCount !== 'incorrectOnly') {
+        flashMessage('苦手問題が20問を超えています。まず苦手問題モードで学習してください。', 'danger');
+        return;
+    }
+    
+    const selectedQuestions = getSelectedQuestions();
 
     // 苦手問題モードの場合は範囲選択チェックをスキップ
     if (selectedQuestionCount !== 'incorrectOnly' && selectedQuestions.length === 0) {
@@ -1101,8 +1150,25 @@ function showQuizResult() {
         }
     });
     
-    // 少し遅延させてボタンテキストを更新
+    // ★新機能：制限解除チェックと関連処理
     setTimeout(() => {
+        const currentWeakCount = incorrectWords.length;
+        
+        // 制限解除チェック（苦手問題が10問以下になった場合）
+        if (currentWeakCount <= 10) {
+            updateIncorrectOnlySelection(); // UI制限を解除
+            
+            // 制限解除メッセージ
+            if (currentWeakCount === 0) {
+                flashMessage('🎉 すべての苦手問題を克服しました！通常学習が利用できます。', 'success');
+            } else if (lastQuizSettings.isIncorrectOnly && currentWeakCount <= 10) {
+                flashMessage(`✨ 苦手問題が${currentWeakCount}問になりました。通常学習が利用できます。`, 'success');
+            }
+        } else if (currentWeakCount > 20) {
+            // まだ制限が必要な場合は制限を維持
+            updateIncorrectOnlySelection();
+        }
+        
         updateRestartButtonText();
     }, 100);
 }
@@ -1989,6 +2055,41 @@ function closeInfoPanelWithTouch() {
     closeInfoPanel();
     if ('ontouchstart' in window) {
         document.removeEventListener('touchstart', handleTouchOutside);
+    }
+}
+
+function showWeakProblemWarning(count) {
+    // 既存の警告を削除
+    removeWeakProblemWarning();
+    
+    const warningDiv = document.createElement('div');
+    warningDiv.id = 'weakProblemWarning';
+    warningDiv.className = 'weak-problem-warning';
+    warningDiv.innerHTML = `
+        <div style="background-color: #fdf2f2; border: 2px solid #e74c3c; border-radius: 8px; padding: 15px; margin: 15px 0; text-align: center;">
+            <h4 style="color: #e74c3c; margin: 0 0 10px 0;">
+                <i class="fas fa-exclamation-triangle"></i> 苦手問題が蓄積されています
+            </h4>
+            <p style="margin: 5px 0; color: #721c24;">
+                現在 <strong>${count}問</strong> の苦手問題があります。<br>
+                まず苦手問題を <strong>10問以下</strong> に減らしてから通常学習に戻りましょう。
+            </p>
+            <p style="margin: 10px 0 0 0; font-size: 0.9em; color: #a94442;">
+                苦手問題モードで学習を続けると、通常モードが利用できるようになります。
+            </p>
+        </div>
+    `;
+    
+    const selectionArea = document.querySelector('.selection-area .controls-area');
+    if (selectionArea) {
+        selectionArea.insertBefore(warningDiv, selectionArea.firstChild);
+    }
+}
+
+function removeWeakProblemWarning() {
+    const existingWarning = document.getElementById('weakProblemWarning');
+    if (existingWarning) {
+        existingWarning.remove();
     }
 }
 
