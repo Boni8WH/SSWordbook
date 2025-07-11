@@ -328,19 +328,25 @@ function loadUserData() {
                 problemHistory = data.problemHistory || {};
                 incorrectWords = data.incorrectWords || [];
                 
-                // ★制限状態の初期化
-                const weakCount = incorrectWords.length;
-                if (weakCount >= 20) {
-                    hasBeenRestricted = true;
-                    restrictionReleased = false;
-                } else if (weakCount <= 10) {
-                    // 苦手問題が少ない場合は制限なし状態として開始
-                    hasBeenRestricted = false;
-                    restrictionReleased = false;
+                // 🆕 サーバーから制限状態を取得
+                if (data.restrictionState) {
+                    hasBeenRestricted = data.restrictionState.hasBeenRestricted || false;
+                    restrictionReleased = data.restrictionState.restrictionReleased || false;
+                    console.log(`🔄 サーバーから制限状態を復元: hasBeenRestricted=${hasBeenRestricted}, restrictionReleased=${restrictionReleased}`);
+                } else {
+                    // 🆕 制限状態の初期化（苦手問題数に基づく）
+                    const weakCount = incorrectWords.length;
+                    if (weakCount >= 20) {
+                        hasBeenRestricted = true;
+                        restrictionReleased = false;
+                    } else {
+                        hasBeenRestricted = false;
+                        restrictionReleased = false;
+                    }
+                    console.log(`🔄 制限状態を初期化: 苦手${weakCount}問 -> hasBeenRestricted=${hasBeenRestricted}`);
                 }
                 
                 console.log(`ユーザーデータロード完了: 苦手問題 ${incorrectWords.length}個`);
-                console.log(`制限状態: hasBeenRestricted=${hasBeenRestricted}, restrictionReleased=${restrictionReleased}`);
                 
                 setTimeout(() => {
                     updateIncorrectOnlySelection();
@@ -352,6 +358,35 @@ function loadUserData() {
         .catch(error => {
             console.error('Error loading user data:', error);
         });
+}
+
+// 🆕 制限状態をサーバーに保存する関数を追加
+function saveRestrictionState() {
+    const restrictionData = {
+        hasBeenRestricted: hasBeenRestricted,
+        restrictionReleased: restrictionReleased
+    };
+    
+    console.log('🔄 制限状態をサーバーに保存:', restrictionData);
+    
+    fetch('/api/update_restriction_state', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(restrictionData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            console.log('✅ 制限状態保存成功');
+        } else {
+            console.error('❌ 制限状態保存失敗:', data.message);
+        }
+    })
+    .catch(error => {
+        console.error('❌ 制限状態保存エラー:', error);
+    });
 }
 
 function loadWordDataFromServer() {
@@ -512,13 +547,17 @@ function updateIncorrectOnlySelection() {
     
     const weakProblemCount = incorrectWords.length;
     
-    // ★修正：制限状態の更新ロジック
+    // 🆕 制限状態の更新ロジック（状態変更時にサーバーに保存）
+    let stateChanged = false;
+    const oldHasBeenRestricted = hasBeenRestricted;
+    const oldRestrictionReleased = restrictionReleased;
     
     // 1. 20問以上で制限発動（初回も再発動も同じ条件）
     if (weakProblemCount >= 20) {
         if (!hasBeenRestricted || restrictionReleased) {
             hasBeenRestricted = true;
             restrictionReleased = false;
+            stateChanged = true;
             console.log('🔒 制限発動: 苦手問題', weakProblemCount, '問（20問以上）');
         }
     }
@@ -526,7 +565,14 @@ function updateIncorrectOnlySelection() {
     // 2. 10問以下で制限解除
     if (hasBeenRestricted && !restrictionReleased && weakProblemCount <= 10) {
         restrictionReleased = true;
+        stateChanged = true;
         console.log('🔓 制限解除: 苦手問題', weakProblemCount, '問（10問以下達成）');
+    }
+    
+    // 🆕 状態が変更された場合はサーバーに保存
+    if (stateChanged) {
+        console.log(`📤 制限状態変更を保存: ${oldHasBeenRestricted}->${hasBeenRestricted}, ${oldRestrictionReleased}->${restrictionReleased}`);
+        saveRestrictionState();
     }
     
     // ★現在の制限状態判定：20問以上か、制限中で11問以上のみ
