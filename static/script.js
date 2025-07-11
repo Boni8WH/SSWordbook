@@ -487,6 +487,7 @@ function loadSelectionState() {
 function updateIncorrectOnlySelection() {
     const incorrectOnlyRadio = document.getElementById('incorrectOnlyRadio');
     const chaptersContainer = document.querySelector('.chapters-container');
+    const rangeSelectionArea = document.querySelector('.range-selection-area'); // ★新規追加
     const rangeSelectionTitle = document.querySelector('.selection-area h3');
     const questionCountRadios = document.querySelectorAll('input[name="questionCount"]:not(#incorrectOnlyRadio)');
     
@@ -500,6 +501,9 @@ function updateIncorrectOnlySelection() {
         if (chaptersContainer) {
             chaptersContainer.style.opacity = '0.5';
             chaptersContainer.style.pointerEvents = 'none';
+        }
+        if (rangeSelectionArea) {
+            rangeSelectionArea.style.display = 'none'; // ★完全に非表示
         }
         if (rangeSelectionTitle) {
             rangeSelectionTitle.textContent = '出題数を選択（苦手問題モードでは無効）';
@@ -515,14 +519,12 @@ function updateIncorrectOnlySelection() {
             radio.parentElement.style.opacity = '0.5';
         });
         
-        // 範囲選択も無効化
-        if (chaptersContainer) {
-            chaptersContainer.style.opacity = '0.3';
-            chaptersContainer.style.pointerEvents = 'none';
+        // ★新機能：出題範囲選択を完全に非表示
+        if (rangeSelectionArea) {
+            rangeSelectionArea.style.display = 'none';
         }
-        if (rangeSelectionTitle) {
-            rangeSelectionTitle.textContent = '苦手問題が多すぎます（苦手問題モード必須）';
-            rangeSelectionTitle.style.color = '#e74c3c';
+        if (chaptersContainer) {
+            chaptersContainer.style.display = 'none'; // ★完全に非表示
         }
         
         // 警告メッセージを表示
@@ -534,7 +536,12 @@ function updateIncorrectOnlySelection() {
             radio.parentElement.style.opacity = '1';
         });
         
+        // ★修正：出題範囲選択を表示・有効化
+        if (rangeSelectionArea) {
+            rangeSelectionArea.style.display = 'block';
+        }
         if (chaptersContainer) {
+            chaptersContainer.style.display = 'block';
             chaptersContainer.style.opacity = '1';
             chaptersContainer.style.pointerEvents = 'auto';
         }
@@ -554,13 +561,12 @@ function updateIncorrectOnlySelection() {
             radio.parentElement.style.opacity = '0.5';
         });
         
-        if (chaptersContainer) {
-            chaptersContainer.style.opacity = '0.3';
-            chaptersContainer.style.pointerEvents = 'none';
+        // ★新機能：出題範囲選択を完全に非表示
+        if (rangeSelectionArea) {
+            rangeSelectionArea.style.display = 'none';
         }
-        if (rangeSelectionTitle) {
-            rangeSelectionTitle.textContent = '苦手問題を10問以下にしてください（制限継続中）';
-            rangeSelectionTitle.style.color = '#f39c12';
+        if (chaptersContainer) {
+            chaptersContainer.style.display = 'none'; // ★完全に非表示
         }
         
         // 中間状態の警告メッセージを表示
@@ -2090,7 +2096,7 @@ function closeInfoPanelWithTouch() {
     }
 }
 
-function showIntermediateWeakProblemWarning(count) {
+function showWeakProblemWarning(count) {
     // 既存の警告を削除
     removeWeakProblemWarning();
     
@@ -2098,16 +2104,16 @@ function showIntermediateWeakProblemWarning(count) {
     warningDiv.id = 'weakProblemWarning';
     warningDiv.className = 'weak-problem-warning';
     warningDiv.innerHTML = `
-        <div style="background-color: #fef9e7; border: 2px solid #f39c12; border-radius: 8px; padding: 15px; margin: 15px 0; text-align: center;">
-            <h4 style="color: #f39c12; margin: 0 0 10px 0;">
-                <i class="fas fa-clock"></i> 制限継続中
+        <div style="background-color: #fdf2f2; border: 2px solid #e74c3c; border-radius: 8px; padding: 20px; margin: 20px 0; text-align: center; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+            <h4 style="color: #e74c3c; margin: 0 0 15px 0; font-size: 1.3em;">
+                <i class="fas fa-exclamation-triangle"></i> 苦手問題が蓄積されています
             </h4>
-            <p style="margin: 5px 0; color: #b7950b;">
-                苦手問題が <strong>${count}問</strong> あります。<br>
-                <strong>10問以下</strong> に減らすまで苦手問題モードで学習を続けてください。
+            <p style="margin: 10px 0; color: #721c24; font-size: 1.1em; line-height: 1.6;">
+                現在 <strong style="font-size: 1.2em; color: #e74c3c;">${count}問</strong> の苦手問題があります。<br>
+                まず苦手問題を <strong style="color: #e74c3c;">10問以下</strong> に減らしてから通常学習に戻りましょう。
             </p>
-            <p style="margin: 10px 0 0 0; font-size: 0.9em; color: #d68910;">
-                あと <strong>${count - 10}問</strong> 克服すれば通常モードが利用できます。
+            <p style="margin: 15px 0 0 0; font-size: 1em; color: #a94442; background-color: #f8d7da; padding: 10px; border-radius: 5px;">
+                💡 苦手問題モードで学習を続けると、通常モードが利用できるようになります。
             </p>
         </div>
     `;
@@ -2118,7 +2124,7 @@ function showIntermediateWeakProblemWarning(count) {
     }
 }
 
-function showWeakProblemWarning(count) {
+function showIntermediateWeakProblemWarning(count) {
     // 既存の警告を削除
     removeWeakProblemWarning();
     
@@ -2126,16 +2132,16 @@ function showWeakProblemWarning(count) {
     warningDiv.id = 'weakProblemWarning';
     warningDiv.className = 'weak-problem-warning';
     warningDiv.innerHTML = `
-        <div style="background-color: #fdf2f2; border: 2px solid #e74c3c; border-radius: 8px; padding: 15px; margin: 15px 0; text-align: center;">
-            <h4 style="color: #e74c3c; margin: 0 0 10px 0;">
-                <i class="fas fa-exclamation-triangle"></i> 苦手問題が蓄積されています
+        <div style="background-color: #fef9e7; border: 2px solid #f39c12; border-radius: 8px; padding: 20px; margin: 20px 0; text-align: center; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+            <h4 style="color: #f39c12; margin: 0 0 15px 0; font-size: 1.3em;">
+                <i class="fas fa-clock"></i> 制限継続中
             </h4>
-            <p style="margin: 5px 0; color: #721c24;">
-                現在 <strong>${count}問</strong> の苦手問題があります。<br>
-                まず苦手問題を <strong>10問以下</strong> に減らしてから通常学習に戻りましょう。
+            <p style="margin: 10px 0; color: #b7950b; font-size: 1.1em; line-height: 1.6;">
+                苦手問題が <strong style="font-size: 1.2em; color: #f39c12;">${count}問</strong> あります。<br>
+                <strong style="color: #f39c12;">10問以下</strong> に減らすまで苦手問題モードで学習を続けてください。
             </p>
-            <p style="margin: 10px 0 0 0; font-size: 0.9em; color: #a94442;">
-                苦手問題モードで学習を続けると、通常モードが利用できるようになります。
+            <p style="margin: 15px 0 0 0; font-size: 1em; color: #d68910; background-color: #fcf3cd; padding: 10px; border-radius: 5px;">
+                🎯 あと <strong style="color: #f39c12;">${count - 10}問</strong> 克服すれば通常モードが利用できます！
             </p>
         </div>
     `;
