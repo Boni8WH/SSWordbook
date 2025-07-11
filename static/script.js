@@ -507,25 +507,20 @@ function updateIncorrectOnlySelection() {
     
     const weakProblemCount = incorrectWords.length;
     
-    // ★修正：制限発動のみをチェック（解除は別の条件で厳密に）
-    
-    // 1. 制限発動条件をチェック
-    if (weakProblemCount >= 20) {
-        if (!hasBeenRestricted || restrictionReleased) {
-            // 初回制限または再制限
-            hasBeenRestricted = true;
-            restrictionReleased = false;
-            console.log('🔒 制限発動: 苦手問題', weakProblemCount, '問');
-        }
+    // ★修正：制限発動は20問以上で確実に実行
+    if (weakProblemCount >= 20 && !hasBeenRestricted) {
+        hasBeenRestricted = true;
+        restrictionReleased = false;
+        console.log('🔒 制限発動: 苦手問題', weakProblemCount, '問');
     }
     
-    // 2. ★重要：制限解除は10問以下の場合のみ
+    // ★修正：制限解除は10問以下かつ制限中の場合のみ
     if (hasBeenRestricted && !restrictionReleased && weakProblemCount <= 10) {
         restrictionReleased = true;
         console.log('🔓 制限解除: 苦手問題', weakProblemCount, '問（10問以下達成）');
     }
     
-    // 3. 現在の制限状態を判定
+    // ★修正：現在の制限状態をシンプルに判定
     const isCurrentlyRestricted = hasBeenRestricted && !restrictionReleased;
     
     console.log(`制限状態: 苦手${weakProblemCount}問, 制限中=${isCurrentlyRestricted}, hasBeenRestricted=${hasBeenRestricted}, restrictionReleased=${restrictionReleased}`);
@@ -762,11 +757,12 @@ function startQuiz() {
     
     console.log(`startQuiz制限チェック: 苦手${weakProblemCount}問, isCurrentlyRestricted=${isCurrentlyRestricted}`);
     
+    // ★修正：制限中は苦手問題モード以外を明確に拒否
     if (isCurrentlyRestricted && selectedQuestionCount !== 'incorrectOnly') {
         if (weakProblemCount >= 20) {
             flashMessage('苦手問題が20問以上あります。まず苦手問題モードで学習してください。', 'danger');
         } else {
-            flashMessage('苦手問題を10問以下に減らすまで、苦手問題モードで学習してください。', 'warning');
+            flashMessage(`苦手問題を10問以下に減らすまで、苦手問題モードで学習してください。（現在${weakProblemCount}問）`, 'warning');
         }
         return;
     }
@@ -896,6 +892,7 @@ function startQuiz() {
     updateProgressBar();
     showNextQuestion();
 }
+
 
 function restartWeakProblemsQuiz() {
     console.log('\n🎯 苦手問題モード専用再学習');
@@ -1113,7 +1110,7 @@ function handleAnswer(isCorrect) {
     console.log(`苦手問題?: ${incorrectWords.includes(wordIdentifier)}`);
     console.log('===========================\n');
 
-    // ★修正：制限状態の詳細ログ
+    // ★修正：制限状態チェック部分を簡潔に
     const beforeRestricted = hasBeenRestricted && !restrictionReleased;
     console.log(`\n🔍 回答後の制限状態チェック:`);
     console.log(`  苦手問題数: ${incorrectWords.length}`);
@@ -1127,28 +1124,36 @@ function handleAnswer(isCorrect) {
     currentQuestionIndex++;
     updateProgressBar();
 
-    // 即座に制限状態をチェック
-    setTimeout(() => {
-        const currentWeakCount = incorrectWords.length;
+    // ★修正：制限状態の更新を即座に実行
+    const currentWeakCount = incorrectWords.length;
+    
+    // 制限発動チェック
+    if (currentWeakCount >= 20 && !hasBeenRestricted) {
+        hasBeenRestricted = true;
+        restrictionReleased = false;
+        console.log(`🔒 制限発動: 苦手問題 ${currentWeakCount}問`);
+    }
+    
+    // 制限解除チェック
+    if (hasBeenRestricted && !restrictionReleased && currentWeakCount <= 10) {
+        restrictionReleased = true;
+        console.log(`🔓 制限解除: 苦手問題 ${currentWeakCount}問`);
         
-        // ★重要：updateIncorrectOnlySelectionを呼び出して状態を更新
-        updateIncorrectOnlySelection();
-        
-        const afterRestricted = hasBeenRestricted && !restrictionReleased;
-        console.log(`  制限後の状態: hasBeenRestricted=${hasBeenRestricted}, restrictionReleased=${restrictionReleased}`);
-        console.log(`  制限後の判定: ${afterRestricted ? '制限中' : '制限なし'}`);
-        
-        // 制限解除された場合のメッセージ
-        if (beforeRestricted && !afterRestricted) {
-            if (currentWeakCount === 0) {
-                flashMessage('🎉 すべての苦手問題を克服！制限が解除されました。', 'success');
-            } else {
-                flashMessage(`✨ 苦手問題が${currentWeakCount}問に！制限が解除されました。`, 'success');
-            }
-            console.log(`✅ 制限解除メッセージ表示: ${currentWeakCount}問`);
+        // 制限解除メッセージ
+        if (currentWeakCount === 0) {
+            flashMessage('🎉 すべての苦手問題を克服！制限が解除されました。', 'success');
+        } else {
+            flashMessage(`✨ 苦手問題が${currentWeakCount}問に！制限が解除されました。`, 'success');
         }
-        console.log(`🔍 制限状態チェック完了\n`);
-    }, 100);
+    }
+    
+    const afterRestricted = hasBeenRestricted && !restrictionReleased;
+    console.log(`  制限後の状態: hasBeenRestricted=${hasBeenRestricted}, restrictionReleased=${restrictionReleased}`);
+    console.log(`  制限後の判定: ${afterRestricted ? '制限中' : '制限なし'}`);
+    console.log(`🔍 制限状態チェック完了\n`);
+    
+    // UI更新
+    updateIncorrectOnlySelection();
 
     if (currentQuestionIndex < totalQuestions) {
         showNextQuestion();
