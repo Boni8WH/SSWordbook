@@ -7282,105 +7282,166 @@ def diagnose_mail_config():
     
     print("===================\n")
 
-@app.route('/admin/detailed_storage_analysis')
-def admin_detailed_storage_analysis():
-    """詳細なストレージ使用量分析"""
+@app.route('/admin/comprehensive_storage_analysis')
+def admin_comprehensive_storage_analysis():
+    """包括的ストレージ分析（データベース全体を調査）"""
     if not session.get('admin_logged_in'):
         return redirect(url_for('login_page'))
     
     try:
         analysis = {}
         
-        # 1. ユーザーデータの分析
-        users_data = []
-        total_history_size = 0
-        total_incorrect_size = 0
+        # 1. 各テーブルのレコード数とサイズ推定
+        table_analysis = {}
         
-        for user in User.query.all():
+        # Userテーブル
+        users = User.query.all()
+        user_data_size = 0
+        user_count = 0
+        max_user_size = 0
+        max_user_name = ""
+        
+        for user in users:
             if user.username == 'admin':
                 continue
-                
-            history = user.get_problem_history()
-            incorrect = user.get_incorrect_words()
+            user_count += 1
             
-            history_str = json.dumps(history)
-            incorrect_str = json.dumps(incorrect)
+            # 各フィールドのサイズを計算
+            user_size = 0
+            user_size += len(str(user.username).encode('utf-8'))
+            user_size += len(str(user.room_number).encode('utf-8'))
+            user_size += len(str(user.student_id).encode('utf-8'))
             
-            history_size = len(history_str.encode('utf-8'))
-            incorrect_size = len(incorrect_str.encode('utf-8'))
+            if user.problem_history:
+                user_size += len(user.problem_history.encode('utf-8'))
+            if user.incorrect_words:
+                user_size += len(user.incorrect_words.encode('utf-8'))
             
-            total_history_size += history_size
-            total_incorrect_size += incorrect_size
+            # パスワードハッシュのサイズ
+            if hasattr(user, '_room_password_hash') and user._room_password_hash:
+                user_size += len(user._room_password_hash.encode('utf-8'))
+            if hasattr(user, '_individual_password_hash') and user._individual_password_hash:
+                user_size += len(user._individual_password_hash.encode('utf-8'))
             
-            users_data.append({
-                'username': user.username,
-                'room_number': user.room_number,
-                'history_entries': len(history),
-                'history_size_kb': round(history_size / 1024, 2),
-                'incorrect_count': len(incorrect),
-                'incorrect_size_kb': round(incorrect_size / 1024, 2),
-                'total_size_kb': round((history_size + incorrect_size) / 1024, 2)
-            })
-        
-        # サイズ順でソート
-        users_data.sort(key=lambda x: x['total_size_kb'], reverse=True)
-        
-        # 2. CSVファイルの分析
-        csv_files_data = []
-        total_csv_size = 0
-        
-        for csv_file in CsvFileContent.query.all():
-            content_size = len(csv_file.content.encode('utf-8'))
-            total_csv_size += content_size
+            user_data_size += user_size
             
-            csv_files_data.append({
-                'filename': csv_file.filename,
-                'original_filename': csv_file.original_filename,
-                'size_kb': round(content_size / 1024, 2),
-                'word_count': csv_file.word_count,
-                'upload_date': csv_file.upload_date.strftime('%Y-%m-%d %H:%M')
-            })
+            if user_size > max_user_size:
+                max_user_size = user_size
+                max_user_name = user.username
         
-        # 3. その他のデータ
-        room_settings_count = RoomSetting.query.count()
-        password_tokens_count = PasswordResetToken.query.count()
-        
-        # user_stats テーブルが存在するかチェック
-        try:
-            user_stats_count = UserStats.query.count()
-        except:
-            user_stats_count = 0
-        
-        # 4. 総計
-        analysis = {
-            'users_analysis': {
-                'total_users': len(users_data),
-                'total_history_size_mb': round(total_history_size / (1024 * 1024), 2),
-                'total_incorrect_size_mb': round(total_incorrect_size / (1024 * 1024), 2),
-                'users_data': users_data[:10]  # 上位10人
-            },
-            'csv_analysis': {
-                'total_files': len(csv_files_data),
-                'total_csv_size_mb': round(total_csv_size / (1024 * 1024), 2),
-                'csv_files': csv_files_data
-            },
-            'other_data': {
-                'room_settings': room_settings_count,
-                'password_tokens': password_tokens_count,
-                'user_stats': user_stats_count
-            },
-            'estimated_total_mb': round((total_history_size + total_incorrect_size + total_csv_size) / (1024 * 1024), 2)
+        table_analysis['users'] = {
+            'count': user_count,
+            'total_size_mb': round(user_data_size / (1024 * 1024), 3),
+            'avg_size_kb': round(user_data_size / user_count / 1024, 2) if user_count > 0 else 0,
+            'max_user': max_user_name,
+            'max_size_kb': round(max_user_size / 1024, 2)
         }
         
-        return render_template('admin_storage_analysis.html', analysis=analysis)
+        # CSVファイルテーブル
+        csv_files = CsvFileContent.query.all()
+        csv_total_size = sum(len(f.content.encode('utf-8')) for f in csv_files)
+        
+        table_analysis['csv_files'] = {
+            'count': len(csv_files),
+            'total_size_mb': round(csv_total_size / (1024 * 1024), 3),
+            'files': [
+                {
+                    'filename': f.filename,
+                    'size_kb': round(len(f.content.encode('utf-8')) / 1024, 2),
+                    'word_count': f.word_count
+                }
+                for f in csv_files
+            ]
+        }
+        
+        # その他のテーブル
+        room_settings = RoomSetting.query.all()
+        settings_size = sum(
+            len(str(rs.room_number).encode('utf-8')) +
+            len(str(rs.csv_filename).encode('utf-8')) +
+            len(str(rs.max_enabled_unit_number).encode('utf-8')) +
+            len(str(getattr(rs, 'enabled_units', '')).encode('utf-8'))
+            for rs in room_settings
+        )
+        
+        table_analysis['room_settings'] = {
+            'count': len(room_settings),
+            'total_size_kb': round(settings_size / 1024, 2)
+        }
+        
+        # パスワードリセットトークン
+        tokens = PasswordResetToken.query.all()
+        tokens_size = sum(
+            len(str(t.token).encode('utf-8')) +
+            len(str(t.user_id).encode('utf-8')) +
+            32  # 日時フィールドの推定サイズ
+            for t in tokens
+        )
+        
+        table_analysis['password_tokens'] = {
+            'count': len(tokens),
+            'total_size_kb': round(tokens_size / 1024, 2)
+        }
+        
+        # AppInfoテーブル
+        app_infos = AppInfo.query.all()
+        app_info_size = 0
+        for info in app_infos:
+            app_info_size += len(str(info.app_name).encode('utf-8'))
+            app_info_size += len(str(info.update_content).encode('utf-8'))
+            app_info_size += len(str(getattr(info, 'footer_text', '')).encode('utf-8'))
+            # その他のフィールド
+        
+        table_analysis['app_info'] = {
+            'count': len(app_infos),
+            'total_size_kb': round(app_info_size / 1024, 2)
+        }
+        
+        # UserStatsテーブル（存在する場合）
+        try:
+            user_stats = UserStats.query.all()
+            stats_size = len(user_stats) * 200  # 1レコードあたり約200バイトと推定
+            table_analysis['user_stats'] = {
+                'count': len(user_stats),
+                'total_size_kb': round(stats_size / 1024, 2)
+            }
+        except:
+            table_analysis['user_stats'] = {
+                'count': 0,
+                'total_size_kb': 0
+            }
+        
+        # 総計算
+        total_estimated_mb = sum([
+            table_analysis['users']['total_size_mb'],
+            table_analysis['csv_files']['total_size_mb'],
+            table_analysis['room_settings']['total_size_kb'] / 1024,
+            table_analysis['password_tokens']['total_size_kb'] / 1024,
+            table_analysis['app_info']['total_size_kb'] / 1024,
+            table_analysis['user_stats']['total_size_kb'] / 1024
+        ])
+        
+        # データベースメタデータの推定
+        metadata_overhead_mb = total_estimated_mb * 0.3  # インデックスなどで30%のオーバーヘッド
+        
+        analysis = {
+            'table_analysis': table_analysis,
+            'data_total_mb': round(total_estimated_mb, 3),
+            'metadata_overhead_mb': round(metadata_overhead_mb, 3),
+            'estimated_db_total_mb': round(total_estimated_mb + metadata_overhead_mb, 3),
+            'render_usage_mb': 84,  # Renderでの実際の使用量
+            'difference_mb': round(84 - (total_estimated_mb + metadata_overhead_mb), 3)
+        }
+        
+        return render_template('admin_comprehensive_analysis.html', analysis=analysis)
         
     except Exception as e:
-        print(f"ストレージ分析エラー: {e}")
+        print(f"包括的ストレージ分析エラー: {e}")
         import traceback
         traceback.print_exc()
-        flash(f'ストレージ分析エラー: {str(e)}', 'danger')
+        flash(f'包括的ストレージ分析エラー: {str(e)}', 'danger')
         return redirect(url_for('admin_page'))
-
+    
 # ===== メイン起動処理の修正 =====
 if __name__ == '__main__':
     try:
