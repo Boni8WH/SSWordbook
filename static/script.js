@@ -1207,30 +1207,30 @@ function showQuizResult() {
         }
     });
     
-    // ★新機能：制限解除チェックと関連処理
-    setTimeout(() => {
-        const currentWeakCount = incorrectWords.length;
-        const wasRestricted = hasBeenRestricted && !restrictionReleased;
-        
-        // updateIncorrectOnlySelectionを呼び出して状態を更新
-        updateIncorrectOnlySelection();
-        
-        // 制限解除された場合のメッセージ
-        const isNowRestricted = hasBeenRestricted && !restrictionReleased;
-        if (wasRestricted && !isNowRestricted) {
-            // 制限が解除された場合
-            if (currentWeakCount === 0) {
-                flashMessage('🎉 すべての苦手問題を克服しました！通常学習が利用できます。', 'success');
-            } else {
-                flashMessage(`✨ 苦手問題が${currentWeakCount}問になりました。通常学習が利用できます。`, 'success');
-            }
-        } else if (isNowRestricted && currentWeakCount < 20 && lastQuizSettings.isIncorrectOnly) {
-            // 制限継続中の進捗メッセージ
-            flashMessage(`📈 苦手問題が${currentWeakCount}問に減りました。あと${currentWeakCount - 10}問克服で制限解除です。`, 'info');
+    // ★重要：制限解除チェックと関連処理（即座に実行）
+    const currentWeakCount = incorrectWords.length;
+    const wasRestricted = hasBeenRestricted && !restrictionReleased;
+    
+    console.log(`📍 結果画面での制限状態チェック - 苦手問題: ${currentWeakCount}問`);
+    
+    // updateIncorrectOnlySelectionを呼び出して状態を更新
+    updateIncorrectOnlySelection();
+    
+    // 制限解除された場合のメッセージ
+    const isNowRestricted = hasBeenRestricted && !restrictionReleased;
+    if (wasRestricted && !isNowRestricted) {
+        // 制限が解除された場合
+        if (currentWeakCount === 0) {
+            flashMessage('🎉 すべての苦手問題を克服しました！通常学習が利用できます。', 'success');
+        } else {
+            flashMessage(`✨ 苦手問題が${currentWeakCount}問になりました。通常学習が利用できます。`, 'success');
         }
-        
-        updateRestartButtonText();
-    }, 100);
+    } else if (isNowRestricted && currentWeakCount < 20 && lastQuizSettings.isIncorrectOnly) {
+        // 制限継続中の進捗メッセージ
+        flashMessage(`📈 苦手問題が${currentWeakCount}問に減りました。あと${currentWeakCount - 10}問克服で制限解除です。`, 'info');
+    }
+    
+    updateRestartButtonText();
 }
 
 function calculateAccurateRangeTotal() {
