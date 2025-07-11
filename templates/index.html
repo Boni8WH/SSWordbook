@@ -46,17 +46,17 @@
                     </div>
                     <div class="unit-list">
                         {% for unit_num, unit in chapter.units.items() %}
+                        {% if unit.enabled %}
                         <div class="unit-item">
                             <input type="checkbox" 
-                                   id="unit-{{ chapter_num }}-{{ unit_num }}" 
-                                   value="{{ unit_num }}" 
-                                   data-chapter="{{ chapter_num }}" 
-                                   {% if not unit.enabled %}disabled{% endif %}>
+                                id="unit-{{ chapter_num }}-{{ unit_num }}" 
+                                value="{{ unit_num }}" 
+                                data-chapter="{{ chapter_num }}">
                             <label for="unit-{{ chapter_num }}-{{ unit_num }}">
-                                {{ unit_num }}. {{ unit.categoryName }} 
-                                {% if not unit.enabled %}(利用不可){% endif %}
+                                {{ unit_num }}. {{ unit.categoryName }}
                             </label>
                         </div>
+                        {% endif %}
                         {% endfor %}
                     </div>
                 </div>
@@ -205,4 +205,20 @@ function debugRoomSetting(roomNumber) {
 <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
 <!-- メインのJavaScriptファイル -->
 <script src="{{ url_for('static', filename='script.js') }}"></script>
+
+<style>
+.weak-problem-warning {
+    animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.radio-group label input:disabled + span {
+    color: #bbb;
+    cursor: not-allowed;
+}
+</style>
 {% endblock %}
