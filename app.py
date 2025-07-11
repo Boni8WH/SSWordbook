@@ -2609,7 +2609,6 @@ def fix_foreign_key_constraints():
         import traceback
         traceback.print_exc()
 
-# app.py に追加（admin_force_migration の後に）
 @app.route('/emergency_add_restriction_columns')
 def emergency_add_restriction_columns():
     """緊急修復：制限状態用カラムを追加"""
@@ -7282,6 +7281,105 @@ def diagnose_mail_config():
             print(f"{var}: ❌ 未設定")
     
     print("===================\n")
+
+@app.route('/admin/detailed_storage_analysis')
+def admin_detailed_storage_analysis():
+    """詳細なストレージ使用量分析"""
+    if not session.get('admin_logged_in'):
+        return redirect(url_for('login_page'))
+    
+    try:
+        analysis = {}
+        
+        # 1. ユーザーデータの分析
+        users_data = []
+        total_history_size = 0
+        total_incorrect_size = 0
+        
+        for user in User.query.all():
+            if user.username == 'admin':
+                continue
+                
+            history = user.get_problem_history()
+            incorrect = user.get_incorrect_words()
+            
+            history_str = json.dumps(history)
+            incorrect_str = json.dumps(incorrect)
+            
+            history_size = len(history_str.encode('utf-8'))
+            incorrect_size = len(incorrect_str.encode('utf-8'))
+            
+            total_history_size += history_size
+            total_incorrect_size += incorrect_size
+            
+            users_data.append({
+                'username': user.username,
+                'room_number': user.room_number,
+                'history_entries': len(history),
+                'history_size_kb': round(history_size / 1024, 2),
+                'incorrect_count': len(incorrect),
+                'incorrect_size_kb': round(incorrect_size / 1024, 2),
+                'total_size_kb': round((history_size + incorrect_size) / 1024, 2)
+            })
+        
+        # サイズ順でソート
+        users_data.sort(key=lambda x: x['total_size_kb'], reverse=True)
+        
+        # 2. CSVファイルの分析
+        csv_files_data = []
+        total_csv_size = 0
+        
+        for csv_file in CsvFileContent.query.all():
+            content_size = len(csv_file.content.encode('utf-8'))
+            total_csv_size += content_size
+            
+            csv_files_data.append({
+                'filename': csv_file.filename,
+                'original_filename': csv_file.original_filename,
+                'size_kb': round(content_size / 1024, 2),
+                'word_count': csv_file.word_count,
+                'upload_date': csv_file.upload_date.strftime('%Y-%m-%d %H:%M')
+            })
+        
+        # 3. その他のデータ
+        room_settings_count = RoomSetting.query.count()
+        password_tokens_count = PasswordResetToken.query.count()
+        
+        # user_stats テーブルが存在するかチェック
+        try:
+            user_stats_count = UserStats.query.count()
+        except:
+            user_stats_count = 0
+        
+        # 4. 総計
+        analysis = {
+            'users_analysis': {
+                'total_users': len(users_data),
+                'total_history_size_mb': round(total_history_size / (1024 * 1024), 2),
+                'total_incorrect_size_mb': round(total_incorrect_size / (1024 * 1024), 2),
+                'users_data': users_data[:10]  # 上位10人
+            },
+            'csv_analysis': {
+                'total_files': len(csv_files_data),
+                'total_csv_size_mb': round(total_csv_size / (1024 * 1024), 2),
+                'csv_files': csv_files_data
+            },
+            'other_data': {
+                'room_settings': room_settings_count,
+                'password_tokens': password_tokens_count,
+                'user_stats': user_stats_count
+            },
+            'estimated_total_mb': round((total_history_size + total_incorrect_size + total_csv_size) / (1024 * 1024), 2)
+        }
+        
+        return render_template('admin_storage_analysis.html', analysis=analysis)
+        
+    except Exception as e:
+        print(f"ストレージ分析エラー: {e}")
+        import traceback
+        traceback.print_exc()
+        flash(f'ストレージ分析エラー: {str(e)}', 'danger')
+        return redirect(url_for('admin_page'))
 
 # ===== メイン起動処理の修正 =====
 if __name__ == '__main__':
