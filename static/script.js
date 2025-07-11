@@ -1220,6 +1220,38 @@ function showQuizResult() {
     const isNowRestricted = hasBeenRestricted && !restrictionReleased;
     if (wasRestricted && !isNowRestricted) {
         // 制限が解除された場合
+        console.log('🔓 制限解除されました - UIを強制リセット');
+        
+        // ★強制的に範囲選択画面のUIをリセット
+        const questionCountRadios = document.querySelectorAll('input[name="questionCount"]:not(#incorrectOnlyRadio)');
+        const rangeSelectionArea = document.querySelector('.range-selection-area');
+        const chaptersContainer = document.querySelector('.chapters-container');
+        const rangeSelectionTitle = document.querySelector('.selection-area h3');
+        
+        // 他の選択肢を有効化
+        questionCountRadios.forEach(radio => {
+            radio.disabled = false;
+            radio.parentElement.style.opacity = '1';
+        });
+        
+        // 範囲選択エリアを表示
+        if (rangeSelectionArea) {
+            rangeSelectionArea.style.display = 'block';
+        }
+        if (chaptersContainer) {
+            chaptersContainer.style.display = 'block';
+            chaptersContainer.style.opacity = '1';
+            chaptersContainer.style.pointerEvents = 'auto';
+        }
+        if (rangeSelectionTitle) {
+            rangeSelectionTitle.textContent = '出題数を選択';
+            rangeSelectionTitle.style.color = '#34495e';
+        }
+        
+        // 警告メッセージを削除
+        removeWeakProblemWarning();
+        
+        // フラッシュメッセージ
         if (currentWeakCount === 0) {
             flashMessage('🎉 すべての苦手問題を克服しました！通常学習が利用できます。', 'success');
         } else {
@@ -1229,7 +1261,7 @@ function showQuizResult() {
         // 制限継続中の進捗メッセージ
         flashMessage(`📈 苦手問題が${currentWeakCount}問に減りました。あと${currentWeakCount - 10}問克服で制限解除です。`, 'info');
     }
-    
+        
     updateRestartButtonText();
 }
 
