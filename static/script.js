@@ -512,20 +512,53 @@ function saveRestrictionState() {
     });
 }
 
+// script.js の loadWordDataFromServer 関数を以下に置き換える
+
 function loadWordDataFromServer() {
     fetch('/api/word_data')
         .then(response => response.json())
         .then(data => {
-            if (Array.isArray(data)) {
+            console.log('サーバーからのレスポンス:', data);
+            
+            // ✅ 修正：レスポンス形式に応じて処理を分岐
+            if (data.status === 'success' && data.word_data) {
+                // 新しい形式：{status: 'success', word_data: [...]}
+                word_data = data.word_data;
+                console.log(`✅ 新形式で${word_data.length}個の単語を読み込みました`);
+                
+                // ⭐︎問題の状態も保存
+                if (data.star_availability) {
+                    starProblemStatus = data.star_availability;
+                    console.log('⭐︎問題状態も取得:', starProblemStatus);
+                }
+                if (data.star_requirements) {
+                    starRequirements = data.star_requirements;
+                }
+                
+            } else if (Array.isArray(data)) {
+                // 古い形式：直接配列
                 word_data = data;
-                console.log(`Loaded ${word_data.length} words from server.`);
-                updateUnitCheckboxStates();
+                console.log(`✅ 旧形式で${word_data.length}個の単語を読み込みました`);
+                
             } else {
-                console.error('Failed to load word data: Invalid format', data);
+                console.error('❌ 単語データの読み込み失敗:', data);
+                flashMessage('単語データの読み込みに失敗しました。', 'danger');
+                return;
             }
+            
+            // 単語データ読み込み完了後の処理
+            updateUnitCheckboxStates();
+            
+            // ⭐︎問題UIの更新（少し遅延）
+            setTimeout(() => {
+                if (typeof updateStarProblemUI === 'function') {
+                    updateStarProblemUI();
+                }
+            }, 500);
+            
         })
         .catch(error => {
-            console.error('Error loading word data:', error);
+            console.error('❌ 単語データ読み込みエラー:', error);
             flashMessage('単語データのロード中にエラーが発生しました。', 'danger');
         });
 }
