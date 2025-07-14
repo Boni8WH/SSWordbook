@@ -20,7 +20,6 @@ let isAnswerButtonDisabled = false;
 let answerButtonTimeout = null;
 let hasBeenRestricted = false; // 一度でも制限されたかのフラグ
 let restrictionReleased = false; // 制限が解除されたかのフラグ
-let starProblemStatus = {};
 
 // DOM要素
 const startButton = document.getElementById('startButton');
@@ -97,7 +96,7 @@ let word_data = [];
 
 // 「全て選択」ボタンのテキストと色を更新する関数（スマホ対応版）
 function updateSelectAllButtonText(button, isAllSelected) {
-    // null チェックを追加
+    // ★ 修正: null チェックを追加
     if (!button) {
         console.warn('updateSelectAllButtonText: button parameter is null or undefined');
         return;
@@ -246,19 +245,37 @@ function optimizeScrolling() {
 // =========================================================
 // 問題ID生成関数（修正版 - 衝突を防ぐ）
 // =========================================================
-// 問題ID生成関数（サーバー側と一致させる）
+
+// script.jsの問題ID生成関数を以下に置き換え（約197行目付近）
+
+// script.js の generateProblemId 関数を以下に置き換え
+
+// script.js の generateProblemId 関数を以下に置き換え
+// 既存のID形式に合わせて修正
+
+// script.js の generateProblemId 関数を以下に置き換え
+
+// script.js の generateProblemId 関数を以下に置き換え
+
 function generateProblemId(word) {
+    /**
+     * 統一された問題ID生成（Python側と完全一致）
+     */
     try {
-        const chapter = String(word.chapter).padStart(3, '0');
-        const number = String(word.number).padStart(3, '0');
+        const chapter = String(word.chapter || '0').padStart(3, '0');
+        const number = String(word.number || '0').padStart(3, '0');
         const question = String(word.question || '');
         const answer = String(word.answer || '');
         
-        // 問題文と答えから英数字と日本語文字のみ抽出
-        const questionClean = question.slice(0, 15).replace(/[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/g, '');
-        const answerClean = answer.slice(0, 10).replace(/[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/g, '');
+        // 問題文と答えから英数字と日本語文字のみ抽出（Python側と同じ処理）
+        const questionClean = question.substring(0, 15).replace(/[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/g, '');
+        const answerClean = answer.substring(0, 10).replace(/[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/g, '');
         
-        return `${chapter}-${number}-${questionClean}-${answerClean}`;
+        // 統一フォーマット: chapter-number-question-answer
+        const problemId = `${chapter}-${number}-${questionClean}-${answerClean}`;
+        
+        return problemId;
+        
     } catch (error) {
         console.error('ID生成エラー:', error);
         const chapter = String(word.chapter || '0').padStart(3, '0');
@@ -292,146 +309,6 @@ document.addEventListener('DOMContentLoaded', () => {
             console.log('📍 初期化完了 - 制限状態をチェック');
             updateIncorrectOnlySelection();
         }, 1500); // 1.5秒後に1回だけ
-        
-        if (noWeakWordsMessage) {
-            noWeakWordsMessage.classList.add('hidden');
-        }
-    } catch (error) {
-        console.error('Error during initialization:', error);
-    }
-
-    document.addEventListener('keydown', handleEscapeKey);
-});
-
-// クイズ開始時のバリデーション強化
-const originalStartQuiz = window.startQuiz;
-window.startQuiz = function() {
-    console.log('🚀 クイズ開始 - ⭐︎問題バリデーション実行');
-    
-    // ⭐︎問題のバリデーション
-    if (!validateStarProblemSelection()) {
-        console.log('❌ ⭐︎問題バリデーション失敗');
-        return false;
-    }
-    
-    // 既存のstartQuiz処理を実行
-    if (originalStartQuiz) {
-        return originalStartQuiz.apply(this, arguments);
-    } else {
-        // 既存の関数が見つからない場合は、本来のstartQuiz処理
-        return startQuizOriginal();
-    }
-};
-
-function enhanceProgressPageForStarProblems() {
-    // 進捗ページの章ごとの表示を強化
-    const chapterSections = document.querySelectorAll('.chapter-section');
-    
-    chapterSections.forEach(section => {
-        const chapterNum = section.dataset.chapter;
-        if (!chapterNum) return;
-        
-        // ⭐︎問題の単元があるかチェック
-        const starUnits = section.querySelectorAll('.unit-progress[data-unit="⭐︎"]');
-        
-        starUnits.forEach(unit => {
-            const isAvailable = checkStarUnitAvailability(chapterNum);
-            
-            if (isAvailable) {
-                unit.classList.add('star-unlocked');
-                unit.style.background = 'linear-gradient(135deg, #ffd700, #ffed4e)';
-                unit.style.border = '2px solid #ffd700';
-                
-                // 解放済みマークを追加
-                if (!unit.querySelector('.unlocked-mark')) {
-                    const mark = document.createElement('span');
-                    mark.className = 'unlocked-mark';
-                    mark.textContent = '✨';
-                    mark.style.cssText = 'position: absolute; top: 5px; right: 5px; font-size: 1.2em;';
-                    unit.style.position = 'relative';
-                    unit.appendChild(mark);
-                }
-            } else {
-                unit.classList.add('star-locked');
-                unit.style.opacity = '0.6';
-                unit.style.filter = 'grayscale(50%)';
-                
-                // ロックマークを追加
-                if (!unit.querySelector('.locked-mark')) {
-                    const mark = document.createElement('span');
-                    mark.className = 'locked-mark';
-                    mark.textContent = '🔒';
-                    mark.style.cssText = 'position: absolute; top: 5px; right: 5px; font-size: 1.2em; color: #999;';
-                    unit.style.position = 'relative';
-                    unit.appendChild(mark);
-                }
-            }
-        });
-    });
-}
-
-// チェックボックスの変更時にも「全て選択」ボタンを更新
-document.addEventListener('change', function(event) {
-    if (event.target.type === 'checkbox' && event.target.dataset.chapter) {
-        const chapterNum = event.target.dataset.chapter;
-        const button = document.querySelector(`.select-all-chapter-btn[data-chapter="${chapterNum}"]`);
-        
-        if (button) {
-            setTimeout(() => {
-                updateSelectAllButtonsForStarProblems();
-            }, 50);
-        }
-    }
-});
-
-document.addEventListener('DOMContentLoaded', () => {
-    console.log('DOM loaded, initializing application...');
-    
-    try {
-        updateIncorrectOnlyRadio();
-        loadUserData();
-        loadWordDataFromServer();
-        setupEventListeners();
-
-        // データロード後に選択状態を復元
-        setTimeout(() => {
-            loadSelectionState();
-            initializeSelectAllButtons();
-            initializeMobileOptimizations();
-            improveTouchExperience();
-            optimizeScrolling();
-            
-            // ⭐︎問題関連の初期化を追加
-            if (typeof addStarUnlockStyles === 'function') {
-                addStarUnlockStyles(); // CSSアニメーション追加
-            }
-            
-            console.log('📍 初期化完了 - 制限状態をチェック');
-            updateIncorrectOnlySelection();
-        }, 1500);
-        
-        // ⭐︎問題UI更新（メインページ用）
-        setTimeout(() => {
-            if (typeof updateStarProblemUI === 'function') {
-                updateStarProblemUI();
-            }
-        }, 2000);
-        
-        // 進捗ページ専用の処理
-        if (window.location.pathname === '/progress') {
-            setTimeout(() => {
-                if (typeof enhanceProgressPageForStarProblems === 'function') {
-                    enhanceProgressPageForStarProblems();
-                }
-            }, 1500);
-        }
-        
-        // ⭐︎問題状態の取得（さらに遅らせる）
-        setTimeout(async () => {
-            if (typeof loadStarProblemStatusEnhanced === 'function') {
-                await loadStarProblemStatusEnhanced();
-            }
-        }, 2500);
         
         if (noWeakWordsMessage) {
             noWeakWordsMessage.classList.add('hidden');
@@ -512,53 +389,20 @@ function saveRestrictionState() {
     });
 }
 
-// script.js の loadWordDataFromServer 関数を以下に置き換える
-
 function loadWordDataFromServer() {
     fetch('/api/word_data')
         .then(response => response.json())
         .then(data => {
-            console.log('サーバーからのレスポンス:', data);
-            
-            // ✅ 修正：レスポンス形式に応じて処理を分岐
-            if (data.status === 'success' && data.word_data) {
-                // 新しい形式：{status: 'success', word_data: [...]}
-                word_data = data.word_data;
-                console.log(`✅ 新形式で${word_data.length}個の単語を読み込みました`);
-                
-                // ⭐︎問題の状態も保存
-                if (data.star_availability) {
-                    starProblemStatus = data.star_availability;
-                    console.log('⭐︎問題状態も取得:', starProblemStatus);
-                }
-                if (data.star_requirements) {
-                    starRequirements = data.star_requirements;
-                }
-                
-            } else if (Array.isArray(data)) {
-                // 古い形式：直接配列
+            if (Array.isArray(data)) {
                 word_data = data;
-                console.log(`✅ 旧形式で${word_data.length}個の単語を読み込みました`);
-                
+                console.log(`Loaded ${word_data.length} words from server.`);
+                updateUnitCheckboxStates();
             } else {
-                console.error('❌ 単語データの読み込み失敗:', data);
-                flashMessage('単語データの読み込みに失敗しました。', 'danger');
-                return;
+                console.error('Failed to load word data: Invalid format', data);
             }
-            
-            // 単語データ読み込み完了後の処理
-            updateUnitCheckboxStates();
-            
-            // ⭐︎問題UIの更新（少し遅延）
-            setTimeout(() => {
-                if (typeof updateStarProblemUI === 'function') {
-                    updateStarProblemUI();
-                }
-            }, 500);
-            
         })
         .catch(error => {
-            console.error('❌ 単語データ読み込みエラー:', error);
+            console.error('Error loading word data:', error);
             flashMessage('単語データのロード中にエラーが発生しました。', 'danger');
         });
 }
@@ -856,19 +700,18 @@ function setupEventListeners() {
         // 章のヘッダーをクリックで単元リストの表示/非表示を切り替え（スマホ対応版）
         if (chaptersContainer) {
             chaptersContainer.addEventListener('click', (event) => {
-                console.log('章コンテナクリック:', event.target);
-                
                 // 「全て選択」ボタンがクリックされた場合の処理
-                if (event.target.classList.contains('select-all-chapter-btn')) {
+                const selectAllBtn = event.target.closest('.select-all-chapter-btn');
+                if (selectAllBtn) {
                     event.stopPropagation();
                     event.preventDefault();
                     
-                    const selectAllBtn = event.target;
                     const chapterNum = selectAllBtn.dataset.chapter;
                     const chapterItem = selectAllBtn.closest('.chapter-item');
                     if (!chapterItem) return;
                     
                     const checkboxes = chapterItem.querySelectorAll(`input[type="checkbox"][data-chapter="${chapterNum}"]`);
+                    
                     const enabledCheckboxes = Array.from(checkboxes).filter(cb => !cb.disabled);
                     const allChecked = enabledCheckboxes.every(cb => cb.checked);
                     
@@ -877,48 +720,20 @@ function setupEventListeners() {
                     });
                     
                     updateSelectAllButtonText(selectAllBtn, !allChecked);
-                    console.log(`全て選択ボタン処理完了: 第${chapterNum}章`);
-                    return;
+                    
+                    // 章の展開状態は変更しない
+                    return false;
                 }
                 
-                // チェックボックスや「全て選択」ボタン以外の章ヘッダー領域をクリックした場合
+                // 章ヘッダーがクリックされた場合のみ展開/折りたたみ処理
                 const chapterHeader = event.target.closest('.chapter-header');
-                if (chapterHeader && 
-                    !event.target.classList.contains('select-all-chapter-btn') &&
-                    !event.target.closest('.select-all-chapter-btn') &&
-                    !event.target.closest('input[type="checkbox"]') &&
-                    !event.target.closest('label')) {
-                    
-                    // ★重要：イベントの伝播を停止
-                    event.stopPropagation();
-                    event.preventDefault();
-                    
-                    console.log('章ヘッダークリック:', chapterHeader);
-                    
+                if (chapterHeader && !event.target.closest('.select-all-chapter-btn')) {
                     const chapterItem = chapterHeader.closest('.chapter-item');
                     if (chapterItem) {
-                        const isCurrentlyExpanded = chapterItem.classList.contains('expanded');
-                        
-                        if (isCurrentlyExpanded) {
-                            chapterItem.classList.remove('expanded');
-                            console.log('章を折りたたみました');
-                        } else {
-                            chapterItem.classList.add('expanded');
-                            console.log('章を展開しました');
-                        }
-                        
+                        chapterItem.classList.toggle('expanded');
                         const toggleIcon = chapterHeader.querySelector('.toggle-icon');
                         if (toggleIcon) {
                             toggleIcon.textContent = chapterItem.classList.contains('expanded') ? '▼' : '▶';
-                        }
-                        
-                        // 展開時に⭐︎問題の状態をチェック
-                        if (chapterItem.classList.contains('expanded')) {
-                            setTimeout(() => {
-                                if (typeof updateStarProblemUI === 'function') {
-                                    updateStarProblemUI();
-                                }
-                            }, 100);
                         }
                     }
                 }
@@ -2525,40 +2340,6 @@ function resetRestrictionState() {
     console.log('制限状態をリセットしました');
     updateIncorrectOnlySelection();
 }
-
-// デバッグ用：⭐︎問題の状態を確認する関数
-window.debugStarProblems = function() {
-    console.log('🌟 === ⭐︎問題デバッグ情報 ===');
-    const availability = checkStarProblemAvailabilityByChapter();
-    
-    Object.keys(availability).forEach(chapterNum => {
-        const data = availability[chapterNum];
-        if (data.hasStarProblems) {
-            console.log(`第${chapterNum}章:`);
-            console.log(`  通常問題: ${data.masteredRegular}/${data.totalRegular} マスター`);
-            console.log(`  ⭐︎問題: ${data.isAvailable ? '利用可能' : '利用不可'}`);
-            if (!data.isAvailable && data.requiredRemaining > 0) {
-                console.log(`  必要: あと${data.requiredRemaining}問マスター`);
-            }
-        }
-    });
-    
-    console.log('========================');
-    return availability;
-};
-
-// 初期化時にloadWordDataFromServerの後に⭐︎問題UIを更新
-const originalLoadWordData = window.loadWordDataFromServer;
-window.loadWordDataFromServer = function() {
-    if (originalLoadWordData) {
-        originalLoadWordData.apply(this, arguments);
-    }
-    
-    // 単語データ読み込み後に⭐︎問題UIを更新
-    setTimeout(() => {
-        updateStarProblemUI();
-    }, 500);
-};
 
 // グローバル関数として公開
 window.setRestrictionState = setRestrictionState;
