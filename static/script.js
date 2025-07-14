@@ -21,7 +21,6 @@ let answerButtonTimeout = null;
 let hasBeenRestricted = false; // 一度でも制限されたかのフラグ
 let restrictionReleased = false; // 制限が解除されたかのフラグ
 let starProblemStatus = {};
-let starRequirements = {};
 
 // DOM要素
 const startButton = document.getElementById('startButton');
@@ -98,7 +97,7 @@ let word_data = [];
 
 // 「全て選択」ボタンのテキストと色を更新する関数（スマホ対応版）
 function updateSelectAllButtonText(button, isAllSelected) {
-    // ★ 修正: null チェックを追加
+    // null チェックを追加
     if (!button) {
         console.warn('updateSelectAllButtonText: button parameter is null or undefined');
         return;
@@ -388,21 +387,71 @@ document.addEventListener('change', function(event) {
     }
 });
 
-document.addEventListener('DOMContentLoaded', function() {
-    // 初期化完了後に⭐︎問題UIを更新
-    setTimeout(() => {
-        updateStarProblemUI();
-    }, 2000);
-});
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('DOM loaded, initializing application...');
+    
+    try {
+        updateIncorrectOnlyRadio();
+        loadUserData();
+        loadWordDataFromServer();
+        setupEventListeners();
 
-// 進捗ページ読み込み時に実行
-if (window.location.pathname === '/progress') {
-    document.addEventListener('DOMContentLoaded', function() {
+        // データロード後に選択状態を復元
         setTimeout(() => {
-            enhanceProgressPageForStarProblems();
+            loadSelectionState();
+            initializeSelectAllButtons();
+            initializeMobileOptimizations();
+            improveTouchExperience();
+            optimizeScrolling();
+            
+            // ⭐︎問題関連の初期化を追加
+            if (typeof addStarUnlockStyles === 'function') {
+                addStarUnlockStyles(); // CSSアニメーション追加
+            }
+            
+            console.log('📍 初期化完了 - 制限状態をチェック');
+            updateIncorrectOnlySelection();
         }, 1500);
-    });
-}
+        
+        // ⭐︎問題UI更新（メインページ用）
+        setTimeout(() => {
+            if (typeof updateStarProblemUI === 'function') {
+                updateStarProblemUI();
+            }
+        }, 2000);
+        
+        // 進捗ページ専用の処理
+        if (window.location.pathname === '/progress') {
+            setTimeout(() => {
+                if (typeof enhanceProgressPageForStarProblems === 'function') {
+                    enhanceProgressPageForStarProblems();
+                }
+            }, 1500);
+        }
+        
+        // ⭐︎問題状態の取得（さらに遅らせる）
+        setTimeout(async () => {
+            if (typeof loadStarProblemStatusEnhanced === 'function') {
+                await loadStarProblemStatusEnhanced();
+            }
+        }, 2500);
+        
+        if (noWeakWordsMessage) {
+            noWeakWordsMessage.classList.add('hidden');
+        }
+    } catch (error) {
+        console.error('Error during initialization:', error);
+    }
+
+    document.addEventListener('keydown', handleEscapeKey);
+    
+    // 最後にloadStarProblemStatus（既存）も呼び出し
+    setTimeout(() => {
+        if (typeof loadStarProblemStatus === 'function') {
+            loadStarProblemStatus();
+        }
+    }, 1000);
+});
 
 function loadUserData() {
     fetch('/api/load_quiz_progress')
