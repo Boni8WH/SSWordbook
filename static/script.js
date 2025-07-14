@@ -301,9 +301,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     document.addEventListener('keydown', handleEscapeKey);
-    setTimeout(() => {
-        loadStarProblemStatus();
-    }, 1000);
 });
 
 // クイズ開始時のバリデーション強化
@@ -444,13 +441,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     document.addEventListener('keydown', handleEscapeKey);
-    
-    // 最後にloadStarProblemStatus（既存）も呼び出し
-    setTimeout(() => {
-        if (typeof loadStarProblemStatusEnhanced === 'function') {
-            loadStarProblemStatusEnhanced(); // 正しい関数名に変更
-        }
-    }, 1000);
 });
 
 function loadUserData() {
