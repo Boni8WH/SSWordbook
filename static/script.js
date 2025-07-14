@@ -20,6 +20,8 @@ let isAnswerButtonDisabled = false;
 let answerButtonTimeout = null;
 let hasBeenRestricted = false; // 一度でも制限されたかのフラグ
 let restrictionReleased = false; // 制限が解除されたかのフラグ
+let starProblemStatus = {};
+let starRequirements = {};
 
 // DOM要素
 const startButton = document.getElementById('startButton');
@@ -245,37 +247,19 @@ function optimizeScrolling() {
 // =========================================================
 // 問題ID生成関数（修正版 - 衝突を防ぐ）
 // =========================================================
-
-// script.jsの問題ID生成関数を以下に置き換え（約197行目付近）
-
-// script.js の generateProblemId 関数を以下に置き換え
-
-// script.js の generateProblemId 関数を以下に置き換え
-// 既存のID形式に合わせて修正
-
-// script.js の generateProblemId 関数を以下に置き換え
-
-// script.js の generateProblemId 関数を以下に置き換え
-
+// 問題ID生成関数（サーバー側と一致させる）
 function generateProblemId(word) {
-    /**
-     * 統一された問題ID生成（Python側と完全一致）
-     */
     try {
-        const chapter = String(word.chapter || '0').padStart(3, '0');
-        const number = String(word.number || '0').padStart(3, '0');
+        const chapter = String(word.chapter).padStart(3, '0');
+        const number = String(word.number).padStart(3, '0');
         const question = String(word.question || '');
         const answer = String(word.answer || '');
         
-        // 問題文と答えから英数字と日本語文字のみ抽出（Python側と同じ処理）
-        const questionClean = question.substring(0, 15).replace(/[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/g, '');
-        const answerClean = answer.substring(0, 10).replace(/[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/g, '');
+        // 問題文と答えから英数字と日本語文字のみ抽出
+        const questionClean = question.slice(0, 15).replace(/[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/g, '');
+        const answerClean = answer.slice(0, 10).replace(/[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/g, '');
         
-        // 統一フォーマット: chapter-number-question-answer
-        const problemId = `${chapter}-${number}-${questionClean}-${answerClean}`;
-        
-        return problemId;
-        
+        return `${chapter}-${number}-${questionClean}-${answerClean}`;
     } catch (error) {
         console.error('ID生成エラー:', error);
         const chapter = String(word.chapter || '0').padStart(3, '0');
@@ -318,7 +302,107 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     document.addEventListener('keydown', handleEscapeKey);
+    setTimeout(() => {
+        loadStarProblemStatus();
+    }, 1000);
 });
+
+// クイズ開始時のバリデーション強化
+const originalStartQuiz = window.startQuiz;
+window.startQuiz = function() {
+    console.log('🚀 クイズ開始 - ⭐︎問題バリデーション実行');
+    
+    // ⭐︎問題のバリデーション
+    if (!validateStarProblemSelection()) {
+        console.log('❌ ⭐︎問題バリデーション失敗');
+        return false;
+    }
+    
+    // 既存のstartQuiz処理を実行
+    if (originalStartQuiz) {
+        return originalStartQuiz.apply(this, arguments);
+    } else {
+        // 既存の関数が見つからない場合は、本来のstartQuiz処理
+        return startQuizOriginal();
+    }
+};
+
+function enhanceProgressPageForStarProblems() {
+    // 進捗ページの章ごとの表示を強化
+    const chapterSections = document.querySelectorAll('.chapter-section');
+    
+    chapterSections.forEach(section => {
+        const chapterNum = section.dataset.chapter;
+        if (!chapterNum) return;
+        
+        // ⭐︎問題の単元があるかチェック
+        const starUnits = section.querySelectorAll('.unit-progress[data-unit="⭐︎"]');
+        
+        starUnits.forEach(unit => {
+            const isAvailable = checkStarUnitAvailability(chapterNum);
+            
+            if (isAvailable) {
+                unit.classList.add('star-unlocked');
+                unit.style.background = 'linear-gradient(135deg, #ffd700, #ffed4e)';
+                unit.style.border = '2px solid #ffd700';
+                
+                // 解放済みマークを追加
+                if (!unit.querySelector('.unlocked-mark')) {
+                    const mark = document.createElement('span');
+                    mark.className = 'unlocked-mark';
+                    mark.textContent = '✨';
+                    mark.style.cssText = 'position: absolute; top: 5px; right: 5px; font-size: 1.2em;';
+                    unit.style.position = 'relative';
+                    unit.appendChild(mark);
+                }
+            } else {
+                unit.classList.add('star-locked');
+                unit.style.opacity = '0.6';
+                unit.style.filter = 'grayscale(50%)';
+                
+                // ロックマークを追加
+                if (!unit.querySelector('.locked-mark')) {
+                    const mark = document.createElement('span');
+                    mark.className = 'locked-mark';
+                    mark.textContent = '🔒';
+                    mark.style.cssText = 'position: absolute; top: 5px; right: 5px; font-size: 1.2em; color: #999;';
+                    unit.style.position = 'relative';
+                    unit.appendChild(mark);
+                }
+            }
+        });
+    });
+}
+
+// チェックボックスの変更時にも「全て選択」ボタンを更新
+document.addEventListener('change', function(event) {
+    if (event.target.type === 'checkbox' && event.target.dataset.chapter) {
+        const chapterNum = event.target.dataset.chapter;
+        const button = document.querySelector(`.select-all-chapter-btn[data-chapter="${chapterNum}"]`);
+        
+        if (button) {
+            setTimeout(() => {
+                updateSelectAllButtonsForStarProblems();
+            }, 50);
+        }
+    }
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+    // 初期化完了後に⭐︎問題UIを更新
+    setTimeout(() => {
+        updateStarProblemUI();
+    }, 2000);
+});
+
+// 進捗ページ読み込み時に実行
+if (window.location.pathname === '/progress') {
+    document.addEventListener('DOMContentLoaded', function() {
+        setTimeout(() => {
+            enhanceProgressPageForStarProblems();
+        }, 1500);
+    });
+}
 
 function loadUserData() {
     fetch('/api/load_quiz_progress')
@@ -2340,6 +2424,40 @@ function resetRestrictionState() {
     console.log('制限状態をリセットしました');
     updateIncorrectOnlySelection();
 }
+
+// デバッグ用：⭐︎問題の状態を確認する関数
+window.debugStarProblems = function() {
+    console.log('🌟 === ⭐︎問題デバッグ情報 ===');
+    const availability = checkStarProblemAvailabilityByChapter();
+    
+    Object.keys(availability).forEach(chapterNum => {
+        const data = availability[chapterNum];
+        if (data.hasStarProblems) {
+            console.log(`第${chapterNum}章:`);
+            console.log(`  通常問題: ${data.masteredRegular}/${data.totalRegular} マスター`);
+            console.log(`  ⭐︎問題: ${data.isAvailable ? '利用可能' : '利用不可'}`);
+            if (!data.isAvailable && data.requiredRemaining > 0) {
+                console.log(`  必要: あと${data.requiredRemaining}問マスター`);
+            }
+        }
+    });
+    
+    console.log('========================');
+    return availability;
+};
+
+// 初期化時にloadWordDataFromServerの後に⭐︎問題UIを更新
+const originalLoadWordData = window.loadWordDataFromServer;
+window.loadWordDataFromServer = function() {
+    if (originalLoadWordData) {
+        originalLoadWordData.apply(this, arguments);
+    }
+    
+    // 単語データ読み込み後に⭐︎問題UIを更新
+    setTimeout(() => {
+        updateStarProblemUI();
+    }, 500);
+};
 
 // グローバル関数として公開
 window.setRestrictionState = setRestrictionState;
