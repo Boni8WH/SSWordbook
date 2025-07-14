@@ -2043,6 +2043,8 @@ def index():
         traceback.print_exc()
         return f"Internal Server Error: {e}", 500
 
+# app.py に以下のエンドポイントを追加
+
 @app.route('/api/star_problem_status_enhanced')
 def api_star_problem_status_enhanced():
     """⭐︎問題の詳細な状態を確認するAPI（強化版）"""
@@ -2069,8 +2071,9 @@ def api_star_problem_status_enhanced():
             if is_word_enabled_in_csv and is_unit_enabled_by_room:
                 filtered_word_data.append(word)
         
-        star_availability = check_star_problem_availability_enhanced(current_user_id, filtered_word_data)
-        star_requirements = get_star_problem_requirements_enhanced(filtered_word_data)
+        # 既存の関数を使用（名前を変更）
+        star_availability = check_star_problem_availability(current_user_id, filtered_word_data)
+        star_requirements = get_star_problem_requirements(filtered_word_data)
         
         # 章ごとの詳細な進捗状況を取得
         user_history = current_user.get_problem_history()
