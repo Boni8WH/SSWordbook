@@ -1985,6 +1985,8 @@ def index():
         word_data = load_word_data_for_room(current_user.room_number)
         
         room_setting = RoomSetting.query.filter_by(room_number=current_user.room_number).first()
+        max_enabled_unit_num_str = room_setting.max_enabled_unit_number if room_setting else "9999"
+        parsed_max_enabled_unit_num = parse_unit_number(max_enabled_unit_num_str)
 
         all_chapter_unit_status = {}
         for word in word_data:
@@ -2002,26 +2004,12 @@ def index():
                     all_chapter_unit_status[chapter_num] = {'units': {}, 'name': f'第{chapter_num}章'}
                 
                 if unit_num not in all_chapter_unit_status[chapter_num]['units']:
-                    # ⭐︎問題の場合は利用可能性をチェック
-                    if str(unit_num) == '⭐︎':
-                        star_availability = check_star_problem_availability_enhanced(current_user.id, word_data)
-                        problem_id = get_problem_id(word)
-                        is_star_available = star_availability.get(problem_id, False)
-                        
-                        all_chapter_unit_status[chapter_num]['units'][unit_num] = {
-                            'categoryName': category_name,
-                            'enabled': is_star_available,  # ⭐︎問題は利用可能性による
-                            'is_star_problem': True,
-                            'star_available': is_star_available
-                        }
-                    else:
-                        all_chapter_unit_status[chapter_num]['units'][unit_num] = {
-                            'categoryName': category_name,
-                            'enabled': True,  # 通常問題は常に利用可能
-                            'is_star_problem': False
-                        }
+                    all_chapter_unit_status[chapter_num]['units'][unit_num] = {
+                        'categoryName': category_name,
+                        'enabled': True  # 利用可能な単元のみ追加するのでenabled=True
+                    }
 
-        # 空の章（利用可能な単元がない章）を除外
+        # ★新機能：空の章（利用可能な単元がない章）を除外
         filtered_chapter_unit_status = {}
         for chapter_num, chapter_data in all_chapter_unit_status.items():
             if chapter_data['units']:  # 章に利用可能な単元がある場合のみ含める
@@ -2033,6 +2021,7 @@ def index():
         # フッター用のコンテキストを取得
         context = get_template_context()
         
+        # ★重要な修正：JavaScriptで使う変数名を変更
         return render_template('index.html',
                                 app_info_for_js=app_info_for_js,
                                 chapter_data=sorted_all_chapter_unit_status)
@@ -2043,174 +2032,7 @@ def index():
         traceback.print_exc()
         return f"Internal Server Error: {e}", 500
 
-# app.py に以下のエンドポイントを追加
-
-@app.route('/api/star_problem_status_enhanced')
-def api_star_problem_status_enhanced():
-    """⭐︎問題の詳細な状態を確認するAPI（強化版）"""
-    try:
-        if 'user_id' not in session:
-            return jsonify(status='error', message='認証されていません。'), 401
-
-        current_user_id = session.get('user_id')
-        current_user = User.query.get(current_user_id)
-        
-        if not current_user:
-            return jsonify(status='error', message='ユーザーが見つかりません。'), 404
-
-        word_data = load_word_data_for_room(current_user.room_number)
-        room_setting = RoomSetting.query.filter_by(room_number=current_user.room_number).first()
-
-        # 有効な問題のみフィルタリング
-        filtered_word_data = []
-        for word in word_data:
-            unit_num = word['number']
-            is_word_enabled_in_csv = word['enabled']
-            is_unit_enabled_by_room = is_unit_enabled_by_room_setting(unit_num, room_setting)
-
-            if is_word_enabled_in_csv and is_unit_enabled_by_room:
-                filtered_word_data.append(word)
-        
-        # 既存の関数を使用（名前を変更）
-        star_availability = check_star_problem_availability(current_user_id, filtered_word_data)
-        star_requirements = get_star_problem_requirements(filtered_word_data)
-        
-        # 章ごとの詳細な進捗状況を取得
-        user_history = current_user.get_problem_history()
-        chapter_progress = {}
-        
-        for word in filtered_word_data:
-            chapter = str(word['chapter'])
-            number = str(word['number'])
-            problem_id = get_problem_id(word)
-            
-            if chapter not in chapter_progress:
-                chapter_progress[chapter] = {
-                    'regular_total': 0,
-                    'regular_mastered': 0,
-                    'regular_problems': [],
-                    'star_total': 0,
-                    'star_available': 0,
-                    'star_problems': []
-                }
-            
-            if number == '⭐︎':
-                chapter_progress[chapter]['star_total'] += 1
-                star_info = {
-                    'problem_id': problem_id,
-                    'question': word['question'],
-                    'available': star_availability.get(problem_id, False),
-                    'requirements': star_requirements.get(problem_id, {})
-                }
-                chapter_progress[chapter]['star_problems'].append(star_info)
-                
-                if star_availability.get(problem_id, False):
-                    chapter_progress[chapter]['star_available'] += 1
-            else:
-                chapter_progress[chapter]['regular_total'] += 1
-                chapter_progress[chapter]['regular_problems'].append({
-                    'problem_id': problem_id,
-                    'question': word['question'],
-                    'number': number
-                })
-                
-                # マスター判定
-                if problem_id in user_history:
-                    history = user_history[problem_id]
-                    correct_attempts = history.get('correct_attempts', 0)
-                    incorrect_attempts = history.get('incorrect_attempts', 0)
-                    total_attempts = correct_attempts + incorrect_attempts
-                    
-                    if total_attempts > 0:
-                        accuracy_rate = (correct_attempts / total_attempts) * 100
-                        if accuracy_rate >= 80.0:
-                            chapter_progress[chapter]['regular_mastered'] += 1
-        
-        return jsonify({
-            'status': 'success',
-            'star_availability': star_availability,
-            'star_requirements': star_requirements,
-            'chapter_progress': chapter_progress,
-            'user_id': current_user_id
-        })
-        
-    except Exception as e:
-        print(f"Error in api_star_problem_status_enhanced: {e}")
-        return jsonify(status='error', message=str(e)), 500
-
-@app.route('/api/save_progress_with_star_check', methods=['POST'])
-def save_progress_with_star_check():
-    """学習進捗保存 + ⭐︎問題状態チェック"""
-    try:
-        if 'user_id' not in session:
-            return jsonify(status='error', message='ログインしていません。'), 401
-        
-        data = request.get_json()
-        received_problem_history = data.get('problemHistory', {})
-        received_incorrect_words = data.get('incorrectWords', [])
-
-        current_user = User.query.get(session['user_id'])
-        if not current_user:
-            return jsonify(status='error', message='ユーザーが見つかりません。'), 404
-
-        print(f"💾 学習データ保存開始: {current_user.username}")
-
-        # 保存前の⭐︎問題状態を取得
-        word_data = load_word_data_for_room(current_user.room_number)
-        old_star_availability = check_star_problem_availability_enhanced(current_user.id, word_data)
-
-        # 学習履歴を保存
-        current_user.set_problem_history(received_problem_history)
-        current_user.set_incorrect_words(received_incorrect_words)
-        
-        # 統計を自動更新
-        try:
-            user_stats = UserStats.get_or_create(current_user.id)
-            if user_stats:
-                user_stats.update_stats(word_data)
-                print(f"📊 統計自動更新: {current_user.username} (スコア: {user_stats.balance_score:.1f})")
-        except Exception as stats_error:
-            print(f"⚠️ 統計更新エラー: {stats_error}")
-        
-        # 一括コミット
-        db.session.commit()
-        
-        # 保存後の⭐︎問題状態を取得
-        new_star_availability = check_star_problem_availability_enhanced(current_user.id, word_data)
-        
-        # 新しく解放された⭐︎問題があるかチェック
-        newly_unlocked = []
-        for problem_id, is_available in new_star_availability.items():
-            if is_available and not old_star_availability.get(problem_id, False):
-                # 対応する問題データを取得
-                for word in word_data:
-                    if get_problem_id(word) == problem_id:
-                        newly_unlocked.append({
-                            'problem_id': problem_id,
-                            'chapter': word['chapter'],
-                            'question': word['question']
-                        })
-                        break
-        
-        response_data = {
-            'status': 'success',
-            'message': '進捗が保存され、統計が更新されました。',
-            'newly_unlocked_stars': newly_unlocked,
-            'total_unlocked_count': len([v for v in new_star_availability.values() if v])
-        }
-        
-        if newly_unlocked:
-            chapters = list(set([star['chapter'] for star in newly_unlocked]))
-            response_data['unlock_message'] = f"🌟 第{', '.join(chapters)}章の⭐︎問題が解放されました！"
-            print(f"🌟 新しく解放された⭐︎問題: {len(newly_unlocked)}個")
-        
-        print(f"✅ 学習データ保存完了: {current_user.username}")
-        return jsonify(response_data)
-        
-    except Exception as e:
-        print(f"❌ 進捗保存エラー: {e}")
-        db.session.rollback()
-        return jsonify(status='error', message=f'進捗の保存中にエラーが発生しました: {str(e)}'), 500
+# app.py の login_page ルートを修正
 
 @app.route('/login', methods=['GET', 'POST'])
 def login_page():
@@ -3567,166 +3389,16 @@ def api_word_data():
         for word in word_data:
             unit_num = word['number']
             is_word_enabled_in_csv = word['enabled']
+            # 修正：新しい関数を使用
             is_unit_enabled_by_room = is_unit_enabled_by_room_setting(unit_num, room_setting)
 
             if is_word_enabled_in_csv and is_unit_enabled_by_room:
                 filtered_word_data.append(word)
         
-        # ⭐︎問題の利用可能性をチェック（強化版）
-        star_availability = check_star_problem_availability_enhanced(current_user_id, filtered_word_data)
-        star_requirements = get_star_problem_requirements_enhanced(filtered_word_data)
-        
-        # 各問題に⭐︎問題の情報を追加
-        for word in filtered_word_data:
-            problem_id = get_problem_id(word)
-            word['is_star_problem'] = str(word['number']) == '⭐︎'
-            
-            if word['is_star_problem']:
-                word['star_available'] = star_availability.get(problem_id, False)
-                word['star_requirements'] = star_requirements.get(problem_id, {})
-            else:
-                word['star_available'] = True  # 通常問題は常に利用可能
-                word['star_requirements'] = {}
-        
-        return jsonify({
-            'status': 'success',
-            'word_data': filtered_word_data,
-            'star_availability': star_availability,
-            'star_requirements': star_requirements
-        })
+        return jsonify(filtered_word_data)
         
     except Exception as e:
         print(f"Error in api_word_data: {e}")
-        return jsonify(status='error', message=str(e)), 500
-
-def get_star_problem_requirements_enhanced(word_data):
-    """
-    各⭐︎問題の解放条件を詳細に取得する
-    """
-    requirements = {}
-    chapters_data = {}
-    
-    for word in word_data:
-        if not word['enabled']:
-            continue
-            
-        chapter = str(word['chapter'])
-        number = str(word['number'])
-        problem_id = get_problem_id(word)
-        
-        if chapter not in chapters_data:
-            chapters_data[chapter] = {
-                'regular_problems': [],
-                'star_problems': []
-            }
-        
-        if number == '⭐︎':
-            chapters_data[chapter]['star_problems'].append({
-                'problem_id': problem_id,
-                'word': word
-            })
-        else:
-            chapters_data[chapter]['regular_problems'].append({
-                'problem_id': problem_id,
-                'word': word
-            })
-    
-    # 各⭐︎問題の要件を設定
-    for chapter, data in chapters_data.items():
-        for star_problem in data['star_problems']:
-            requirements[star_problem['problem_id']] = {
-                'chapter': chapter,
-                'required_problems': len(data['regular_problems']),
-                'regular_problem_ids': [p['problem_id'] for p in data['regular_problems']],
-                'description': f'第{chapter}章の通常問題{len(data["regular_problems"])}問を全てマスターする必要があります'
-            }
-    
-    return requirements
-
-# ====================================================================
-# ⭐︎問題状態確認用API
-# ====================================================================
-
-@app.route('/api/star_problem_status')
-def api_star_problem_status():
-    """⭐︎問題の状態を確認するAPI"""
-    try:
-        if 'user_id' not in session:
-            return jsonify(status='error', message='認証されていません。'), 401
-
-        current_user_id = session.get('user_id')
-        current_user = User.query.get(current_user_id)
-        
-        if not current_user:
-            return jsonify(status='error', message='ユーザーが見つかりません。'), 404
-
-        word_data = load_word_data_for_room(current_user.room_number)
-        room_setting = RoomSetting.query.filter_by(room_number=current_user.room_number).first()
-
-        # 有効な問題のみフィルタリング
-        filtered_word_data = []
-        for word in word_data:
-            unit_num = word['number']
-            is_word_enabled_in_csv = word['enabled']
-            is_unit_enabled_by_room = is_unit_enabled_by_room_setting(unit_num, room_setting)
-
-            if is_word_enabled_in_csv and is_unit_enabled_by_room:
-                filtered_word_data.append(word)
-        
-        star_availability = check_star_problem_availability(current_user_id, filtered_word_data)
-        star_requirements = get_star_problem_requirements(filtered_word_data)
-        
-        # 章ごとの進捗状況を取得
-        user_history = current_user.get_problem_history()
-        chapter_progress = {}
-        
-        for word in filtered_word_data:
-            chapter = str(word['chapter'])
-            number = str(word['number'])
-            problem_id = get_problem_id(word)
-            
-            if chapter not in chapter_progress:
-                chapter_progress[chapter] = {
-                    'regular_total': 0,
-                    'regular_mastered': 0,
-                    'star_total': 0,
-                    'star_available': 0,
-                    'star_problems': []
-                }
-            
-            if number == '⭐︎':
-                chapter_progress[chapter]['star_total'] += 1
-                chapter_progress[chapter]['star_problems'].append({
-                    'problem_id': problem_id,
-                    'question': word['question'],
-                    'available': star_availability.get(problem_id, False)
-                })
-                if star_availability.get(problem_id, False):
-                    chapter_progress[chapter]['star_available'] += 1
-            else:
-                chapter_progress[chapter]['regular_total'] += 1
-                
-                # マスター判定
-                if problem_id in user_history:
-                    history = user_history[problem_id]
-                    correct_attempts = history.get('correct_attempts', 0)
-                    incorrect_attempts = history.get('incorrect_attempts', 0)
-                    total_attempts = correct_attempts + incorrect_attempts
-                    
-                    if total_attempts > 0:
-                        accuracy_rate = (correct_attempts / total_attempts) * 100
-                        if accuracy_rate >= 80.0:
-                            chapter_progress[chapter]['regular_mastered'] += 1
-        
-        return jsonify({
-            'status': 'success',
-            'star_availability': star_availability,
-            'star_requirements': star_requirements,
-            'chapter_progress': chapter_progress
-        })
-        
-    except Exception as e:
-        print(f"Error in api_star_problem_status: {e}")
         return jsonify(status='error', message=str(e)), 500
 
 @app.route('/api/load_quiz_progress')
@@ -4836,7 +4508,7 @@ def admin_analyze_invalid_history_detailed():
 # ====================================================================
 @app.route('/progress')
 def progress_page():
-    """個人進捗のみを高速表示（⭐︎問題対応版）"""
+    """個人進捗のみを高速表示（ランキングは非同期）"""
     try:
         if 'user_id' not in session:
             flash('進捗を確認するにはログインしてください。', 'info')
@@ -4847,7 +4519,7 @@ def progress_page():
             flash('ユーザーが見つかりません。', 'danger')
             return redirect(url_for('logout'))
 
-        print(f"\n=== 進捗ページ（⭐︎対応版）処理開始 ===")
+        print(f"\n=== 進捗ページ（高速版）処理開始 ===")
         print(f"ユーザー: {current_user.username} (部屋: {current_user.room_number})")
 
         user_problem_history = current_user.get_problem_history()
@@ -4862,10 +4534,7 @@ def progress_page():
         parsed_max_enabled_unit_num = parse_unit_number(max_enabled_unit_num_str)
         print(f"最大単元番号: {max_enabled_unit_num_str}")
 
-        # ⭐︎問題の利用可能性をチェック
-        star_availability = check_star_problem_availability(current_user.id, word_data)
-        
-        # 章ごとに進捗をまとめる（⭐︎問題対応）
+        # 章ごとに進捗をまとめる（個人のみ、高速化）
         chapter_progress_summary = {}
 
         # 有効な単語データで単元進捗を初期化
@@ -4875,48 +4544,32 @@ def progress_page():
             category_name = word.get('category', '未分類')
             
             is_word_enabled_in_csv = word['enabled']
-            is_unit_enabled_by_room = is_unit_enabled_by_room_setting(unit_num, room_setting)
+            is_unit_enabled_by_room = is_unit_enabled_by_room_setting(unit_num, room_setting)  # ←変数名を変更
 
-            # ⭐︎問題の特別処理
-            is_star_problem = str(unit_num) == '⭐︎'
-            problem_id = get_problem_id(word)
-            is_star_available = star_availability.get(problem_id, False) if is_star_problem else True
-
-            if is_word_enabled_in_csv and is_unit_enabled_by_room and is_star_available:
+            if is_word_enabled_in_csv and is_unit_enabled_by_room:
                 # 章の初期化
                 if chapter_num not in chapter_progress_summary:
                     chapter_progress_summary[chapter_num] = {
                         'chapter_name': f'第{chapter_num}章',
                         'units': {},
                         'total_questions': 0,
-                        'total_mastered': 0,
-                        'star_problems': {}
+                        'total_mastered': 0
                     }
                 
                 # 単元の初期化
-                unit_key = unit_num if not is_star_problem else f'⭐︎_{problem_id}'
-                
-                if unit_key not in chapter_progress_summary[chapter_num]['units']:
-                    chapter_progress_summary[chapter_num]['units'][unit_key] = {
+                if unit_num not in chapter_progress_summary[chapter_num]['units']:
+                    chapter_progress_summary[chapter_num]['units'][unit_num] = {
                         'categoryName': category_name,
                         'attempted_problems': set(),
                         'mastered_problems': set(),
                         'total_questions_in_unit': 0,
-                        'total_attempts': 0,
-                        'is_star_problem': is_star_problem,
-                        'unit_display': '⭐︎' if is_star_problem else unit_num
+                        'total_attempts': 0
                     }
                 
-                chapter_progress_summary[chapter_num]['units'][unit_key]['total_questions_in_unit'] += 1
+                chapter_progress_summary[chapter_num]['units'][unit_num]['total_questions_in_unit'] += 1
                 chapter_progress_summary[chapter_num]['total_questions'] += 1
-                
-                if is_star_problem:
-                    chapter_progress_summary[chapter_num]['star_problems'][problem_id] = {
-                        'question': word['question'],
-                        'available': True  # ここに来る時点で利用可能
-                    }
 
-        # 学習履歴を処理（⭐︎問題も含む）
+        # 学習履歴を処理（個人のみ）
         matched_problems = 0
         unmatched_problems = 0
         
@@ -4937,31 +4590,25 @@ def progress_page():
                 is_word_enabled_in_csv = matched_word['enabled']
                 is_unit_enabled_by_room = parse_unit_number(unit_number) <= parsed_max_enabled_unit_num
 
-                # ⭐︎問題の利用可能性チェック
-                is_star_problem = str(unit_number) == '⭐︎'
-                is_star_available = star_availability.get(problem_id, False) if is_star_problem else True
-
-                if (is_word_enabled_in_csv and is_unit_enabled_by_room and is_star_available and
-                    chapter_number in chapter_progress_summary):
+                if (is_word_enabled_in_csv and is_unit_enabled_by_room_setting and 
+                    chapter_number in chapter_progress_summary and
+                    unit_number in chapter_progress_summary[chapter_number]['units']):
                     
-                    unit_key = unit_number if not is_star_problem else f'⭐︎_{problem_id}'
+                    correct_attempts = history.get('correct_attempts', 0)
+                    incorrect_attempts = history.get('incorrect_attempts', 0)
+                    total_problem_attempts = correct_attempts + incorrect_attempts
                     
-                    if unit_key in chapter_progress_summary[chapter_number]['units']:
-                        correct_attempts = history.get('correct_attempts', 0)
-                        incorrect_attempts = history.get('incorrect_attempts', 0)
-                        problem_total_attempts = correct_attempts + incorrect_attempts
+                    unit_data = chapter_progress_summary[chapter_number]['units'][unit_number]
+                    unit_data['total_attempts'] += total_problem_attempts
+                    
+                    if total_problem_attempts > 0:
+                        unit_data['attempted_problems'].add(problem_id)
                         
-                        unit_data = chapter_progress_summary[chapter_number]['units'][unit_key]
-                        unit_data['total_attempts'] += problem_total_attempts
-                        
-                        if problem_total_attempts > 0:
-                            unit_data['attempted_problems'].add(problem_id)
-                            
-                            # マスター判定：正答率80%以上
-                            accuracy_rate = (correct_attempts / problem_total_attempts) * 100
-                            if accuracy_rate >= 80.0:
-                                unit_data['mastered_problems'].add(problem_id)
-                                chapter_progress_summary[chapter_number]['total_mastered'] += 1
+                        # マスター判定：正答率80%以上
+                        accuracy_rate = (correct_attempts / total_problem_attempts) * 100
+                        if accuracy_rate >= 80.0:
+                            unit_data['mastered_problems'].add(problem_id)
+                            chapter_progress_summary[chapter_number]['total_mastered'] += 1
             else:
                 unmatched_problems += 1
 
@@ -4970,49 +4617,36 @@ def progress_page():
         for chapter_num in sorted(chapter_progress_summary.keys(), key=lambda x: int(x) if x.isdigit() else float('inf')):
             chapter_data = chapter_progress_summary[chapter_num]
             
-            # 単元データをソートして配列に変換（⭐︎問題は最後に）
+            # 単元データをソートして配列に変換
             sorted_units = []
-            regular_units = []
-            star_units = []
-            
-            for unit_key, unit_data in chapter_data['units'].items():
-                unit_info = {
-                    'unit_num': unit_data['unit_display'],
+            for unit_num in sorted(chapter_data['units'].keys(), key=lambda x: parse_unit_number(x)):
+                unit_data = chapter_data['units'][unit_num]
+                sorted_units.append({
+                    'unit_num': unit_num,
                     'category_name': unit_data['categoryName'],
                     'attempted_problems': list(unit_data['attempted_problems']),
                     'mastered_problems': list(unit_data['mastered_problems']),
                     'total_questions_in_unit': unit_data['total_questions_in_unit'],
-                    'total_attempts': unit_data['total_attempts'],
-                    'is_star_problem': unit_data['is_star_problem']
-                }
-                
-                if unit_data['is_star_problem']:
-                    star_units.append(unit_info)
-                else:
-                    regular_units.append(unit_info)
-            
-            # 通常問題をソート、⭐︎問題を最後に追加
-            regular_units.sort(key=lambda x: parse_unit_number(x['unit_num']))
-            sorted_units = regular_units + star_units
+                    'total_attempts': unit_data['total_attempts']
+                })
             
             sorted_chapter_progress[chapter_num] = {
                 'chapter_name': chapter_data['chapter_name'],
                 'units': sorted_units,
                 'total_questions': chapter_data['total_questions'],
-                'total_mastered': chapter_data['total_mastered'],
-                'star_problems': chapter_data.get('star_problems', {})
+                'total_mastered': chapter_data['total_mastered']
             }
 
         print(f"章別進捗: {len(sorted_chapter_progress)}章")
-        print("=== 進捗ページ（⭐︎対応版）処理完了 ===\n")
+        print("=== 進捗ページ（高速版）処理完了 ===\n")
 
         context = get_template_context()
         
+        # ★重要：ランキングデータは空で渡す（Ajax で後から取得）
         return render_template('progress.html',
                                current_user=current_user,
                                user_progress_by_chapter=sorted_chapter_progress,
-                               star_availability=star_availability,
-                               # ランキング関連は空・None で初期化（Ajax で後から取得）
+                               # ランキング関連は空・None で初期化
                                top_10_ranking=[],  
                                current_user_stats=None,
                                current_user_rank=None,
@@ -7000,133 +6634,6 @@ def debug_timezone_check():
         """
 
 # ====================================================================
-# ⭐︎問題制御用のヘルパー関数
-# ====================================================================
-
-def check_star_problem_availability(user_id, word_data):
-    """
-    ⭐︎問題の利用可能性をチェックする
-    同じchapterの他の全ての問題をマスターしている場合のみ⭐︎問題を利用可能にする
-    """
-    try:
-        current_user = User.query.get(user_id)
-        if not current_user:
-            return {}
-        
-        user_history = current_user.get_problem_history()
-        
-        # 章ごとの問題を分類
-        chapters_data = {}
-        star_problems = {}
-        
-        for word in word_data:
-            if not word['enabled']:
-                continue
-                
-            chapter = str(word['chapter'])
-            number = str(word['number'])
-            problem_id = get_problem_id(word)
-            
-            if chapter not in chapters_data:
-                chapters_data[chapter] = {
-                    'regular_problems': [],
-                    'star_problems': [],
-                    'total_regular': 0,
-                    'mastered_regular': 0
-                }
-            
-            if number == '⭐︎':
-                chapters_data[chapter]['star_problems'].append({
-                    'problem_id': problem_id,
-                    'word': word
-                })
-                star_problems[problem_id] = False  # デフォルトは利用不可
-            else:
-                chapters_data[chapter]['regular_problems'].append({
-                    'problem_id': problem_id,
-                    'word': word
-                })
-                chapters_data[chapter]['total_regular'] += 1
-        
-        # 各章でマスターした通常問題数をカウント
-        for chapter, data in chapters_data.items():
-            mastered_count = 0
-            
-            for problem_info in data['regular_problems']:
-                problem_id = problem_info['problem_id']
-                if problem_id in user_history:
-                    history = user_history[problem_id]
-                    correct_attempts = history.get('correct_attempts', 0)
-                    incorrect_attempts = history.get('incorrect_attempts', 0)
-                    total_attempts = correct_attempts + incorrect_attempts
-                    
-                    if total_attempts > 0:
-                        accuracy_rate = (correct_attempts / total_attempts) * 100
-                        if accuracy_rate >= 80.0:  # マスター判定：正答率80%以上
-                            mastered_count += 1
-            
-            data['mastered_regular'] = mastered_count
-            
-            # 通常問題を全てマスターしている場合、⭐︎問題を利用可能にする
-            if data['total_regular'] > 0 and mastered_count >= data['total_regular']:
-                for star_problem in data['star_problems']:
-                    star_problems[star_problem['problem_id']] = True
-        
-        print(f"⭐︎問題利用可能性チェック完了: {len(star_problems)}個の⭐︎問題")
-        for chapter, data in chapters_data.items():
-            if data['star_problems']:
-                print(f"  第{chapter}章: {data['mastered_regular']}/{data['total_regular']} マスター → ⭐︎問題{'利用可' if data['mastered_regular'] >= data['total_regular'] else '利用不可'}")
-        
-        return star_problems
-        
-    except Exception as e:
-        print(f"❌ ⭐︎問題チェックエラー: {e}")
-        return {}
-
-def get_star_problem_requirements(word_data):
-    """
-    各⭐︎問題の解放条件を取得する
-    """
-    requirements = {}
-    chapters_data = {}
-    
-    for word in word_data:
-        if not word['enabled']:
-            continue
-            
-        chapter = str(word['chapter'])
-        number = str(word['number'])
-        problem_id = get_problem_id(word)
-        
-        if chapter not in chapters_data:
-            chapters_data[chapter] = {
-                'regular_problems': [],
-                'star_problems': []
-            }
-        
-        if number == '⭐︎':
-            chapters_data[chapter]['star_problems'].append({
-                'problem_id': problem_id,
-                'word': word
-            })
-        else:
-            chapters_data[chapter]['regular_problems'].append({
-                'problem_id': problem_id,
-                'word': word
-            })
-    
-    # 各⭐︎問題の要件を設定
-    for chapter, data in chapters_data.items():
-        for star_problem in data['star_problems']:
-            requirements[star_problem['problem_id']] = {
-                'chapter': chapter,
-                'required_problems': len(data['regular_problems']),
-                'regular_problem_ids': [p['problem_id'] for p in data['regular_problems']]
-            }
-    
-    return requirements
-
-# ====================================================================
 # エラーハンドラー
 # ====================================================================
 
@@ -7410,85 +6917,7 @@ def debug_smart_id_fix():
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
-def check_star_problem_availability_enhanced(user_id, word_data):
-    """
-    ⭐︎問題の利用可能性をチェックする（強化版）
-    """
-    try:
-        current_user = User.query.get(user_id)
-        if not current_user:
-            return {}
-        
-        user_history = current_user.get_problem_history()
-        
-        # 章ごとの問題を分類
-        chapters_data = {}
-        star_problems = {}
-        
-        for word in word_data:
-            if not word['enabled']:
-                continue
-                
-            chapter = str(word['chapter'])
-            number = str(word['number'])
-            problem_id = get_problem_id(word)
-            
-            if chapter not in chapters_data:
-                chapters_data[chapter] = {
-                    'regular_problems': [],
-                    'star_problems': [],
-                    'total_regular': 0,
-                    'mastered_regular': 0
-                }
-            
-            if number == '⭐︎':
-                chapters_data[chapter]['star_problems'].append({
-                    'problem_id': problem_id,
-                    'word': word
-                })
-                star_problems[problem_id] = False  # デフォルトは利用不可
-            else:
-                chapters_data[chapter]['regular_problems'].append({
-                    'problem_id': problem_id,
-                    'word': word
-                })
-                chapters_data[chapter]['total_regular'] += 1
-        
-        # 各章でマスターした通常問題数をカウント
-        for chapter, data in chapters_data.items():
-            mastered_count = 0
-            
-            for problem_info in data['regular_problems']:
-                problem_id = problem_info['problem_id']
-                if problem_id in user_history:
-                    history = user_history[problem_id]
-                    correct_attempts = history.get('correct_attempts', 0)
-                    incorrect_attempts = history.get('incorrect_attempts', 0)
-                    total_attempts = correct_attempts + incorrect_attempts
-                    
-                    if total_attempts > 0:
-                        accuracy_rate = (correct_attempts / total_attempts) * 100
-                        if accuracy_rate >= 80.0:  # マスター判定：正答率80%以上
-                            mastered_count += 1
-            
-            data['mastered_regular'] = mastered_count
-            
-            # 通常問題を全てマスターしている場合、⭐︎問題を利用可能にする
-            if data['total_regular'] > 0 and mastered_count >= data['total_regular']:
-                for star_problem in data['star_problems']:
-                    star_problems[star_problem['problem_id']] = True
-                    
-                print(f"⭐️ 第{chapter}章の⭐︎問題が解放されました！ ({mastered_count}/{data['total_regular']} マスター)")
-            else:
-                remaining = data['total_regular'] - mastered_count
-                print(f"🔒 第{chapter}章の⭐︎問題は未解放 (あと{remaining}問必要)")
-        
-        print(f"⭐︎問題利用可能性チェック完了: {len(star_problems)}個の⭐︎問題")
-        return star_problems
-        
-    except Exception as e:
-        print(f"❌ ⭐︎問題チェックエラー: {e}")
-        return {}
+# app.py に追加する修正用ルート
 
 @app.route('/debug/force_fix_user_data', methods=['POST'])
 def debug_force_fix_user_data():
