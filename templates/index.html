@@ -1264,7 +1264,7 @@ function addStarUnlockStyles() {
 </script>
 <script>
     // Flaskからのデータをグローバル変数として設定
-    window.appInfoFromFlask = {{ app_info_for_js | tojson | safe }};  <!-- この行を修正 -->
+    window.appInfoFromFlask = {{ app_info_for_js | tojson | safe }};
     window.chapterDataFromFlask = {{ chapter_data | tojson | safe }};
 </script>
 <!-- html2canvas ライブラリの読み込み -->
