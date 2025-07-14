@@ -447,8 +447,8 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // 最後にloadStarProblemStatus（既存）も呼び出し
     setTimeout(() => {
-        if (typeof loadStarProblemStatus === 'function') {
-            loadStarProblemStatus();
+        if (typeof loadStarProblemStatusEnhanced === 'function') {
+            loadStarProblemStatusEnhanced(); // 正しい関数名に変更
         }
     }, 1000);
 });
