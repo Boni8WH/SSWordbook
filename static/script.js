@@ -881,7 +881,6 @@ function setupEventListeners() {
                     return;
                 }
                 
-                // 章ヘッダーがクリックされた場合の展開/折りたたみ処理
                 // チェックボックスや「全て選択」ボタン以外の章ヘッダー領域をクリックした場合
                 const chapterHeader = event.target.closest('.chapter-header');
                 if (chapterHeader && 
@@ -889,6 +888,10 @@ function setupEventListeners() {
                     !event.target.closest('.select-all-chapter-btn') &&
                     !event.target.closest('input[type="checkbox"]') &&
                     !event.target.closest('label')) {
+                    
+                    // ★重要：イベントの伝播を停止
+                    event.stopPropagation();
+                    event.preventDefault();
                     
                     console.log('章ヘッダークリック:', chapterHeader);
                     
