@@ -47,13 +47,24 @@
                     <div class="unit-list">
                         {% for unit_num, unit in chapter.units.items() %}
                         {% if unit.enabled %}
-                        <div class="unit-item">
+                        <div class="unit-item" data-unit-type="{{ '⭐︎' if unit_num == '⭐︎' else 'regular' }}">
                             <input type="checkbox" 
                                 id="unit-{{ chapter_num }}-{{ unit_num }}" 
                                 value="{{ unit_num }}" 
-                                data-chapter="{{ chapter_num }}">
+                                data-chapter="{{ chapter_num }}"
+                                {% if unit_num == '⭐︎' %}data-is-star="true"{% endif %}>
                             <label for="unit-{{ chapter_num }}-{{ unit_num }}">
-                                {{ unit_num }}. {{ unit.categoryName }}
+                                {% if unit_num == '⭐︎' %}
+                                    <span class="star-unit-label">
+                                        <span class="star-icon">⭐︎</span>
+                                        {{ unit.categoryName }}
+                                        <span class="star-status" id="star-status-{{ chapter_num }}">
+                                            <!-- JavaScriptで動的に設定 -->
+                                        </span>
+                                    </span>
+                                {% else %}
+                                    {{ unit_num }}. {{ unit.categoryName }}
+                                {% endif %}
                             </label>
                         </div>
                         {% endif %}
@@ -63,7 +74,6 @@
                 {% endfor %}
             </div>
         </div>
-
         <div class="bottom-controls">
             <button id="startButton" class="primary-button">学習開始</button>
             <button id="resetSelectionButton" class="secondary-button">選択リセット</button>
@@ -151,6 +161,987 @@
 
 {% block scripts %}
 <script>
+let starAvailability = {};
+let starRequirements = {};
+
+// ページ読み込み時に⭐︎問題の状態を取得
+async function loadStarProblemStatusEnhanced() {
+    try {
+        console.log('🌟 ⭐︎問題状態取得開始（強化版）');
+        
+        const response = await fetch('/api/star_problem_status_enhanced');
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            starProblemStatus = data.star_availability || {};
+            starRequirements = data.star_requirements || {};
+            
+            console.log('⭐︎問題状態取得完了:', {
+                available: Object.keys(starProblemStatus).filter(id => starProblemStatus[id]).length,
+                total: Object.keys(starProblemStatus).length,
+                chapterProgress: data.chapter_progress
+            });
+            
+            // UI更新
+            updateStarProblemUIComplete();
+            updateChapterProgressDisplay(data.chapter_progress);
+            
+            return data;
+        } else {
+            console.error('⭐︎問題状態取得失敗:', data.message);
+            return null;
+        }
+    } catch (error) {
+        console.error('⭐︎問題状態取得エラー:', error);
+        return null;
+    }
+}
+
+// 完全版⭐︎問題UI更新
+function updateStarProblemUIComplete() {
+    console.log('🎨 ⭐︎問題UI完全更新開始');
+    
+    // 各⭐︎問題チェックボックスの状態を更新
+    document.querySelectorAll('input[data-is-star="true"]').forEach(checkbox => {
+        const chapterNum = checkbox.dataset.chapter;
+        const unitNum = checkbox.value; // '⭐︎'
+        
+        // この章の⭐︎問題の利用可能性をチェック
+        const isAvailable = checkChapterStarAvailability(chapterNum);
+        
+        updateStarCheckboxState(checkbox, isAvailable, chapterNum);
+    });
+    
+    // 「全て選択」ボタンの状態を更新
+    updateSelectAllButtonsForStarProblems();
+    
+    console.log('🎨 ⭐︎問題UI完全更新完了');
+}
+
+// ⭐︎チェックボックスの状態を更新
+function updateStarCheckboxState(checkbox, isAvailable, chapterNum) {
+    const unitItem = checkbox.closest('.unit-item');
+    const starStatus = document.getElementById(`star-status-${chapterNum}`);
+    
+    if (!unitItem) return;
+    
+    if (isAvailable) {
+        // ⭐︎問題が利用可能
+        checkbox.disabled = false;
+        unitItem.classList.remove('star-locked');
+        unitItem.classList.add('star-available');
+        
+        if (starStatus) {
+            starStatus.textContent = '利用可能';
+            starStatus.className = 'star-status available';
+        }
+        
+        checkbox.title = '⭐︎問題：この章の全ての通常問題をマスターしたため利用可能です';
+        
+        // 解放アニメーション
+        if (!unitItem.classList.contains('star-unlock-animated')) {
+            unitItem.classList.add('star-unlock-animated');
+            setTimeout(() => {
+                unitItem.classList.remove('star-unlock-animated');
+            }, 2000);
+        }
+        
+    } else {
+        // ⭐︎問題が利用不可
+        checkbox.disabled = true;
+        checkbox.checked = false;
+        unitItem.classList.add('star-locked');
+        unitItem.classList.remove('star-available');
+        
+        // 必要な問題数を計算
+        const requiredCount = calculateRequiredProblemsForChapter(chapterNum);
+        
+        if (starStatus) {
+            if (requiredCount > 0) {
+                starStatus.textContent = `あと${requiredCount}問`;
+                starStatus.className = 'star-status locked';
+            } else {
+                starStatus.textContent = '準備中';
+                starStatus.className = 'star-status locked';
+            }
+        }
+        
+        checkbox.title = `⭐︎問題：この章の通常問題をあと${requiredCount}問マスターすると利用可能になります`;
+    }
+}
+
+// 章に必要な残り問題数を計算
+function calculateRequiredProblemsForChapter(chapterNum) {
+    const chapterWords = word_data.filter(word => 
+        String(word.chapter) === String(chapterNum) && String(word.number) !== '⭐︎'
+    );
+    
+    let masteredCount = 0;
+    
+    chapterWords.forEach(word => {
+        const problemId = generateProblemId(word);
+        const history = problemHistory[problemId];
+        
+        if (history) {
+            const correctAttempts = history.correct_attempts || 0;
+            const incorrectAttempts = history.incorrect_attempts || 0;
+            const totalAttempts = correctAttempts + incorrectAttempts;
+            
+            if (totalAttempts > 0) {
+                const accuracyRate = (correctAttempts / totalAttempts) * 100;
+                if (accuracyRate >= 80.0) {
+                    masteredCount++;
+                }
+            }
+        }
+    });
+    
+    return Math.max(0, chapterWords.length - masteredCount);
+}
+
+// 章の⭐︎問題が利用可能かチェック
+function checkChapterStarAvailability(chapterNum) {
+    // その章の⭐︎問題を検索
+    const chapterStarProblems = word_data.filter(word => 
+        String(word.chapter) === String(chapterNum) && String(word.number) === '⭐︎'
+    );
+    
+    if (chapterStarProblems.length === 0) {
+        return false; // ⭐︎問題がない章
+    }
+    
+    // どれか一つでも利用可能なら true
+    return chapterStarProblems.some(word => {
+        const problemId = generateProblemId(word);
+        return starProblemStatus[problemId] === true;
+    });
+}
+
+// ⭐︎問題の利用可能性をチェックし、UIを更新する関数（強化版）
+function updateStarProblemUI() {
+    console.log('🌟 ⭐︎問題UI更新開始');
+    
+    if (!word_data || word_data.length === 0) {
+        console.log('単語データが読み込まれていません');
+        return;
+    }
+    
+    // 章ごとの⭐︎問題の利用可能性をチェック
+    const starAvailability = checkStarProblemAvailabilityByChapter();
+    
+    // 各⭐︎問題のUIを更新
+    Object.keys(starAvailability).forEach(chapterNum => {
+        const availability = starAvailability[chapterNum];
+        updateStarUnitUI(chapterNum, availability);
+    });
+    
+    // 「全て選択」ボタンの状態も更新
+    updateSelectAllButtonsForStarProblems();
+    
+    console.log('🌟 ⭐︎問題UI更新完了', starAvailability);
+}
+
+// 特定の章の⭐︎単元のUIを更新
+function updateStarUnitUI(chapterNum, availability) {
+    if (!availability.hasStarProblems) return;
+    
+    const starCheckbox = document.getElementById(`unit-${chapterNum}-⭐︎`);
+    const starStatus = document.getElementById(`star-status-${chapterNum}`);
+    const unitItem = starCheckbox ? starCheckbox.closest('.unit-item') : null;
+    
+    if (!starCheckbox || !unitItem) return;
+    
+    if (availability.isAvailable) {
+        // ⭐︎問題が利用可能な場合
+        starCheckbox.disabled = false;
+        unitItem.classList.remove('star-locked');
+        unitItem.classList.add('star-available');
+        
+        if (starStatus) {
+            starStatus.textContent = '利用可能';
+            starStatus.className = 'star-status available';
+        }
+        
+        // ツールチップ
+        starCheckbox.title = '⭐︎問題：この章の全ての通常問題をマスターしたため利用可能です';
+        
+    } else {
+        // ⭐︎問題が利用不可な場合
+        starCheckbox.disabled = true;
+        starCheckbox.checked = false; // チェックも外す
+        unitItem.classList.add('star-locked');
+        unitItem.classList.remove('star-available');
+        
+        if (starStatus) {
+            if (availability.requiredRemaining > 0) {
+                starStatus.textContent = `あと${availability.requiredRemaining}問`;
+                starStatus.className = 'star-status locked';
+            } else {
+                starStatus.textContent = '準備中';
+                starStatus.className = 'star-status locked';
+            }
+        }
+        
+        // ツールチップ
+        starCheckbox.title = `⭐︎問題：この章の通常問題をあと${availability.requiredRemaining}問マスターすると利用可能になります`;
+    }
+}
+
+// 「全て選択」ボタンを⭐︎問題の状態に合わせて更新
+function updateSelectAllButtonsForStarProblems() {
+    document.querySelectorAll('.select-all-chapter-btn').forEach(button => {
+        const chapterNum = button.dataset.chapter;
+        const chapterItem = button.closest('.chapter-item');
+        
+        if (chapterItem) {
+            // その章の有効なチェックボックスを取得（⭐︎問題の利用可能性も考慮）
+            const allCheckboxes = chapterItem.querySelectorAll(`input[type="checkbox"][data-chapter="${chapterNum}"]`);
+            const enabledCheckboxes = Array.from(allCheckboxes).filter(cb => !cb.disabled);
+            const checkedCheckboxes = enabledCheckboxes.filter(cb => cb.checked);
+            
+            const allChecked = enabledCheckboxes.length > 0 && checkedCheckboxes.length === enabledCheckboxes.length;
+            
+            updateSelectAllButtonText(button, allChecked);
+        }
+    });
+}
+
+// 章ごとの⭐︎問題利用可能性をチェック
+function checkStarProblemAvailabilityByChapter() {
+    const availability = {};
+    
+    // 章ごとに問題を分類
+    const chapterData = {};
+    word_data.forEach(word => {
+        const chapter = String(word.chapter);
+        const number = String(word.number);
+        
+        if (!chapterData[chapter]) {
+            chapterData[chapter] = {
+                regularProblems: [],
+                starProblems: [],
+                masteredRegular: 0,
+                totalRegular: 0
+            };
+        }
+        
+        if (number === '⭐︎') {
+            chapterData[chapter].starProblems.push(word);
+        } else {
+            chapterData[chapter].regularProblems.push(word);
+            chapterData[chapter].totalRegular++;
+        }
+    });
+    
+    // 各章のマスター状況をチェック
+    Object.keys(chapterData).forEach(chapterNum => {
+        const data = chapterData[chapterNum];
+        
+        // その章の通常問題のマスター数をカウント
+        let masteredCount = 0;
+        data.regularProblems.forEach(word => {
+            const problemId = generateProblemId(word);
+            const history = problemHistory[problemId];
+            
+            if (history) {
+                const correctAttempts = history.correct_attempts || 0;
+                const incorrectAttempts = history.incorrect_attempts || 0;
+                const totalAttempts = correctAttempts + incorrectAttempts;
+                
+                if (totalAttempts > 0) {
+                    const accuracyRate = (correctAttempts / totalAttempts) * 100;
+                    if (accuracyRate >= 80.0) { // マスター判定：正答率80%以上
+                        masteredCount++;
+                    }
+                }
+            }
+        });
+        
+        data.masteredRegular = masteredCount;
+        
+        // ⭐︎問題が利用可能かどうか判定
+        const isStarAvailable = data.totalRegular > 0 && masteredCount >= data.totalRegular;
+        
+        availability[chapterNum] = {
+            hasStarProblems: data.starProblems.length > 0,
+            totalRegular: data.totalRegular,
+            masteredRegular: masteredCount,
+            isAvailable: isStarAvailable,
+            requiredRemaining: Math.max(0, data.totalRegular - masteredCount)
+        };
+        
+        console.log(`第${chapterNum}章: ${masteredCount}/${data.totalRegular} マスター → ⭐︎問題${isStarAvailable ? '利用可' : '利用不可'}`);
+    });
+    
+    return availability;
+}
+
+// 章・単元選択ドロップダウンの更新
+function updateChapterUnitDropdowns() {
+    const chapterSelect = document.getElementById('chapter-select');
+    const unitSelect = document.getElementById('unit-select');
+    
+    if (!chapterSelect || !unitSelect) return;
+    
+    // 選択された章の単元リストを更新
+    const selectedChapter = chapterSelect.value;
+    if (selectedChapter && chapterData[selectedChapter]) {
+        updateUnitOptions(selectedChapter);
+    }
+}
+
+// 単元選択肢の更新（⭐︎問題の利用可能性を考慮）
+function updateUnitOptions(chapterNum) {
+    const unitSelect = document.getElementById('unit-select');
+    if (!unitSelect) return;
+    
+    // 既存のオプションをクリア
+    unitSelect.innerHTML = '<option value="">単元を選択してください</option>';
+    
+    if (!chapterData[chapterNum] || !chapterData[chapterNum].units) return;
+    
+    const units = chapterData[chapterNum].units;
+    
+    // 通常の単元と⭐︎問題を分離
+    const regularUnits = [];
+    const starUnits = [];
+    
+    Object.keys(units).forEach(unitNum => {
+        const unitData = units[unitNum];
+        
+        if (unitNum === '⭐︎') {
+            // ⭐︎問題の利用可能性をチェック
+            const isAvailable = checkStarUnitAvailability(chapterNum);
+            starUnits.push({
+                unitNum: unitNum,
+                data: unitData,
+                available: isAvailable
+            });
+        } else {
+            regularUnits.push({
+                unitNum: unitNum,
+                data: unitData,
+                available: true
+            });
+        }
+    });
+    
+    // 通常の単元を数値順でソート
+    regularUnits.sort((a, b) => {
+        const aNum = parseInt(a.unitNum) || 0;
+        const bNum = parseInt(b.unitNum) || 0;
+        return aNum - bNum;
+    });
+    
+    // 通常の単元を追加
+    regularUnits.forEach(unit => {
+        const option = document.createElement('option');
+        option.value = unit.unitNum;
+        option.textContent = `${unit.unitNum}. ${unit.data.categoryName}`;
+        unitSelect.appendChild(option);
+    });
+    
+    // ⭐︎問題を追加
+    starUnits.forEach(unit => {
+        const option = document.createElement('option');
+        option.value = unit.unitNum;
+        
+        if (unit.available) {
+            option.textContent = `⭐︎ ${unit.data.categoryName}`;
+            option.style.color = '#ffd700'; // 金色
+        } else {
+            option.textContent = `⭐︎ ${unit.data.categoryName} (要解放)`;
+            option.disabled = true;
+            option.style.color = '#999';
+            option.title = `この⭐︎問題を利用するには、第${chapterNum}章の他の全ての問題をマスターしてください`;
+        }
+        
+        unitSelect.appendChild(option);
+    });
+}
+
+// ⭐︎単元の利用可能性をチェック
+function checkStarUnitAvailability(chapterNum) {
+    // 該当章の⭐︎問題をチェック
+    for (const [problemId, isAvailable] of Object.entries(starAvailability)) {
+        const requirement = starRequirements[problemId];
+        if (requirement && requirement.chapter === chapterNum) {
+            return isAvailable;
+        }
+    }
+    return false;
+}
+
+// 範囲選択モードの選択肢更新
+function updateRangeSelectionOptions() {
+    const rangeOptions = document.querySelectorAll('.range-option');
+    
+    rangeOptions.forEach(option => {
+        const chapterNum = option.dataset.chapter;
+        const unitNum = option.dataset.unit;
+        
+        if (unitNum === '⭐︎') {
+            const isAvailable = checkStarUnitAvailability(chapterNum);
+            
+            if (!isAvailable) {
+                option.classList.add('star-locked');
+                option.style.opacity = '0.5';
+                option.style.pointerEvents = 'none';
+                
+                // ツールチップを追加
+                option.title = `⭐︎問題：第${chapterNum}章の他の全ての問題をマスターすると利用可能になります`;
+                
+                // ロックアイコンを追加
+                if (!option.querySelector('.lock-icon')) {
+                    const lockIcon = document.createElement('span');
+                    lockIcon.className = 'lock-icon';
+                    lockIcon.innerHTML = ' 🔒';
+                    lockIcon.style.color = '#999';
+                    option.appendChild(lockIcon);
+                }
+            } else {
+                option.classList.remove('star-locked');
+                option.style.opacity = '1';
+                option.style.pointerEvents = 'auto';
+                option.title = '⭐︎問題：利用可能';
+                
+                // ロックアイコンを削除
+                const lockIcon = option.querySelector('.lock-icon');
+                if (lockIcon) {
+                    lockIcon.remove();
+                }
+                
+                // 特別なスタイルを追加
+                option.style.background = 'linear-gradient(135deg, #ffd700, #ffed4e)';
+                option.style.color = '#000';
+                option.style.border = '2px solid #ffd700';
+            }
+        }
+    });
+}
+
+// 章別進捗表示の更新
+function updateChapterProgressDisplay(chapterProgress) {
+    Object.keys(chapterProgress).forEach(chapterNum => {
+        const progress = chapterProgress[chapterNum];
+        const chapterElement = document.querySelector(`[data-chapter="${chapterNum}"]`);
+        
+        if (chapterElement && progress.star_total > 0) {
+            // 既存のステータス表示を削除
+            const existingStatus = chapterElement.querySelector('.chapter-star-progress');
+            if (existingStatus) {
+                existingStatus.remove();
+            }
+            
+            // 新しいステータス表示を作成
+            const statusDiv = document.createElement('div');
+            statusDiv.className = 'chapter-star-progress';
+            
+            const availableStars = progress.star_available;
+            const totalStars = progress.star_total;
+            const masteredRegular = progress.regular_mastered;
+            const totalRegular = progress.regular_total;
+            
+            let statusText = '';
+            let statusClass = '';
+            
+            if (availableStars === totalStars && totalStars > 0) {
+                statusText = `⭐︎ 全て解放済み (${totalStars}問)`;
+                statusClass = 'star-unlocked';
+            } else {
+                const remaining = totalRegular - masteredRegular;
+                if (remaining > 0) {
+                    statusText = `⭐︎ 要解放 (残り${remaining}問)`;
+                } else {
+                    statusText = '⭐︎ 解放処理中...';
+                }
+                statusClass = 'star-locked';
+            }
+            
+            statusDiv.innerHTML = `
+                <div class="star-progress-info ${statusClass}">
+                    <span class="star-status-text">${statusText}</span>
+                    <small class="star-progress-detail">
+                        通常問題: ${masteredRegular}/${totalRegular} マスター
+                    </small>
+                </div>
+            `;
+            
+            // 章ヘッダーに追加
+            const chapterHeader = chapterElement.querySelector('.chapter-header');
+            if (chapterHeader) {
+                chapterHeader.appendChild(statusDiv);
+            }
+        }
+    });
+}
+
+// 学習進捗保存を⭐︎問題対応版に変更
+async function saveQuizProgressWithStarCheck() {
+    console.log('\n=== ⭐︎問題対応進捗保存開始 ===');
+    
+    const dataToSave = {
+        problemHistory: problemHistory,
+        incorrectWords: incorrectWords
+    };
+
+    try {
+        const response = await fetch('/api/save_progress_with_star_check', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(dataToSave)
+        });
+        
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            console.log('✅ ⭐︎問題対応進捗保存成功');
+            
+            // 新しく解放された⭐︎問題があるかチェック
+            if (data.newly_unlocked_stars && data.newly_unlocked_stars.length > 0) {
+                console.log('🌟 新しく解放された⭐︎問題:', data.newly_unlocked_stars);
+                
+                // 解放通知を表示
+                showStarUnlockNotification(data.newly_unlocked_stars, data.unlock_message);
+                
+                // ⭐︎問題状態を再取得してUIを更新
+                setTimeout(async () => {
+                    await loadStarProblemStatusEnhanced();
+                }, 500);
+            }
+            
+            if (data.debug_info) {
+                console.log('保存デバッグ情報:', data.debug_info);
+            }
+        } else {
+            console.error('❌ ⭐︎問題対応進捗保存失敗:', data.message);
+            flashMessage(data.message, 'danger');
+        }
+        
+        console.log('=== ⭐︎問題対応進捗保存終了 ===\n');
+        return data;
+        
+    } catch (error) {
+        console.error('❌ ⭐︎問題対応進捗保存エラー:', error);
+        flashMessage('進捗の保存中にエラーが発生しました。', 'danger');
+        throw error;
+    }
+}
+
+// ⭐︎問題解放通知を表示
+function showStarUnlockNotification(newlyUnlocked, message) {
+    // 既存の通知があれば削除
+    const existingNotification = document.querySelector('.star-unlock-notification');
+    if (existingNotification) {
+        existingNotification.remove();
+    }
+    
+    const notification = document.createElement('div');
+    notification.className = 'star-unlock-notification';
+    
+    const chapters = [...new Set(newlyUnlocked.map(star => star.chapter))];
+    
+    notification.innerHTML = `
+        <div class="notification-content">
+            <div class="star-icon">🌟</div>
+            <div class="notification-text">
+                <strong>おめでとうございます！</strong><br>
+                ${message || `第${chapters.join('、')}章の⭐︎問題が解放されました！`}
+            </div>
+            <div class="unlock-details">
+                <small>解放された問題:</small>
+                <ul>
+                    ${newlyUnlocked.map(star => 
+                        `<li>第${star.chapter}章: ${star.question.substring(0, 30)}...</li>`
+                    ).join('')}
+                </ul>
+            </div>
+        </div>
+    `;
+    
+    // スタイルを設定
+    notification.style.cssText = `
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: linear-gradient(135deg, #ffd700, #ffed4e);
+        color: #000;
+        padding: 25px;
+        border-radius: 15px;
+        box-shadow: 0 8px 32px rgba(255, 215, 0, 0.4);
+        z-index: 10000;
+        animation: starUnlockPulse 3s ease-in-out;
+        border: 3px solid #ffd700;
+        text-align: center;
+        min-width: 350px;
+        max-width: 90vw;
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // 4秒後に通知を削除
+    setTimeout(() => {
+        notification.style.opacity = '0';
+        notification.style.transform = 'translate(-50%, -50%) scale(0.8)';
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
+        }, 500);
+    }, 4000);
+    
+    // フラッシュメッセージも表示
+    flashMessage('🌟 新しい⭐︎問題が解放されました！', 'success');
+}
+
+// クイズ開始時の⭐︎問題フィルタリング
+function filterStarProblemsForQuiz(problems) {
+    return problems.filter(problem => {
+        // ⭐︎問題かどうかチェック
+        if (problem.number === '⭐︎') {
+            const problemId = generateProblemId(problem);
+            return starAvailability[problemId] === true;
+        }
+        return true; // 通常問題は常に含める
+    });
+}
+
+// 問題選択時の⭐︎問題チェック
+function validateStarProblemSelection(selectedProblems) {
+    const invalidProblems = [];
+    
+    selectedProblems.forEach(problem => {
+        if (problem.number === '⭐︎') {
+            const problemId = generateProblemId(problem);
+            if (!starAvailability[problemId]) {
+                invalidProblems.push({
+                    problem: problem,
+                    chapter: problem.chapter,
+                    requirement: starRequirements[problemId]
+                });
+            }
+        }
+    });
+    
+    return invalidProblems;
+}
+
+// 範囲選択のバリデーション（⭐︎問題対応）
+function validateStarProblemSelection() {
+    const selectedStarUnits = [];
+    
+    // 選択された⭐︎問題をチェック
+    document.querySelectorAll('input[data-is-star="true"]:checked').forEach(checkbox => {
+        const chapterNum = checkbox.dataset.chapter;
+        selectedStarUnits.push(chapterNum);
+    });
+    
+    if (selectedStarUnits.length === 0) {
+        return true; // ⭐︎問題が選択されていない場合はOK
+    }
+    
+    // 選択された⭐︎問題の利用可能性を再チェック
+    const starAvailability = checkStarProblemAvailabilityByChapter();
+    const invalidSelections = [];
+    
+    selectedStarUnits.forEach(chapterNum => {
+        const availability = starAvailability[chapterNum];
+        if (!availability || !availability.isAvailable) {
+            invalidSelections.push({
+                chapter: chapterNum,
+                required: availability ? availability.requiredRemaining : 0
+            });
+        }
+    });
+    
+    if (invalidSelections.length > 0) {
+        // 無効な選択があった場合、チェックを外してエラーメッセージ
+        invalidSelections.forEach(invalid => {
+            const checkbox = document.getElementById(`unit-${invalid.chapter}-⭐︎`);
+            if (checkbox) {
+                checkbox.checked = false;
+            }
+        });
+        
+        const errorChapters = invalidSelections.map(inv => `第${inv.chapter}章`).join('、');
+        flashMessage(`${errorChapters}の⭐︎問題はまだ利用できません。該当章の通常問題を全てマスターしてから再度お試しください。`, 'warning');
+        
+        return false;
+    }
+    
+    return true;
+}
+
+// ⭐︎問題解放通知
+function showStarProblemUnlocked(chapterNum) {
+    // 通知メッセージを表示
+    const notification = document.createElement('div');
+    notification.className = 'star-unlock-notification';
+    notification.innerHTML = `
+        <div class="notification-content">
+            <span class="star-icon">⭐️</span>
+            <div class="notification-text">
+                <strong>おめでとうございます！</strong><br>
+                第${chapterNum}章の⭐︎問題が解放されました！
+            </div>
+        </div>
+    `;
+    
+    // スタイルを設定
+    notification.style.cssText = `
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: linear-gradient(135deg, #ffd700, #ffed4e);
+        color: #000;
+        padding: 20px;
+        border-radius: 15px;
+        box-shadow: 0 8px 32px rgba(255, 215, 0, 0.3);
+        z-index: 10000;
+        animation: starUnlockPulse 2s ease-in-out;
+        border: 3px solid #ffd700;
+        text-align: center;
+        min-width: 300px;
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // アニメーション用CSSを追加
+    if (!document.getElementById('star-unlock-styles')) {
+        const style = document.createElement('style');
+        style.id = 'star-unlock-styles';
+        style.textContent = `
+            @keyframes starUnlockPulse {
+                0% { 
+                    opacity: 0; 
+                    transform: translate(-50%, -50%) scale(0.5); 
+                }
+                50% { 
+                    opacity: 1; 
+                    transform: translate(-50%, -50%) scale(1.1); 
+                }
+                100% { 
+                    opacity: 1; 
+                    transform: translate(-50%, -50%) scale(1); 
+                }
+            }
+            
+            .star-unlock-notification .star-icon {
+                font-size: 2em;
+                display: block;
+                margin-bottom: 10px;
+                animation: starRotate 2s infinite linear;
+            }
+            
+            @keyframes starRotate {
+                from { transform: rotate(0deg); }
+                to { transform: rotate(360deg); }
+            }
+            
+            .star-status.star-unlocked {
+                background: linear-gradient(135deg, #ffd700, #ffed4e);
+                color: #000;
+                padding: 5px 10px;
+                border-radius: 15px;
+                font-weight: bold;
+                margin-top: 5px;
+            }
+            
+            .star-status.star-locked {
+                background: #f0f0f0;
+                color: #666;
+                padding: 5px 10px;
+                border-radius: 15px;
+                margin-top: 5px;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+    
+    // 3秒後に通知を削除
+    setTimeout(() => {
+        notification.style.opacity = '0';
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
+        }, 500);
+    }, 3000);
+}
+
+// 学習履歴保存後に⭐︎問題の状態を再チェック
+async function recheckStarProblemsAfterProgress() {
+    const oldAvailability = { ...starAvailability };
+    
+    // 最新の⭐︎問題状態を取得
+    await loadStarProblemStatus();
+    
+    // 新しく解放された⭐︎問題があるかチェック
+    Object.keys(starAvailability).forEach(problemId => {
+        const wasLocked = !oldAvailability[problemId];
+        const isNowUnlocked = starAvailability[problemId];
+        
+        if (wasLocked && isNowUnlocked) {
+            const requirement = starRequirements[problemId];
+            if (requirement) {
+                showStarProblemUnlocked(requirement.chapter);
+            }
+        }
+    });
+}
+
+// ページ読み込み時の初期化
+document.addEventListener('DOMContentLoaded', function() {
+    // CSSアニメーションを追加
+    addStarUnlockStyles();
+    
+    // 既存の初期化完了後に⭐︎問題状態を取得
+    setTimeout(async () => {
+        await loadStarProblemStatusEnhanced();
+    }, 2500);
+});
+
+// handleAnswer関数を修正して⭐︎問題チェックを含める
+const originalHandleAnswer = window.handleAnswer;
+window.handleAnswer = function(isCorrect) {
+    // 元のhandleAnswer処理を実行
+    if (originalHandleAnswer) {
+        originalHandleAnswer.call(this, isCorrect);
+    }
+    
+    // 回答後に⭐︎問題状態をチェック（遅延）
+    setTimeout(async () => {
+        console.log('🔄 回答後⭐︎問題状態チェック');
+        await loadStarProblemStatusEnhanced();
+    }, 1000);
+};
+
+// 学習進捗保存後に⭐︎問題の状態を再チェック
+const originalSaveProgress = window.saveQuizProgressToServer;
+window.saveQuizProgressToServer = saveQuizProgressWithStarCheck;
+
+// デバッグ用：⭐︎問題の完全な状態を確認
+window.debugStarProblemsComplete = function() {
+    console.log('🌟 === ⭐︎問題完全デバッグ ===');
+    console.log('現在の⭐︎問題状態:', starProblemStatus);
+    console.log('⭐︎問題要件:', starRequirements);
+    
+    // 章ごとの詳細
+    const chapterData = {};
+    word_data.forEach(word => {
+        const chapter = String(word.chapter);
+        const number = String(word.number);
+        
+        if (!chapterData[chapter]) {
+            chapterData[chapter] = { regular: [], star: [] };
+        }
+        
+        if (number === '⭐︎') {
+            const problemId = generateProblemId(word);
+            chapterData[chapter].star.push({
+                question: word.question,
+                available: starProblemStatus[problemId] || false,
+                problemId: problemId
+            });
+        } else {
+            const problemId = generateProblemId(word);
+            const history = problemHistory[problemId] || {};
+            const correctAttempts = history.correct_attempts || 0;
+            const incorrectAttempts = history.incorrect_attempts || 0;
+            const totalAttempts = correctAttempts + incorrectAttempts;
+            const accuracyRate = totalAttempts > 0 ? (correctAttempts / totalAttempts) * 100 : 0;
+            
+            chapterData[chapter].regular.push({
+                number: number,
+                question: word.question,
+                mastered: accuracyRate >= 80.0,
+                accuracyRate: accuracyRate.toFixed(1)
+            });
+        }
+    });
+    
+    Object.keys(chapterData).forEach(chapter => {
+        const data = chapterData[chapter];
+        const masteredCount = data.regular.filter(p => p.mastered).length;
+        const totalRegular = data.regular.length;
+        
+        console.log(`\n第${chapter}章:`);
+        console.log(`  通常問題: ${masteredCount}/${totalRegular} マスター`);
+        console.log(`  ⭐︎問題: ${data.star.length}問`);
+        
+        data.star.forEach((star, index) => {
+            console.log(`    ${index + 1}. ${star.available ? '✅' : '🔒'} ${star.question.substring(0, 30)}...`);
+        });
+    });
+    
+    console.log('==========================');
+    return { starProblemStatus, starRequirements, chapterData };
+};
+
+// 範囲選択での⭐︎問題バリデーション
+function validateRangeSelection() {
+    const selectedRanges = document.querySelectorAll('.range-option.selected');
+    const invalidSelections = [];
+    
+    selectedRanges.forEach(option => {
+        const chapterNum = option.dataset.chapter;
+        const unitNum = option.dataset.unit;
+        
+        if (unitNum === '⭐︎') {
+            const isAvailable = checkStarUnitAvailability(chapterNum);
+            if (!isAvailable) {
+                invalidSelections.push({
+                    chapter: chapterNum,
+                    unit: unitNum,
+                    element: option
+                });
+            }
+        }
+    });
+    
+    if (invalidSelections.length > 0) {
+        // 無効な選択を解除
+        invalidSelections.forEach(invalid => {
+            invalid.element.classList.remove('selected');
+        });
+        
+        // 警告メッセージを表示
+        const chapters = invalidSelections.map(inv => `第${inv.chapter}章`).join('、');
+        alert(`${chapters}の⭐︎問題はまだ利用できません。\n該当章の他の全ての問題をマスターしてから再度お試しください。`);
+        
+        return false;
+    }
+    
+    return true;
+}
+
+// 単元選択での⭐︎問題バリデーション
+function validateUnitSelection() {
+    const chapterSelect = document.getElementById('chapter-select');
+    const unitSelect = document.getElementById('unit-select');
+    
+    if (!chapterSelect || !unitSelect) return true;
+    
+    const selectedChapter = chapterSelect.value;
+    const selectedUnit = unitSelect.value;
+    
+    if (selectedUnit === '⭐︎') {
+        const isAvailable = checkStarUnitAvailability(selectedChapter);
+        if (!isAvailable) {
+            alert(`第${selectedChapter}章の⭐︎問題はまだ利用できません。\n該当章の他の全ての問題をマスターしてから再度お試しください。`);
+            unitSelect.value = '';
+            return false;
+        }
+    }
+    
+    return true;
+}
+
+
 function debugRoomSetting(roomNumber) {
     console.log(`🔍 部屋${roomNumber}のデバッグ情報:`);
     
@@ -194,6 +1185,81 @@ function debugRoomSetting(roomNumber) {
     .catch(error => {
         console.error('❌ 設定取得エラー:', error);
     });
+}
+
+// CSS アニメーションを追加
+function addStarUnlockStyles() {
+    if (!document.getElementById('star-unlock-styles')) {
+        const style = document.createElement('style');
+        style.id = 'star-unlock-styles';
+        style.textContent = `
+            @keyframes starUnlockPulse {
+                0% { 
+                    opacity: 0; 
+                    transform: translate(-50%, -50%) scale(0.5); 
+                }
+                20% { 
+                    opacity: 1; 
+                    transform: translate(-50%, -50%) scale(1.1); 
+                }
+                100% { 
+                    opacity: 1; 
+                    transform: translate(-50%, -50%) scale(1); 
+                }
+            }
+            
+            .star-unlock-notification .star-icon {
+                font-size: 2.5em;
+                display: block;
+                margin-bottom: 15px;
+                animation: starRotate 2s infinite linear;
+            }
+            
+            @keyframes starRotate {
+                from { transform: rotate(0deg); }
+                to { transform: rotate(360deg); }
+            }
+            
+            .star-unlock-animated {
+                animation: starUnlockGlow 2s ease-in-out;
+            }
+            
+            @keyframes starUnlockGlow {
+                0%, 100% { box-shadow: none; }
+                50% { box-shadow: 0 0 20px rgba(255, 215, 0, 0.8); }
+            }
+            
+            .chapter-star-progress {
+                margin-top: 8px;
+                font-size: 0.85em;
+            }
+            
+            .star-progress-info {
+                padding: 5px 10px;
+                border-radius: 12px;
+                display: inline-block;
+            }
+            
+            .star-progress-info.star-unlocked {
+                background: linear-gradient(135deg, #d4edda, #c3e6cb);
+                color: #155724;
+                border: 1px solid #c3e6cb;
+            }
+            
+            .star-progress-info.star-locked {
+                background: linear-gradient(135deg, #f8d7da, #f5c6cb);
+                color: #721c24;
+                border: 1px solid #f5c6cb;
+            }
+            
+            .star-progress-detail {
+                display: block;
+                margin-top: 2px;
+                opacity: 0.8;
+            }
+        `;
+        document.head.appendChild(style);
+    }
 }
 </script>
 <script>
@@ -249,6 +1315,69 @@ function debugRoomSetting(roomNumber) {
     
     .weak-problem-warning p {
         font-size: 1em !important;
+    }
+}
+
+.star-unit-label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+}
+
+.star-icon {
+    color: #ffd700;
+    font-size: 1.2em;
+    margin-right: 5px;
+}
+
+.star-status {
+    font-size: 0.8em;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-weight: bold;
+}
+
+.star-status.available {
+    background-color: #d4edda;
+    color: #155724;
+}
+
+.star-status.locked {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+
+.unit-item[data-unit-type="⭐︎"].star-locked {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.unit-item[data-unit-type="⭐︎"].star-locked input[type="checkbox"] {
+    cursor: not-allowed;
+}
+
+.unit-item[data-unit-type="⭐︎"].star-locked label {
+    color: #6c757d;
+    cursor: not-allowed;
+}
+
+.unit-item[data-unit-type="⭐︎"].star-available {
+    background: linear-gradient(135deg, #fff8dc, #fffacd);
+    border: 1px solid #ffd700;
+    border-radius: 5px;
+    padding: 5px;
+}
+
+@media (max-width: 767px) {
+    .star-unit-label {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .star-status {
+        margin-top: 3px;
+        font-size: 0.7em;
     }
 }
 </style>
