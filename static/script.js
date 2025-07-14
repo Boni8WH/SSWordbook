@@ -856,6 +856,8 @@ function setupEventListeners() {
         // 章のヘッダーをクリックで単元リストの表示/非表示を切り替え（スマホ対応版）
         if (chaptersContainer) {
             chaptersContainer.addEventListener('click', (event) => {
+                console.log('章コンテナクリック:', event.target);
+                
                 // 「全て選択」ボタンがクリックされた場合の処理
                 const selectAllBtn = event.target.closest('.select-all-chapter-btn');
                 if (selectAllBtn) {
@@ -877,19 +879,41 @@ function setupEventListeners() {
                     
                     updateSelectAllButtonText(selectAllBtn, !allChecked);
                     
-                    // 章の展開状態は変更しない
+                    console.log(`全て選択ボタン処理完了: 第${chapterNum}章`);
                     return false;
                 }
                 
-                // 章ヘッダーがクリックされた場合のみ展開/折りたたみ処理
+                // 章ヘッダーがクリックされた場合の展開/折りたたみ処理
                 const chapterHeader = event.target.closest('.chapter-header');
                 if (chapterHeader && !event.target.closest('.select-all-chapter-btn')) {
+                    console.log('章ヘッダークリック:', chapterHeader);
+                    
                     const chapterItem = chapterHeader.closest('.chapter-item');
                     if (chapterItem) {
-                        chapterItem.classList.toggle('expanded');
+                        const isCurrentlyExpanded = chapterItem.classList.contains('expanded');
+                        
+                        if (isCurrentlyExpanded) {
+                            // 折りたたみ
+                            chapterItem.classList.remove('expanded');
+                            console.log('章を折りたたみました');
+                        } else {
+                            // 展開
+                            chapterItem.classList.add('expanded');
+                            console.log('章を展開しました');
+                        }
+                        
                         const toggleIcon = chapterHeader.querySelector('.toggle-icon');
                         if (toggleIcon) {
                             toggleIcon.textContent = chapterItem.classList.contains('expanded') ? '▼' : '▶';
+                        }
+                        
+                        // 展開時に⭐︎問題の状態をチェック
+                        if (chapterItem.classList.contains('expanded')) {
+                            setTimeout(() => {
+                                if (typeof updateStarProblemUI === 'function') {
+                                    updateStarProblemUI();
+                                }
+                            }, 100);
                         }
                     }
                 }
