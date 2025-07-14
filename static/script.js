@@ -859,17 +859,16 @@ function setupEventListeners() {
                 console.log('章コンテナクリック:', event.target);
                 
                 // 「全て選択」ボタンがクリックされた場合の処理
-                const selectAllBtn = event.target.closest('.select-all-chapter-btn');
-                if (selectAllBtn) {
+                if (event.target.classList.contains('select-all-chapter-btn')) {
                     event.stopPropagation();
                     event.preventDefault();
                     
+                    const selectAllBtn = event.target;
                     const chapterNum = selectAllBtn.dataset.chapter;
                     const chapterItem = selectAllBtn.closest('.chapter-item');
                     if (!chapterItem) return;
                     
                     const checkboxes = chapterItem.querySelectorAll(`input[type="checkbox"][data-chapter="${chapterNum}"]`);
-                    
                     const enabledCheckboxes = Array.from(checkboxes).filter(cb => !cb.disabled);
                     const allChecked = enabledCheckboxes.every(cb => cb.checked);
                     
@@ -878,14 +877,19 @@ function setupEventListeners() {
                     });
                     
                     updateSelectAllButtonText(selectAllBtn, !allChecked);
-                    
                     console.log(`全て選択ボタン処理完了: 第${chapterNum}章`);
-                    return false;
+                    return;
                 }
                 
                 // 章ヘッダーがクリックされた場合の展開/折りたたみ処理
+                // チェックボックスや「全て選択」ボタン以外の章ヘッダー領域をクリックした場合
                 const chapterHeader = event.target.closest('.chapter-header');
-                if (chapterHeader && !event.target.closest('.select-all-chapter-btn')) {
+                if (chapterHeader && 
+                    !event.target.classList.contains('select-all-chapter-btn') &&
+                    !event.target.closest('.select-all-chapter-btn') &&
+                    !event.target.closest('input[type="checkbox"]') &&
+                    !event.target.closest('label')) {
+                    
                     console.log('章ヘッダークリック:', chapterHeader);
                     
                     const chapterItem = chapterHeader.closest('.chapter-item');
@@ -893,11 +897,9 @@ function setupEventListeners() {
                         const isCurrentlyExpanded = chapterItem.classList.contains('expanded');
                         
                         if (isCurrentlyExpanded) {
-                            // 折りたたみ
                             chapterItem.classList.remove('expanded');
                             console.log('章を折りたたみました');
                         } else {
-                            // 展開
                             chapterItem.classList.add('expanded');
                             console.log('章を展開しました');
                         }
