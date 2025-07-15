@@ -565,9 +565,7 @@ class UserStats(db.Model):
 
 # 部屋ごとの単語データを読み込む関数
 def load_word_data_for_room(room_number):
-    """指定された部屋の単語データを読み込む（完全DB対応版）"""
     try:
-        # データベースから部屋設定を取得
         room_setting = RoomSetting.query.filter_by(room_number=room_number).first()
         
         if room_setting and room_setting.csv_filename:
@@ -575,9 +573,6 @@ def load_word_data_for_room(room_number):
         else:
             csv_filename = "words.csv"
         
-        print(f"🔍 部屋{room_number}のCSVファイル: {csv_filename}")
-        
-        # デフォルトファイルの場合
         if csv_filename == "words.csv":
             word_data = []
             try:
@@ -588,16 +583,14 @@ def load_word_data_for_room(room_number):
                         row['chapter'] = str(row['chapter'])
                         row['number'] = str(row['number'])
                         word_data.append(row)
-                print(f"✅ デフォルトファイル読み込み: {len(word_data)}問")
             except FileNotFoundError:
                 print(f"❌ デフォルトファイルが見つかりません: words.csv")
                 return []
         else:
             # ★重要：データベースからカスタムCSVの内容を取得
-            csv_file = CsvFileContent.query.filter_by(filename=csv_filename).first()
+            csv_file = CsvFileContent.query.filter_by(filename=csv_filename).first()  # この行が抜けていました
             if csv_file:
                 try:
-                    # CSV内容をパース
                     content = csv_file.content
                     reader = csv.DictReader(StringIO(content))
                     word_data = []
@@ -606,25 +599,17 @@ def load_word_data_for_room(room_number):
                         row['chapter'] = str(row['chapter'])
                         row['number'] = str(row['number'])
                         word_data.append(row)
-                    print(f"✅ データベースからCSV読み込み: {len(word_data)}問 from {csv_filename}")
                 except Exception as parse_error:
                     print(f"❌ CSVパースエラー: {parse_error}")
                     return []
             else:
                 print(f"❌ データベースにCSVが見つかりません: {csv_filename}")
-                # フォールバック: デフォルトファイル使用
-                print("🔄 デフォルトファイルにフォールバック")
                 return load_word_data_for_room("default")
         
-        # α問題のフィルタリング処理を追加
-        filtered_word_data = filter_alpha_problems(word_data, room_number)
-        
-        return filtered_word_data
+        return word_data
         
     except Exception as e:
         print(f"❌ 読み込みエラー: {e}")
-        import traceback
-        traceback.print_exc()
         return []
 
 def filter_alpha_problems(word_data, room_number):
@@ -773,25 +758,20 @@ def is_unit_enabled_by_room_setting(unit_number, room_setting):
 
 # 問題IDを生成するヘルパー関数
 def get_problem_id(word):
-    """統一された問題ID生成（JavaScript側と完全一致）"""
     try:
         chapter = str(word.get('chapter', '0')).zfill(3)
         number = str(word.get('number', '0')).zfill(3)
         question = str(word.get('question', ''))
         answer = str(word.get('answer', ''))
         
-        # 問題文と答えから英数字と日本語文字のみ抽出（JavaScript側と同じ処理）
-        import re
         question_clean = re.sub(r'[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]', '', question[:15])
         answer_clean = re.sub(r'[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]', '', answer[:10])
         
-        # 統一フォーマット
         problem_id = f"{chapter}-{number}-{question_clean}-{answer_clean}"
-        
         return problem_id
         
     except Exception as e:
-        print(f'ID生成エラー: {e}')
+        # print(f'ID生成エラー: {e}')  # 削除
         chapter = str(word.get('chapter', '0')).zfill(3)
         number = str(word.get('number', '0')).zfill(3)
         return f"{chapter}-{number}-error"
