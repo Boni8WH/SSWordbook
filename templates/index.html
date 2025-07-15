@@ -251,5 +251,21 @@ function debugRoomSetting(roomNumber) {
         font-size: 1em !important;
     }
 }
+
+/* クイズ中の通知用アニメーション */
+@keyframes slideInRight {
+    from {
+        opacity: 0;
+        transform: translateX(100px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.quiz-time-notification {
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
 </style>
 {% endblock %}
