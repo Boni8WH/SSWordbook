@@ -2946,7 +2946,35 @@ def admin_ranking_page():
 # ====================================================================
 # 管理者用ランキング API エンドポイント
 # ====================================================================
+@app.route('/admin/get_available_units/<room_number>')
+def admin_get_available_units(room_number):
+    """指定部屋で利用可能な単元一覧を取得（管理者用・フィルタリングなし）"""
+    try:
+        if not session.get('admin_logged_in'):
+            return jsonify(status='error', message='管理者権限がありません。'), 403
 
+        # 管理者用：フィルタリングなしで部屋の単語データを取得
+        word_data = load_raw_word_data_for_room(room_number)
+        
+        # 単元一覧を抽出
+        units = set()
+        for word in word_data:
+            if word['enabled']:
+                units.add(str(word['number']))
+        
+        # ソートして返す（Z問題を最後に）
+        sorted_units = sorted(list(units), key=lambda x: (x.upper() == 'Z', parse_unit_number(x)))
+        
+        return jsonify({
+            'status': 'success',
+            'available_units': sorted_units,
+            'total_problems': len(word_data),
+            'enabled_problems': len([w for w in word_data if w['enabled']])
+        })
+        
+    except Exception as e:
+        return jsonify(status='error', message=str(e)), 500
+    
 @app.route('/api/admin/rooms')
 def api_admin_rooms():
     """管理者用：全部屋の一覧を取得"""
@@ -5815,34 +5843,7 @@ def admin_update_room_units_setting():
     except Exception as e:
         print(f"Error in admin_update_room_units_setting: {e}")
         return jsonify(status='error', message=str(e)), 500
-
-@app.route('/admin/get_available_units/<room_number>')
-def admin_get_available_units(room_number):
-    """指定部屋で利用可能な単元一覧を取得"""
-    try:
-        if not session.get('admin_logged_in'):
-            return jsonify(status='error', message='管理者権限がありません。'), 403
-
-        # 部屋の単語データを取得
-        word_data = load_word_data_for_room(room_number)
-        
-        # 単元一覧を抽出
-        units = set()
-        for word in word_data:
-            if word['enabled']:
-                units.add(str(word['number']))
-        
-        # ソートして返す
-        sorted_units = sorted(list(units), key=lambda x: parse_unit_number(x))
-        
-        return jsonify({
-            'status': 'success',
-            'available_units': sorted_units
-        })
-        
-    except Exception as e:
-        return jsonify(status='error', message=str(e)), 500
-
+    
 @app.route('/admin/update_room_unit_setting', methods=['POST'])
 def admin_update_room_unit_setting():
     try:
@@ -6714,6 +6715,54 @@ def debug_timezone_check():
         <pre>{error_detail}</pre>
         """
 
+def load_raw_word_data_for_room(room_number):
+    """管理者用：フィルタリングなしで部屋の単語データを読み込む"""
+    try:
+        room_setting = RoomSetting.query.filter_by(room_number=room_number).first()
+        
+        if room_setting and room_setting.csv_filename:
+            csv_filename = room_setting.csv_filename
+        else:
+            csv_filename = "words.csv"
+        
+        if csv_filename == "words.csv":
+            word_data = []
+            try:
+                with open('words.csv', 'r', encoding='utf-8') as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        row['enabled'] = row.get('enabled', '1') == '1'
+                        row['chapter'] = str(row['chapter'])
+                        row['number'] = str(row['number'])
+                        word_data.append(row)
+            except FileNotFoundError:
+                print(f"❌ デフォルトファイルが見つかりません: words.csv")
+                return []
+        else:
+            csv_file = CsvFileContent.query.filter_by(filename=csv_filename).first()
+            if csv_file:
+                try:
+                    content = csv_file.content
+                    reader = csv.DictReader(StringIO(content))
+                    word_data = []
+                    for row in reader:
+                        row['enabled'] = row.get('enabled', '1') == '1'
+                        row['chapter'] = str(row['chapter'])
+                        row['number'] = str(row['number'])
+                        word_data.append(row)
+                except Exception as parse_error:
+                    print(f"❌ CSVパースエラー: {parse_error}")
+                    return []
+            else:
+                print(f"❌ データベースにCSVが見つかりません: {csv_filename}")
+                return []
+        
+        return word_data  # フィルタリングなしで返す
+        
+    except Exception as e:
+        print(f"❌ 読み込みエラー: {e}")
+        return []
+    
 # ====================================================================
 # エラーハンドラー
 # ====================================================================
