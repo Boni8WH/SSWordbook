@@ -616,13 +616,83 @@ def load_word_data_for_room(room_number):
                 print("🔄 デフォルトファイルにフォールバック")
                 return load_word_data_for_room("default")
         
-        return word_data
+        # α問題のフィルタリング処理を追加
+        filtered_word_data = filter_alpha_problems(word_data, room_number)
+        
+        return filtered_word_data
         
     except Exception as e:
         print(f"❌ 読み込みエラー: {e}")
         import traceback
         traceback.print_exc()
         return []
+
+def filter_alpha_problems(word_data, room_number):
+    """α問題のフィルタリング処理"""
+    # 章ごとにグループ化
+    chapters = {}
+    for word in word_data:
+        chapter = word['chapter']
+        if chapter not in chapters:
+            chapters[chapter] = {'regular': [], 'alpha': []}
+        
+        if str(word['number']).lower() == 'α':
+            chapters[chapter]['alpha'].append(word)
+        else:
+            chapters[chapter]['regular'].append(word)
+    
+    # 部屋内の全ユーザーのマスター状況を確認
+    users = User.query.filter_by(room_number=room_number).all()
+    filtered_data = []
+    
+    for chapter, problems in chapters.items():
+        # 通常問題は常に追加
+        filtered_data.extend(problems['regular'])
+        
+        # α問題の解放判定
+        alpha_unlocked = check_alpha_unlock_status(chapter, problems['regular'], users)
+        
+        if alpha_unlocked:
+            # α問題を有効化して追加
+            for alpha_word in problems['alpha']:
+                alpha_word['enabled'] = True
+                filtered_data.append(alpha_word)
+            print(f"🔓 第{chapter}章のα問題を解放しました")
+        else:
+            print(f"🔒 第{chapter}章のα問題は条件未達成のため非表示")
+    
+    return filtered_data
+
+def check_alpha_unlock_status(chapter, regular_problems, users):
+    """特定の章のα問題が解放されるかチェック"""
+    if not regular_problems:
+        return False
+    
+    # 章内の全通常問題がマスターされているかチェック
+    for word in regular_problems:
+        problem_id = get_problem_id(word)
+        
+        # 誰かがこの問題をマスターしていない場合
+        is_mastered_by_anyone = False
+        for user in users:
+            if user.username == 'admin':
+                continue
+            
+            user_history = user.get_problem_history()
+            if problem_id in user_history:
+                history = user_history[problem_id]
+                correct = history.get('correct_attempts', 0)
+                incorrect = history.get('incorrect_attempts', 0)
+                total = correct + incorrect
+                
+                if total > 0 and (correct / total) >= 0.8:
+                    is_mastered_by_anyone = True
+                    break
+        
+        if not is_mastered_by_anyone:
+            return False
+    
+    return True
 
 # 管理者用：全体のデフォルト単語データを読み込む関数
 def load_default_word_data():
@@ -6458,6 +6528,37 @@ def download_room_settings_template_csv():
     response = Response(output, mimetype="text/csv")
     response.headers["Content-Disposition"] = "attachment; filename=room_settings_template.csv"
     return response
+
+@app.route('/api/check_alpha_status/<chapter_num>')
+def api_check_alpha_status(chapter_num):
+    """特定の章のα問題解放状態をチェック"""
+    try:
+        if 'user_id' not in session:
+            return jsonify(status='error', message='認証が必要です'), 401
+        
+        current_user = User.query.get(session['user_id'])
+        if not current_user:
+            return jsonify(status='error', message='ユーザーが見つかりません'), 404
+        
+        # 部屋内の全ユーザーを取得
+        users = User.query.filter_by(room_number=current_user.room_number).all()
+        
+        # 章の通常問題を取得
+        word_data = load_word_data_for_room(current_user.room_number)
+        regular_problems = [w for w in word_data if w['chapter'] == chapter_num and str(w['number']).lower() != 'α']
+        
+        # α問題の解放状態をチェック
+        is_unlocked = check_alpha_unlock_status(chapter_num, regular_problems, users)
+        
+        return jsonify({
+            'status': 'success',
+            'chapter': chapter_num,
+            'alpha_unlocked': is_unlocked,
+            'regular_problems_count': len(regular_problems)
+        })
+        
+    except Exception as e:
+        return jsonify(status='error', message=str(e)), 500
 
 # ====================================================================
 # デバッグ・管理機能
