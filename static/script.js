@@ -288,9 +288,7 @@ function generateProblemId(word) {
 // 初期ロードとデータ取得
 // =========================================================
 
-document.addEventListener('DOMContentLoaded', () => {
-    console.log('DOM loaded, initializing application...');
-    
+document.addEventListener('DOMContentLoaded', () => {    
     try {
         updateIncorrectOnlyRadio();
         loadUserData();
@@ -305,8 +303,6 @@ document.addEventListener('DOMContentLoaded', () => {
             improveTouchExperience();
             optimizeScrolling();
             
-            // ★制限状態チェックを最後に1回だけ実行
-            console.log('📍 初期化完了 - 制限状態をチェック');
             updateIncorrectOnlySelection();
         }, 1500); // 1.5秒後に1回だけ
         
@@ -332,7 +328,6 @@ function loadUserData() {
                 if (data.restrictionState) {
                     hasBeenRestricted = data.restrictionState.hasBeenRestricted || false;
                     restrictionReleased = data.restrictionState.restrictionReleased || false;
-                    console.log(`🔄 サーバーから制限状態を復元: hasBeenRestricted=${hasBeenRestricted}, restrictionReleased=${restrictionReleased}`);
                 } else {
                     // 🆕 制限状態の初期化（苦手問題数に基づく）
                     const weakCount = incorrectWords.length;
@@ -343,10 +338,7 @@ function loadUserData() {
                         hasBeenRestricted = false;
                         restrictionReleased = false;
                     }
-                    console.log(`🔄 制限状態を初期化: 苦手${weakCount}問 -> hasBeenRestricted=${hasBeenRestricted}`);
                 }
-                
-                console.log(`ユーザーデータロード完了: 苦手問題 ${incorrectWords.length}個`);
                 
                 setTimeout(() => {
                     updateIncorrectOnlySelection();
@@ -395,7 +387,6 @@ function loadWordDataFromServer() {
         .then(data => {
             if (Array.isArray(data)) {
                 word_data = data;
-                console.log(`Loaded ${word_data.length} words from server.`);
                 updateUnitCheckboxStates();
             } else {
                 console.error('Failed to load word data: Invalid format', data);
@@ -1184,10 +1175,7 @@ function handleAnswer(isCorrect) {
         return;
     }
     
-    console.log(`\n=== "${currentWord.question}" ===`);
-    
     const wordIdentifier = generateProblemId(currentWord);
-    console.log(`ID: ${wordIdentifier}`);
 
     if (!problemHistory[wordIdentifier]) {
         problemHistory[wordIdentifier] = {
@@ -1206,13 +1194,10 @@ function handleAnswer(isCorrect) {
         problemHistory[wordIdentifier].correct_attempts++;
         problemHistory[wordIdentifier].correct_streak++;
 
-        console.log(`✅ 正解! 連続正解数: ${problemHistory[wordIdentifier].correct_streak}`);
-
         if (problemHistory[wordIdentifier].correct_streak >= 2) {
             const incorrectIndex = incorrectWords.indexOf(wordIdentifier);
             if (incorrectIndex > -1) {
                 incorrectWords.splice(incorrectIndex, 1);
-                console.log(`🎉 苦手問題から削除! 残り: ${incorrectWords.length}個`);
                 
                 // α問題の苦手解消による解放状態更新
                 const currentWord = currentQuizData[currentQuestionIndex];
@@ -1227,11 +1212,8 @@ function handleAnswer(isCorrect) {
         problemHistory[wordIdentifier].incorrect_attempts++;
         problemHistory[wordIdentifier].correct_streak = 0;
 
-        console.log(`❌ 不正解! 連続正解数リセット`);
-
         if (!incorrectWords.includes(wordIdentifier)) {
             incorrectWords.push(wordIdentifier);
-            console.log(`📝 苦手問題に追加! 合計: ${incorrectWords.length}個`);
             
             // 通常問題の不正解によるα問題ロック確認
             const currentWord = currentQuizData[currentQuestionIndex];
@@ -1853,11 +1835,7 @@ function toggleWeakAnswer(index) {
 // API呼び出しヘルパー
 // =========================================================
 
-function saveQuizProgressToServer() {
-    console.log('\n=== 進捗保存開始 (JavaScript側) ===');
-    console.log(`保存する履歴数: ${Object.keys(problemHistory).length}`);
-    console.log(`保存する苦手問題数: ${incorrectWords.length}`);
-    
+function saveQuizProgressToServer() {    
     // 最近の変更を詳細ログ
     const recentEntries = Object.entries(problemHistory)
         .filter(([id, history]) => {
@@ -1878,7 +1856,7 @@ function saveQuizProgressToServer() {
         incorrectWords: incorrectWords
     };
 
-    fetch('/api/save_progress_debug', {  // デバッグ版エンドポイントを使用
+    fetch('/api/save_progress', {  // デバッグ版ではなく通常版に戻す
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
@@ -1887,21 +1865,14 @@ function saveQuizProgressToServer() {
     })
     .then(response => response.json())
     .then(data => {
-        if (data.status === 'success') {
-            console.log('✅ 進捗保存成功');
-            if (data.debug_info) {
-                console.log('保存デバッグ情報:', data.debug_info);
-            }
-        } else {
-            console.error('❌ 進捗保存失敗:', data.message);
+        if (data.status !== 'success') {
+            console.error('❌ 進捗保存失敗:', data.message);  // エラーのみ残す
             flashMessage(data.message, 'danger');
         }
-        console.log('=== 進捗保存終了 ===\n');
     })
     .catch(error => {
-        console.error('❌ 進捗保存エラー:', error);
+        console.error('❌ 進捗保存エラー:', error);  // エラーのみ残す
         flashMessage('進捗の保存中にエラーが発生しました。', 'danger');
-        console.log('=== 進捗保存終了（エラー） ===\n');
     });
 }
 
