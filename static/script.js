@@ -425,28 +425,35 @@ function updateUnitCheckboxStates() {
     for (const chapterNum in window.chapterDataFromFlask) {
         if (window.chapterDataFromFlask.hasOwnProperty(chapterNum)) {
             const chapter = window.chapterDataFromFlask[chapterNum];
-            let hasEnabledUnits = false; // 章内に利用可能な単元があるかフラグ
+            let hasEnabledUnits = false;
             
             for (const unitNum in chapter.units) {
                 if (chapter.units.hasOwnProperty(unitNum)) {
                     const unit = chapter.units[unitNum];
                     const checkbox = document.getElementById(`unit-${chapterNum}-${unitNum}`);
                     if (checkbox) {
-                        if (!unit.enabled) {
-                            // 利用不可の場合は単元を非表示
+                        // α問題の特別処理
+                        const isAlphaProblem = unitNum.toLowerCase() === 'α';
+                        let isEnabled = unit.enabled;
+                        
+                        if (isAlphaProblem) {
+                            // α問題の解放状態をリアルタイムでチェック
+                            isEnabled = unit.enabled && checkAlphaUnlockClientSide(chapterNum);
+                        }
+                        
+                        if (!isEnabled) {
                             const unitItem = checkbox.closest('.unit-item');
                             if (unitItem) {
                                 unitItem.style.display = 'none';
                             }
                         } else {
-                            // 利用可能な場合は表示
                             const unitItem = checkbox.closest('.unit-item');
                             if (unitItem) {
                                 unitItem.style.display = 'block';
                             }
-                            hasEnabledUnits = true; // 利用可能な単元が見つかった
+                            hasEnabledUnits = true;
                         }
-                        checkbox.disabled = !unit.enabled;
+                        checkbox.disabled = !isEnabled;
                         if (checkbox.disabled && checkbox.checked) {
                             checkbox.checked = false;
                         }
@@ -454,18 +461,46 @@ function updateUnitCheckboxStates() {
                 }
             }
             
-            // ★新機能：章内に利用可能な単元がない場合は章全体を非表示
+            // 章の表示/非表示制御
             const chapterItem = document.querySelector(`.chapter-item[data-chapter="${chapterNum}"]`);
             if (chapterItem) {
                 if (hasEnabledUnits) {
-                    chapterItem.style.display = 'block'; // 章を表示
+                    chapterItem.style.display = 'block';
                 } else {
-                    chapterItem.style.display = 'none';  // 章を非表示
+                    chapterItem.style.display = 'none';
                     console.log(`第${chapterNum}章は全単元が利用不可のため非表示にしました`);
                 }
             }
         }
     }
+}
+
+function checkAlphaUnlockClientSide(chapterNum) {
+    // 同じ章の通常問題（α以外）を取得
+    const regularProblems = word_data.filter(word => 
+        word.chapter === chapterNum && 
+        String(word.number).toLowerCase() !== 'α'
+    );
+    
+    if (regularProblems.length === 0) return false;
+    
+    // 全ての通常問題がマスターされているかチェック
+    for (const word of regularProblems) {
+        const problemId = generateProblemId(word);
+        const history = problemHistory[problemId];
+        
+        if (!history) return false;
+        
+        const correct = history.correct_attempts || 0;
+        const incorrect = history.incorrect_attempts || 0;
+        const total = correct + incorrect;
+        
+        if (total === 0 || (correct / total) < 0.8) {
+            return false;
+        }
+    }
+    
+    return true;
 }
 
 // =========================================================
@@ -1165,6 +1200,7 @@ function handleAnswer(isCorrect) {
     
     problemHistory[wordIdentifier].last_answered = new Date().toISOString();
 
+    // handleAnswer関数内の苦手問題処理部分
     if (isCorrect) {
         correctCount++;
         problemHistory[wordIdentifier].correct_attempts++;
@@ -1177,9 +1213,14 @@ function handleAnswer(isCorrect) {
             if (incorrectIndex > -1) {
                 incorrectWords.splice(incorrectIndex, 1);
                 console.log(`🎉 苦手問題から削除! 残り: ${incorrectWords.length}個`);
+                
+                // α問題の苦手解消による解放状態更新
+                const currentWord = currentQuizData[currentQuestionIndex];
+                if (String(currentWord.number).toLowerCase() === 'α') {
+                    console.log('α問題の苦手が解消されました - 解放状態を更新');
+                    setTimeout(() => updateUnitCheckboxStates(), 200);
+                }
             }
-        } else {
-            console.log(`まだ ${problemHistory[wordIdentifier].correct_streak}/2 回正解`);
         }
     } else {
         incorrectCount++;
@@ -1191,6 +1232,13 @@ function handleAnswer(isCorrect) {
         if (!incorrectWords.includes(wordIdentifier)) {
             incorrectWords.push(wordIdentifier);
             console.log(`📝 苦手問題に追加! 合計: ${incorrectWords.length}個`);
+            
+            // 通常問題の不正解によるα問題ロック確認
+            const currentWord = currentQuizData[currentQuestionIndex];
+            if (String(currentWord.number).toLowerCase() !== 'α') {
+                console.log('通常問題を不正解 - α問題の解放状態を確認');
+                setTimeout(() => updateUnitCheckboxStates(), 200);
+            }
         }
     }
 
@@ -1206,6 +1254,12 @@ function handleAnswer(isCorrect) {
     } else {
         showQuizResult();
     }
+    // 最後に動的更新処理を追加
+    setTimeout(() => {
+        // α問題の解放状態を再チェック
+        updateUnitCheckboxStates();
+        console.log('α問題の解放状態を更新しました');
+    }, 100);
 }
 
 function updateProgressBar() {
