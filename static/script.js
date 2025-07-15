@@ -21,6 +21,10 @@ let answerButtonTimeout = null;
 let hasBeenRestricted = false; // 一度でも制限されたかのフラグ
 let restrictionReleased = false; // 制限が解除されたかのフラグ
 
+// word_data をグローバルに明示的に定義
+window.word_data = [];  // この行を追加
+let word_data = window.word_data;  // この行も追加
+
 // DOM要素
 const startButton = document.getElementById('startButton');
 const questionCountRadios = document.querySelectorAll('input[name="questionCount"]');
@@ -86,9 +90,6 @@ if (typeof window.appInfoFromFlask === 'undefined') {
         contactSection.style.display = 'block';
     }
 }
-
-// word_data はサーバーから取得する必要があるため、初期化は空に
-let word_data = [];
 
 // =========================================================
 // スマホ対応関数
@@ -387,6 +388,7 @@ function loadWordDataFromServer() {
         .then(data => {
             if (Array.isArray(data)) {
                 word_data = data;
+                window.word_data = data;  // グローバルにも設定
                 updateUnitCheckboxStates();
             } else {
                 console.error('Failed to load word data: Invalid format', data);
@@ -423,15 +425,16 @@ function updateUnitCheckboxStates() {
                     const unit = chapter.units[unitNum];
                     const checkbox = document.getElementById(`unit-${chapterNum}-${unitNum}`);
                     if (checkbox) {
-                        // α問題の特別処理
-                        const isAlphaProblem = unitNum.toLowerCase() === 'α';
+                        // Z問題の特別処理
+                        const isSpecialProblem = unitNum.toUpperCase() === 'Z';  // 変更
                         let isEnabled = unit.enabled;
                         
-                        if (isAlphaProblem) {
-                            // α問題の解放状態をリアルタイムでチェック
-                            isEnabled = unit.enabled && checkAlphaUnlockClientSide(chapterNum);
+                        if (isSpecialProblem) {
+                            // Z問題の解放状態をリアルタイムでチェック
+                            isEnabled = unit.enabled && checkSpecialUnlockClientSide(chapterNum);  // 関数名変更
                         }
                         
+                        // 以下既存の処理...
                         if (!isEnabled) {
                             const unitItem = checkbox.closest('.unit-item');
                             if (unitItem) {
@@ -459,18 +462,17 @@ function updateUnitCheckboxStates() {
                     chapterItem.style.display = 'block';
                 } else {
                     chapterItem.style.display = 'none';
-                    console.log(`第${chapterNum}章は全単元が利用不可のため非表示にしました`);
                 }
             }
         }
     }
 }
 
-function checkAlphaUnlockClientSide(chapterNum) {
-    // 同じ章の通常問題（α以外）を取得
+function checkSpecialUnlockClientSide(chapterNum) {
+    // 同じ章の通常問題（Z以外）を取得
     const regularProblems = word_data.filter(word => 
         word.chapter === chapterNum && 
-        String(word.number).toLowerCase() !== 'α'
+        String(word.number).toUpperCase() !== 'Z'
     );
     
     if (regularProblems.length === 0) return false;
@@ -1193,17 +1195,16 @@ function handleAnswer(isCorrect) {
         correctCount++;
         problemHistory[wordIdentifier].correct_attempts++;
         problemHistory[wordIdentifier].correct_streak++;
-
         if (problemHistory[wordIdentifier].correct_streak >= 2) {
-            const incorrectIndex = incorrectWords.indexOf(wordIdentifier);
-            if (incorrectIndex > -1) {
-                incorrectWords.splice(incorrectIndex, 1);
-                
-                // α問題の苦手解消による解放状態更新
-                const currentWord = currentQuizData[currentQuestionIndex];
-                if (String(currentWord.number).toLowerCase() === 'α') {
-                    console.log('α問題の苦手が解消されました - 解放状態を更新');
-                    setTimeout(() => updateUnitCheckboxStates(), 200);
+        const incorrectIndex = incorrectWords.indexOf(wordIdentifier);
+        if (incorrectIndex > -1) {
+            incorrectWords.splice(incorrectIndex, 1);
+            
+            // Z問題の苦手解消による解放状態更新
+            const currentWord = currentQuizData[currentQuestionIndex];
+            if (String(currentWord.number).toUpperCase() === 'Z') {  // 変更
+                console.log('Z問題の苦手が解消されました - 解放状態を更新');
+                setTimeout(() => updateUnitCheckboxStates(), 200);
                 }
             }
         }
@@ -1213,16 +1214,16 @@ function handleAnswer(isCorrect) {
         problemHistory[wordIdentifier].correct_streak = 0;
 
         if (!incorrectWords.includes(wordIdentifier)) {
-            incorrectWords.push(wordIdentifier);
-            
-            // 通常問題の不正解によるα問題ロック確認
-            const currentWord = currentQuizData[currentQuestionIndex];
-            if (String(currentWord.number).toLowerCase() !== 'α') {
-                console.log('通常問題を不正解 - α問題の解放状態を確認');
-                setTimeout(() => updateUnitCheckboxStates(), 200);
-            }
+        incorrectWords.push(wordIdentifier);
+        
+        // 通常問題の不正解によるZ問題ロック確認
+        const currentWord = currentQuizData[currentQuestionIndex];
+        if (String(currentWord.number).toUpperCase() !== 'Z') {  // 変更
+            console.log('通常問題を不正解 - Z問題の解放状態を確認');
+            setTimeout(() => updateUnitCheckboxStates(), 200);
         }
     }
+}
 
     // ★修正：正解・不正解判定直後に即座に保存
     saveQuizProgressToServer();
