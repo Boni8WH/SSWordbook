@@ -3418,7 +3418,33 @@ def api_admin_update_ranking_display_count():
 # ====================================================================
 # APIエンドポイント
 # ====================================================================
+@app.route('/api/update_user_stats', methods=['POST'])
+def update_user_stats():
+    """ユーザー統計を非同期更新"""
+    try:
+        if 'user_id' not in session:
+            return jsonify(status='error', message='ログインしていません。'), 401
+        
+        current_user = User.query.get(session['user_id'])
+        if not current_user:
+            return jsonify(status='error', message='ユーザーが見つかりません。'), 404
 
+        # 統計更新
+        try:
+            user_stats = UserStats.get_or_create(current_user.id)
+            if user_stats:
+                word_data = load_word_data_for_room(current_user.room_number)
+                user_stats.update_stats(word_data)
+                db.session.commit()
+        except Exception as stats_error:
+            db.session.rollback()
+            return jsonify(status='error', message=f'統計更新エラー: {str(stats_error)}'), 500
+        
+        return jsonify(status='success', message='統計を更新しました。')
+        
+    except Exception as e:
+        return jsonify(status='error', message=str(e)), 500
+    
 @app.route('/api/word_data')
 def api_word_data():
     try:
@@ -3477,7 +3503,7 @@ def api_load_quiz_progress():
 
 @app.route('/api/save_progress', methods=['POST'])
 def save_quiz_progress():
-    """学習進捗保存 + 統計自動更新"""
+    """学習進捗保存（軽量版 - 統計更新なし）"""
     try:
         if 'user_id' not in session:
             return jsonify(status='error', message='ログインしていません。'), 401
@@ -3490,36 +3516,16 @@ def save_quiz_progress():
         if not current_user:
             return jsonify(status='error', message='ユーザーが見つかりません。'), 404
 
-        print(f"💾 学習データ保存開始: {current_user.username}")
-
-        # 学習履歴を保存
+        # 学習履歴を保存（統計更新なし）
         current_user.set_problem_history(received_problem_history)
         current_user.set_incorrect_words(received_incorrect_words)
-        
-        # ★重要：統計を自動更新
-        try:
-            user_stats = UserStats.get_or_create(current_user.id)
-            if user_stats:
-                # 部屋の単語データを一度だけ取得（効率化）
-                word_data = load_word_data_for_room(current_user.room_number)
-                user_stats.update_stats(word_data)
-                print(f"📊 統計自動更新: {current_user.username} (スコア: {user_stats.balance_score:.1f})")
-            else:
-                print(f"⚠️ 統計オブジェクト作成失敗: {current_user.username}")
-                
-        except Exception as stats_error:
-            print(f"⚠️ 統計更新エラー: {stats_error}")
-            # 統計更新が失敗しても学習データは保存
         
         # 一括コミット
         db.session.commit()
         
-        print(f"✅ 学習データ保存完了: {current_user.username}")
-
-        return jsonify(status='success', message='進捗が保存され、統計が更新されました。')
+        return jsonify(status='success', message='進捗を保存しました。')
         
     except Exception as e:
-        print(f"❌ 進捗保存エラー: {e}")
         db.session.rollback()
         return jsonify(status='error', message=f'進捗の保存中にエラーが発生しました: {str(e)}'), 500
 
