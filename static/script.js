@@ -288,35 +288,31 @@ function generateProblemId(word) {
 // =========================================================
 // 初期ロードとデータ取得
 // =========================================================
-
-document.addEventListener('DOMContentLoaded', () => {    
+document.addEventListener('DOMContentLoaded', () => {
     try {
         updateIncorrectOnlyRadio();
         loadUserData();
         loadWordDataFromServer();
         setupEventListeners();
 
-        // データロード後に選択状態を復元
         setTimeout(() => {
             loadSelectionState();
             initializeSelectAllButtons();
             initializeMobileOptimizations();
             improveTouchExperience();
             optimizeScrolling();
-            
             updateIncorrectOnlySelection();
-        }, 1500); // 1.5秒後に1回だけ
+        }, 1500);
         
         if (noWeakWordsMessage) {
             noWeakWordsMessage.classList.add('hidden');
         }
     } catch (error) {
-        console.error('Error during initialization:', error);
+        console.error('❌ 初期化エラー:', error);
     }
 
     document.addEventListener('keydown', handleEscapeKey);
 });
-
 function loadUserData() {
     fetch('/api/load_quiz_progress')
         .then(response => response.json())
@@ -325,12 +321,10 @@ function loadUserData() {
                 problemHistory = data.problemHistory || {};
                 incorrectWords = data.incorrectWords || [];
                 
-                // 🆕 サーバーから制限状態を取得
                 if (data.restrictionState) {
                     hasBeenRestricted = data.restrictionState.hasBeenRestricted || false;
                     restrictionReleased = data.restrictionState.restrictionReleased || false;
                 } else {
-                    // 🆕 制限状態の初期化（苦手問題数に基づく）
                     const weakCount = incorrectWords.length;
                     if (weakCount >= 20) {
                         hasBeenRestricted = true;
@@ -345,11 +339,11 @@ function loadUserData() {
                     updateIncorrectOnlySelection();
                 }, 500);
             } else {
-                console.error('Failed to load user data:', data.message);
+                console.error('❌ ユーザーデータ読み込み失敗:', data.message);
             }
         })
         .catch(error => {
-            console.error('Error loading user data:', error);
+            console.error('❌ ユーザーデータ読み込みエラー:', error);
         });
 }
 
@@ -386,16 +380,35 @@ function loadWordDataFromServer() {
     fetch('/api/word_data')
         .then(response => response.json())
         .then(data => {
-            if (Array.isArray(data)) {
+            if (data.status === 'success' && data.word_data) {
+                word_data = data.word_data;
+                
+                if (data.star_availability) {
+                    starProblemStatus = data.star_availability;
+                }
+                if (data.star_requirements) {
+                    starRequirements = data.star_requirements;
+                }
+                
+            } else if (Array.isArray(data)) {
                 word_data = data;
-                window.word_data = data;  // グローバルにも設定
-                updateUnitCheckboxStates();
             } else {
-                console.error('Failed to load word data: Invalid format', data);
+                console.error('❌ 単語データの読み込み失敗:', data);
+                flashMessage('単語データの読み込みに失敗しました。', 'danger');
+                return;
             }
+            
+            updateUnitCheckboxStates();
+            
+            setTimeout(() => {
+                if (typeof updateStarProblemUI === 'function') {
+                    updateStarProblemUI();
+                }
+            }, 500);
+            
         })
         .catch(error => {
-            console.error('Error loading word data:', error);
+            console.error('❌ 単語データ読み込みエラー:', error);
             flashMessage('単語データのロード中にエラーが発生しました。', 'danger');
         });
 }
@@ -575,69 +588,51 @@ function updateIncorrectOnlySelection() {
     
     const weakProblemCount = incorrectWords.length;
     
-    // 🆕 制限状態の更新ロジック（状態変更時にサーバーに保存）
     let stateChanged = false;
     const oldHasBeenRestricted = hasBeenRestricted;
     const oldRestrictionReleased = restrictionReleased;
     
-    // 1. 20問以上で制限発動（初回も再発動も同じ条件）
+    // 制限状態の更新ロジック
     if (weakProblemCount >= 20) {
         if (!hasBeenRestricted || restrictionReleased) {
             hasBeenRestricted = true;
             restrictionReleased = false;
             stateChanged = true;
-            console.log('🔒 制限発動: 苦手問題', weakProblemCount, '問（20問以上）');
         }
     }
     
-    // 2. 10問以下で制限解除
     if (hasBeenRestricted && !restrictionReleased && weakProblemCount <= 10) {
         restrictionReleased = true;
         stateChanged = true;
-        console.log('🔓 制限解除: 苦手問題', weakProblemCount, '問（10問以下達成）');
     }
     
-    // 🆕 状態が変更された場合はサーバーに保存
+    // 状態が変更された場合はサーバーに保存
     if (stateChanged) {
-        console.log(`📤 制限状態変更を保存: ${oldHasBeenRestricted}->${hasBeenRestricted}, ${oldRestrictionReleased}->${restrictionReleased}`);
         saveRestrictionState();
     }
     
-    // ★現在の制限状態判定：20問以上か、制限中で11問以上のみ
+    // 現在の制限状態判定
     let isCurrentlyRestricted = false;
     
     if (weakProblemCount >= 20) {
-        // 20問以上は無条件で制限
         isCurrentlyRestricted = true;
-        console.log('🔒 制限中: 苦手問題', weakProblemCount, '問（20問以上）');
     } else if (hasBeenRestricted && !restrictionReleased && weakProblemCount >= 11) {
-        // 制限中かつ11問以上は制限継続
         isCurrentlyRestricted = true;
-        console.log('🔒 制限継続: 苦手問題', weakProblemCount, '問（11-19問）');
     } else {
-        // それ以外は制限なし
         isCurrentlyRestricted = false;
-        console.log('🔓 制限なし: 苦手問題', weakProblemCount, '問');
     }
     
-    console.log(`制限状態: 苦手${weakProblemCount}問, 制限中=${isCurrentlyRestricted}, hasBeenRestricted=${hasBeenRestricted}, restrictionReleased=${restrictionReleased}`);
-    
     if (isCurrentlyRestricted) {
-        // ★制限発動中（最優先で処理）
-        console.log('🔒 制限適用中 - UIを制限モードに変更');
-        
-        // 苦手問題ラジオボタンを強制選択
+        // 制限発動中
         if (incorrectOnlyRadio) {
             incorrectOnlyRadio.checked = true;
         }
         
-        // 他の選択肢を無効化
         questionCountRadios.forEach(radio => {
             radio.disabled = true;
             radio.parentElement.style.opacity = '0.5';
         });
         
-        // 出題範囲選択を完全に非表示
         if (rangeSelectionArea) {
             rangeSelectionArea.style.display = 'none';
         }
@@ -645,7 +640,6 @@ function updateIncorrectOnlySelection() {
             chaptersContainer.style.display = 'none';
         }
         
-        // 制限状態に応じた警告メッセージ
         if (weakProblemCount >= 20) {
             showWeakProblemWarning(weakProblemCount);
         } else if (weakProblemCount > 10) {
@@ -653,7 +647,7 @@ function updateIncorrectOnlySelection() {
         }
         
     } else if (incorrectOnlyRadio && incorrectOnlyRadio.checked) {
-        // 手動で苦手問題が選択されている場合（制限なし）
+        // 手動で苦手問題が選択されている場合
         if (rangeSelectionArea) {
             rangeSelectionArea.style.display = 'none';
         }
@@ -662,7 +656,7 @@ function updateIncorrectOnlySelection() {
             rangeSelectionTitle.style.color = '#95a5a6';
         }
     } else {
-        // ★制限なし（通常モード）
+        // 制限なし（通常モード）
         questionCountRadios.forEach(radio => {
             radio.disabled = false;
             radio.parentElement.style.opacity = '1';
@@ -688,10 +682,7 @@ function updateIncorrectOnlySelection() {
 // =========================================================
 // イベントリスナーの設定（修正版）
 // =========================================================
-
 function setupEventListeners() {
-    console.log('Setting up event listeners...');
-    
     try {
         if (startButton) startButton.addEventListener('click', startQuiz);
         if (showAnswerButton) {
@@ -699,9 +690,7 @@ function setupEventListeners() {
                 e.preventDefault();
                 e.stopPropagation();
                 
-                // 無効化中はクリックを無視
                 if (isAnswerButtonDisabled) {
-                    console.log('答えを見るボタンは無効化中です（イベントリスナーレベル）');
                     return false;
                 }
                 
@@ -720,26 +709,23 @@ function setupEventListeners() {
         if (shareXButton) shareXButton.addEventListener('click', shareOnX);
         if (downloadImageButton) downloadImageButton.addEventListener('click', downloadQuizResultImage);
 
-        // 出題数選択のラジオボタンにイベントリスナーを追加
         questionCountRadios.forEach(radio => {
             radio.addEventListener('change', updateIncorrectOnlySelection);
         });
 
-        // 章のヘッダーをクリックで単元リストの表示/非表示を切り替え（スマホ対応版）
         if (chaptersContainer) {
             chaptersContainer.addEventListener('click', (event) => {
                 // 「全て選択」ボタンがクリックされた場合の処理
-                const selectAllBtn = event.target.closest('.select-all-chapter-btn');
-                if (selectAllBtn) {
+                if (event.target.classList.contains('select-all-chapter-btn')) {
                     event.stopPropagation();
                     event.preventDefault();
                     
+                    const selectAllBtn = event.target;
                     const chapterNum = selectAllBtn.dataset.chapter;
                     const chapterItem = selectAllBtn.closest('.chapter-item');
                     if (!chapterItem) return;
                     
                     const checkboxes = chapterItem.querySelectorAll(`input[type="checkbox"][data-chapter="${chapterNum}"]`);
-                    
                     const enabledCheckboxes = Array.from(checkboxes).filter(cb => !cb.disabled);
                     const allChecked = enabledCheckboxes.every(cb => cb.checked);
                     
@@ -748,29 +734,49 @@ function setupEventListeners() {
                     });
                     
                     updateSelectAllButtonText(selectAllBtn, !allChecked);
-                    
-                    // 章の展開状態は変更しない
-                    return false;
+                    return;
                 }
                 
-                // 章ヘッダーがクリックされた場合のみ展開/折りたたみ処理
+                // 章ヘッダーがクリックされた場合の展開/折りたたみ処理
                 const chapterHeader = event.target.closest('.chapter-header');
-                if (chapterHeader && !event.target.closest('.select-all-chapter-btn')) {
+                if (chapterHeader && 
+                    !event.target.classList.contains('select-all-chapter-btn') &&
+                    !event.target.closest('.select-all-chapter-btn') &&
+                    !event.target.closest('input[type="checkbox"]') &&
+                    !event.target.closest('label')) {
+                    
+                    event.stopPropagation();
+                    event.preventDefault();
+                    
                     const chapterItem = chapterHeader.closest('.chapter-item');
                     if (chapterItem) {
-                        chapterItem.classList.toggle('expanded');
+                        const isCurrentlyExpanded = chapterItem.classList.contains('expanded');
+                        
+                        if (isCurrentlyExpanded) {
+                            chapterItem.classList.remove('expanded');
+                        } else {
+                            chapterItem.classList.add('expanded');
+                        }
+                        
                         const toggleIcon = chapterHeader.querySelector('.toggle-icon');
                         if (toggleIcon) {
                             toggleIcon.textContent = chapterItem.classList.contains('expanded') ? '▼' : '▶';
+                        }
+                        
+                        if (chapterItem.classList.contains('expanded')) {
+                            setTimeout(() => {
+                                if (typeof updateStarProblemUI === 'function') {
+                                    updateStarProblemUI();
+                                }
+                            }, 100);
                         }
                     }
                 }
             });
         }
         
-        console.log('Event listeners setup completed.');
     } catch (error) {
-        console.error('Error setting up event listeners:', error);
+        console.error('❌ イベントリスナー設定エラー:', error);
     }
 }
 
@@ -1117,34 +1123,29 @@ function showNextQuestion() {
     if (correctButton) correctButton.classList.add('hidden');
     if (incorrectButton) incorrectButton.classList.add('hidden');
 
-    // ★新機能：答えを見るボタンを2秒間無効化
-    if (currentQuestionIndex > 0) { // 最初の問題以外で無効化
+    // 答えを見るボタンを2秒間無効化（最初の問題以外）
+    if (currentQuestionIndex > 0) {
         isAnswerButtonDisabled = true;
         if (showAnswerButton) {
             showAnswerButton.disabled = true;
             showAnswerButton.style.opacity = '0.5';
             showAnswerButton.style.cursor = 'not-allowed';
-            showAnswerButton.style.pointerEvents = 'none'; // ★追加：完全にクリックを無効化
+            showAnswerButton.style.pointerEvents = 'none';
         }
         
-        // 既存のタイムアウトがあればクリア
         if (answerButtonTimeout) {
             clearTimeout(answerButtonTimeout);
         }
         
-        // 2秒後に有効化
         answerButtonTimeout = setTimeout(() => {
             isAnswerButtonDisabled = false;
             if (showAnswerButton) {
                 showAnswerButton.disabled = false;
                 showAnswerButton.style.opacity = '1';
                 showAnswerButton.style.cursor = 'pointer';
-                showAnswerButton.style.pointerEvents = 'auto'; // ★追加：クリックを再有効化
+                showAnswerButton.style.pointerEvents = 'auto';
             }
-            console.log('答えを見るボタンが有効化されました');
         }, 2000);
-        
-        console.log('答えを見るボタンを2秒間無効化しました');
     }
 
     if (currentQuestionIndex < totalQuestions) {
@@ -1190,22 +1191,15 @@ function handleAnswer(isCorrect) {
     
     problemHistory[wordIdentifier].last_answered = new Date().toISOString();
 
-    // handleAnswer関数内の苦手問題処理部分
     if (isCorrect) {
         correctCount++;
         problemHistory[wordIdentifier].correct_attempts++;
         problemHistory[wordIdentifier].correct_streak++;
+
         if (problemHistory[wordIdentifier].correct_streak >= 2) {
-        const incorrectIndex = incorrectWords.indexOf(wordIdentifier);
-        if (incorrectIndex > -1) {
-            incorrectWords.splice(incorrectIndex, 1);
-            
-            // Z問題の苦手解消による解放状態更新
-            const currentWord = currentQuizData[currentQuestionIndex];
-            if (String(currentWord.number).toUpperCase() === 'Z') {  // 変更
-                console.log('Z問題の苦手が解消されました - 解放状態を更新');
-                setTimeout(() => updateUnitCheckboxStates(), 200);
-                }
+            const incorrectIndex = incorrectWords.indexOf(wordIdentifier);
+            if (incorrectIndex > -1) {
+                incorrectWords.splice(incorrectIndex, 1);
             }
         }
     } else {
@@ -1214,19 +1208,20 @@ function handleAnswer(isCorrect) {
         problemHistory[wordIdentifier].correct_streak = 0;
 
         if (!incorrectWords.includes(wordIdentifier)) {
-        incorrectWords.push(wordIdentifier);
-        
-        // 通常問題の不正解によるZ問題ロック確認
-        const currentWord = currentQuizData[currentQuestionIndex];
-        if (String(currentWord.number).toUpperCase() !== 'Z') {  // 変更
-            console.log('通常問題を不正解 - Z問題の解放状態を確認');
-            setTimeout(() => updateUnitCheckboxStates(), 200);
+            incorrectWords.push(wordIdentifier);
         }
     }
-}
 
-    // ★修正：正解・不正解判定直後に即座に保存
-    saveQuizProgressToServer();
+    // ★修正：1問ごとに即座に保存（統計更新対応版）
+    saveQuizProgressToServer().then(() => {
+        // 制限状態の即座更新
+        setTimeout(() => {
+            updateIncorrectOnlySelection();
+        }, 300);
+        
+    }).catch((error) => {
+        console.error('❌ 1問回答後の保存エラー:', error);
+    });
 
     // 次の問題へ進む
     currentQuestionIndex++;
@@ -1237,12 +1232,75 @@ function handleAnswer(isCorrect) {
     } else {
         showQuizResult();
     }
-    // 最後に動的更新処理を追加
+}
+
+// 1問回答後の軽量な進捗通知
+function showQuizTimeProgressNotification(weakCount) {
+    // 制限状態に関わる重要な変化のみ通知
+    const wasRestricted = hasBeenRestricted && !restrictionReleased;
+    const currentWeakCount = incorrectWords.length;
+    
+    // 制限解除の瞬間のみ通知
+    if (wasRestricted && currentWeakCount <= 10) {
+        showQuizTimeNotification('🔓 制限解除まであと少し！', 'success');
+    }
+    // 制限発動の瞬間のみ通知
+    else if (!wasRestricted && currentWeakCount >= 20) {
+        showQuizTimeNotification('⚠️ 苦手問題が蓄積されています', 'warning');
+    }
+}
+
+// クイズ中の軽量通知
+function showQuizTimeNotification(message, type = 'info') {
+    // 既存の通知があれば削除
+    const existingNotification = document.querySelector('.quiz-time-notification');
+    if (existingNotification) {
+        existingNotification.remove();
+    }
+    
+    const colors = {
+        success: { bg: '#d4edda', border: '#c3e6cb', text: '#155724' },
+        warning: { bg: '#fff3cd', border: '#ffeaa7', text: '#856404' },
+        info: { bg: '#d1ecf1', border: '#bee5eb', text: '#0c5460' }
+    };
+    
+    const color = colors[type] || colors.info;
+    
+    const notification = document.createElement('div');
+    notification.className = 'quiz-time-notification';
+    notification.innerHTML = `
+        <div style="
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: ${color.bg};
+            color: ${color.text};
+            border: 1px solid ${color.border};
+            padding: 12px 18px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            z-index: 9999;
+            font-size: 0.9em;
+            font-weight: 500;
+            animation: slideInRight 0.3s ease-out;
+            max-width: 280px;
+        ">
+            ${message}
+        </div>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // 2.5秒後に通知を削除
     setTimeout(() => {
-        // α問題の解放状態を再チェック
-        updateUnitCheckboxStates();
-        console.log('α問題の解放状態を更新しました');
-    }, 100);
+        notification.style.opacity = '0';
+        notification.style.transform = 'translateX(100px)';
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
+        }, 300);
+    }, 2500);
 }
 
 function updateProgressBar() {
@@ -1271,17 +1329,13 @@ function showQuizResult() {
     const accuracy = totalQuestions === 0 ? 0 : (correctCount / totalQuestions) * 100;
     if (accuracyRateSpan) accuracyRateSpan.textContent = accuracy.toFixed(1);
 
-    // ★修正：正確な選択範囲の全問題数を表示
+    // 正確な選択範囲の全問題数を表示
     let displayedRangeTotal = 0;
     
     if (lastQuizSettings.totalSelectedRangeQuestions > 0) {
-        // 保存された正確な選択範囲数を使用
         displayedRangeTotal = lastQuizSettings.totalSelectedRangeQuestions;
-        console.log(`📊 保存された選択範囲を使用: ${displayedRangeTotal}問`);
     } else {
-        // フォールバック：計算で求める
         displayedRangeTotal = calculateAccurateRangeTotal();
-        console.log(`📊 フォールバック計算: ${displayedRangeTotal}問`);
     }
     
     if (selectedRangeTotalQuestionsSpan) {
@@ -1290,77 +1344,25 @@ function showQuizResult() {
 
     displayIncorrectWordsForCurrentQuiz();
     
-    // 詳細なログ出力
-    console.log('🔍 結果画面表示時の詳細情報:', {
-        mode: lastQuizSettings.isIncorrectOnly ? '苦手問題モード' : '通常モード',
-        出題数: totalQuestions,
-        選択範囲の全問題数: displayedRangeTotal,
-        正解数: correctCount,
-        正答率: accuracy.toFixed(1) + '%',
-        設定保存状況: {
-            selectedUnits: lastQuizSettings.selectedUnits?.length || 0,
-            availableQuestions: lastQuizSettings.availableQuestions?.length || 0,
-            totalSelectedRangeQuestions: lastQuizSettings.totalSelectedRangeQuestions
-        }
-    });
-    
-    // ★重要：制限解除チェックと関連処理（即座に実行）
+    // ★追加：制限解除チェック（最終確認）
     const currentWeakCount = incorrectWords.length;
     const wasRestricted = hasBeenRestricted && !restrictionReleased;
     
-    console.log(`📍 結果画面での制限状態チェック - 苦手問題: ${currentWeakCount}問`);
-    
-    // updateIncorrectOnlySelectionを呼び出して状態を更新
-    updateIncorrectOnlySelection();
-    
-    // 制限解除された場合のメッセージ
-    const isNowRestricted = hasBeenRestricted && !restrictionReleased;
-    if (wasRestricted && !isNowRestricted) {
-        // 制限が解除された場合
-        console.log('🔓 制限解除されました - UIを強制リセット');
+    setTimeout(() => {
+        updateIncorrectOnlySelection();
         
-        // ★強制的に範囲選択画面のUIをリセット
-        const questionCountRadios = document.querySelectorAll('input[name="questionCount"]:not(#incorrectOnlyRadio)');
-        const rangeSelectionArea = document.querySelector('.range-selection-area');
-        const chaptersContainer = document.querySelector('.chapters-container');
-        const rangeSelectionTitle = document.querySelector('.selection-area h3');
-        
-        // 他の選択肢を有効化
-        questionCountRadios.forEach(radio => {
-            radio.disabled = false;
-            radio.parentElement.style.opacity = '1';
-        });
-        
-        // 範囲選択エリアを表示
-        if (rangeSelectionArea) {
-            rangeSelectionArea.style.display = 'block';
+        // 制限解除された場合の最終メッセージ
+        const isNowRestricted = hasBeenRestricted && !restrictionReleased;
+        if (wasRestricted && !isNowRestricted) {
+            if (currentWeakCount === 0) {
+                flashMessage('🎉 すべての苦手問題を克服しました！通常学習が利用できます。', 'success');
+            } else {
+                flashMessage(`✨ 苦手問題が${currentWeakCount}問になりました。通常学習が利用できます。`, 'success');
+            }
         }
-        if (chaptersContainer) {
-            chaptersContainer.style.display = 'block';
-            chaptersContainer.style.opacity = '1';
-            chaptersContainer.style.pointerEvents = 'auto';
-        }
-        if (rangeSelectionTitle) {
-            rangeSelectionTitle.textContent = '出題数を選択';
-            rangeSelectionTitle.style.color = '#34495e';
-        }
-        
-        // 警告メッセージを削除
-        removeWeakProblemWarning();
-        
-        // フラッシュメッセージ
-        if (currentWeakCount === 0) {
-            flashMessage('🎉 すべての苦手問題を克服しました！通常学習が利用できます。', 'success');
-        } else {
-            flashMessage(`✨ 苦手問題が${currentWeakCount}問になりました。通常学習が利用できます。`, 'success');
-        }
-    } else if (isNowRestricted && currentWeakCount < 20 && lastQuizSettings.isIncorrectOnly) {
-        // 制限継続中の進捗メッセージ
-        flashMessage(`📈 苦手問題が${currentWeakCount}問に減りました。あと${currentWeakCount - 10}問克服で制限解除です。`, 'info');
-    }
+    }, 300);
         
     updateRestartButtonText();
-    updateUserStatsAsync();
 }
 
 function updateUserStatsAsync() {
@@ -1853,14 +1855,14 @@ function toggleWeakAnswer(index) {
 // =========================================================
 // API呼び出しヘルパー
 // =========================================================
-
 function saveQuizProgressToServer() {
     const dataToSave = {
         problemHistory: problemHistory,
         incorrectWords: incorrectWords
     };
 
-    fetch('/api/save_progress', {  // デバッグ版(_debug)ではなく通常版を使用
+    // ★修正：Promiseを返すように変更
+    return fetch('/api/save_progress_debug', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
@@ -1869,14 +1871,18 @@ function saveQuizProgressToServer() {
     })
     .then(response => response.json())
     .then(data => {
-        if (data.status !== 'success') {
+        if (data.status === 'success') {
+            // 制限状態の重要な変化を通知
+            showQuizTimeProgressNotification(incorrectWords.length);
+            return data; // ★データを返す
+        } else {
             console.error('❌ 進捗保存失敗:', data.message);
-            flashMessage(data.message, 'danger');
+            throw new Error(data.message);
         }
     })
     .catch(error => {
         console.error('❌ 進捗保存エラー:', error);
-        flashMessage('進捗の保存中にエラーが発生しました。', 'danger');
+        throw error; // ★エラーを再スロー
     });
 }
 
