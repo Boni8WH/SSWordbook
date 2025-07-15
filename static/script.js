@@ -1359,6 +1359,23 @@ function showQuizResult() {
     }
         
     updateRestartButtonText();
+    updateUserStatsAsync();
+}
+
+function updateUserStatsAsync() {
+    fetch('/api/update_user_stats', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            console.log('統計更新完了');
+        }
+    })
+    .catch(error => {
+        console.error('統計更新エラー:', error);
+    });
 }
 
 function calculateAccurateRangeTotal() {
@@ -1831,32 +1848,18 @@ function toggleWeakAnswer(index) {
     }
 }
 
+
 // =========================================================
 // API呼び出しヘルパー
 // =========================================================
 
-function saveQuizProgressToServer() {    
-    // 最近の変更を詳細ログ
-    const recentEntries = Object.entries(problemHistory)
-        .filter(([id, history]) => {
-            const lastAnswered = history.last_answered;
-            if (!lastAnswered) return false;
-            const lastTime = new Date(lastAnswered);
-            const now = new Date();
-            return (now - lastTime) < 5 * 60 * 1000; // 5分以内
-        });
-    
-    console.log(`最近5分以内の履歴: ${recentEntries.length}件`);
-    recentEntries.forEach(([id, history]) => {
-        console.log(`  ${id}: 正解${history.correct_attempts}回, 不正解${history.incorrect_attempts}回, 連続${history.correct_streak}回`);
-    });
-
+function saveQuizProgressToServer() {
     const dataToSave = {
         problemHistory: problemHistory,
         incorrectWords: incorrectWords
     };
 
-    fetch('/api/save_progress', {  // デバッグ版ではなく通常版に戻す
+    fetch('/api/save_progress', {  // デバッグ版(_debug)ではなく通常版を使用
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
@@ -1866,12 +1869,12 @@ function saveQuizProgressToServer() {
     .then(response => response.json())
     .then(data => {
         if (data.status !== 'success') {
-            console.error('❌ 進捗保存失敗:', data.message);  // エラーのみ残す
+            console.error('❌ 進捗保存失敗:', data.message);
             flashMessage(data.message, 'danger');
         }
     })
     .catch(error => {
-        console.error('❌ 進捗保存エラー:', error);  // エラーのみ残す
+        console.error('❌ 進捗保存エラー:', error);
         flashMessage('進捗の保存中にエラーが発生しました。', 'danger');
     });
 }
