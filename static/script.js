@@ -1123,7 +1123,7 @@ function showNextQuestion() {
     if (correctButton) correctButton.classList.add('hidden');
     if (incorrectButton) incorrectButton.classList.add('hidden');
 
-    // 答えを見るボタンを2秒間無効化（最初の問題以外）
+    // 答えを見るボタンを1.5秒間無効化（最初の問題以外）
     if (currentQuestionIndex > 0) {
         isAnswerButtonDisabled = true;
         if (showAnswerButton) {
@@ -1145,7 +1145,7 @@ function showNextQuestion() {
                 showAnswerButton.style.cursor = 'pointer';
                 showAnswerButton.style.pointerEvents = 'auto';
             }
-        }, 2000);
+        }, 1500);
     }
 
     if (currentQuestionIndex < totalQuestions) {
