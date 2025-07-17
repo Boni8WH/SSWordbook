@@ -6762,7 +6762,55 @@ def load_raw_word_data_for_room(room_number):
     except Exception as e:
         print(f"❌ 読み込みエラー: {e}")
         return []
-    
+
+@app.route('/emergency_add_ranking_column')
+def emergency_add_ranking_column():
+    """緊急修復：ranking_display_countカラムを追加（GET版）"""
+    try:
+        print("🆘 緊急ranking_display_countカラム追加開始...")
+        
+        with db.engine.connect() as conn:
+            # カラム存在確認
+            try:
+                result = conn.execute(text("""
+                    SELECT column_name 
+                    FROM information_schema.columns 
+                    WHERE table_name = 'room_setting' AND column_name = 'ranking_display_count'
+                """))
+                
+                if not result.fetchone():
+                    print("🔧 ranking_display_countカラムを追加中...")
+                    conn.execute(text('ALTER TABLE room_setting ADD COLUMN ranking_display_count INTEGER DEFAULT 10'))
+                    conn.commit()
+                    print("✅ ranking_display_countカラムを追加しました")
+                    
+                    return """
+                    <h1>✅ 緊急修復完了</h1>
+                    <p>ranking_display_countカラムを追加しました。</p>
+                    <p><a href="/admin">管理者ページに戻る</a></p>
+                    <p><a href="/admin/upload_room_csv">CSVアップロードを再試行</a></p>
+                    """
+                else:
+                    return """
+                    <h1>✅ カラムは既に存在します</h1>
+                    <p>ranking_display_countカラムは既に存在します。</p>
+                    <p><a href="/admin">管理者ページに戻る</a></p>
+                    """
+                    
+            except Exception as fix_error:
+                print(f"修復エラー: {fix_error}")
+                return f"""
+                <h1>❌ 修復エラー</h1>
+                <p>エラー: {str(fix_error)}</p>
+                <p><a href="/admin">管理者ページに戻る</a></p>
+                """
+                
+    except Exception as e:
+        print(f"緊急修復失敗: {e}")
+        return f"""
+        <h1>💥 緊急修復失敗</h1>
+        <p>エラー: {str(e)}</p>
+        """
 # ====================================================================
 # エラーハンドラー
 # ====================================================================
