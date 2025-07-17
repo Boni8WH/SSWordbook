@@ -6783,6 +6783,53 @@ def load_raw_word_data_for_room(room_number):
         print(f"❌ 読み込みエラー: {e}")
         return []
 
+# 一時的にこのコードを追加して実行
+@app.route('/admin/create_essay_tables')
+def create_essay_tables():
+    """essay関連のテーブルを作成（管理者用）"""
+    try:
+        # essay_problemsテーブルの作成
+        db.session.execute("""
+            CREATE TABLE IF NOT EXISTS essay_problems (
+                id SERIAL PRIMARY KEY,
+                chapter VARCHAR(10) NOT NULL,
+                type VARCHAR(10),
+                university VARCHAR(100),
+                year INTEGER,
+                question TEXT NOT NULL,
+                answer TEXT,
+                enabled BOOLEAN DEFAULT true,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # essay_progressテーブルの作成
+        db.session.execute("""
+            CREATE TABLE IF NOT EXISTS essay_progress (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL,
+                problem_id INTEGER NOT NULL,
+                viewed_answer BOOLEAN DEFAULT false,
+                understood BOOLEAN DEFAULT false,
+                difficulty_rating INTEGER,
+                memo TEXT,
+                review_flag BOOLEAN DEFAULT false,
+                viewed_at TIMESTAMP,
+                understood_at TIMESTAMP,
+                last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id),
+                FOREIGN KEY (problem_id) REFERENCES essay_problems(id)
+            )
+        """)
+        
+        db.session.commit()
+        return "Essay tables created successfully!"
+        
+    except Exception as e:
+        db.session.rollback()
+        return f"Error creating tables: {e}"
+
 @app.route('/emergency_add_ranking_column')
 def emergency_add_ranking_column():
     """緊急修復：ranking_display_countカラムを追加（GET版）"""
