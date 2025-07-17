@@ -10,6 +10,8 @@ import secrets
 import string
 from io import StringIO
 from datetime import datetime, timedelta
+# 既存のインポートの後に追加
+from sqlalchemy import inspect, text, func, case, cast, Integer
 
 # 外部ライブラリ
 import pytz
@@ -6866,6 +6868,464 @@ def debug_room_setting_model():
         
     except Exception as e:
         return f"<h1>診断エラー: {str(e)}</h1>"
+    
+# app.py に追加する論述問題集用ルート
+
+# ========================================
+# 論述問題集用データベースモデル
+# ========================================
+
+class EssayProblem(db.Model):
+    __tablename__ = 'essay_problems'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    chapter = db.Column(db.String(10), nullable=False)
+    type = db.Column(db.String(1), nullable=False)  # A, B, C, D
+    university = db.Column(db.String(100), nullable=False)
+    year = db.Column(db.Integer, nullable=False)
+    question = db.Column(db.Text, nullable=False)
+    answer = db.Column(db.Text, nullable=False)
+    answer_length = db.Column(db.Integer, nullable=False)
+    enabled = db.Column(db.Boolean, default=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'chapter': self.chapter,
+            'type': self.type,
+            'university': self.university,
+            'year': self.year,
+            'question': self.question,
+            'answer': self.answer,
+            'answer_length': self.answer_length,
+            'enabled': self.enabled
+        }
+
+class EssayProgress(db.Model):
+    __tablename__ = 'essay_progress'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False)
+    problem_id = db.Column(db.Integer, db.ForeignKey('essay_problems.id', ondelete='CASCADE'), nullable=False)
+    viewed_answer = db.Column(db.Boolean, default=False, nullable=False)
+    understood = db.Column(db.Boolean, default=False, nullable=False)
+    difficulty_rating = db.Column(db.Integer)  # 1-5
+    memo = db.Column(db.Text)
+    review_flag = db.Column(db.Boolean, default=False, nullable=False)
+    viewed_at = db.Column(db.DateTime)
+    understood_at = db.Column(db.DateTime)
+    last_updated = db.Column(db.DateTime, default=lambda: datetime.now(JST))
+    
+    __table_args__ = (
+        db.UniqueConstraint('user_id', 'problem_id', name='unique_user_problem'),
+    )
+    
+    user = db.relationship('User', backref='essay_progress')
+    problem = db.relationship('EssayProblem', backref='progress_records')
+
+class EssayCsvFile(db.Model):
+    __tablename__ = 'essay_csv_files'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    filename = db.Column(db.String(100), unique=True, nullable=False)
+    original_filename = db.Column(db.String(100), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    file_size = db.Column(db.Integer, nullable=False)
+    problem_count = db.Column(db.Integer, default=0, nullable=False)
+    upload_date = db.Column(db.DateTime, default=lambda: datetime.now(JST))
+
+# ========================================
+# 論述問題集用ルート
+# ========================================
+
+@app.route('/essay')
+def essay_index():
+    """論述問題集のメインページ"""
+    try:
+        if 'user_id' not in session:
+            flash('論述問題集を利用するにはログインしてください。', 'info')
+            return redirect(url_for('login_page'))
+        
+        current_user = User.query.get(session['user_id'])
+        if not current_user:
+            flash('ユーザーが見つかりません。', 'danger')
+            return redirect(url_for('logout'))
+        
+        # 章別の問題数と進捗を取得
+        chapter_stats = get_essay_chapter_stats(current_user.id)
+        
+        context = get_template_context()
+        context.update({
+            'chapter_stats': chapter_stats,
+            'current_user': current_user
+        })
+        
+        return render_template('essay_index.html', **context)
+        
+    except Exception as e:
+        logger.error(f"Error in essay_index: {e}")
+        flash('論述問題集の読み込み中にエラーが発生しました。', 'danger')
+        return redirect(url_for('index'))
+
+@app.route('/essay/chapter/<chapter>')
+def essay_chapter(chapter):
+    """章別問題一覧"""
+    try:
+        if 'user_id' not in session:
+            return redirect(url_for('login_page'))
+        
+        current_user = User.query.get(session['user_id'])
+        if not current_user:
+            return redirect(url_for('logout'))
+        
+        # フィルタリングパラメータ
+        type_filter = request.args.get('type', '')
+        university_filter = request.args.get('university', '')
+        year_from = request.args.get('year_from', type=int)
+        year_to = request.args.get('year_to', type=int)
+        keyword = request.args.get('keyword', '')
+        
+        # 問題一覧を取得
+        problems = get_filtered_essay_problems(
+            chapter=chapter,
+            type_filter=type_filter,
+            university_filter=university_filter,
+            year_from=year_from,
+            year_to=year_to,
+            keyword=keyword,
+            user_id=current_user.id
+        )
+        
+        # フィルター用データ
+        filter_data = get_essay_filter_data(chapter)
+        
+        context = get_template_context()
+        context.update({
+            'chapter': chapter,
+            'chapter_name': f'第{chapter}章' if chapter != 'com' else '総合問題',
+            'problems': problems,
+            'filter_data': filter_data,
+            'current_filters': {
+                'type': type_filter,
+                'university': university_filter,
+                'year_from': year_from,
+                'year_to': year_to,
+                'keyword': keyword
+            }
+        })
+        
+        return render_template('essay_chapter.html', **context)
+        
+    except Exception as e:
+        logger.error(f"Error in essay_chapter: {e}")
+        flash('問題一覧の読み込み中にエラーが発生しました。', 'danger')
+        return redirect(url_for('essay_index'))
+
+@app.route('/essay/problem/<int:problem_id>')
+def essay_problem(problem_id):
+    """個別問題表示"""
+    try:
+        if 'user_id' not in session:
+            return redirect(url_for('login_page'))
+        
+        current_user = User.query.get(session['user_id'])
+        if not current_user:
+            return redirect(url_for('logout'))
+        
+        # 問題を取得
+        problem = EssayProblem.query.get_or_404(problem_id)
+        
+        # 進捗を取得または作成
+        progress = EssayProgress.query.filter_by(
+            user_id=current_user.id,
+            problem_id=problem_id
+        ).first()
+        
+        if not progress:
+            progress = EssayProgress(
+                user_id=current_user.id,
+                problem_id=problem_id
+            )
+            db.session.add(progress)
+            db.session.commit()
+        
+        # 同じ章の前後の問題を取得
+        prev_problem, next_problem = get_adjacent_problems(problem)
+        
+        context = get_template_context()
+        context.update({
+            'problem': problem,
+            'progress': progress,
+            'prev_problem': prev_problem,
+            'next_problem': next_problem
+        })
+        
+        return render_template('essay_problem.html', **context)
+        
+    except Exception as e:
+        logger.error(f"Error in essay_problem: {e}")
+        flash('問題の読み込み中にエラーが発生しました。', 'danger')
+        return redirect(url_for('essay_index'))
+
+# ========================================
+# API エンドポイント
+# ========================================
+
+@app.route('/api/essay/progress/update', methods=['POST'])
+def update_essay_progress():
+    """論述問題の進捗更新"""
+    try:
+        if 'user_id' not in session:
+            return jsonify({'status': 'error', 'message': 'ログインが必要です'}), 401
+        
+        data = request.get_json()
+        problem_id = data.get('problem_id')
+        updates = data.get('updates', {})
+        
+        if not problem_id:
+            return jsonify({'status': 'error', 'message': '問題IDが必要です'}), 400
+        
+        current_user = User.query.get(session['user_id'])
+        if not current_user:
+            return jsonify({'status': 'error', 'message': 'ユーザーが見つかりません'}), 404
+        
+        # 進捗を取得または作成
+        progress = EssayProgress.query.filter_by(
+            user_id=current_user.id,
+            problem_id=problem_id
+        ).first()
+        
+        if not progress:
+            progress = EssayProgress(
+                user_id=current_user.id,
+                problem_id=problem_id
+            )
+            db.session.add(progress)
+        
+        # 更新処理
+        now = datetime.now(JST)
+        
+        if 'viewed_answer' in updates and updates['viewed_answer']:
+            progress.viewed_answer = True
+            if not progress.viewed_at:
+                progress.viewed_at = now
+        
+        if 'understood' in updates:
+            progress.understood = updates['understood']
+            if updates['understood']:
+                progress.understood_at = now
+        
+        if 'difficulty_rating' in updates:
+            progress.difficulty_rating = updates['difficulty_rating']
+        
+        if 'memo' in updates:
+            progress.memo = updates['memo']
+        
+        if 'review_flag' in updates:
+            progress.review_flag = updates['review_flag']
+        
+        progress.last_updated = now
+        
+        db.session.commit()
+        
+        return jsonify({
+            'status': 'success',
+            'message': '進捗を更新しました',
+            'progress': {
+                'viewed_answer': progress.viewed_answer,
+                'understood': progress.understood,
+                'difficulty_rating': progress.difficulty_rating,
+                'memo': progress.memo,
+                'review_flag': progress.review_flag
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Error updating essay progress: {e}")
+        db.session.rollback()
+        return jsonify({'status': 'error', 'message': '進捗の更新中にエラーが発生しました'}), 500
+
+# ========================================
+# ヘルパー関数
+# ========================================
+def get_essay_chapter_stats(user_id):
+    """章別の統計情報を取得"""
+    try:
+        # 章別の問題数と進捗を集計
+        stats_query = db.session.query(
+            EssayProblem.chapter,
+            func.count(EssayProblem.id).label('total_problems'),
+            func.count(EssayProgress.id).label('viewed_problems'),
+            func.sum(
+                db.case(
+                    (EssayProgress.understood == True, 1),
+                    else_=0
+                )
+            ).label('understood_problems')
+        ).outerjoin(
+            EssayProgress,
+            db.and_(
+                EssayProblem.id == EssayProgress.problem_id,
+                EssayProgress.user_id == user_id
+            )
+        ).filter(
+            EssayProblem.enabled == True
+        ).group_by(
+            EssayProblem.chapter
+        ).order_by(
+            db.case(
+                (EssayProblem.chapter == 'com', 999),
+                else_=db.cast(EssayProblem.chapter, db.Integer)
+            )
+        ).all()
+        
+        chapter_stats = []
+        for stat in stats_query:
+            chapter_stats.append({
+                'chapter': stat.chapter,
+                'chapter_name': f'第{stat.chapter}章' if stat.chapter != 'com' else '総合問題',
+                'total_problems': stat.total_problems,
+                'viewed_problems': stat.viewed_problems or 0,
+                'understood_problems': stat.understood_problems or 0,
+                'progress_rate': round((stat.understood_problems or 0) / stat.total_problems * 100, 1) if stat.total_problems > 0 else 0
+            })
+        
+        return chapter_stats
+        
+    except Exception as e:
+        logger.error(f"Error getting essay chapter stats: {e}")
+        return []
+
+def get_filtered_essay_problems(chapter, type_filter='', university_filter='', 
+                               year_from=None, year_to=None, keyword='', user_id=None):
+    """フィルタリングされた問題一覧を取得"""
+    try:
+        query = db.session.query(EssayProblem, EssayProgress).outerjoin(
+            EssayProgress,
+            (EssayProblem.id == EssayProgress.problem_id) & 
+            (EssayProgress.user_id == user_id)
+        ).filter(
+            EssayProblem.chapter == chapter,
+            EssayProblem.enabled == True
+        )
+        
+        # フィルタリング
+        if type_filter:
+            query = query.filter(EssayProblem.type == type_filter)
+        
+        if university_filter:
+            query = query.filter(EssayProblem.university.ilike(f'%{university_filter}%'))
+        
+        if year_from:
+            query = query.filter(EssayProblem.year >= year_from)
+        
+        if year_to:
+            query = query.filter(EssayProblem.year <= year_to)
+        
+        if keyword:
+            keyword_filter = f'%{keyword}%'
+            query = query.filter(
+                db.or_(
+                    EssayProblem.question.ilike(keyword_filter),
+                    EssayProblem.answer.ilike(keyword_filter)
+                )
+            )
+        
+        # ソート: type → year → university
+        query = query.order_by(
+            EssayProblem.type,
+            EssayProblem.year.desc(),
+            EssayProblem.university
+        )
+        
+        results = query.all()
+        
+        problems = []
+        for problem, progress in results:
+            problem_data = problem.to_dict()
+            problem_data['preview'] = problem.question[:20] + '...' if len(problem.question) > 20 else problem.question
+            problem_data['progress'] = {
+                'viewed_answer': progress.viewed_answer if progress else False,
+                'understood': progress.understood if progress else False,
+                'difficulty_rating': progress.difficulty_rating if progress else None,
+                'review_flag': progress.review_flag if progress else False
+            }
+            problems.append(problem_data)
+        
+        return problems
+        
+    except Exception as e:
+        logger.error(f"Error getting filtered essay problems: {e}")
+        return []
+
+def get_essay_filter_data(chapter):
+    """フィルター用のデータを取得"""
+    try:
+        # 大学一覧
+        universities = db.session.query(EssayProblem.university).filter(
+            EssayProblem.chapter == chapter,
+            EssayProblem.enabled == True
+        ).distinct().order_by(EssayProblem.university).all()
+        
+        # 年度範囲
+        year_range = db.session.query(
+            func.min(EssayProblem.year).label('min_year'),
+            func.max(EssayProblem.year).label('max_year')
+        ).filter(
+            EssayProblem.chapter == chapter,
+            EssayProblem.enabled == True
+        ).first()
+        
+        return {
+            'universities': [u[0] for u in universities],
+            'year_range': {
+                'min': year_range.min_year or 2020,
+                'max': year_range.max_year or 2025
+            },
+            'types': ['A', 'B', 'C', 'D']
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting essay filter data: {e}")
+        return {
+            'universities': [],
+            'year_range': {'min': 2020, 'max': 2025},
+            'types': ['A', 'B', 'C', 'D']
+        }
+
+def get_adjacent_problems(problem):
+    """前後の問題を取得"""
+    try:
+        # 同じ章の問題を type → year → university の順でソート
+        ordered_problems = EssayProblem.query.filter(
+            EssayProblem.chapter == problem.chapter,
+            EssayProblem.enabled == True
+        ).order_by(
+            EssayProblem.type,
+            EssayProblem.year.desc(),
+            EssayProblem.university
+        ).all()
+        
+        current_index = None
+        for i, p in enumerate(ordered_problems):
+            if p.id == problem.id:
+                current_index = i
+                break
+        
+        if current_index is None:
+            return None, None
+        
+        prev_problem = ordered_problems[current_index - 1] if current_index > 0 else None
+        next_problem = ordered_problems[current_index + 1] if current_index < len(ordered_problems) - 1 else None
+        
+        return prev_problem, next_problem
+        
+    except Exception as e:
+        logger.error(f"Error getting adjacent problems: {e}")
+        return None, None
+
 # ====================================================================
 # エラーハンドラー
 # ====================================================================
