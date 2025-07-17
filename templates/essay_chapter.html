@@ -186,7 +186,9 @@
         {% endif %}
     </div>
 </div>
+{% endblock %}
 
+{% block scripts %}
 <script>
 // フィルターのクリア
 function clearAllFilters() {
@@ -237,7 +239,9 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 </script>
+{% endblock %}
 
+{% block head_extra %}
 <style>
 .essay-chapter-container {
     max-width: 1200px;
@@ -649,4 +653,5 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 }
 </style>
+{% endblock %}
 {% endblock %}

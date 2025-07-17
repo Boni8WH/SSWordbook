@@ -46,7 +46,7 @@
                 
                 <div class="progress-bar-container">
                     <div class="progress-bar">
-                        <div class="progress-fill"></div>
+                        <div class="progress-fill" data-progress="{{ chapter_stat.progress_rate }}"></div>
                     </div>
                     <span class="progress-text">{{ chapter_stat.progress_rate }}%</span>
                 </div>
@@ -98,7 +98,33 @@
         </div>
     </div>
 </div>
+{% endblock %}
 
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 章カードのクリックイベント
+    document.querySelectorAll('.chapter-card').forEach(card => {
+        card.addEventListener('click', function() {
+            const url = this.dataset.chapterUrl;
+            if (url) {
+                location.href = url;
+            }
+        });
+    });
+    
+    // プログレスバーの幅を設定
+    document.querySelectorAll('.progress-fill').forEach(progressBar => {
+        const progress = progressBar.dataset.progress;
+        if (progress) {
+            progressBar.style.width = progress + '%';
+        }
+    });
+});
+</script>
+{% endblock %}
+
+{% block head_extra %}
 <style>
 .essay-container {
     max-width: 1200px;
@@ -485,24 +511,5 @@
         color: #cbd5e0;
     }
 }
-.chapter-card {
-    background: white;
-    border-radius: 15px;
-    padding: 25px;
-    /* 他のプロパティ */
-}
 </style>
-
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    document.querySelectorAll('.chapter-card').forEach(card => {
-        card.addEventListener('click', function() {
-            const url = this.dataset.chapterUrl;
-            if (url) {
-                location.href = url;
-            }
-        });
-    });
-});
-</script>
 {% endblock %}
