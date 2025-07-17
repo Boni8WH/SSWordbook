@@ -1789,7 +1789,42 @@ def admin_add_first_login_columns():
             'message': f'カラム追加エラー: {str(e)}'
         }), 500
 
-# app.py に緊急修復用のルートを追加
+@app.route('/emergency_create_essay_tables')
+def emergency_create_essay_tables():
+    """緊急修復：論述問題用テーブルを作成"""
+    try:
+        print("🆘 緊急論述問題テーブル作成開始...")
+        
+        with db.engine.connect() as conn:
+            # essay_problemsテーブル作成
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS essay_problems (
+                    id SERIAL PRIMARY KEY,
+                    chapter VARCHAR(10) NOT NULL,
+                    type VARCHAR(1) NOT NULL,
+                    university VARCHAR(100) NOT NULL,
+                    year INTEGER NOT NULL,
+                    question TEXT NOT NULL,
+                    answer TEXT NOT NULL,
+                    answer_length INTEGER NOT NULL,
+                    enabled BOOLEAN DEFAULT TRUE NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            
+            conn.commit()
+            print("✅ 論述問題テーブル作成完了")
+            
+            return """
+            <h1>✅ 緊急修復完了</h1>
+            <p>論述問題テーブルの作成が完了しました。</p>
+            <p><a href="/admin">管理者ページに戻る</a></p>
+            """
+            
+    except Exception as e:
+        print(f"緊急修復失敗: {e}")
+        return f"<h1>💥 緊急修復失敗</h1><p>エラー: {str(e)}</p>"
 
 @app.route('/emergency_add_first_login_columns')
 def emergency_add_first_login_columns():
@@ -7248,11 +7283,13 @@ def admin_essay_update_problem(problem_id):
 # ========================================
 # Essay関連のAPIルート（app.pyに追加してください）
 # ========================================
-
 @app.route('/admin/essay/add_problem', methods=['POST'])
 def admin_essay_add_problem():
     """論述問題を手動追加"""
     try:
+        if not session.get('admin_logged_in'):
+            return jsonify({'status': 'error', 'message': '管理者権限が必要です'}), 403
+        
         data = request.get_json()
         
         # 必須フィールドの確認
@@ -7267,13 +7304,13 @@ def admin_essay_add_problem():
         # 新しい問題を作成
         new_problem = EssayProblem(
             chapter=data['chapter'],
-            type=data.get('type', 'A'),  # デフォルト値を設定
-            university=data.get('university', '未指定'),  # デフォルト値を設定
-            year=data.get('year', 2025),  # デフォルト値を設定
+            type=data.get('type', 'A'),
+            university=data.get('university', '未指定'),
+            year=data.get('year', 2025),
             question=data['question'],
-            answer=data.get('answer', '解答なし'),  # デフォルト値を設定
-            answer_length=len(data.get('answer', '解答なし')),  # answer_lengthを追加
-            enabled=True
+            answer=data.get('answer', '解答なし'),
+            answer_length=len(data.get('answer', '解答なし')),
+            enabled=data.get('enabled', True)
         )
         
         db.session.add(new_problem)
