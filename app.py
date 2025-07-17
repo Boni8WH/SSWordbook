@@ -6667,10 +6667,16 @@ def get_template_context():
     """全テンプレートで共通に使用するコンテキストを取得"""
     try:
         app_info = AppInfo.get_current_info()
-        return {'app_info': app_info}
+        return {
+            'app_info': app_info,
+            'app_name': app_info.app_name
+        }
     except Exception as e:
         logger.error(f"Error getting app_info: {e}")
-        return {'app_info': None}
+        return {
+            'app_info': None,
+            'app_name': 'アプリ'  # エラー時のデフォルト値
+        }
 
 @app.route('/debug/timezone_check')
 def debug_timezone_check():
