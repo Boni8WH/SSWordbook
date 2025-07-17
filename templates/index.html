@@ -129,11 +129,17 @@
     <button id="backToSelectionFromWeakListButton" class="secondary-button">選択画面に戻る</button>
 </section>
 
-<!-- 論述問題集へのリンク -->
-<div class="essay-link-section">
-    <a href="{{ url_for('essay_index') }}" class="btn btn-outline-primary essay-link-btn">
-        <i class="fas fa-edit"></i> 論述問題集
-    </a>
+<!-- index.htmlの苦手問題一覧ボタンの近くに追加 -->
+<div class="action-buttons-container">
+    <div class="action-buttons">
+        <button id="showIncorrectWords" class="btn btn-warning" disabled>
+            <i class="fas fa-exclamation-triangle"></i> 苦手問題一覧
+        </button>
+        <!-- 論述問題集ボタンを追加 -->
+        <a href="{{ url_for('essay_index') }}" class="btn btn-outline-primary essay-nav-btn">
+            <i class="fas fa-edit"></i> 論述問題集
+        </a>
+    </div>
 </div>
 
 <!-- 情報パネル -->
@@ -205,7 +211,7 @@ function debugRoomSetting(roomNumber) {
 </script>
 <script>
     // Flaskからのデータをグローバル変数として設定
-    window.appInfoFromFlask = {{ app_info_for_js | tojson | safe }};  <!-- この行を修正 -->
+    window.appInfoFromFlask = {{ app_info_for_js | tojson | safe }};
     window.chapterDataFromFlask = {{ chapter_data | tojson | safe }};
 </script>
 <!-- html2canvas ライブラリの読み込み -->
@@ -314,6 +320,43 @@ function debugRoomSetting(roomNumber) {
     .essay-link-btn {
         font-size: 0.9rem;
         padding: 8px 16px;
+    }
+}
+
+/* index.html用のスタイル */
+.action-buttons-container {
+    margin: 20px 0;
+    text-align: center;
+}
+
+.action-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    flex-wrap: wrap;
+}
+
+.essay-nav-btn {
+    border-radius: 25px;
+    padding: 10px 20px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.essay-nav-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+@media (max-width: 768px) {
+    .action-buttons {
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .action-buttons .btn {
+        width: 200px;
+        margin-bottom: 10px;
     }
 }
 </style>
