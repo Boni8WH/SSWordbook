@@ -1,0 +1,508 @@
+{% extends "base.html" %}
+{% block title %}論述問題集 - {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="essay-container">
+    <div class="essay-header">
+        <h1><i class="fas fa-edit"></i> 論述問題集</h1>
+        <p class="essay-description">
+            過去の入試問題から厳選された論述問題を章別に学習できます。<br>
+            各問題で「理解した」マークを付けて、学習進捗を管理しましょう。
+        </p>
+        <div class="back-to-main">
+            <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> 学習モードに戻る
+            </a>
+        </div>
+    </div>
+
+    <div class="chapter-grid">
+        {% for chapter_stat in chapter_stats %}
+        <div class="chapter-card" data-chapter-url="{{ url_for('essay_chapter', chapter=chapter_stat.chapter) }}">
+            <div class="chapter-card-header">
+                <h3 class="chapter-title">
+                    {% if chapter_stat.chapter == 'com' %}
+                        <i class="fas fa-star"></i> {{ chapter_stat.chapter_name }}
+                    {% else %}
+                        <i class="fas fa-book"></i> {{ chapter_stat.chapter_name }}
+                    {% endif %}
+                </h3>
+                <div class="problem-count">
+                    <span class="total-count">{{ chapter_stat.total_problems }}問</span>
+                </div>
+            </div>
+            
+            <div class="progress-section">
+                <div class="progress-stats">
+                    <div class="stat-item">
+                        <span class="stat-label">閲覧済み</span>
+                        <span class="stat-value">{{ chapter_stat.viewed_problems }}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">理解済み</span>
+                        <span class="stat-value understood">{{ chapter_stat.understood_problems }}</span>
+                    </div>
+                </div>
+                
+                <div class="progress-bar-container">
+                    <div class="progress-bar">
+                        <div class="progress-fill"></div>
+                    </div>
+                    <span class="progress-text">{{ chapter_stat.progress_rate }}%</span>
+                </div>
+            </div>
+            
+            <div class="chapter-card-footer">
+                <span class="enter-hint">
+                    <i class="fas fa-arrow-right"></i> クリックして問題一覧へ
+                </span>
+            </div>
+        </div>
+        {% endfor %}
+        
+        {% if not chapter_stats %}
+        <div class="no-problems-message">
+            <div class="message-content">
+                <i class="fas fa-info-circle"></i>
+                <h3>論述問題がまだ登録されていません</h3>
+                <p>管理者によって問題が登録されるまでお待ちください。</p>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- 学習のヒント -->
+    <div class="study-tips">
+        <h3><i class="fas fa-lightbulb"></i> 学習のコツ</h3>
+        <div class="tips-grid">
+            <div class="tip-card">
+                <i class="fas fa-eye"></i>
+                <h4>まずは問題を読む</h4>
+                <p>解答を見る前に、自分なりに答えを考えてみましょう。</p>
+            </div>
+            <div class="tip-card">
+                <i class="fas fa-check-circle"></i>
+                <h4>理解度をマーク</h4>
+                <p>「理解した」ボタンで進捗を記録し、学習状況を把握しましょう。</p>
+            </div>
+            <div class="tip-card">
+                <i class="fas fa-sticky-note"></i>
+                <h4>メモを活用</h4>
+                <p>重要なポイントや覚えにくい内容はメモ機能を使って記録しましょう。</p>
+            </div>
+            <div class="tip-card">
+                <i class="fas fa-flag"></i>
+                <h4>復習フラグ</h4>
+                <p>後で見返したい問題には復習フラグを付けておきましょう。</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.essay-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.essay-header {
+    text-align: center;
+    margin-bottom: 40px;
+    padding: 30px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 15px;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+}
+
+.essay-header h1 {
+    margin: 0 0 15px 0;
+    font-size: 2.5rem;
+    font-weight: 700;
+}
+
+.essay-description {
+    font-size: 1.1rem;
+    margin-bottom: 20px;
+    opacity: 0.95;
+    line-height: 1.6;
+}
+
+.back-to-main .btn {
+    background: rgba(255,255,255,0.2);
+    border: 2px solid rgba(255,255,255,0.3);
+    color: white;
+    padding: 10px 20px;
+    border-radius: 25px;
+    transition: all 0.3s ease;
+}
+
+.back-to-main .btn:hover {
+    background: rgba(255,255,255,0.3);
+    border-color: rgba(255,255,255,0.5);
+    color: white;
+    transform: translateY(-2px);
+}
+
+.chapter-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 25px;
+    margin-bottom: 50px;
+}
+
+.chapter-card {
+    background: white;
+    border-radius: 15px;
+    padding: 25px;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+    border: 1px solid #e1e8ed;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.chapter-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+    border-color: #667eea;
+}
+
+.chapter-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid #f5f7fa;
+}
+
+.chapter-title {
+    margin: 0;
+    font-size: 1.3rem;
+    font-weight: 600;
+    color: #2d3748;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.chapter-title i {
+    color: #667eea;
+}
+
+.problem-count .total-count {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    padding: 8px 15px;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.progress-section {
+    margin-bottom: 20px;
+}
+
+.progress-stats {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 15px;
+}
+
+.stat-item {
+    text-align: center;
+    flex: 1;
+}
+
+.stat-label {
+    display: block;
+    font-size: 0.8rem;
+    color: #718096;
+    margin-bottom: 5px;
+}
+
+.stat-value {
+    display: block;
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: #2d3748;
+}
+
+.stat-value.understood {
+    color: #28a745;
+}
+
+.progress-bar-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.progress-bar {
+    flex: 1;
+    height: 8px;
+    background: #e2e8f0;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #28a745, #20c997);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+
+.progress-text {
+    font-weight: 600;
+    color: #4a5568;
+    font-size: 0.9rem;
+    min-width: 40px;
+    text-align: right;
+}
+
+.chapter-card-footer {
+    text-align: center;
+    margin-top: 15px;
+}
+
+.enter-hint {
+    color: #718096;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    opacity: 0.7;
+    transition: opacity 0.3s ease;
+}
+
+.chapter-card:hover .enter-hint {
+    opacity: 1;
+    color: #667eea;
+}
+
+.no-problems-message {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 60px 20px;
+    background: #f8f9fa;
+    border-radius: 15px;
+    border: 2px dashed #dee2e6;
+}
+
+.message-content h3 {
+    color: #6c757d;
+    margin: 15px 0 10px 0;
+}
+
+.message-content i {
+    font-size: 3rem;
+    color: #adb5bd;
+    margin-bottom: 20px;
+}
+
+.message-content p {
+    color: #6c757d;
+    margin: 0;
+}
+
+.study-tips {
+    background: white;
+    padding: 30px;
+    border-radius: 15px;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+    border: 1px solid #e1e8ed;
+}
+
+.study-tips h3 {
+    text-align: center;
+    margin-bottom: 30px;
+    color: #2d3748;
+    font-size: 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.study-tips h3 i {
+    color: #ffc107;
+}
+
+.tips-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+}
+
+.tip-card {
+    text-align: center;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 10px;
+    border: 1px solid #e9ecef;
+    transition: all 0.3s ease;
+}
+
+.tip-card:hover {
+    background: #e9ecef;
+    transform: translateY(-2px);
+}
+
+.tip-card i {
+    font-size: 2rem;
+    color: #667eea;
+    margin-bottom: 15px;
+}
+
+.tip-card h4 {
+    margin: 0 0 10px 0;
+    color: #2d3748;
+    font-size: 1.1rem;
+}
+
+.tip-card p {
+    margin: 0;
+    color: #4a5568;
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+/* レスポンシブデザイン */
+@media (max-width: 768px) {
+    .essay-container {
+        padding: 15px;
+    }
+    
+    .essay-header {
+        padding: 20px;
+        margin-bottom: 30px;
+    }
+    
+    .essay-header h1 {
+        font-size: 2rem;
+    }
+    
+    .essay-description {
+        font-size: 1rem;
+    }
+    
+    .chapter-grid {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+    
+    .chapter-card {
+        padding: 20px;
+    }
+    
+    .chapter-title {
+        font-size: 1.2rem;
+    }
+    
+    .tips-grid {
+        grid-template-columns: 1fr;
+        gap: 15px;
+    }
+    
+    .study-tips {
+        padding: 20px;
+    }
+}
+
+@media (max-width: 480px) {
+    .chapter-card-header {
+        flex-direction: column;
+        gap: 15px;
+        text-align: center;
+    }
+    
+    .progress-stats {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .stat-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .stat-label, .stat-value {
+        display: inline;
+    }
+}
+
+/* ダークモード対応 */
+@media (prefers-color-scheme: dark) {
+    .chapter-card {
+        background: #2d3748;
+        border-color: #4a5568;
+        color: #e2e8f0;
+    }
+    
+    .chapter-title {
+        color: #e2e8f0;
+    }
+    
+    .stat-value {
+        color: #e2e8f0;
+    }
+    
+    .progress-text {
+        color: #cbd5e0;
+    }
+    
+    .study-tips {
+        background: #2d3748;
+        border-color: #4a5568;
+        color: #e2e8f0;
+    }
+    
+    .study-tips h3 {
+        color: #e2e8f0;
+    }
+    
+    .tip-card {
+        background: #4a5568;
+        border-color: #718096;
+        color: #e2e8f0;
+    }
+    
+    .tip-card:hover {
+        background: #718096;
+    }
+    
+    .tip-card h4 {
+        color: #e2e8f0;
+    }
+    
+    .tip-card p {
+        color: #cbd5e0;
+    }
+}
+.chapter-card {
+    background: white;
+    border-radius: 15px;
+    padding: 25px;
+    /* 他のプロパティ */
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.chapter-card').forEach(card => {
+        card.addEventListener('click', function() {
+            const url = this.dataset.chapterUrl;
+            if (url) {
+                location.href = url;
+            }
+        });
+    });
+});
+</script>
+{% endblock %}
