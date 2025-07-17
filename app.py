@@ -6923,7 +6923,7 @@ class EssayProgress(db.Model):
     __tablename__ = 'essay_progress'
     
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
     problem_id = db.Column(db.Integer, db.ForeignKey('essay_problems.id', ondelete='CASCADE'), nullable=False)
     viewed_answer = db.Column(db.Boolean, default=False, nullable=False)
     understood = db.Column(db.Boolean, default=False, nullable=False)
@@ -7085,6 +7085,236 @@ def essay_problem(problem_id):
         flash('問題の読み込み中にエラーが発生しました。', 'danger')
         return redirect(url_for('essay_index'))
 
+# ========================================
+# Essay関連のAPIルート（app.pyに追加してください）
+# ========================================
+
+@app.route('/admin/essay/add_problem', methods=['POST'])
+def admin_essay_add_problem():
+    """論述問題を手動追加"""
+    try:
+        data = request.get_json()
+        
+        # 必須フィールドの確認
+        required_fields = ['chapter', 'question']
+        for field in required_fields:
+            if not data.get(field):
+                return jsonify({
+                    'status': 'error',
+                    'message': f'{field}は必須です'
+                }), 400
+        
+        # 新しい問題を作成
+        new_problem = EssayProblem(
+            chapter=data['chapter'],
+            type=data.get('type', 'A'),  # デフォルト値を設定
+            university=data.get('university', '未指定'),  # デフォルト値を設定
+            year=data.get('year', 2025),  # デフォルト値を設定
+            question=data['question'],
+            answer=data.get('answer', '解答なし'),  # デフォルト値を設定
+            answer_length=len(data.get('answer', '解答なし')),  # answer_lengthを追加
+            enabled=True
+        )
+        
+        db.session.add(new_problem)
+        db.session.commit()
+        
+        return jsonify({
+            'status': 'success',
+            'message': '論述問題を追加しました',
+            'problem_id': new_problem.id
+        })
+        
+    except Exception as e:
+        logger.error(f"Error adding essay problem: {e}")
+        db.session.rollback()
+        return jsonify({
+            'status': 'error',
+            'message': '問題の追加中にエラーが発生しました'
+        }), 500
+
+@app.route('/admin/essay/upload_csv', methods=['POST'])
+def admin_essay_upload_csv():
+    """論述問題をCSVで一括追加"""
+    try:
+        if 'file' not in request.files:
+            return jsonify({
+                'status': 'error',
+                'message': 'ファイルが選択されていません'
+            }), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({
+                'status': 'error',
+                'message': 'ファイルが選択されていません'
+            }), 400
+        
+        if not file.filename.endswith('.csv'):
+            return jsonify({
+                'status': 'error',
+                'message': 'CSVファイルを選択してください'
+            }), 400
+        
+        # CSVファイルを読み込み
+        import csv
+        import io
+        
+        stream = io.StringIO(file.stream.read().decode("UTF8"), newline=None)
+        csv_reader = csv.DictReader(stream)
+        
+        added_count = 0
+        error_count = 0
+        
+        for row_num, row in enumerate(csv_reader, start=2):  # ヘッダーを除いて2行目から
+            try:
+                # 必須フィールドの確認
+                if not row.get('chapter') or not row.get('question'):
+                    error_count += 1
+                    logger.warning(f"Row {row_num}: Missing required fields")
+                    continue
+                
+                # 年度の処理
+                year = None
+                if row.get('year'):
+                    try:
+                        year = int(row['year'])
+                    except ValueError:
+                        pass
+                
+                # 新しい問題を作成
+                new_problem = EssayProblem(
+                    chapter=row['chapter'].strip(),
+                    type=row.get('type', 'A').strip() or 'A',  # 空文字列の場合もデフォルト値
+                    university=row.get('university', '未指定').strip() or '未指定',  # 空文字列の場合もデフォルト値
+                    year=year or 2025,  # Noneの場合はデフォルト値
+                    question=row['question'].strip(),
+                    answer=row.get('answer', '解答なし').strip() or '解答なし',  # 空文字列の場合もデフォルト値
+                    answer_length=len(row.get('answer', '解答なし').strip() or '解答なし'),  # answer_lengthを追加
+                    enabled=True
+                )
+                
+                db.session.add(new_problem)
+                added_count += 1
+                
+            except Exception as e:
+                error_count += 1
+                logger.error(f"Error processing row {row_num}: {e}")
+                continue
+        
+        # 一括コミット
+        if added_count > 0:
+            db.session.commit()
+        
+        return jsonify({
+            'status': 'success',
+            'message': f'{added_count}件の問題を追加しました',
+            'added_count': added_count,
+            'error_count': error_count
+        })
+        
+    except Exception as e:
+        logger.error(f"Error uploading CSV: {e}")
+        db.session.rollback()
+        return jsonify({
+            'status': 'error',
+            'message': 'CSVファイルの処理中にエラーが発生しました'
+        }), 500
+
+@app.route('/admin/essay/problems', methods=['GET'])
+def admin_essay_problems():
+    """論述問題一覧を取得"""
+    try:
+        page = request.args.get('page', 1, type=int)
+        per_page = 20
+        
+        problems = EssayProblem.query.order_by(
+            EssayProblem.chapter,
+            EssayProblem.type,
+            EssayProblem.year.desc()
+        ).paginate(
+            page=page,
+            per_page=per_page,
+            error_out=False
+        )
+        
+        problem_list = []
+        for problem in problems.items:
+            problem_list.append({
+                'id': problem.id,
+                'chapter': problem.chapter,
+                'type': problem.type,
+                'university': problem.university,
+                'year': problem.year,
+                'question_preview': problem.question[:50] + '...' if len(problem.question) > 50 else problem.question,
+                'enabled': problem.enabled
+            })
+        
+        return jsonify({
+            'status': 'success',
+            'problems': problem_list,
+            'pagination': {
+                'page': problems.page,
+                'pages': problems.pages,
+                'per_page': problems.per_page,
+                'total': problems.total
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting essay problems: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': '問題一覧の取得中にエラーが発生しました'
+        }), 500
+
+@app.route('/admin/essay/problem/<int:problem_id>', methods=['DELETE'])
+def admin_essay_delete_problem(problem_id):
+    """論述問題を削除"""
+    try:
+        problem = EssayProblem.query.get_or_404(problem_id)
+        
+        # 関連する進捗データも削除
+        EssayProgress.query.filter_by(problem_id=problem_id).delete()
+        
+        db.session.delete(problem)
+        db.session.commit()
+        
+        return jsonify({
+            'status': 'success',
+            'message': '問題を削除しました'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error deleting essay problem: {e}")
+        db.session.rollback()
+        return jsonify({
+            'status': 'error',
+            'message': '問題の削除中にエラーが発生しました'
+        }), 500
+
+@app.route('/admin/essay/problem/<int:problem_id>/toggle', methods=['POST'])
+def admin_essay_toggle_problem(problem_id):
+    """論述問題の有効/無効を切り替え"""
+    try:
+        problem = EssayProblem.query.get_or_404(problem_id)
+        problem.enabled = not problem.enabled
+        
+        db.session.commit()
+        
+        return jsonify({
+            'status': 'success',
+            'message': f'問題を{"有効" if problem.enabled else "無効"}にしました',
+            'enabled': problem.enabled
+        })
+        
+    except Exception as e:
+        logger.error(f"Error toggling essay problem: {e}")
+        db.session.rollback()
+        return jsonify({
+            'status': 'error',
+            'message': '問題の切り替え中にエラーが発生しました'
+        }), 500
 # ========================================
 # API エンドポイント
 # ========================================
