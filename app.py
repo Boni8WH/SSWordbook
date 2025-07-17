@@ -7381,53 +7381,6 @@ def admin_essay_upload_csv():
             'message': 'CSVファイルの処理中にエラーが発生しました'
         }), 500
 
-@app.route('/admin/essay/problems', methods=['GET'])
-def admin_essay_problems():
-    """論述問題一覧を取得"""
-    try:
-        page = request.args.get('page', 1, type=int)
-        per_page = 20
-        
-        problems = EssayProblem.query.order_by(
-            EssayProblem.chapter,
-            EssayProblem.type,
-            EssayProblem.year.desc()
-        ).paginate(
-            page=page,
-            per_page=per_page,
-            error_out=False
-        )
-        
-        problem_list = []
-        for problem in problems.items:
-            problem_list.append({
-                'id': problem.id,
-                'chapter': problem.chapter,
-                'type': problem.type,
-                'university': problem.university,
-                'year': problem.year,
-                'question_preview': problem.question[:50] + '...' if len(problem.question) > 50 else problem.question,
-                'enabled': problem.enabled
-            })
-        
-        return jsonify({
-            'status': 'success',
-            'problems': problem_list,
-            'pagination': {
-                'page': problems.page,
-                'pages': problems.pages,
-                'per_page': problems.per_page,
-                'total': problems.total
-            }
-        })
-        
-    except Exception as e:
-        logger.error(f"Error getting essay problems: {e}")
-        return jsonify({
-            'status': 'error',
-            'message': '問題一覧の取得中にエラーが発生しました'
-        }), 500
-
 @app.route('/admin/essay/problem/<int:problem_id>', methods=['DELETE'])
 def admin_essay_delete_problem(problem_id):
     """論述問題を削除"""
