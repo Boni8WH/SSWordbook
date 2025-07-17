@@ -6923,11 +6923,11 @@ class EssayProgress(db.Model):
     __tablename__ = 'essay_progress'
     
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False)
     problem_id = db.Column(db.Integer, db.ForeignKey('essay_problems.id', ondelete='CASCADE'), nullable=False)
     viewed_answer = db.Column(db.Boolean, default=False, nullable=False)
     understood = db.Column(db.Boolean, default=False, nullable=False)
-    difficulty_rating = db.Column(db.Integer)  # 1-5
+    difficulty_rating = db.Column(db.Integer)
     memo = db.Column(db.Text)
     review_flag = db.Column(db.Boolean, default=False, nullable=False)
     viewed_at = db.Column(db.DateTime)
@@ -6937,9 +6937,6 @@ class EssayProgress(db.Model):
     __table_args__ = (
         db.UniqueConstraint('user_id', 'problem_id', name='unique_user_problem'),
     )
-    
-    user = db.relationship('User', backref='essay_progress')
-    problem = db.relationship('EssayProblem', backref='progress_records')
 
 class EssayCsvFile(db.Model):
     __tablename__ = 'essay_csv_files'
@@ -7084,19 +7081,6 @@ def essay_problem(problem_id):
         flash('問題の読み込み中にエラーが発生しました。', 'danger')
         return redirect(url_for('essay_index'))
 
-@app.route('/admin/check_tables')
-def check_tables():
-    """テーブル名を確認（一時的）"""
-    try:
-        from sqlalchemy import inspect
-        inspector = inspect(db.engine)
-        tables = inspector.get_table_names()
-        
-        user_tables = [t for t in tables if 'user' in t.lower()]
-        
-        return f"All tables: {tables}<br><br>User-related tables: {user_tables}"
-    except Exception as e:
-        return f"Error: {e}"
 # ========================================
 # Essay関連のAPIルート（app.pyに追加してください）
 # ========================================
