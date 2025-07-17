@@ -6955,7 +6955,6 @@ class EssayCsvFile(db.Model):
 # ========================================
 # 論述問題集用ルート
 # ========================================
-
 @app.route('/essay')
 def essay_index():
     """論述問題集のメインページ"""
@@ -7085,6 +7084,19 @@ def essay_problem(problem_id):
         flash('問題の読み込み中にエラーが発生しました。', 'danger')
         return redirect(url_for('essay_index'))
 
+@app.route('/admin/check_tables')
+def check_tables():
+    """テーブル名を確認（一時的）"""
+    try:
+        from sqlalchemy import inspect
+        inspector = inspect(db.engine)
+        tables = inspector.get_table_names()
+        
+        user_tables = [t for t in tables if 'user' in t.lower()]
+        
+        return f"All tables: {tables}<br><br>User-related tables: {user_tables}"
+    except Exception as e:
+        return f"Error: {e}"
 # ========================================
 # Essay関連のAPIルート（app.pyに追加してください）
 # ========================================
