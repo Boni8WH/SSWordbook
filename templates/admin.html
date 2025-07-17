@@ -1776,12 +1776,22 @@ document.getElementById('essayUploadForm').addEventListener('submit', function(e
 });
 
 // 個別論述問題追加
+// 個別論述問題追加
 document.getElementById('essayAddForm').addEventListener('submit', function(e) {
     e.preventDefault();
     
     const formData = new FormData(this);
-    const answerText = formData.get('answer');
-    formData.set('answer_length', answerText.length);
+    
+    // FormDataをJSONオブジェクトに変換
+    const data = {
+        chapter: formData.get('chapter'),
+        type: formData.get('type'),
+        university: formData.get('university'),
+        year: parseInt(formData.get('year')),
+        question: formData.get('question'),
+        answer: formData.get('answer'),
+        enabled: formData.get('enabled') === 'on'
+    };
     
     const submitBtn = this.querySelector('button[type="submit"]');
     const originalText = submitBtn.textContent;
@@ -1790,7 +1800,10 @@ document.getElementById('essayAddForm').addEventListener('submit', function(e) {
     
     fetch('/admin/essay/add_problem', {
         method: 'POST',
-        body: formData
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(data)
     })
     .then(response => response.json())
     .then(data => {
