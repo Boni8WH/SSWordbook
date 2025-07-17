@@ -6667,32 +6667,27 @@ def get_template_context():
     """全テンプレートで共通に使用するコンテキストを取得"""
     try:
         app_info = AppInfo.get_current_info()
-        
-        # デバッグ情報をログに出力
-        logger.info(f"=== DEBUG get_template_context ===")
-        logger.info(f"app_info object: {app_info}")
-        logger.info(f"app_info type: {type(app_info)}")
-        
-        if app_info:
-            logger.info(f"app_info.app_name: '{app_info.app_name}'")
-            logger.info(f"app_info.app_name type: {type(app_info.app_name)}")
-            logger.info(f"app_info.app_name length: {len(app_info.app_name) if app_info.app_name else 'None'}")
-        else:
-            logger.info("app_info is None or False")
-        
         return {
             'app_info': app_info,
-            'app_name': app_info.app_name if app_info and app_info.app_name else 'DEFAULT_APP_NAME'
+            'app_name': app_info.app_name if app_info and app_info.app_name else 'アプリ'
         }
     except Exception as e:
         logger.error(f"Error getting app_info: {e}")
-        logger.error(f"Exception type: {type(e)}")
-        import traceback
-        logger.error(f"Traceback: {traceback.format_exc()}")
-        return {
-            'app_info': None,
-            'app_name': 'ERROR_FALLBACK'
-        }
+        
+        # トランザクションをロールバックして新しいセッションで再試行
+        try:
+            db.session.rollback()
+            app_info = AppInfo.get_current_info()
+            return {
+                'app_info': app_info,
+                'app_name': app_info.app_name if app_info and app_info.app_name else 'アプリ'
+            }
+        except Exception as e2:
+            logger.error(f"Error getting app_info after rollback: {e2}")
+            return {
+                'app_info': None,
+                'app_name': 'アプリ'
+            }
 
 @app.route('/debug/timezone_check')
 def debug_timezone_check():
