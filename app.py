@@ -10,7 +10,6 @@ import secrets
 import string
 from io import StringIO
 from datetime import datetime, timedelta
-# 既存のインポートの後に追加
 from sqlalchemy import inspect, text, func, case, cast, Integer
 
 # 外部ライブラリ
@@ -6789,7 +6788,7 @@ def create_essay_tables():
     """essay関連のテーブルを作成（管理者用）"""
     try:
         # essay_problemsテーブルの作成
-        db.session.execute("""
+        db.session.execute(text("""
             CREATE TABLE IF NOT EXISTS essay_problems (
                 id SERIAL PRIMARY KEY,
                 chapter VARCHAR(10) NOT NULL,
@@ -6802,10 +6801,10 @@ def create_essay_tables():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
-        """)
+        """))
         
         # essay_progressテーブルの作成
-        db.session.execute("""
+        db.session.execute(text("""
             CREATE TABLE IF NOT EXISTS essay_progress (
                 id SERIAL PRIMARY KEY,
                 user_id INTEGER NOT NULL,
@@ -6817,18 +6816,35 @@ def create_essay_tables():
                 review_flag BOOLEAN DEFAULT false,
                 viewed_at TIMESTAMP,
                 understood_at TIMESTAMP,
-                last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users(id),
-                FOREIGN KEY (problem_id) REFERENCES essay_problems(id)
+                last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
-        """)
+        """))
+        
+        # 外部キー制約は別途追加（PostgreSQLの場合）
+        try:
+            db.session.execute(text("""
+                ALTER TABLE essay_progress 
+                ADD CONSTRAINT fk_essay_progress_user 
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            """))
+        except:
+            pass  # 既に存在する場合は無視
+            
+        try:
+            db.session.execute(text("""
+                ALTER TABLE essay_progress 
+                ADD CONSTRAINT fk_essay_progress_problem 
+                FOREIGN KEY (problem_id) REFERENCES essay_problems(id)
+            """))
+        except:
+            pass  # 既に存在する場合は無視
         
         db.session.commit()
         return "Essay tables created successfully!"
         
     except Exception as e:
         db.session.rollback()
-        return f"Error creating tables: {e}"
+        return f"Error creating tables: {str(e)}"
 
 @app.route('/emergency_add_ranking_column')
 def emergency_add_ranking_column():
