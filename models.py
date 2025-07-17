@@ -75,11 +75,9 @@ class AdminUser(db.Model):
 class RoomSetting(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     room_number = db.Column(db.String(50), unique=True, nullable=False)
-    # この部屋で有効とする最大の単元番号
     max_enabled_unit_number = db.Column(db.String(50), default="9999", nullable=False)
-    # この部屋で使用するCSVファイル名（room_csv フォルダ内の相対パス）
     csv_filename = db.Column(db.String(100), default="words.csv", nullable=False)
-    # 作成・更新日時
+    ranking_display_count = db.Column(db.Integer, default=10, nullable=False)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(JST), onupdate=lambda: datetime.now(JST))
 
