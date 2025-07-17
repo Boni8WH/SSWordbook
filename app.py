@@ -280,6 +280,7 @@ class RoomSetting(db.Model):
     enabled_units = db.Column(db.Text, default="[]", nullable=False)  # ← JSON形式で単元リストを保存
     csv_filename = db.Column(db.String(100), default="words.csv", nullable=False)
     max_enabled_unit_number = db.Column(db.String(50), default="9999", nullable=False)
+    ranking_display_count = db.Column(db.Integer, default=10, nullable=False)
 
     def get_enabled_units(self):
         """有効な単元のリストを取得"""
@@ -6811,6 +6812,60 @@ def emergency_add_ranking_column():
         <h1>💥 緊急修復失敗</h1>
         <p>エラー: {str(e)}</p>
         """
+
+@app.route('/debug_room_setting_model')
+def debug_room_setting_model():
+    """RoomSettingモデルの状態をデバッグ"""
+    if not session.get('admin_logged_in'):
+        return "管理者権限が必要です", 403
+    
+    try:
+        # モデルの属性を確認
+        model_attributes = [attr for attr in dir(RoomSetting) if not attr.startswith('_')]
+        
+        # データベースのカラムを確認
+        with db.engine.connect() as conn:
+            result = conn.execute(text("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'room_setting'
+                ORDER BY column_name
+            """))
+            db_columns = [row[0] for row in result.fetchall()]
+        
+        # テスト用のRoomSettingインスタンスを作成してみる
+        test_instance_error = None
+        try:
+            test_room = RoomSetting(
+                room_number="TEST",
+                ranking_display_count=5  # この行でエラーが出るかテスト
+            )
+            test_success = True
+        except Exception as e:
+            test_success = False
+            test_instance_error = str(e)
+        
+        return f"""
+        <h1>RoomSetting モデル診断</h1>
+        <h3>モデルの属性:</h3>
+        <p>{model_attributes}</p>
+        
+        <h3>データベースのカラム:</h3>
+        <p>{db_columns}</p>
+        
+        <h3>ranking_display_count の状態:</h3>
+        <p>モデルにranking_display_countがあるか: {'ranking_display_count' in model_attributes}</p>
+        <p>DBにranking_display_countがあるか: {'ranking_display_count' in db_columns}</p>
+        
+        <h3>テストインスタンス作成:</h3>
+        <p>成功: {test_success}</p>
+        <p>エラー: {test_instance_error}</p>
+        
+        <p><a href="/admin">管理者ページに戻る</a></p>
+        """
+        
+    except Exception as e:
+        return f"<h1>診断エラー: {str(e)}</h1>"
 # ====================================================================
 # エラーハンドラー
 # ====================================================================
