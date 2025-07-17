@@ -7082,6 +7082,170 @@ def essay_problem(problem_id):
         return redirect(url_for('essay_index'))
 
 # ========================================
+# 不足しているEssay関連ルート（app.pyに追加）
+# ========================================
+
+@app.route('/admin/essay/stats', methods=['GET'])
+def admin_essay_stats():
+    """論述問題の統計情報を取得"""
+    try:
+        # 全体統計
+        total_problems = EssayProblem.query.filter_by(enabled=True).count()
+        total_disabled = EssayProblem.query.filter_by(enabled=False).count()
+        
+        # 章別統計
+        chapter_stats = db.session.query(
+            EssayProblem.chapter,
+            func.count(EssayProblem.id).label('count')
+        ).filter_by(enabled=True).group_by(EssayProblem.chapter).all()
+        
+        # タイプ別統計
+        type_stats = db.session.query(
+            EssayProblem.type,
+            func.count(EssayProblem.id).label('count')
+        ).filter_by(enabled=True).group_by(EssayProblem.type).all()
+        
+        # 大学別統計（上位10校）
+        university_stats = db.session.query(
+            EssayProblem.university,
+            func.count(EssayProblem.id).label('count')
+        ).filter_by(enabled=True).group_by(
+            EssayProblem.university
+        ).order_by(func.count(EssayProblem.id).desc()).limit(10).all()
+        
+        return jsonify({
+            'status': 'success',
+            'stats': {
+                'total_problems': total_problems,
+                'total_disabled': total_disabled,
+                'chapter_stats': [{'chapter': c, 'count': count} for c, count in chapter_stats],
+                'type_stats': [{'type': t, 'count': count} for t, count in type_stats],
+                'university_stats': [{'university': u, 'count': count} for u, count in university_stats]
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting essay stats: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': '統計情報の取得中にエラーが発生しました'
+        }), 500
+
+@app.route('/admin/essay/problems', methods=['GET'])
+def admin_essay_problems():
+    """論述問題一覧を取得"""
+    try:
+        page = request.args.get('page', 1, type=int)
+        per_page = 20
+        chapter_filter = request.args.get('chapter', '')
+        type_filter = request.args.get('type', '')
+        
+        # 基本クエリ
+        query = EssayProblem.query
+        
+        # フィルタリング
+        if chapter_filter:
+            query = query.filter(EssayProblem.chapter == chapter_filter)
+        if type_filter:
+            query = query.filter(EssayProblem.type == type_filter)
+        
+        # ページング
+        problems = query.order_by(
+            EssayProblem.chapter,
+            EssayProblem.type,
+            EssayProblem.year.desc()
+        ).paginate(
+            page=page,
+            per_page=per_page,
+            error_out=False
+        )
+        
+        problem_list = []
+        for problem in problems.items:
+            problem_list.append({
+                'id': problem.id,
+                'chapter': problem.chapter,
+                'type': problem.type,
+                'university': problem.university,
+                'year': problem.year,
+                'question_preview': problem.question[:50] + '...' if len(problem.question) > 50 else problem.question,
+                'answer_length': problem.answer_length,
+                'enabled': problem.enabled
+            })
+        
+        return jsonify({
+            'status': 'success',
+            'problems': problem_list,
+            'pagination': {
+                'page': problems.page,
+                'pages': problems.pages,
+                'per_page': problems.per_page,
+                'total': problems.total,
+                'has_prev': problems.has_prev,
+                'has_next': problems.has_next
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting essay problems: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': '問題一覧の取得中にエラーが発生しました'
+        }), 500
+
+@app.route('/admin/essay/problem/<int:problem_id>', methods=['GET'])
+def admin_essay_get_problem(problem_id):
+    """個別問題の詳細を取得"""
+    try:
+        problem = EssayProblem.query.get_or_404(problem_id)
+        
+        return jsonify({
+            'status': 'success',
+            'problem': problem.to_dict()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting essay problem {problem_id}: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': '問題の取得中にエラーが発生しました'
+        }), 500
+
+@app.route('/admin/essay/problem/<int:problem_id>', methods=['PUT'])
+def admin_essay_update_problem(problem_id):
+    """問題を更新"""
+    try:
+        problem = EssayProblem.query.get_or_404(problem_id)
+        data = request.get_json()
+        
+        # 更新可能なフィールド
+        updatable_fields = ['chapter', 'type', 'university', 'year', 'question', 'answer', 'enabled']
+        
+        for field in updatable_fields:
+            if field in data:
+                if field == 'answer':
+                    problem.answer = data[field]
+                    problem.answer_length = len(data[field])  # answer_lengthも自動更新
+                else:
+                    setattr(problem, field, data[field])
+        
+        db.session.commit()
+        
+        return jsonify({
+            'status': 'success',
+            'message': '問題を更新しました',
+            'problem': problem.to_dict()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error updating essay problem {problem_id}: {e}")
+        db.session.rollback()
+        return jsonify({
+            'status': 'error',
+            'message': '問題の更新中にエラーが発生しました'
+        }), 500
+
+# ========================================
 # Essay関連のAPIルート（app.pyに追加してください）
 # ========================================
 
