@@ -6,7 +6,7 @@
 <style>
 /* ベーススタイル */
 .essay-chapter-container {
-    max-width: 1200px;
+    max-width: 100%;
     margin: 0 auto;
     padding: 15px;
 }
@@ -554,6 +554,74 @@
         color: #cbd5e0;
     }
 }
+
+/* 大画面でのコンテンツ幅制限（オプション） */
+@media (min-width: 1400px) {
+    .essay-chapter-container {
+        max-width: 1400px;  /* より広い最大幅 */
+        padding: 20px 30px;  /* より広いパディング */
+    }
+}
+
+/* 2. problems-grid のグリッド設定も改善 */
+.problems-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));  /* 300px から 350px に変更 */
+    gap: 20px;
+}
+
+/* 3. 大画面での問題カードの最適化 */
+@media (min-width: 1200px) {
+    .problems-grid {
+        grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));  /* より大きなカード */
+        gap: 25px;
+    }
+}
+
+/* 4. フィルターセクションも画面幅に合わせて調整 */
+.filter-section {
+    background: white;
+    border-radius: 15px;
+    padding: 20px;
+    margin-bottom: 25px;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+    border: 1px solid #e1e8ed;
+    width: 100%;  /* 幅を100%に */
+}
+
+/* 5. filter-grid のレスポンシブ対応を改善 */
+.filter-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));  /* より柔軟なグリッド */
+    gap: 15px;
+}
+
+@media (min-width: 1200px) {
+    .filter-grid {
+        grid-template-columns: repeat(4, 1fr);  /* 大画面では4列固定 */
+        gap: 20px;
+    }
+}
+
+/* 6. 年度範囲入力フィールドの改善 */
+.year-range {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    max-width: 300px;  /* 最大幅を設定 */
+}
+
+.year-range input {
+    flex: 1;
+    min-width: 80px;
+}
+
+/* 7. 検索フィールドの最適化 */
+@media (min-width: 1200px) {
+    .filter-group:last-child {  /* キーワード検索フィールド */
+        grid-column: span 2;  /* 2列分の幅を使用 */
+    }
+}
 </style>
 {% endblock %}
 
@@ -685,50 +753,52 @@
                         <div class="problems-grid">
                 {% endif %}
                 
-                <!-- 個別問題カード -->
-                <div class="problem-card" data-problem-url="{{ url_for('essay_problem', problem_id=problem.id) }}">
-                    <div class="problem-header">
-                        <div class="university-year">
-                            <span class="university">{{ problem.university }}</span>
-                            <span class="year">{{ problem.year }}年</span>
+                <!-- 個別問題カード（aタグで囲む） -->
+                <a href="{{ url_for('essay_problem', problem_id=problem.id) }}" class="problem-card-link">
+                    <div class="problem-card">
+                        <div class="problem-header">
+                            <div class="university-year">
+                                <span class="university">{{ problem.university }}</span>
+                                <span class="year">{{ problem.year }}年</span>
+                            </div>
+                            <div class="progress-indicators">
+                                {% if problem.progress.viewed_answer %}
+                                    <span class="indicator viewed" title="解答閲覧済み">
+                                        <i class="fas fa-eye"></i>
+                                    </span>
+                                {% endif %}
+                                {% if problem.progress.understood %}
+                                    <span class="indicator understood" title="理解済み">
+                                        <i class="fas fa-check-circle"></i>
+                                    </span>
+                                {% endif %}
+                                {% if problem.progress.review_flag %}
+                                    <span class="indicator review" title="復習フラグ">
+                                        <i class="fas fa-flag"></i>
+                                    </span>
+                                {% endif %}
+                                {% if problem.progress.difficulty_rating %}
+                                    <span class="indicator difficulty" title="難易度: {{ problem.progress.difficulty_rating }}/5">
+                                        <i class="fas fa-star"></i>{{ problem.progress.difficulty_rating }}
+                                    </span>
+                                {% endif %}
+                            </div>
                         </div>
-                        <div class="progress-indicators">
-                            {% if problem.progress.viewed_answer %}
-                                <span class="indicator viewed" title="解答閲覧済み">
-                                    <i class="fas fa-eye"></i>
-                                </span>
-                            {% endif %}
-                            {% if problem.progress.understood %}
-                                <span class="indicator understood" title="理解済み">
-                                    <i class="fas fa-check-circle"></i>
-                                </span>
-                            {% endif %}
-                            {% if problem.progress.review_flag %}
-                                <span class="indicator review" title="復習フラグ">
-                                    <i class="fas fa-flag"></i>
-                                </span>
-                            {% endif %}
-                            {% if problem.progress.difficulty_rating %}
-                                <span class="indicator difficulty" title="難易度: {{ problem.progress.difficulty_rating }}/5">
-                                    <i class="fas fa-star"></i>{{ problem.progress.difficulty_rating }}
-                                </span>
-                            {% endif %}
+                        
+                        <div class="problem-content">
+                            <p class="problem-preview">{{ problem.preview }}</p>
+                            <div class="problem-meta">
+                                <span class="answer-length">解答: {{ problem.answer_length }}字</span>
+                            </div>
+                        </div>
+                        
+                        <div class="problem-footer">
+                            <span class="read-more">
+                                <i class="fas fa-arrow-right"></i> 問題を見る
+                            </span>
                         </div>
                     </div>
-                    
-                    <div class="problem-content">
-                        <p class="problem-preview">{{ problem.preview }}</p>
-                        <div class="problem-meta">
-                            <span class="answer-length">解答: {{ problem.answer_length }}字</span>
-                        </div>
-                    </div>
-                    
-                    <div class="problem-footer">
-                        <span class="read-more">
-                            <i class="fas fa-arrow-right"></i> 問題を見る
-                        </span>
-                    </div>
-                </div>
+                </a>
                 
                 {% if loop.last %}
                         </div> <!-- 最後のproblems-gridを閉じる -->
@@ -749,6 +819,67 @@
             </div>
         {% endif %}
     </div>
+
+    <!-- JavaScriptセクションから以下のコードを削除 -->
+    <script>
+    // 問題カードのクリックイベント（削除してください）
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.problem-card').forEach(card => {
+            card.addEventListener('click', function() {
+                const url = this.getAttribute('data-problem-url');
+                if (url) {
+                    window.location.href = url;
+                }
+            });
+        });
+    });
+    </script>
+
+    <!-- スタイルセクションに以下を追加 -->
+    <style>
+    /* リンクのスタイル調整 */
+    .problem-card-link {
+        text-decoration: none;
+        color: inherit;
+        display: block;
+    }
+
+    .problem-card-link:hover {
+        text-decoration: none;
+    }
+
+    /* problems-grid を広げる */
+    .problems-section {
+        width: 100%;
+    }
+
+    .type-group {
+        margin-bottom: 30px;
+        width: 100%;
+    }
+
+    .problems-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+        gap: 20px;
+        width: 100%;
+    }
+
+    /* 大画面用の調整 */
+    @media (min-width: 1200px) {
+        .problems-grid {
+            grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+            gap: 25px;
+        }
+    }
+
+    /* 超大画面用（1600px以上） */
+    @media (min-width: 1600px) {
+        .problems-grid {
+            grid-template-columns: repeat(auto-fill, minmax(450px, 1fr));
+        }
+    }
+    </style>
 </div>
 
 <script>
