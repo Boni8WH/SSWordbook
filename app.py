@@ -4885,14 +4885,7 @@ def api_ranking_data():
             return fallback_ranking_calculation(current_user, start_time)
         
         # ランキング表示人数を取得
-        ranking_display_count = 5
-        try:
-            room_setting = RoomSetting.query.filter_by(room_number=current_room_number).first()
-            if room_setting and hasattr(room_setting, 'ranking_display_count'):
-                ranking_display_count = room_setting.ranking_display_count or 5
-        except Exception as e:
-            print(f"⚠️ ranking_display_count 取得エラー: {e}")
-        
+        ranking_display_count = 5        
         # ランキングデータを構築（計算済みデータを使用）
         ranking_data = []
         current_user_stats = None
