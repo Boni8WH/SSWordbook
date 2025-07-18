@@ -7316,11 +7316,11 @@ def admin_essay_problem_detail(problem_id):
         }
         
         if inspector.has_table('essay_progress'):
-            # 学習進捗統計
+            # 学習進捗統計 - case()の構文を修正
             progress_stats = db.session.query(
                 func.count(EssayProgress.id).label('total_views'),
-                func.count(case([(EssayProgress.understood == True, 1)])).label('understood_count'),
-                func.count(case([(EssayProgress.viewed_answer == True, 1)])).label('viewed_answer_count'),
+                func.count(case((EssayProgress.understood == True, 1))).label('understood_count'),
+                func.count(case((EssayProgress.viewed_answer == True, 1))).label('viewed_answer_count'),
                 func.avg(EssayProgress.difficulty_rating).label('avg_difficulty')
             ).filter(EssayProgress.problem_id == problem_id).first()
             
