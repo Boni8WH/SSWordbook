@@ -118,7 +118,12 @@
                 
                 <!-- 章の進捗バー -->
                 <div class="chapter-progress-bar-container">
-                    <div class="chapter-progress-bar" style="width: {{ ((chapter_data.total_mastered / chapter_data.total_questions * 100) if chapter_data.total_questions > 0 else 0)|round(1) }}%;"></div>
+                    <div class="chapter-progress-bar-container">
+                        <div class="chapter-progress-bar" 
+                            data-total-mastered="{{ chapter_data.total_mastered }}"
+                            data-total-questions="{{ chapter_data.total_questions }}"
+                            style="width: 0%;"></div>
+                    </div>
                 </div>
 
                 <!-- 単元詳細（初期状態は非表示） -->
@@ -136,7 +141,10 @@
                             （{% if total_questions > 0 %}{{ (mastered_count / total_questions * 100)|round(1) }}%{% else %}0%{% endif %}）
                         </p>
                         <div class="unit-progress-bar-container">
-                            <div class="unit-progress-bar" style="width: {% if total_questions > 0 %}{{ (mastered_count / total_questions * 100)|round(1) }}%{% else %}0%{% endif %};"></div>
+                            <div class="unit-progress-bar" 
+                                data-mastered-count="{{ mastered_count }}"
+                                data-total-questions="{{ total_questions }}"
+                                style="width: 0%;"></div>
                         </div>
                     </div>
                     {% endfor %}
@@ -167,21 +175,31 @@ function toggleChapterProgress(chapterNum) {
 
 // ランキングデータの非同期読み込み
 async function loadRankingData() {
-    console.log('🔄 ランキングデータ読み込み開始...');
-    
     try {
-        // ローディング表示
-        document.getElementById('ranking-loading').style.display = 'block';
-        document.getElementById('ranking-error').style.display = 'none';
-        document.getElementById('ranking-table-container').style.display = 'none';
+        console.log('🔄 ランキングデータを取得中...');
         
-        const response = await fetch('/api/ranking_data');
+        const response = await fetch('/api/get_ranking_data', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({})
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
         const data = await response.json();
         
         if (data.status === 'success') {
-            console.log(`✅ ランキングデータ取得成功 (${data.calculation_time}秒)`);
+            console.log(`📊 ランキングデータ取得成功: ${data.ranking_data.length}人分`);
+            console.log(`📋 表示制限: ${data.ranking_display_count}人`);
             
-            // ランキングテーブルを更新
+            // グローバル変数に表示制限数を保存
+            window.rankingDisplayCount = data.ranking_display_count;
+            
+            // ランキングテーブルを更新（制限適用）
             updateRankingTable(data.ranking_data);
             
             // ユーザー統計を更新
@@ -216,7 +234,10 @@ function updateRankingTable(rankingData) {
     const tbody = document.getElementById('ranking-table-body');
     tbody.innerHTML = '';
     
-    rankingData.forEach((user, index) => {
+    // rankingDataは既にサーバー側で制限されているが、念のためクライアント側でも制限
+    const limitedRankingData = rankingData.slice(0, window.rankingDisplayCount || 5);
+    
+    limitedRankingData.forEach((user, index) => {
         const row = document.createElement('tr');
         row.innerHTML = `
             <td>${index + 1}</td>
@@ -299,16 +320,23 @@ function updateUserRank(rank, totalUsers) {
 }
 
 // ページ読み込み時にランキングデータを非同期取得
+// ページロード時に進捗バーを設定
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('📋 進捗ページ読み込み完了');
+    // 章の進捗バーを設定
+    document.querySelectorAll('.chapter-progress-bar').forEach(function(bar) {
+        const mastered = parseInt(bar.getAttribute('data-total-mastered') || '0');
+        const total = parseInt(bar.getAttribute('data-total-questions') || '0');
+        const percentage = total > 0 ? Math.round((mastered / total) * 100 * 10) / 10 : 0;
+        bar.style.width = Math.max(0, Math.min(100, percentage)) + '%';
+    });
     
-    // 個人進捗は即座に表示済み
-    console.log('✅ 個人進捗表示完了');
-    
-    // ランキングデータを非同期で取得
-    setTimeout(() => {
-        loadRankingData();
-    }, 100); // 100ms後に開始（画面描画完了を待つ）
+    // 単元の進捗バーを設定
+    document.querySelectorAll('.unit-progress-bar').forEach(function(bar) {
+        const mastered = parseInt(bar.getAttribute('data-mastered-count') || '0');
+        const total = parseInt(bar.getAttribute('data-total-questions') || '0');
+        const percentage = total > 0 ? Math.round((mastered / total) * 100 * 10) / 10 : 0;
+        bar.style.width = Math.max(0, Math.min(100, percentage)) + '%';
+    });
 });
 </script>
 
