@@ -172,6 +172,7 @@ function toggleChapterProgress(chapterNum) {
 }
 
 // ランキングデータの非同期読み込み
+// ランキングデータの非同期読み込み（修正版）
 async function loadRankingData() {
     try {
         console.log('🔄 ランキングデータを取得中...');
@@ -181,13 +182,12 @@ async function loadRankingData() {
         document.getElementById('ranking-error').style.display = 'none';
         document.getElementById('ranking-table-container').style.display = 'none';
         
-        // APIエンドポイントを確認
-        const response = await fetch('/api/get_ranking_data', {
-            method: 'POST',
+        // 正しいAPIエンドポイントを使用
+        const response = await fetch('/api/ranking_data', {
+            method: 'GET',  // POSTからGETに変更
             headers: {
                 'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({})
+            }
         });
         
         if (!response.ok) {
@@ -231,10 +231,10 @@ async function loadRankingData() {
         document.getElementById('ranking-loading').style.display = 'none';
         document.getElementById('ranking-error').style.display = 'block';
         
-        // エラーメッセージを表示
+        // エラーメッセージを詳細表示
         const errorButton = document.querySelector('#ranking-error .btn');
         if (errorButton) {
-            errorButton.textContent = `エラー: ${error.message}`;
+            errorButton.innerHTML = `<i class="fas fa-redo"></i> 再試行 (${error.message})`;
         }
     }
 }
