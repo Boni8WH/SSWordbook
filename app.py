@@ -7304,13 +7304,33 @@ def admin_essay_problem_detail(problem_id):
         if not problem:
             return jsonify({'status': 'error', 'message': '問題が見つかりません'}), 404
         
-        # 学習進捗統計
-        progress_stats = db.session.query(
-            func.count(EssayProgress.id).label('total_views'),
-            func.count(case([(EssayProgress.understood == True, 1)])).label('understood_count'),
-            func.count(case([(EssayProgress.viewed_answer == True, 1)])).label('viewed_answer_count'),
-            func.avg(EssayProgress.difficulty_rating).label('avg_difficulty')
-        ).filter(EssayProgress.problem_id == problem_id).first()
+        # EssayProgressテーブルの存在確認
+        from sqlalchemy import inspect
+        inspector = inspect(db.engine)
+        
+        stats = {
+            'total_views': 0,
+            'understood_count': 0,
+            'viewed_answer_count': 0,
+            'avg_difficulty': 0
+        }
+        
+        if inspector.has_table('essay_progress'):
+            # 学習進捗統計
+            progress_stats = db.session.query(
+                func.count(EssayProgress.id).label('total_views'),
+                func.count(case([(EssayProgress.understood == True, 1)])).label('understood_count'),
+                func.count(case([(EssayProgress.viewed_answer == True, 1)])).label('viewed_answer_count'),
+                func.avg(EssayProgress.difficulty_rating).label('avg_difficulty')
+            ).filter(EssayProgress.problem_id == problem_id).first()
+            
+            if progress_stats:
+                stats = {
+                    'total_views': progress_stats.total_views or 0,
+                    'understood_count': progress_stats.understood_count or 0,
+                    'viewed_answer_count': progress_stats.viewed_answer_count or 0,
+                    'avg_difficulty': round(progress_stats.avg_difficulty or 0, 1)
+                }
         
         return jsonify({
             'status': 'success',
@@ -7325,16 +7345,13 @@ def admin_essay_problem_detail(problem_id):
                 'answer_length': problem.answer_length,
                 'enabled': problem.enabled
             },
-            'stats': {
-                'total_views': progress_stats.total_views or 0,
-                'understood_count': progress_stats.understood_count or 0,
-                'viewed_answer_count': progress_stats.viewed_answer_count or 0,
-                'avg_difficulty': round(progress_stats.avg_difficulty or 0, 1)
-            }
+            'stats': stats
         })
         
     except Exception as e:
         logger.error(f"Error getting essay problem detail: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({
             'status': 'error',
             'message': '問題詳細の取得中にエラーが発生しました'
