@@ -7119,11 +7119,13 @@ def essay_problem(problem_id):
 # ========================================
 # 不足しているEssay関連ルート（app.pyに追加）
 # ========================================
-
 @app.route('/admin/essay/stats', methods=['GET'])
 def admin_essay_stats():
     """論述問題の統計情報を取得"""
     try:
+        if not session.get('admin_logged_in'):
+            return jsonify(status='error', message='管理者権限が必要です'), 403
+        
         # 全体統計
         total_problems = EssayProblem.query.filter_by(enabled=True).count()
         total_disabled = EssayProblem.query.filter_by(enabled=False).count()
@@ -7153,6 +7155,8 @@ def admin_essay_stats():
             'stats': {
                 'total_problems': total_problems,
                 'total_disabled': total_disabled,
+                'total_chapters': len(chapter_stats),
+                'total_universities': len(university_stats),
                 'chapter_stats': [{'chapter': c, 'count': count} for c, count in chapter_stats],
                 'type_stats': [{'type': t, 'count': count} for t, count in type_stats],
                 'university_stats': [{'university': u, 'count': count} for u, count in university_stats]
@@ -7170,10 +7174,14 @@ def admin_essay_stats():
 def admin_essay_problems():
     """論述問題一覧を取得"""
     try:
+        if not session.get('admin_logged_in'):
+            return jsonify(status='error', message='管理者権限が必要です'), 403
+        
         page = request.args.get('page', 1, type=int)
         per_page = 20
         chapter_filter = request.args.get('chapter', '')
         type_filter = request.args.get('type', '')
+        search = request.args.get('search', '')
         
         # 基本クエリ
         query = EssayProblem.query
@@ -7183,6 +7191,15 @@ def admin_essay_problems():
             query = query.filter(EssayProblem.chapter == chapter_filter)
         if type_filter:
             query = query.filter(EssayProblem.type == type_filter)
+        if search:
+            search_filter = f'%{search}%'
+            query = query.filter(
+                db.or_(
+                    EssayProblem.question.ilike(search_filter),
+                    EssayProblem.university.ilike(search_filter),
+                    EssayProblem.answer.ilike(search_filter)
+                )
+            )
         
         # ページング
         problems = query.order_by(
@@ -7203,14 +7220,20 @@ def admin_essay_problems():
                 'type': problem.type,
                 'university': problem.university,
                 'year': problem.year,
+                'question': problem.question,
                 'question_preview': problem.question[:50] + '...' if len(problem.question) > 50 else problem.question,
                 'answer_length': problem.answer_length,
                 'enabled': problem.enabled
             })
         
+        # 章一覧も取得
+        chapters = db.session.query(EssayProblem.chapter).distinct().order_by(EssayProblem.chapter).all()
+        chapter_list = [c[0] for c in chapters]
+        
         return jsonify({
             'status': 'success',
             'problems': problem_list,
+            'chapters': chapter_list,
             'pagination': {
                 'page': problems.page,
                 'pages': problems.pages,
