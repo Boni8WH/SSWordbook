@@ -1996,7 +1996,7 @@ def admin_fix_progress_issue():
         
         for setting in room_settings:
             if not hasattr(setting, 'ranking_display_count') or setting.ranking_display_count is None:
-                setting.ranking_display_count = 10
+                setting.ranking_display_count = 5
                 updated_count += 1
         
         if updated_count > 0:
@@ -3484,7 +3484,7 @@ def api_admin_update_ranking_display_count():
         
         data = request.get_json()
         room_number = data.get('room_number')
-        display_count = data.get('ranking_display_count', 10)
+        display_count = data.get('ranking_display_count', 5)
         
         if not room_number:
             return jsonify(status='error', message='部屋番号が指定されていません'), 400
@@ -5467,7 +5467,7 @@ def admin_page():
             else:
                 room_max_unit_settings[rs.room_number] = "9999"  # デフォルト値
         room_csv_settings = {rs.room_number: rs.csv_filename for rs in room_settings}
-        room_ranking_settings = {rs.room_number: getattr(rs, 'ranking_display_count', 10) for rs in room_settings}
+        room_ranking_settings = {rs.room_number: getattr(rs, 'ranking_display_count', 5) for rs in room_settings}
         
         # ユーザー情報を拡張（元のアカウント名と変更履歴を含む）
         user_list_with_details = []
@@ -5504,12 +5504,12 @@ def admin_page():
                     room_number=room_num,
                     max_enabled_unit_number="9999",
                     csv_filename="words.csv",
-                    ranking_display_count=10  # ★ランキング表示人数のデフォルト値
+                    ranking_display_count=5  # ★ランキング表示人数のデフォルト値
                 )
                 db.session.add(default_room_setting)
                 room_max_unit_settings[room_num] = "9999"
                 room_csv_settings[room_num] = "words.csv"
-                room_ranking_settings[room_num] = 10
+                room_ranking_settings[room_num] = 5
         
         try:
             db.session.commit()
@@ -5814,7 +5814,7 @@ def admin_get_room_setting():
             # 安全に属性にアクセス
             max_unit = getattr(room_setting, 'max_enabled_unit_number', '9999')
             csv_filename = getattr(room_setting, 'csv_filename', 'words.csv')
-            ranking_count = getattr(room_setting, 'ranking_display_count', 10)
+            ranking_count = getattr(room_setting, 'ranking_display_count', 5)
             enabled_units = room_setting.get_enabled_units() if hasattr(room_setting, 'get_enabled_units') else []
             
             result = {
@@ -5834,7 +5834,7 @@ def admin_get_room_setting():
                 'max_enabled_unit_number': '9999',
                 'enabled_units': [],
                 'csv_filename': 'words.csv',
-                'ranking_display_count': 10
+                'ranking_display_count': 5
             }
             print(f"📄 デフォルト設定を返却: {room_number}")
 
@@ -6886,7 +6886,7 @@ def emergency_add_ranking_column():
                 
                 if not result.fetchone():
                     print("🔧 ranking_display_countカラムを追加中...")
-                    conn.execute(text('ALTER TABLE room_setting ADD COLUMN ranking_display_count INTEGER DEFAULT 10'))
+                    conn.execute(text('ALTER TABLE room_setting ADD COLUMN ranking_display_count INTEGER DEFAULT 5'))
                     conn.commit()
                     print("✅ ranking_display_countカラムを追加しました")
                     
