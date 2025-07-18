@@ -281,7 +281,7 @@ class RoomSetting(db.Model):
     enabled_units = db.Column(db.Text, default="[]", nullable=False)  # ← JSON形式で単元リストを保存
     csv_filename = db.Column(db.String(100), default="words.csv", nullable=False)
     max_enabled_unit_number = db.Column(db.String(50), default="9999", nullable=False)
-    ranking_display_count = db.Column(db.Integer, default=10, nullable=False)
+    ranking_display_count = db.Column(db.Integer, default=5, nullable=False)
 
     def get_enabled_units(self):
         """有効な単元のリストを取得"""
@@ -4818,7 +4818,7 @@ def progress_page():
                                current_user=current_user,
                                user_progress_by_chapter=sorted_chapter_progress,
                                # ランキング関連は空・None で初期化
-                               top_10_ranking=[],  
+                               top_5_ranking=[],  
                                current_user_stats=None,
                                current_user_rank=None,
                                total_users_in_room=0,
