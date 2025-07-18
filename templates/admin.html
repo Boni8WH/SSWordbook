@@ -1959,23 +1959,52 @@ function updateChapterFilter(chapters) {
     select.value = currentValue;
 }
 
+// 論述問題編集
+function editEssayProblem(problemId) {
+    // 簡単な編集ダイアログを表示
+    const newQuestion = prompt('問題文を入力してください:');
+    if (newQuestion && newQuestion.trim()) {
+        fetch(`/admin/essay/problem/${problemId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                question: newQuestion.trim()
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                alert('✅ ' + data.message);
+                loadEssayProblems();
+            } else {
+                alert('❌ エラー: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('編集エラー:', error);
+            alert('❌ 編集中にエラーが発生しました。');
+        });
+    }
+}
+
 // 論述問題の有効/無効切り替え
 function toggleEssayProblem(problemId, currentEnabled) {
     const newStatus = !currentEnabled;
     const action = newStatus ? '有効' : '無効';
     
     if (confirm('この問題を' + action + 'にしますか？')) {
-        fetch('/admin/essay/toggle_problem', {
+        fetch(`/admin/essay/problem/${problemId}/toggle`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                problem_id: problemId,
-                enabled: newStatus
-            })
+            headers: {
+                'Content-Type': 'application/json'
+            }
         })
         .then(response => response.json())
         .then(data => {
             if (data.status === 'success') {
+                alert('✅ ' + data.message);
                 loadEssayProblems();
                 loadEssayStats();
             } else {
@@ -1992,10 +2021,11 @@ function toggleEssayProblem(problemId, currentEnabled) {
 // 論述問題削除
 function deleteEssayProblem(problemId) {
     if (confirm('この論述問題を削除しますか？\n\n⚠️ この操作は元に戻せません。')) {
-        fetch('/admin/essay/delete_problem', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ problem_id: problemId })
+        fetch(`/admin/essay/problem/${problemId}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json'
+            }
         })
         .then(response => response.json())
         .then(data => {
