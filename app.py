@@ -7255,6 +7255,9 @@ def admin_essay_problems():
 def admin_essay_get_problem(problem_id):
     """個別問題の詳細を取得"""
     try:
+        if not session.get('admin_logged_in'):
+            return jsonify(status='error', message='管理者権限が必要です'), 403
+        
         problem = EssayProblem.query.get_or_404(problem_id)
         
         return jsonify({
@@ -7273,6 +7276,9 @@ def admin_essay_get_problem(problem_id):
 def admin_essay_update_problem(problem_id):
     """問題を更新"""
     try:
+        if not session.get('admin_logged_in'):
+            return jsonify(status='error', message='管理者権限が必要です'), 403
+        
         problem = EssayProblem.query.get_or_404(problem_id)
         data = request.get_json()
         
@@ -7287,6 +7293,7 @@ def admin_essay_update_problem(problem_id):
                 else:
                     setattr(problem, field, data[field])
         
+        problem.updated_at = datetime.now(JST)
         db.session.commit()
         
         return jsonify({
@@ -7440,11 +7447,14 @@ def admin_essay_upload_csv():
             'status': 'error',
             'message': 'CSVファイルの処理中にエラーが発生しました'
         }), 500
-
+    
 @app.route('/admin/essay/problem/<int:problem_id>', methods=['DELETE'])
 def admin_essay_delete_problem(problem_id):
     """論述問題を削除"""
     try:
+        if not session.get('admin_logged_in'):
+            return jsonify(status='error', message='管理者権限が必要です'), 403
+        
         problem = EssayProblem.query.get_or_404(problem_id)
         
         # 関連する進捗データも削除
@@ -7470,8 +7480,12 @@ def admin_essay_delete_problem(problem_id):
 def admin_essay_toggle_problem(problem_id):
     """論述問題の有効/無効を切り替え"""
     try:
+        if not session.get('admin_logged_in'):
+            return jsonify(status='error', message='管理者権限が必要です'), 403
+        
         problem = EssayProblem.query.get_or_404(problem_id)
         problem.enabled = not problem.enabled
+        problem.updated_at = datetime.now(JST)
         
         db.session.commit()
         
@@ -7567,8 +7581,9 @@ def update_essay_progress():
         return jsonify({'status': 'error', 'message': '進捗の更新中にエラーが発生しました'}), 500
 
 # ========================================
-# ヘルパー関数
+# Essay関連のヘルパー関数を追加
 # ========================================
+
 def get_essay_chapter_stats(user_id):
     """章別の統計情報を取得"""
     try:
@@ -7664,7 +7679,7 @@ def get_filtered_essay_problems(chapter, type_filter='', university_filter='',
         problems = []
         for problem, progress in results:
             problem_data = problem.to_dict()
-            problem_data['preview'] = problem.question[:20] + '...' if len(problem.question) > 20 else problem.question
+            problem_data['preview'] = problem.question[:100] + '...' if len(problem.question) > 100 else problem.question
             problem_data['progress'] = {
                 'viewed_answer': progress.viewed_answer if progress else False,
                 'understood': progress.understood if progress else False,
