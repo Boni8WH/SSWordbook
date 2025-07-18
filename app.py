@@ -7448,7 +7448,7 @@ def admin_essay_upload_csv():
             'message': 'CSVファイルの処理中にエラーが発生しました'
         }), 500
     
-@app.route('/admin/essay/problem/<int:problem_id>', methods=['DELETE'])
+@app.route('/admin/essay/problem/<int:problem_id>/delete', methods=['POST'])
 def admin_essay_delete_problem(problem_id):
     """論述問題を削除"""
     try:
