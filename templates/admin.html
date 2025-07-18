@@ -1900,6 +1900,7 @@ document.getElementById('essayAddForm').addEventListener('submit', function(e) {
     });
 });
 
+// 既存のloadEssayProblems関数を以下で完全に置き換える
 function loadEssayProblems() {
     const container = document.getElementById('essay-problems-container');
     if (!container) return;
@@ -1926,43 +1927,85 @@ function loadEssayProblems() {
                 
                 // 問題一覧を表示
                 if (data.problems && data.problems.length > 0) {
+                    // 統計サマリーを追加
                     let html = `
+                        <div class="essay-stats-summary">
+                            <div class="stat-item">
+                                <div class="stat-value">${data.pagination.total}</div>
+                                <div class="stat-label">総問題数</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value">${data.problems.length}</div>
+                                <div class="stat-label">表示中</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value">${data.pagination.pages}</div>
+                                <div class="stat-label">総ページ数</div>
+                            </div>
+                        </div>
                         <div class="essay-problems-list">
-                            <p class="mb-3">📊 全 ${data.pagination.total} 件中 ${data.problems.length} 件を表示</p>
                     `;
                     
+                    // 各問題を表示
                     data.problems.forEach(problem => {
-                        const typeColor = getTypeColor(problem.type);
+                        const typeColor = {
+                            'A': 'type-A',
+                            'B': 'type-B', 
+                            'C': 'type-C',
+                            'D': 'type-D'
+                        }[problem.type] || '';
+                        
                         const enabledBadge = problem.enabled 
-                            ? '<span class="badge bg-success">有効</span>'
-                            : '<span class="badge bg-secondary">無効</span>';
+                            ? '<span class="badge bg-success"><i class="fas fa-check"></i> 有効</span>'
+                            : '<span class="badge bg-secondary"><i class="fas fa-times"></i> 無効</span>';
+                        
+                        // 問題文を短縮（100文字まで）
+                        const shortQuestion = problem.question.length > 100 
+                            ? problem.question.substring(0, 100) + '...' 
+                            : problem.question;
                         
                         html += `
                             <div class="essay-problem-item">
                                 <div class="problem-header">
                                     <div class="problem-info">
-                                        <span class="badge bg-primary">第${problem.chapter}章</span>
-                                        <span class="badge bg-${typeColor}">タイプ${problem.type}</span>
+                                        <span class="badge badge-chapter">
+                                            <i class="fas fa-book"></i> 第${problem.chapter}章
+                                        </span>
+                                        <span class="badge badge-${typeColor}">
+                                            <i class="fas fa-tag"></i> タイプ${problem.type}
+                                        </span>
                                         ${enabledBadge}
-                                        <span class="text-muted">${problem.university} ${problem.year}年</span>
+                                        <div class="university-info">
+                                            <i class="fas fa-university"></i>
+                                            <span>${problem.university} ${problem.year}年</span>
+                                        </div>
                                     </div>
                                     <div class="problem-actions">
-                                        <button class="btn btn-sm btn-info" onclick="editEssayProblem(${problem.id})">
-                                            <i class="fas fa-edit"></i> 編集
+                                        <button class="btn btn-sm btn-info" onclick="editEssayProblem(${problem.id})" title="編集">
+                                            <i class="fas fa-edit"></i>
                                         </button>
-                                        <button class="btn btn-sm btn-warning" onclick="toggleEssayProblem(${problem.id}, ${problem.enabled})">
+                                        <button class="btn btn-sm btn-warning" onclick="toggleEssayProblem(${problem.id}, ${problem.enabled})" title="有効/無効">
                                             <i class="fas fa-toggle-${problem.enabled ? 'on' : 'off'}"></i>
                                         </button>
-                                        <button class="btn btn-sm btn-danger" onclick="deleteEssayProblem(${problem.id})">
+                                        <button class="btn btn-sm btn-danger" onclick="deleteEssayProblem(${problem.id})" title="削除">
                                             <i class="fas fa-trash"></i>
                                         </button>
                                     </div>
                                 </div>
                                 <div class="problem-content">
-                                    <p class="mb-1"><strong>問題:</strong> ${problem.question}</p>
-                                    <p class="text-muted mb-0">
-                                        <i class="fas fa-file-alt"></i> 解答文字数: ${problem.answer_length}文字
+                                    <p class="problem-question">
+                                        <strong>問題:</strong> ${shortQuestion}
                                     </p>
+                                </div>
+                                <div class="problem-meta">
+                                    <div class="problem-meta-item">
+                                        <i class="fas fa-file-alt"></i>
+                                        <span>解答: ${problem.answer_length}文字</span>
+                                    </div>
+                                    <div class="problem-meta-item">
+                                        <i class="fas fa-calendar"></i>
+                                        <span>ID: ${problem.id}</span>
+                                    </div>
                                 </div>
                             </div>
                         `;
@@ -3648,6 +3691,188 @@ function debounce(func, wait) {
         border-color: #6b7280;
         color: #f9fafb;
     }
+}
+
+/* 論述問題一覧のスタイル改善 - admin.htmlの<style>タグ内の最後に追加 */
+.essay-problem-item {
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 15px;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.essay-problem-item:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    transform: translateY(-2px);
+    border-color: #ffa726;
+}
+
+.problem-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 15px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.problem-info {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+}
+
+.problem-info .badge {
+    font-size: 0.85rem;
+    padding: 5px 12px;
+    font-weight: 500;
+}
+
+/* 章番号のバッジ */
+.badge-chapter {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+/* タイプ別の配色 */
+.badge-type-A {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    color: white;
+}
+
+.badge-type-B {
+    background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+    color: #333;
+}
+
+.badge-type-C {
+    background: linear-gradient(135deg, #30cfd0 0%, #330867 100%);
+    color: white;
+}
+
+.badge-type-D {
+    background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+    color: #333;
+}
+
+/* 大学名と年度 */
+.university-info {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    color: #6c757d;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.university-info i {
+    color: #ff6b6b;
+}
+
+/* 問題文表示エリア */
+.problem-content {
+    background: #f8f9fa;
+    border-radius: 6px;
+    padding: 15px;
+    margin-bottom: 10px;
+}
+
+.problem-question {
+    color: #2c3e50;
+    line-height: 1.6;
+    margin: 0;
+    font-size: 1rem;
+}
+
+.problem-question strong {
+    color: #e67e22;
+    font-weight: 600;
+}
+
+/* 問題の詳細情報 */
+.problem-meta {
+    display: flex;
+    gap: 20px;
+    color: #6c757d;
+    font-size: 0.85rem;
+    padding-top: 10px;
+}
+
+.problem-meta-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.problem-meta-item i {
+    color: #95a5a6;
+}
+
+/* アクションボタン */
+.problem-actions {
+    display: flex;
+    gap: 5px;
+}
+
+.problem-actions .btn {
+    padding: 6px 12px;
+    font-size: 0.85rem;
+    border-radius: 5px;
+    transition: all 0.3s ease;
+}
+
+.problem-actions .btn-info {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: none;
+    color: white;
+}
+
+.problem-actions .btn-info:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(102, 126, 234, 0.4);
+}
+
+.problem-actions .btn-warning {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    border: none;
+    color: white;
+}
+
+.problem-actions .btn-danger {
+    background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+    border: none;
+    color: white;
+}
+
+/* 統計情報の表示 */
+.essay-stats-summary {
+    background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
+    border: 1px solid #ffb74d;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+}
+
+.stat-item {
+    text-align: center;
+}
+
+.stat-value {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #f57c00;
+}
+
+.stat-label {
+    font-size: 0.85rem;
+    color: #6c757d;
 }
 </style>
 {% endblock %}
