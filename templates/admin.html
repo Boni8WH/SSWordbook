@@ -1689,17 +1689,24 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // 論述問題統計を読み込み
+// 論述問題統計を読み込み（修正版）
 function loadEssayStats() {
     fetch('/admin/essay/stats')
         .then(response => response.json())
         .then(data => {
-            if (data.status === 'success') {
-                document.getElementById('totalEssayProblems').textContent = data.stats.total_problems;
-                document.getElementById('enabledEssayProblems').textContent = data.stats.enabled_problems;
-                document.getElementById('totalChapters').textContent = data.stats.total_chapters;
-                document.getElementById('totalUniversities').textContent = data.stats.total_universities;
+            console.log('統計データ受信:', data); // デバッグ用
+            if (data.status === 'success' && data.stats) {
+                document.getElementById('totalEssayProblems').textContent = data.stats.total_problems || 0;
+                document.getElementById('enabledEssayProblems').textContent = data.stats.total_problems || 0;
+                document.getElementById('totalChapters').textContent = data.stats.total_chapters || 0;
+                document.getElementById('totalUniversities').textContent = data.stats.total_universities || 0;
             } else {
-                console.error('統計取得エラー:', data.message);
+                console.error('統計取得エラー:', data.message || '不明なエラー');
+                // エラー時はダミーデータを表示
+                document.getElementById('totalEssayProblems').textContent = '0';
+                document.getElementById('enabledEssayProblems').textContent = '0';
+                document.getElementById('totalChapters').textContent = '0';
+                document.getElementById('totalUniversities').textContent = '0';
             }
         })
         .catch(error => {
@@ -1844,22 +1851,36 @@ function loadEssayProblems() {
     fetch('/admin/essay/problems?' + params.toString())
         .then(response => response.json())
         .then(data => {
+            console.log('論述問題データ受信:', data); // デバッグ用
             if (data.status === 'success') {
-                displayEssayProblems(data.problems);
-                updateChapterFilter(data.chapters);
+                // データの妥当性をチェック
+                if (data.problems && Array.isArray(data.problems)) {
+                    displayEssayProblems(data.problems);
+                    if (data.chapters && Array.isArray(data.chapters)) {
+                        updateChapterFilter(data.chapters);
+                    }
+                } else {
+                    console.error('論述問題データが不正:', data);
+                    container.innerHTML = '<p class="text-warning">⚠️ 問題データの形式が不正です</p>';
+                }
             } else {
-                container.innerHTML = '<p class="text-danger">❌ ' + data.message + '</p>';
+                container.innerHTML = '<p class="text-danger">❌ ' + (data.message || '不明なエラー') + '</p>';
             }
         })
         .catch(error => {
             console.error('問題一覧取得エラー:', error);
-            container.innerHTML = '<p class="text-danger">❌ 問題一覧の取得に失敗しました。</p>';
+            container.innerHTML = '<p class="text-danger">❌ 問題一覧の取得に失敗しました: ' + error.message + '</p>';
         });
 }
 
 // 論述問題一覧を表示
 function displayEssayProblems(problems) {
     const container = document.getElementById('essay-problems-container');
+    
+    if (!problems || !Array.isArray(problems)) {
+        container.innerHTML = '<p class="text-danger">❌ 問題データが不正です</p>';
+        return;
+    }
     
     if (problems.length === 0) {
         container.innerHTML = '<p class="text-muted">📭 条件に合う論述問題が見つかりません。</p>';
@@ -1873,17 +1894,18 @@ function displayEssayProblems(problems) {
     html += '</tr></thead><tbody>';
     
     problems.forEach(problem => {
-        const questionPreview = problem.question.length > 50 ? 
-            problem.question.substring(0, 50) + '...' : problem.question;
+        // 各プロパティの存在を確認
+        const questionPreview = (problem.question && problem.question.length > 50) ? 
+            problem.question.substring(0, 50) + '...' : (problem.question || '問題文なし');
         
         html += '<tr>';
-        html += '<td>' + problem.id + '</td>';
-        html += '<td><span class="badge bg-secondary">' + problem.chapter + '</span></td>';
-        html += '<td><span class="badge bg-' + getTypeColor(problem.type) + '">' + problem.type + '</span></td>';
-        html += '<td>' + problem.university + '</td>';
-        html += '<td>' + problem.year + '</td>';
+        html += '<td>' + (problem.id || 'N/A') + '</td>';
+        html += '<td><span class="badge bg-secondary">' + (problem.chapter || 'N/A') + '</span></td>';
+        html += '<td><span class="badge bg-' + getTypeColor(problem.type || 'A') + '">' + (problem.type || 'A') + '</span></td>';
+        html += '<td>' + (problem.university || '未設定') + '</td>';
+        html += '<td>' + (problem.year || 'N/A') + '</td>';
         html += '<td><small>' + questionPreview + '</small></td>';
-        html += '<td>' + problem.answer_length + '字</td>';
+        html += '<td>' + (problem.answer_length || 0) + '字</td>';
         html += '<td>';
         if (problem.enabled) {
             html += '<span class="badge bg-success">有効</span>';
@@ -1893,9 +1915,9 @@ function displayEssayProblems(problems) {
         html += '</td>';
         html += '<td>';
         html += '<div class="btn-group-vertical btn-group-sm">';
-        html += '<button class="btn btn-primary btn-sm" onclick="editEssayProblem(' + problem.id + ')">編集</button>';
-        html += '<button class="btn btn-warning btn-sm" onclick="toggleEssayProblem(' + problem.id + ', ' + problem.enabled + ')">切替</button>';
-        html += '<button class="btn btn-danger btn-sm" onclick="deleteEssayProblem(' + problem.id + ')">削除</button>';
+        html += '<button class="btn btn-primary btn-sm" onclick="editEssayProblem(' + (problem.id || 0) + ')">編集</button>';
+        html += '<button class="btn btn-warning btn-sm" onclick="toggleEssayProblem(' + (problem.id || 0) + ', ' + (problem.enabled || false) + ')">切替</button>';
+        html += '<button class="btn btn-danger btn-sm" onclick="deleteEssayProblem(' + (problem.id || 0) + ')">削除</button>';
         html += '</div></td>';
         html += '</tr>';
     });
