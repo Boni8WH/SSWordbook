@@ -359,15 +359,6 @@
         <div class="collapse" id="section-essay-management">
             <div class="section-content">
                 <p>論述問題の登録・管理・インポートを行います。</p>
-                
-                <!-- 統計情報 -->
-                <div class="essay-stats-section">
-                    <h4><i class="fas fa-chart-bar"></i> 統計情報</h4>
-                    <div id="essay-stats-container">
-                        <p class="text-info">📊 統計情報を読み込み中...</p>
-                    </div>
-                </div>
-
                 <!-- 論述問題CSV一括インポート -->
                 <div class="csv-import-section">
                     <h4><i class="fas fa-upload"></i> CSV一括インポート</h4>
@@ -1984,6 +1975,11 @@ function loadEssayProblems() {
                         ? '<span class="badge bg-success">有効</span>'
                         : '<span class="badge bg-secondary">無効</span>';
                     
+                    // 有効/無効切り替えボタンのスタイルを動的に設定
+                    const toggleBtnClass = problem.enabled ? 'btn-success' : 'btn-secondary';
+                    const toggleBtnText = problem.enabled ? '無効化' : '有効化';
+                    const toggleBtnIcon = problem.enabled ? 'fas fa-toggle-on' : 'fas fa-toggle-off';
+
                     html += `<tr>
                         <td>${problem.id}</td>
                         <td>${problem.chapter}</td>
@@ -1993,12 +1989,17 @@ function loadEssayProblems() {
                         <td title="${problem.question}">${questionPreview}</td>
                         <td>${statusBadge}</td>
                         <td>
-                            <button class="btn btn-sm btn-outline-primary" onclick="editEssayProblem(${problem.id})">
-                                <i class="fas fa-edit"></i> 編集
-                            </button>
-                            <button class="btn btn-sm btn-outline-danger" onclick="deleteEssayProblem(${problem.id})">
-                                <i class="fas fa-trash"></i> 削除
-                            </button>
+                            <div class="btn-group-vertical btn-group-sm">
+                                <button class="btn btn-outline-primary btn-sm" onclick="editEssayProblem(${problem.id})">
+                                    <i class="fas fa-edit"></i> 編集
+                                </button>
+                                <button class="btn ${toggleBtnClass} btn-sm" onclick="toggleEssayProblem(${problem.id}, ${problem.enabled})">
+                                    <i class="${toggleBtnIcon}"></i> ${toggleBtnText}
+                                </button>
+                                <button class="btn btn-outline-danger btn-sm" onclick="deleteEssayProblem(${problem.id})">
+                                    <i class="fas fa-trash"></i> 削除
+                                </button>
+                            </div>
                         </td>
                     </tr>`;
                 });
@@ -2136,10 +2137,6 @@ function updateEssayProblem(problemId, updateData) {
         if (data.status === 'success') {
             alert('✅ ' + data.message);
             loadEssayProblems();
-            // loadEssayStats関数が存在するかチェック
-            if (typeof loadEssayStats === 'function') {
-                loadEssayStats();
-            }
         } else {
             alert('❌ エラー: ' + data.message);
         }
