@@ -7456,12 +7456,18 @@ def admin_essay_chapters():
         if not session.get('admin_logged_in'):
             return jsonify({'status': 'error', 'message': '管理者権限が必要です'}), 403
         
-        # 使用されている章を取得
-        chapters = db.session.query(
+        # 使用されている章を取得（昇順でソート）
+        chapters_query = db.session.query(
             EssayProblem.chapter
-        ).distinct().order_by(EssayProblem.chapter).all()
+        ).distinct().order_by(
+            # 数字の章を先に、'com'を最後にソート
+            case(
+                (EssayProblem.chapter == 'com', 999),
+                else_=cast(EssayProblem.chapter, Integer)
+            )
+        ).all()
         
-        chapter_list = [ch.chapter for ch in chapters if ch.chapter]
+        chapter_list = [ch.chapter for ch in chapters_query if ch.chapter]
         
         return jsonify({
             'status': 'success',
@@ -7474,6 +7480,7 @@ def admin_essay_chapters():
             'status': 'error',
             'message': '章リストの取得中にエラーが発生しました'
         }), 500
+    
 # ========================================
 # Essay関連のAPIルート（app.pyに追加してください）
 # ========================================
