@@ -359,41 +359,6 @@
         <div class="collapse" id="section-essay-management">
             <div class="section-content">
                 <p>論述問題の登録・管理・インポートを行います。</p>
-                
-                <!-- 論述問題統計表示 -->
-                <div class="admin-panel" style="background-color: #e8f4fd; border-left: 5px solid #3498db; margin-bottom: 20px;">
-                    <h4>📊 論述問題統計</h4>
-                    <div class="row">
-                        <div class="col-md-3">
-                            <div class="stat-card">
-                                <div class="stat-number" id="totalEssayProblems">-</div>
-                                <div class="stat-label">総問題数</div>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="stat-card">
-                                <div class="stat-number" id="enabledEssayProblems">-</div>
-                                <div class="stat-label">有効問題数</div>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="stat-card">
-                                <div class="stat-number" id="totalChapters">-</div>
-                                <div class="stat-label">章数</div>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="stat-card">
-                                <div class="stat-number" id="totalUniversities">-</div>
-                                <div class="stat-label">大学数</div>
-                            </div>
-                        </div>
-                    </div>
-                    <button type="button" class="btn btn-info btn-sm" onclick="loadEssayStats()">
-                        <i class="fas fa-sync"></i> 統計を更新
-                    </button>
-                </div>
-
                 <!-- 論述問題CSV一括インポート -->
                 <h4>📤 論述問題CSV一括インポート</h4>
                 <div class="csv-template-section" style="margin-bottom: 25px; padding: 15px; background-color: #f0f8ff; border: 1px solid #87ceeb; border-radius: 6px; border-left: 4px solid #17a2b8;">
@@ -1688,37 +1653,6 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
-// 論述問題統計を読み込み
-// 論述問題統計を読み込み（修正版）
-function loadEssayStats() {
-    fetch('/admin/essay/stats')
-        .then(response => response.json())
-        .then(data => {
-            console.log('統計データ受信:', data); // デバッグ用
-            if (data.status === 'success' && data.stats) {
-                document.getElementById('totalEssayProblems').textContent = data.stats.total_problems || 0;
-                document.getElementById('enabledEssayProblems').textContent = data.stats.total_problems || 0;
-                document.getElementById('totalChapters').textContent = data.stats.total_chapters || 0;
-                document.getElementById('totalUniversities').textContent = data.stats.total_universities || 0;
-            } else {
-                console.error('統計取得エラー:', data.message || '不明なエラー');
-                // エラー時はダミーデータを表示
-                document.getElementById('totalEssayProblems').textContent = '0';
-                document.getElementById('enabledEssayProblems').textContent = '0';
-                document.getElementById('totalChapters').textContent = '0';
-                document.getElementById('totalUniversities').textContent = '0';
-            }
-        })
-        .catch(error => {
-            console.error('統計取得エラー:', error);
-            // エラー時はダミーデータを表示
-            document.getElementById('totalEssayProblems').textContent = '0';
-            document.getElementById('enabledEssayProblems').textContent = '0';
-            document.getElementById('totalChapters').textContent = '0';
-            document.getElementById('totalUniversities').textContent = '0';
-        });
-}
-
 // 論述問題CSVテンプレートダウンロード
 function downloadEssayTemplate() {
     const csvContent = [
@@ -1961,32 +1895,151 @@ function updateChapterFilter(chapters) {
 
 // 論述問題編集
 function editEssayProblem(problemId) {
-    // 簡単な編集ダイアログを表示
-    const newQuestion = prompt('問題文を入力してください:');
-    if (newQuestion && newQuestion.trim()) {
-        fetch(`/admin/essay/problem/${problemId}`, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                question: newQuestion.trim()
-            })
-        })
+    // まず現在の問題データを取得
+    fetch(`/admin/essay/problem/${problemId}`)
         .then(response => response.json())
         .then(data => {
             if (data.status === 'success') {
-                alert('✅ ' + data.message);
-                loadEssayProblems();
+                const problem = data.problem;
+                
+                // 編集ダイアログを表示
+                showEditDialog(problem);
             } else {
-                alert('❌ エラー: ' + data.message);
+                alert('❌ 問題データの取得に失敗しました: ' + data.message);
             }
         })
         .catch(error => {
-            console.error('編集エラー:', error);
-            alert('❌ 編集中にエラーが発生しました。');
+            console.error('問題取得エラー:', error);
+            alert('❌ 問題データの取得中にエラーが発生しました。');
         });
-    }
+}
+
+function showEditDialog(problem) {
+    const modal = document.createElement('div');
+    modal.innerHTML = `
+        <div class="modal fade" id="editEssayModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">論述問題編集 (ID: ${problem.id})</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="editEssayForm">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label">章</label>
+                                        <input type="text" class="form-control" id="edit_chapter" value="${problem.chapter}" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">タイプ</label>
+                                        <select class="form-control" id="edit_type" required>
+                                            <option value="A" ${problem.type === 'A' ? 'selected' : ''}>A（200字以上）</option>
+                                            <option value="B" ${problem.type === 'B' ? 'selected' : ''}>B（100-150字程度）</option>
+                                            <option value="C" ${problem.type === 'C' ? 'selected' : ''}>C（50-75字程度）</option>
+                                            <option value="D" ${problem.type === 'D' ? 'selected' : ''}>D（30字程度）</option>
+                                        </select>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">大学</label>
+                                        <input type="text" class="form-control" id="edit_university" value="${problem.university}" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">年度</label>
+                                        <input type="number" class="form-control" id="edit_year" value="${problem.year}" required min="2000" max="2030">
+                                    </div>
+                                    <div class="mb-3">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="edit_enabled" ${problem.enabled ? 'checked' : ''}>
+                                            <label class="form-check-label">有効にする</label>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label">問題文</label>
+                                        <textarea class="form-control" id="edit_question" rows="5" required>${problem.question}</textarea>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">模範解答</label>
+                                        <textarea class="form-control" id="edit_answer" rows="8" required>${problem.answer}</textarea>
+                                        <small class="text-muted">文字数: <span id="answerLength">${problem.answer_length}</span>字</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+                        <button type="button" class="btn btn-primary" onclick="saveEditedProblem(${problem.id})">保存</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // 文字数カウンター
+    document.getElementById('edit_answer').addEventListener('input', function() {
+        document.getElementById('answerLength').textContent = this.value.length;
+    });
+    
+    // モーダルを表示
+    const bootstrapModal = new bootstrap.Modal(document.getElementById('editEssayModal'));
+    bootstrapModal.show();
+    
+    // モーダルが閉じられたときに要素を削除
+    document.getElementById('editEssayModal').addEventListener('hidden.bs.modal', function() {
+        document.body.removeChild(modal);
+    });
+}
+
+// 編集内容を保存
+function saveEditedProblem(problemId) {
+    const formData = {
+        chapter: document.getElementById('edit_chapter').value,
+        type: document.getElementById('edit_type').value,
+        university: document.getElementById('edit_university').value,
+        year: parseInt(document.getElementById('edit_year').value),
+        question: document.getElementById('edit_question').value,
+        answer: document.getElementById('edit_answer').value,
+        enabled: document.getElementById('edit_enabled').checked
+    };
+    
+    const saveBtn = event.target;
+    const originalText = saveBtn.textContent;
+    saveBtn.disabled = true;
+    saveBtn.textContent = '保存中...';
+    
+    fetch(`/admin/essay/problem/${problemId}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            alert('✅ ' + data.message);
+            // モーダルを閉じる
+            bootstrap.Modal.getInstance(document.getElementById('editEssayModal')).hide();
+            loadEssayProblems();
+            loadEssayStats();
+        } else {
+            alert('❌ エラー: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('保存エラー:', error);
+        alert('❌ 保存中にエラーが発生しました。');
+    })
+    .finally(() => {
+        saveBtn.disabled = false;
+        saveBtn.textContent = originalText;
+    });
 }
 
 // 論述問題の有効/無効切り替え
@@ -2021,8 +2074,8 @@ function toggleEssayProblem(problemId, currentEnabled) {
 // 論述問題削除
 function deleteEssayProblem(problemId) {
     if (confirm('この論述問題を削除しますか？\n\n⚠️ この操作は元に戻せません。')) {
-        fetch(`/admin/essay/problem/${problemId}`, {
-            method: 'DELETE',
+        fetch(`/admin/essay/problem/${problemId}/delete`, {
+            method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             }
