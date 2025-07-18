@@ -7538,10 +7538,11 @@ def admin_essay_delete_problem():
         if not problem:
             return jsonify({'status': 'error', 'message': '問題が見つかりません'}), 404
         
-        # 関連する進捗データも削除
+        # 関連する進捗データも削除（正しいテーブル存在確認）
         try:
-            # EssayProgressテーブルが存在する場合のみ削除
-            if hasattr(db.Model, 'EssayProgress'):
+            from sqlalchemy import inspect
+            inspector = inspect(db.engine)
+            if inspector.has_table('essay_progress'):
                 EssayProgress.query.filter_by(problem_id=problem_id).delete()
         except Exception as progress_error:
             logger.warning(f"Progress data deletion error (non-critical): {progress_error}")
