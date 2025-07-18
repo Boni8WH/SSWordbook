@@ -11,7 +11,7 @@
             </a>
             <i class="fas fa-chevron-right"></i>
             <a href="{{ url_for('essay_chapter', chapter=problem.chapter) }}">
-                {{ '第' + problem.chapter + '章' if problem.chapter != 'com' else '総合問題' }}
+                {% if problem.chapter == 'com' %}総合問題{% else %}第{{ problem.chapter }}章{% endif %}
             </a>
             <i class="fas fa-chevron-right"></i>
             <span>問題 {{ problem.id }}</span>
@@ -71,7 +71,7 @@
             
             <div id="answerContent" class="answer-content" style="display: none;">
                 <div class="answer-text">
-                    {{ problem.answer|nl2br }}
+                    {{ problem.answer|safe|replace('\n', '<br>')|replace('\r', '') }}
                 </div>
                 <div class="answer-meta">
                     <small class="text-muted">文字数: {{ problem.answer_length }}字</small>
@@ -124,9 +124,7 @@
         </div>
     </div>
 </div>
-{% endblock %}
 
-{% block scripts %}
 <!-- データを安全にJavaScriptに渡す -->
 <script id="problem-data" type="application/json">
 {
@@ -207,9 +205,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 </script>
-{% endblock %}
 
-{% block head_extra %}
 <style>
 .essay-problem-container {
     max-width: 900px;
@@ -259,6 +255,7 @@ document.addEventListener('DOMContentLoaded', function() {
     border-radius: 20px;
     font-weight: 600;
     margin-right: 10px;
+    color: white;
 }
 
 .badge-type-a { background: #dc3545; }
@@ -344,6 +341,61 @@ document.addEventListener('DOMContentLoaded', function() {
 .memo-section textarea:focus {
     outline: none;
     border-color: #667eea;
+}
+
+.btn {
+    padding: 10px 20px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.btn-primary {
+    background: #667eea;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #5a67d8;
+}
+
+.btn-outline-primary {
+    background: transparent;
+    color: #667eea;
+    border: 2px solid #667eea;
+}
+
+.btn-outline-primary:hover {
+    background: #667eea;
+    color: white;
+}
+
+.btn-outline-secondary {
+    background: transparent;
+    color: #6c757d;
+    border: 2px solid #6c757d;
+}
+
+.btn-outline-secondary:hover {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-outline-light {
+    background: rgba(255,255,255,0.2);
+    color: white;
+    border: 2px solid rgba(255,255,255,0.3);
+}
+
+.btn-outline-light:hover {
+    background: rgba(255,255,255,0.3);
+    color: white;
 }
 
 @media (max-width: 768px) {
