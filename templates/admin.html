@@ -1900,7 +1900,6 @@ document.getElementById('essayAddForm').addEventListener('submit', function(e) {
     });
 });
 
-// 論述問題一覧を読み込み
 function loadEssayProblems() {
     const container = document.getElementById('essay-problems-container');
     if (!container) return;
@@ -1920,64 +1919,67 @@ function loadEssayProblems() {
         .then(response => response.json())
         .then(data => {
             if (data.status === 'success') {
-                if (data.problems.length === 0) {
-                    container.innerHTML = '<p class="text-muted">📝 該当する問題が見つかりません。</p>';
-                    return;
+                // 章フィルターを更新（データに章リストが含まれている場合）
+                if (data.chapters && data.chapters.length > 0) {
+                    updateChapterFilter(data.chapters);
                 }
                 
-                let html = '<div class="table-responsive"><table class="table table-striped">';
-                html += '<thead><tr>';
-                html += '<th>ID</th><th>章</th><th>タイプ</th><th>大学</th><th>年度</th>';
-                html += '<th>問題文（抜粋）</th><th>状態</th><th>操作</th>';
-                html += '</tr></thead><tbody>';
-                
-                data.problems.forEach(problem => {
-                    const questionPreview = problem.question.length > 50 
-                        ? problem.question.substring(0, 50) + '...' 
-                        : problem.question;
+                // 問題一覧を表示
+                if (data.problems && data.problems.length > 0) {
+                    let html = `
+                        <div class="essay-problems-list">
+                            <p class="mb-3">📊 全 ${data.pagination.total} 件中 ${data.problems.length} 件を表示</p>
+                    `;
                     
-                    const statusBadge = problem.enabled 
-                        ? '<span class="badge bg-success">有効</span>'
-                        : '<span class="badge bg-secondary">無効</span>';
-                    
-                    // 有効/無効切り替えボタンのスタイルを動的に設定
-                    const toggleBtnClass = problem.enabled ? 'btn-success' : 'btn-secondary';
-                    const toggleBtnText = problem.enabled ? '無効化' : '有効化';
-                    const toggleBtnIcon = problem.enabled ? 'fas fa-toggle-on' : 'fas fa-toggle-off';
-
-                    html += `<tr>
-                        <td>${problem.id}</td>
-                        <td>${problem.chapter}</td>
-                        <td><span class="badge bg-primary">タイプ${problem.type}</span></td>
-                        <td>${problem.university}</td>
-                        <td>${problem.year}</td>
-                        <td title="${problem.question}">${questionPreview}</td>
-                        <td>${statusBadge}</td>
-                        <td>
-                            <div class="btn-group-vertical btn-group-sm">
-                                <button class="btn btn-outline-primary btn-sm" onclick="editEssayProblem(${problem.id})">
-                                    <i class="fas fa-edit"></i> 編集
-                                </button>
-                                <button class="btn ${toggleBtnClass} btn-sm" onclick="toggleEssayProblem(${problem.id}, ${problem.enabled})">
-                                    <i class="${toggleBtnIcon}"></i> ${toggleBtnText}
-                                </button>
-                                <button class="btn btn-outline-danger btn-sm" onclick="deleteEssayProblem(${problem.id})">
-                                    <i class="fas fa-trash"></i> 削除
-                                </button>
+                    data.problems.forEach(problem => {
+                        const typeColor = getTypeColor(problem.type);
+                        const enabledBadge = problem.enabled 
+                            ? '<span class="badge bg-success">有効</span>'
+                            : '<span class="badge bg-secondary">無効</span>';
+                        
+                        html += `
+                            <div class="essay-problem-item">
+                                <div class="problem-header">
+                                    <div class="problem-info">
+                                        <span class="badge bg-primary">第${problem.chapter}章</span>
+                                        <span class="badge bg-${typeColor}">タイプ${problem.type}</span>
+                                        ${enabledBadge}
+                                        <span class="text-muted">${problem.university} ${problem.year}年</span>
+                                    </div>
+                                    <div class="problem-actions">
+                                        <button class="btn btn-sm btn-info" onclick="editEssayProblem(${problem.id})">
+                                            <i class="fas fa-edit"></i> 編集
+                                        </button>
+                                        <button class="btn btn-sm btn-warning" onclick="toggleEssayProblem(${problem.id}, ${problem.enabled})">
+                                            <i class="fas fa-toggle-${problem.enabled ? 'on' : 'off'}"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-danger" onclick="deleteEssayProblem(${problem.id})">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="problem-content">
+                                    <p class="mb-1"><strong>問題:</strong> ${problem.question}</p>
+                                    <p class="text-muted mb-0">
+                                        <i class="fas fa-file-alt"></i> 解答文字数: ${problem.answer_length}文字
+                                    </p>
+                                </div>
                             </div>
-                        </td>
-                    </tr>`;
-                });
-                
-                html += '</tbody></table></div>';
-                container.innerHTML = html;
+                        `;
+                    });
+                    
+                    html += '</div>';
+                    container.innerHTML = html;
+                } else {
+                    container.innerHTML = '<p class="text-warning">⚠️ 該当する問題が見つかりませんでした。</p>';
+                }
             } else {
-                container.innerHTML = '<p class="text-danger">❌ 問題一覧の取得に失敗しました。</p>';
+                container.innerHTML = '<p class="text-danger">❌ エラー: ' + data.message + '</p>';
             }
         })
         .catch(error => {
-            console.error('問題一覧取得エラー:', error);
-            container.innerHTML = '<p class="text-danger">❌ 問題一覧の取得中にエラーが発生しました。</p>';
+            console.error('読み込みエラー:', error);
+            container.innerHTML = '<p class="text-danger">❌ 問題一覧の読み込み中にエラーが発生しました。</p>';
         });
 }
 
