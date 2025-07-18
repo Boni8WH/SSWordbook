@@ -2047,12 +2047,16 @@ function saveEditedProblem(problemId) {
     saveBtn.disabled = true;
     saveBtn.textContent = '保存中...';
     
-    fetch(`/admin/essay/problem/${problemId}`, {
-        method: 'PUT',
+    // ★ POSTメソッドに変更し、URLも変更
+    fetch('/admin/essay/update_problem', {
+        method: 'POST',  // PUT から POST に変更
         headers: {
             'Content-Type': 'application/json'
         },
-        body: JSON.stringify(formData)
+        body: JSON.stringify({
+            problem_id: problemId,  // ★ problem_id を追加
+            ...formData
+        })
     })
     .then(response => response.json())
     .then(data => {
@@ -2061,7 +2065,9 @@ function saveEditedProblem(problemId) {
             // モーダルを閉じる
             bootstrap.Modal.getInstance(document.getElementById('editEssayModal')).hide();
             loadEssayProblems();
-            loadEssayStats();
+            if (typeof loadEssayStats === 'function') {
+                loadEssayStats();
+            }
         } else {
             alert('❌ エラー: ' + data.message);
         }
