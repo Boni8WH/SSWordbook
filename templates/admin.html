@@ -2059,7 +2059,14 @@ function updateChapterFilter(chapters) {
     chapters.forEach(chapter => {
         const option = document.createElement('option');
         option.value = chapter;
-        option.textContent = chapter === 'com' ? '総合問題' : '第' + chapter + '章';
+        // 表示テキストをフォーマット
+        if (chapter === 'com') {
+            option.textContent = '総合問題';
+        } else if (!isNaN(chapter)) {
+            option.textContent = '第' + chapter + '章';
+        } else {
+            option.textContent = chapter;
+        }
         select.appendChild(option);
     });
     
