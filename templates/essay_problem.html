@@ -389,6 +389,182 @@
         color: #e2e8f0;
     }
 }
+
+/* =======================================
+   論述問題画面のレイアウト修正
+   ======================================= */
+
+/* 1. 模範解答の表示位置修正 - 大画面対応 */
+.essay-problem-container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 15px;
+}
+
+.problem-content {
+    background: white;
+    border-radius: 15px;
+    padding: 25px 20px;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+    display: flex;
+    flex-direction: column; /* 縦並びで順序を保持 */
+}
+
+/* 問題セクション */
+.question-section {
+    order: 1; /* 最初に表示 */
+    margin-bottom: 25px;
+}
+
+/* 解答表示ボタンセクション */
+.answer-toggle-section {
+    order: 2; /* 問題の次に表示 */
+    text-align: center;
+    padding: 25px 15px;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-radius: 12px;
+    margin-bottom: 25px;
+}
+
+/* 模範解答セクション */
+.answer-section {
+    order: 3; /* ボタンの次に表示 */
+    margin-bottom: 30px;
+    width: 100%; /* 全幅使用 */
+    position: static !important; /* 固定位置を解除 */
+}
+
+/* 学習進捗セクション */
+.progress-section {
+    order: 4; /* 最後に表示 */
+}
+
+/* 模範解答コンテンツの位置調整 */
+.answer-content {
+    position: static !important; /* 固定位置を完全に解除 */
+    float: none !important;
+    width: 100% !important;
+    max-width: none !important;
+    left: auto !important;
+    right: auto !important;
+    top: auto !important;
+    bottom: auto !important;
+    margin: 0 !important;
+    transform: none !important;
+}
+
+/* 2. スマホでのボタンテキスト表示修正 */
+@media (max-width: 767px) {
+    /* ナビゲーションボタンのテキストを常に表示 */
+    .nav-text {
+        display: inline !important; /* 強制的に表示 */
+    }
+    
+    .btn-text {
+        display: inline !important; /* 強制的に表示 */
+    }
+    
+    /* ボタンのサイズ調整 */
+    .btn {
+        padding: 8px 12px !important;
+        font-size: 0.8rem !important;
+        white-space: nowrap; /* テキストの改行を防ぐ */
+        min-width: auto !important;
+    }
+    
+    /* ナビゲーションエリアの調整 */
+    .problem-navigation {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        justify-content: center;
+        align-items: center;
+    }
+    
+    /* ボタンアイコンとテキストの間隔調整 */
+    .btn i {
+        margin-right: 4px !important;
+    }
+    
+    /* 戻るボタンの特別対応 */
+    .btn-back-to-list {
+        flex: 1 1 auto;
+        max-width: 200px;
+        text-align: center;
+    }
+    
+    /* 前後ボタンの調整 */
+    .btn-nav {
+        flex: 0 1 auto;
+        min-width: 80px;
+    }
+}
+
+/* 3. 極小画面（480px以下）での対応 */
+@media (max-width: 480px) {
+    /* テキストを小さくしてでも表示 */
+    .nav-text,
+    .btn-text {
+        display: inline !important;
+        font-size: 0.7rem !important;
+    }
+    
+    .btn {
+        padding: 6px 8px !important;
+        font-size: 0.7rem !important;
+    }
+    
+    /* ナビゲーションを縦並びに */
+    .problem-navigation {
+        flex-direction: column;
+        gap: 6px;
+    }
+    
+    .btn {
+        width: 100%;
+        max-width: 180px;
+        justify-content: center;
+    }
+}
+
+/* 4. 追加の安全対策 - 模範解答の位置固定防止 */
+.answer-content,
+.answer-content * {
+    position: static !important;
+    float: none !important;
+}
+
+/* 模範解答セクション全体の位置確保 */
+.answer-section {
+    clear: both;
+    display: block;
+    width: 100%;
+}
+
+/* 5. レスポンシブ対応の強化 */
+@media (min-width: 768px) {
+    /* 大画面では模範解答を問題文の下に確実に配置 */
+    .answer-section {
+        margin-top: 20px;
+        margin-bottom: 30px;
+    }
+    
+    .answer-content {
+        margin-top: 0 !important;
+    }
+}
+
+/* 6. ダークモード対応の維持 */
+@media (prefers-color-scheme: dark) {
+    .answer-toggle-section {
+        background: linear-gradient(135deg, #4a5568 0%, #2d3748 100%);
+    }
+    
+    .btn-show-answer,
+    .btn-hide-answer {
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    }
+}
 </style>
 {% endblock %}
 
