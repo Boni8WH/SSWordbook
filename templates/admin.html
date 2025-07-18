@@ -359,140 +359,218 @@
         <div class="collapse" id="section-essay-management">
             <div class="section-content">
                 <p>論述問題の登録・管理・インポートを行います。</p>
-                <!-- 論述問題CSV一括インポート -->
-                <h4>📤 論述問題CSV一括インポート</h4>
-                <div class="csv-template-section" style="margin-bottom: 25px; padding: 15px; background-color: #f0f8ff; border: 1px solid #87ceeb; border-radius: 6px; border-left: 4px solid #17a2b8;">
-                    <h5 style="margin-top: 0; color: #17a2b8; display: flex; align-items: center; gap: 8px;">
-                        <i class="fas fa-download"></i> 論述問題CSVテンプレート
-                    </h5>
-                    <p style="color: #666; font-size: 0.9em; margin-bottom: 15px;">
-                        正しい形式の論述問題CSVファイルを作成するためのテンプレートです。
-                    </p>
-                    <div class="template-format" style="background: white; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 0.8em; margin-bottom: 15px;">
-                        <strong>CSVフォーマット:</strong><br>
-                        chapter,type,university,year,question,answer,answer_length,enabled<br>
-                        <br>
-                        <strong>例:</strong><br>
-                        1,A,東京大学,2023,"フランス革命の社会的背景について200字以上で論述せよ","フランス革命は18世紀後半のフランスにおいて...",245,1
+                
+                <!-- 統計情報 -->
+                <div class="essay-stats-section">
+                    <h4><i class="fas fa-chart-bar"></i> 統計情報</h4>
+                    <div id="essay-stats-container">
+                        <p class="text-info">📊 統計情報を読み込み中...</p>
                     </div>
-                    <button class="btn btn-outline-info btn-sm" onclick="downloadEssayTemplate()">
-                        <i class="fas fa-file-csv"></i> 論述問題CSVテンプレートをダウンロード
-                    </button>
-                    <small class="text-muted d-block mt-2">
-                        ※ type: A(200字以上), B(100-150字), C(50-75字), D(30字程度)
-                    </small>
                 </div>
 
-                <form id="essayUploadForm" enctype="multipart/form-data" class="upload-form">
-                    <div class="input-group">
-                        <label for="essay_csv_file">論述問題CSVファイルを選択:</label>
-                        <input type="file" id="essay_csv_file" name="file" accept=".csv" required>
-                        <small class="form-text text-muted">UTF-8エンコーディングのCSVファイルを選択してください</small>
-                    </div>
-                    <div class="input-group">
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="replaceExisting" name="replace_existing">
-                            <label class="form-check-label" for="replaceExisting">
-                                既存の問題を置き換える（注意：全ての論述問題が削除されます）
-                            </label>
+                <!-- 論述問題CSV一括インポート -->
+                <div class="csv-import-section">
+                    <h4><i class="fas fa-upload"></i> CSV一括インポート</h4>
+                    
+                    <!-- CSVテンプレート説明 -->
+                    <div class="csv-template-section">
+                        <h5><i class="fas fa-download"></i> 論述問題CSVテンプレート</h5>
+                        <p>正しい形式の論述問題CSVファイルを作成するためのテンプレートです。</p>
+                        
+                        <div class="template-format">
+                            <strong>CSVフォーマット:</strong><br>
+                            <code>chapter,type,university,year,question,answer,answer_length,enabled</code><br><br>
+                            
+                            <strong>各列の説明:</strong><br>
+                            • <strong>chapter</strong>: 章番号（例: 1, 2, com）<br>
+                            • <strong>type</strong>: 問題タイプ（A: 200字以上, B: 100-150字, C: 50-75字, D: 30字程度）<br>
+                            • <strong>university</strong>: 出題大学名（任意）<br>
+                            • <strong>year</strong>: 出題年度（任意）<br>
+                            • <strong>question</strong>: 問題文（必須）<br>
+                            • <strong>answer</strong>: 模範解答（任意）<br>
+                            • <strong>answer_length</strong>: 解答文字数（自動計算されるため任意）<br>
+                            • <strong>enabled</strong>: 有効フラグ（1: 有効, 0: 無効）
                         </div>
+                        
+                        <button class="btn btn-outline-info btn-sm" onclick="downloadEssayTemplate()">
+                            <i class="fas fa-file-csv"></i> 論述問題CSVテンプレートをダウンロード
+                        </button>
                     </div>
-                    <button type="submit" class="btn btn-success">
-                        <i class="fas fa-upload"></i> 論述問題CSV一括インポート
-                    </button>
-                </form>
 
-                <!-- 個別論述問題登録 -->
-                <h4>➕ 個別論述問題登録</h4>
-                <form id="essayAddForm" class="add-user-form">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="input-group">
-                                <label for="new_essay_chapter">章:</label>
-                                <input type="text" id="new_essay_chapter" name="chapter" required placeholder="例: 1, 2, com">
+                    <!-- CSVアップロードフォーム -->
+                    <form id="essayUploadForm" enctype="multipart/form-data" class="csv-upload-form">
+                        <div class="upload-area">
+                            <div class="file-input-wrapper">
+                                <label for="essay_csv_file" class="file-input-label">
+                                    <i class="fas fa-cloud-upload-alt"></i>
+                                    <span>CSVファイルを選択またはドラッグ&ドロップ</span>
+                                </label>
+                                <input type="file" id="essay_csv_file" name="file" accept=".csv" required>
+                                <small class="form-text text-muted">UTF-8またはShift_JISエンコーディングのCSVファイルを選択してください</small>
                             </div>
-                            <div class="input-group">
-                                <label for="new_essay_type">タイプ:</label>
-                                <select id="new_essay_type" name="type" class="form-control" required>
-                                    <option value="">選択してください</option>
-                                    <option value="A">A（200字以上）</option>
-                                    <option value="B">B（100-150字程度）</option>
-                                    <option value="C">C（50-75字程度）</option>
-                                    <option value="D">D（30字程度）</option>
-                                </select>
-                            </div>
-                            <div class="input-group">
-                                <label for="new_essay_university">大学:</label>
-                                <input type="text" id="new_essay_university" name="university" required placeholder="例: 東京大学">
-                            </div>
-                            <div class="input-group">
-                                <label for="new_essay_year">年度:</label>
-                                <input type="number" id="new_essay_year" name="year" required placeholder="例: 2023" min="2000" max="2030">
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="input-group">
-                                <label for="new_essay_question">問題文:</label>
-                                <textarea id="new_essay_question" name="question" required rows="4" placeholder="問題文を入力してください"></textarea>
-                            </div>
-                            <div class="input-group">
-                                <label for="new_essay_answer">解答:</label>
-                                <textarea id="new_essay_answer" name="answer" required rows="6" placeholder="解答を入力してください"></textarea>
-                            </div>
-                            <div class="input-group">
+                            
+                            <div class="upload-options">
                                 <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="new_essay_enabled" name="enabled" checked>
-                                    <label class="form-check-label" for="new_essay_enabled">
-                                        有効にする
+                                    <input class="form-check-input" type="checkbox" id="replaceExisting" name="replace_existing">
+                                    <label class="form-check-label" for="replaceExisting">
+                                        <i class="fas fa-exclamation-triangle text-warning"></i>
+                                        既存の問題を置き換える（注意：全ての論述問題が削除されます）
                                     </label>
                                 </div>
                             </div>
+                            
+                            <button type="submit" class="btn btn-success btn-upload">
+                                <i class="fas fa-upload"></i>
+                                <span>論述問題CSV一括インポート</span>
+                            </button>
                         </div>
-                    </div>
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-plus"></i> 論述問題を追加
-                    </button>
-                </form>
+                    </form>
+                </div>
 
-                <!-- 論述問題一覧・管理 -->
-                <h4>📋 論述問題一覧・管理</h4>
-                <div class="essay-management-controls mb-3">
-                    <div class="row">
-                        <div class="col-md-4">
-                            <label for="essayChapterFilter">章フィルター:</label>
-                            <select id="essayChapterFilter" class="form-control form-control-sm">
-                                <option value="">全ての章</option>
-                            </select>
-                        </div>
-                        <div class="col-md-4">
-                            <label for="essayTypeFilter">タイプフィルター:</label>
-                            <select id="essayTypeFilter" class="form-control form-control-sm">
-                                <option value="">全てのタイプ</option>
-                                <option value="A">A（200字以上）</option>
-                                <option value="B">B（100-150字程度）</option>
-                                <option value="C">C（50-75字程度）</option>
-                                <option value="D">D（30字程度）</option>
-                            </select>
-                        </div>
-                        <div class="col-md-4">
-                            <label for="essaySearch">問題検索:</label>
-                            <input type="text" id="essaySearch" class="form-control form-control-sm" placeholder="大学名、問題文で検索...">
-                        </div>
-                    </div>
-                    <div class="mt-2">
-                        <button class="btn btn-info btn-sm" onclick="loadEssayProblems()">
-                            <i class="fas fa-sync"></i> 問題一覧を更新
-                        </button>
-                        <button class="btn btn-success btn-sm" onclick="exportEssayProblems()">
-                            <i class="fas fa-download"></i> CSV出力
-                        </button>
+                <!-- 個別論述問題登録 -->
+                <div class="essay-form-section">
+                    <h4><i class="fas fa-plus-circle"></i> 個別論述問題登録</h4>
+                    
+                    <div class="essay-form-container">
+                        <form id="essayAddForm" class="essay-registration-form">
+                            <div class="essay-form-grid">
+                                <!-- 章・タイプ行 -->
+                                <div class="essay-input-group">
+                                    <label for="new_essay_chapter">
+                                        <i class="fas fa-bookmark"></i> 章
+                                    </label>
+                                    <input type="text" 
+                                        id="new_essay_chapter" 
+                                        name="chapter" 
+                                        placeholder="例: 1, 2, com" 
+                                        required>
+                                    <small class="essay-help-text">数字または「com」（総合問題）を入力</small>
+                                </div>
+
+                                <div class="essay-input-group">
+                                    <label for="new_essay_type">
+                                        <i class="fas fa-tag"></i> タイプ
+                                    </label>
+                                    <select id="new_essay_type" name="type" required>
+                                        <option value="">選択してください</option>
+                                        <option value="A">タイプA (200字以上)</option>
+                                        <option value="B">タイプB (100-150字程度)</option>
+                                        <option value="C">タイプC (50-75字程度)</option>
+                                        <option value="D">タイプD (30字程度)</option>
+                                    </select>
+                                    <small class="essay-help-text">問題の文字数規模を選択</small>
+                                </div>
+
+                                <!-- 大学・年度行 -->
+                                <div class="essay-input-group">
+                                    <label for="new_essay_university">
+                                        <i class="fas fa-university"></i> 大学名
+                                    </label>
+                                    <input type="text" 
+                                        id="new_essay_university" 
+                                        name="university" 
+                                        placeholder="例: 東京大学">
+                                    <small class="essay-help-text">出題大学名（任意）</small>
+                                </div>
+
+                                <div class="essay-input-group">
+                                    <label for="new_essay_year">
+                                        <i class="fas fa-calendar-alt"></i> 年度
+                                    </label>
+                                    <input type="number" 
+                                        id="new_essay_year" 
+                                        name="year" 
+                                        placeholder="2024" 
+                                        min="2000" 
+                                        max="2030">
+                                    <small class="essay-help-text">出題年度（任意）</small>
+                                </div>
+
+                                <!-- 問題文（全幅） -->
+                                <div class="essay-input-group essay-form-full-width">
+                                    <label for="new_essay_question">
+                                        <i class="fas fa-question-circle"></i> 問題文
+                                    </label>
+                                    <textarea id="new_essay_question" 
+                                            name="question" 
+                                            class="essay-question-input"
+                                            placeholder="問題文を入力してください..." 
+                                            required></textarea>
+                                    <small class="essay-help-text">出題する問題の内容を詳しく記入</small>
+                                </div>
+
+                                <!-- 解答（全幅） -->
+                                <div class="essay-input-group essay-form-full-width">
+                                    <label for="new_essay_answer">
+                                        <i class="fas fa-lightbulb"></i> 模範解答
+                                    </label>
+                                    <textarea id="new_essay_answer" 
+                                            name="answer" 
+                                            class="essay-answer-input"
+                                            placeholder="模範解答を入力してください..."></textarea>
+                                    <small class="essay-help-text">参考となる解答例（任意）</small>
+                                </div>
+                            </div>
+
+                            <!-- 有効化チェックボックス -->
+                            <div class="essay-checkbox-group">
+                                <input type="checkbox" 
+                                    id="new_essay_enabled" 
+                                    name="enabled" 
+                                    checked>
+                                <label for="new_essay_enabled">
+                                    <i class="fas fa-check-circle"></i> 有効にする
+                                </label>
+                            </div>
+
+                            <!-- 送信ボタン -->
+                            <button type="submit" class="essay-submit-btn">
+                                <i class="fas fa-plus"></i>
+                                <span class="btn-text">論述問題を追加</span>
+                            </button>
+                        </form>
                     </div>
                 </div>
 
-                <!-- 論述問題リスト表示エリア -->
-                <div class="scrollable-table-container">
-                    <div id="essay-problems-container" style="overflow-x: auto;">
-                        <p class="text-info">📋 「問題一覧を更新」をクリックして論述問題を表示してください。</p>
+                <!-- 論述問題一覧・管理 -->
+                <div class="essay-management-section">
+                    <h4><i class="fas fa-list"></i> 論述問題一覧・管理</h4>
+                    
+                    <!-- フィルター -->
+                    <div class="essay-filter-section">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <label for="essayChapterFilter">章でフィルター:</label>
+                                <select id="essayChapterFilter" class="form-control" onchange="filterEssayProblems()">
+                                    <option value="">全ての章</option>
+                                    <option value="1">第1章</option>
+                                    <option value="2">第2章</option>
+                                    <option value="3">第3章</option>
+                                    <option value="4">第4章</option>
+                                    <option value="5">第5章</option>
+                                    <option value="com">総合問題</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label for="essayTypeFilter">タイプでフィルター:</label>
+                                <select id="essayTypeFilter" class="form-control" onchange="filterEssayProblems()">
+                                    <option value="">全てのタイプ</option>
+                                    <option value="A">タイプA</option>
+                                    <option value="B">タイプB</option>
+                                    <option value="C">タイプC</option>
+                                    <option value="D">タイプD</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="essaySearch">キーワード検索:</label>
+                                <input type="text" id="essaySearch" class="form-control" placeholder="問題文や大学名で検索..." onkeyup="filterEssayProblems()">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 問題一覧 -->
+                    <div id="essay-problems-container">
+                        <p class="text-info">📋 問題一覧を読み込み中...</p>
                     </div>
                 </div>
             </div>
@@ -1655,45 +1733,108 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // 論述問題CSVテンプレートダウンロード
 function downloadEssayTemplate() {
-    const csvContent = [
-        'chapter,type,university,year,question,answer,answer_length,enabled',
-        '1,A,東京大学,2023,"フランス革命の社会的背景について200字以上で論述せよ","フランス革命は18世紀後半のフランスにおいて、絶対王政による重税と特権階級の存在が民衆の不満を高めた。また、啓蒙思想の普及により自由・平等の理念が広まり、アメリカ独立革命の影響も受けて、旧体制打破への機運が高まった。これらの要因が複合的に作用し、1789年の革命勃発へと至った。",245,1',
-        '2,B,早稲田大学,2022,"産業革命の影響を100-150字で述べよ","産業革命により機械制工業が発達し、労働者階級と資本家階級の分化が進んだ。都市への人口集中が起こり、劣悪な労働環境と生活環境が社会問題となった。一方で生産性向上により経済発展が促進された。",125,1',
-        '3,C,京都大学,2021,"冷戦の特徴を50-75字で述べよ","米ソ両超大国が直接軍事衝突を避けながら、イデオロギー対立と代理戦争を通じて世界規模で対立した状態。",65,1'
-    ].join('\n');
-    
-    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
+    link.href = '/admin/download_essay_template';
     link.download = 'essay_problems_template.csv';
+    document.body.appendChild(link);
     link.click();
+    document.body.removeChild(link);
 }
 
 // 論述問題統計を読み込み（統一版）
 function loadEssayStats() {
-    updateEssayStatistics();
+    const statsContainer = document.getElementById('essay-stats-container');
+    if (!statsContainer) return;
+    
+    statsContainer.innerHTML = '<p class="text-info">📊 統計情報を読み込み中...</p>';
+    
+    fetch('/admin/essay/stats')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.status === 'success') {
+                statsContainer.innerHTML = `
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="stat-card">
+                                <div class="stat-number">${data.total_problems || 0}</div>
+                                <div class="stat-label">総問題数</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="stat-card">
+                                <div class="stat-number">${data.enabled_problems || 0}</div>
+                                <div class="stat-label">有効な問題</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="stat-card">
+                                <div class="stat-number">${data.chapters_count || 0}</div>
+                                <div class="stat-label">章数</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="stat-card">
+                                <div class="stat-number">${data.progress_records || 0}</div>
+                                <div class="stat-label">学習記録</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } else {
+                throw new Error(data.message || '統計データの取得に失敗');
+            }
+        })
+        .catch(error => {
+            console.error('統計データ取得エラー:', error);
+            statsContainer.innerHTML = `
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle"></i> 
+                    統計データの取得に失敗しました。論述問題管理機能のAPIが未実装の可能性があります。
+                </div>
+            `;
+        });
 }
 
 // 論述問題CSVアップロード
 document.getElementById('essayUploadForm').addEventListener('submit', function(e) {
     e.preventDefault();
     
-    const formData = new FormData();
     const fileInput = document.getElementById('essay_csv_file');
-    const replaceExisting = document.getElementById('replaceExisting').checked;
+    const replaceCheckbox = document.getElementById('replaceExisting');
+    const submitBtn = this.querySelector('button[type="submit"]');
     
-    if (!fileInput.files[0]) {
-        alert('ファイルを選択してください。');
+    if (!fileInput.files.length) {
+        alert('❌ CSVファイルを選択してください。');
         return;
     }
     
-    formData.append('file', fileInput.files[0]);
-    formData.append('replace_existing', replaceExisting);
+    const file = fileInput.files[0];
+    if (!file.name.toLowerCase().endsWith('.csv')) {
+        alert('❌ CSVファイルを選択してください。');
+        return;
+    }
     
-    const submitBtn = this.querySelector('button[type="submit"]');
+    // 既存データ削除の確認
+    if (replaceCheckbox.checked) {
+        if (!confirm('⚠️ 既存の全ての論述問題が削除されます。本当に実行しますか？')) {
+            return;
+        }
+    }
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    if (replaceCheckbox.checked) {
+        formData.append('replace_existing', 'on');
+    }
+    
     const originalText = submitBtn.textContent;
     submitBtn.disabled = true;
-    submitBtn.textContent = 'アップロード中...';
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> アップロード中...';
     
     fetch('/admin/essay/upload_csv', {
         method: 'POST',
@@ -1702,47 +1843,73 @@ document.getElementById('essayUploadForm').addEventListener('submit', function(e
     .then(response => response.json())
     .then(data => {
         if (data.status === 'success') {
-            alert('✅ ' + data.message);
+            let message = `✅ ${data.message}`;
+            if (data.added_count > 0) {
+                message += `\n📊 追加された問題数: ${data.added_count}件`;
+            }
+            if (data.error_count > 0) {
+                message += `\n⚠️ エラー件数: ${data.error_count}件`;
+            }
+            if (data.error_details && data.error_details.length > 0) {
+                message += `\n\n詳細なエラー:\n${data.error_details.join('\n')}`;
+            }
+            alert(message);
+            
+            // フォームをリセット
+            this.reset();
+            
+            // 統計情報を更新
             loadEssayStats();
             loadEssayProblems();
-            fileInput.value = '';
-            document.getElementById('replaceExisting').checked = false;
         } else {
-            alert('❌ エラー: ' + data.message);
+            let errorMessage = `❌ エラー: ${data.message}`;
+            if (data.error_details && data.error_details.length > 0) {
+                errorMessage += `\n\n詳細:\n${data.error_details.join('\n')}`;
+            }
+            alert(errorMessage);
         }
     })
     .catch(error => {
         console.error('アップロードエラー:', error);
-        alert('❌ アップロード中にエラーが発生しました。');
+        alert('❌ アップロード中にエラーが発生しました。\nファイル形式とエンコーディング（UTF-8）を確認してください。');
     })
     .finally(() => {
         submitBtn.disabled = false;
-        submitBtn.textContent = originalText;
+        submitBtn.innerHTML = originalText;
     });
 });
 
-// 個別論述問題追加
 // 個別論述問題追加
 document.getElementById('essayAddForm').addEventListener('submit', function(e) {
     e.preventDefault();
     
     const formData = new FormData(this);
     
+    // 必須項目の確認
+    const chapter = formData.get('chapter');
+    const question = formData.get('question');
+    const type = formData.get('type');
+    
+    if (!chapter || !question || !type) {
+        alert('❌ 章、タイプ、問題文は必須項目です。');
+        return;
+    }
+    
     // FormDataをJSONオブジェクトに変換
     const data = {
-        chapter: formData.get('chapter'),
-        type: formData.get('type'),
-        university: formData.get('university'),
-        year: parseInt(formData.get('year')),
-        question: formData.get('question'),
-        answer: formData.get('answer'),
+        chapter: chapter.trim(),
+        type: type,
+        university: formData.get('university') || '未指定',
+        year: parseInt(formData.get('year')) || 2025,
+        question: question.trim(),
+        answer: formData.get('answer') || '解答なし',
         enabled: formData.get('enabled') === 'on'
     };
     
     const submitBtn = this.querySelector('button[type="submit"]');
-    const originalText = submitBtn.textContent;
+    const originalText = submitBtn.innerHTML;
     submitBtn.disabled = true;
-    submitBtn.textContent = '追加中...';
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 追加中...';
     
     fetch('/admin/essay/add_problem', {
         method: 'POST',
@@ -1755,8 +1922,12 @@ document.getElementById('essayAddForm').addEventListener('submit', function(e) {
     .then(data => {
         if (data.status === 'success') {
             alert('✅ ' + data.message);
+            
+            // フォームをリセット
             this.reset();
             document.getElementById('new_essay_enabled').checked = true;
+            
+            // 統計情報を更新
             loadEssayStats();
             loadEssayProblems();
         } else {
@@ -1769,18 +1940,20 @@ document.getElementById('essayAddForm').addEventListener('submit', function(e) {
     })
     .finally(() => {
         submitBtn.disabled = false;
-        submitBtn.textContent = originalText;
+        submitBtn.innerHTML = originalText;
     });
 });
 
 // 論述問題一覧を読み込み
 function loadEssayProblems() {
     const container = document.getElementById('essay-problems-container');
+    if (!container) return;
+    
     container.innerHTML = '<p class="text-info">📋 問題一覧を読み込み中...</p>';
     
-    const chapter = document.getElementById('essayChapterFilter').value;
-    const type = document.getElementById('essayTypeFilter').value;
-    const search = document.getElementById('essaySearch').value;
+    const chapter = document.getElementById('essayChapterFilter')?.value || '';
+    const type = document.getElementById('essayTypeFilter')?.value || '';
+    const search = document.getElementById('essaySearch')?.value || '';
     
     const params = new URLSearchParams();
     if (chapter) params.append('chapter', chapter);
@@ -1790,25 +1963,55 @@ function loadEssayProblems() {
     fetch('/admin/essay/problems?' + params.toString())
         .then(response => response.json())
         .then(data => {
-            console.log('論述問題データ受信:', data); // デバッグ用
             if (data.status === 'success') {
-                // データの妥当性をチェック
-                if (data.problems && Array.isArray(data.problems)) {
-                    displayEssayProblems(data.problems);
-                    if (data.chapters && Array.isArray(data.chapters)) {
-                        updateChapterFilter(data.chapters);
-                    }
-                } else {
-                    console.error('論述問題データが不正:', data);
-                    container.innerHTML = '<p class="text-warning">⚠️ 問題データの形式が不正です</p>';
+                if (data.problems.length === 0) {
+                    container.innerHTML = '<p class="text-muted">📝 該当する問題が見つかりません。</p>';
+                    return;
                 }
+                
+                let html = '<div class="table-responsive"><table class="table table-striped">';
+                html += '<thead><tr>';
+                html += '<th>ID</th><th>章</th><th>タイプ</th><th>大学</th><th>年度</th>';
+                html += '<th>問題文（抜粋）</th><th>状態</th><th>操作</th>';
+                html += '</tr></thead><tbody>';
+                
+                data.problems.forEach(problem => {
+                    const questionPreview = problem.question.length > 50 
+                        ? problem.question.substring(0, 50) + '...' 
+                        : problem.question;
+                    
+                    const statusBadge = problem.enabled 
+                        ? '<span class="badge bg-success">有効</span>'
+                        : '<span class="badge bg-secondary">無効</span>';
+                    
+                    html += `<tr>
+                        <td>${problem.id}</td>
+                        <td>${problem.chapter}</td>
+                        <td><span class="badge bg-primary">タイプ${problem.type}</span></td>
+                        <td>${problem.university}</td>
+                        <td>${problem.year}</td>
+                        <td title="${problem.question}">${questionPreview}</td>
+                        <td>${statusBadge}</td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-primary" onclick="editEssayProblem(${problem.id})">
+                                <i class="fas fa-edit"></i> 編集
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger" onclick="deleteEssayProblem(${problem.id})">
+                                <i class="fas fa-trash"></i> 削除
+                            </button>
+                        </td>
+                    </tr>`;
+                });
+                
+                html += '</tbody></table></div>';
+                container.innerHTML = html;
             } else {
-                container.innerHTML = '<p class="text-danger">❌ ' + (data.message || '不明なエラー') + '</p>';
+                container.innerHTML = '<p class="text-danger">❌ 問題一覧の取得に失敗しました。</p>';
             }
         })
         .catch(error => {
             console.error('問題一覧取得エラー:', error);
-            container.innerHTML = '<p class="text-danger">❌ 問題一覧の取得に失敗しました: ' + error.message + '</p>';
+            container.innerHTML = '<p class="text-danger">❌ 問題一覧の取得中にエラーが発生しました。</p>';
         });
 }
 
@@ -1948,86 +2151,193 @@ function updateEssayProblem(problemId, updateData) {
 }
 
 function showEditDialog(problem) {
-    const modal = document.createElement('div');
-    modal.innerHTML = `
-        <div class="modal fade" id="editEssayModal" tabindex="-1" aria-hidden="true">
-            <div class="modal-dialog modal-xl">
+    // 既存のモーダルがあれば削除
+    const existingModal = document.getElementById('editEssayModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+
+    // モーダルHTML作成
+    const modalHTML = `
+        <div class="modal fade" id="editEssayModal" tabindex="-1" aria-labelledby="editEssayModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
                 <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">論述問題編集 (ID: ${problem.id})</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    <div class="modal-header bg-primary text-white">
+                        <h5 class="modal-title" id="editEssayModalLabel">
+                            <i class="fas fa-edit"></i> 論述問題編集 (ID: ${problem.id})
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">
                         <form id="editEssayForm">
+                            <input type="hidden" id="edit_problem_id" value="${problem.id}">
+                            
                             <div class="row">
                                 <div class="col-md-6">
                                     <div class="mb-3">
-                                        <label class="form-label">章 <span class="text-danger">*</span></label>
-                                        <input type="text" class="form-control" id="edit_chapter" value="${problem.chapter || ''}" required>
-                                        <div class="form-text">例: 1, 2, 3, com（総合問題）</div>
-                                    </div>
-                                    <div class="mb-3">
-                                        <label class="form-label">タイプ <span class="text-danger">*</span></label>
-                                        <select class="form-control" id="edit_type" required>
-                                            <option value="A" ${problem.type === 'A' ? 'selected' : ''}>A（200字以上）</option>
-                                            <option value="B" ${problem.type === 'B' ? 'selected' : ''}>B（100-150字程度）</option>
-                                            <option value="C" ${problem.type === 'C' ? 'selected' : ''}>C（50-75字程度）</option>
-                                            <option value="D" ${problem.type === 'D' ? 'selected' : ''}>D（30字程度）</option>
-                                        </select>
-                                    </div>
-                                    <div class="mb-3">
-                                        <label class="form-label">大学</label>
-                                        <input type="text" class="form-control" id="edit_university" value="${problem.university || ''}" placeholder="大学名を入力">
-                                    </div>
-                                    <div class="mb-3">
-                                        <label class="form-label">年度</label>
-                                        <input type="number" class="form-control" id="edit_year" value="${problem.year || 2025}" min="2000" max="2030">
-                                    </div>
-                                    <div class="mb-3">
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" id="edit_enabled" ${problem.enabled ? 'checked' : ''}>
-                                            <label class="form-check-label">問題を有効にする</label>
-                                        </div>
+                                        <label for="edit_chapter" class="form-label">
+                                            <i class="fas fa-bookmark"></i> 章 <span class="text-danger">*</span>
+                                        </label>
+                                        <input type="text" class="form-control" id="edit_chapter" value="${problem.chapter}" required>
+                                        <small class="form-text text-muted">例: 1, 2, com</small>
                                     </div>
                                 </div>
                                 <div class="col-md-6">
                                     <div class="mb-3">
-                                        <label class="form-label">問題文 <span class="text-danger">*</span></label>
-                                        <textarea class="form-control" id="edit_question" rows="6" required placeholder="問題文を入力してください">${problem.question || ''}</textarea>
-                                    </div>
-                                    <div class="mb-3">
-                                        <label class="form-label">模範解答</label>
-                                        <textarea class="form-control" id="edit_answer" rows="8" placeholder="模範解答を入力してください">${problem.answer || ''}</textarea>
-                                        <small class="text-muted">文字数: <span id="answerLength">${(problem.answer || '').length}</span>字</small>
+                                        <label for="edit_type" class="form-label">
+                                            <i class="fas fa-tag"></i> タイプ <span class="text-danger">*</span>
+                                        </label>
+                                        <select class="form-control" id="edit_type" required>
+                                            <option value="A" ${problem.type === 'A' ? 'selected' : ''}>タイプA (200字以上)</option>
+                                            <option value="B" ${problem.type === 'B' ? 'selected' : ''}>タイプB (100-150字程度)</option>
+                                            <option value="C" ${problem.type === 'C' ? 'selected' : ''}>タイプC (50-75字程度)</option>
+                                            <option value="D" ${problem.type === 'D' ? 'selected' : ''}>タイプD (30字程度)</option>
+                                        </select>
                                     </div>
                                 </div>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-8">
+                                    <div class="mb-3">
+                                        <label for="edit_university" class="form-label">
+                                            <i class="fas fa-university"></i> 大学名
+                                        </label>
+                                        <input type="text" class="form-control" id="edit_university" value="${problem.university || ''}">
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label for="edit_year" class="form-label">
+                                            <i class="fas fa-calendar-alt"></i> 年度
+                                        </label>
+                                        <input type="number" class="form-control" id="edit_year" value="${problem.year || 2025}" min="2000" max="2030">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="edit_question" class="form-label">
+                                    <i class="fas fa-question-circle"></i> 問題文 <span class="text-danger">*</span>
+                                </label>
+                                <textarea class="form-control" id="edit_question" rows="4" required>${problem.question}</textarea>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="edit_answer" class="form-label">
+                                    <i class="fas fa-lightbulb"></i> 模範解答
+                                </label>
+                                <textarea class="form-control" id="edit_answer" rows="6">${problem.answer || ''}</textarea>
+                                <small class="form-text text-muted">文字数: <span id="answerLength">${(problem.answer || '').length}</span>字</small>
+                            </div>
+                            
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="edit_enabled" ${problem.enabled ? 'checked' : ''}>
+                                <label class="form-check-label" for="edit_enabled">
+                                    <i class="fas fa-check-circle"></i> 有効にする
+                                </label>
                             </div>
                         </form>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
-                        <button type="button" class="btn btn-primary" onclick="saveEditedProblem(${problem.id})">保存</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                            <i class="fas fa-times"></i> キャンセル
+                        </button>
+                        <button type="button" class="btn btn-primary" onclick="saveEssayProblem()">
+                            <i class="fas fa-save"></i> 保存
+                        </button>
                     </div>
                 </div>
             </div>
         </div>
     `;
+
+    // DOMに追加
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+
+    // 文字数カウンター設定
+    const answerTextarea = document.getElementById('edit_answer');
+    const answerLengthSpan = document.getElementById('answerLength');
     
-    document.body.appendChild(modal);
-    
-    // 文字数カウンター
-    document.getElementById('edit_answer').addEventListener('input', function() {
-        document.getElementById('answerLength').textContent = this.value.length;
+    answerTextarea.addEventListener('input', function() {
+        answerLengthSpan.textContent = this.value.length;
     });
-    
-    // モーダルを表示
-    const bootstrapModal = new bootstrap.Modal(document.getElementById('editEssayModal'));
-    bootstrapModal.show();
-    
-    // モーダルが閉じられたときに要素を削除
+
+    // モーダル表示
+    const modal = new bootstrap.Modal(document.getElementById('editEssayModal'));
+    modal.show();
+
+    // モーダルが閉じられた時の cleanup
     document.getElementById('editEssayModal').addEventListener('hidden.bs.modal', function() {
-        document.body.removeChild(modal);
+        this.remove();
     });
+}
+
+function saveEssayProblem() {
+    const problemId = document.getElementById('edit_problem_id').value;
+    const submitBtn = document.querySelector('#editEssayModal .btn-primary');
+    const originalText = submitBtn.innerHTML;
+    
+    // バリデーション
+    const chapter = document.getElementById('edit_chapter').value.trim();
+    const question = document.getElementById('edit_question').value.trim();
+    const type = document.getElementById('edit_type').value;
+    
+    if (!chapter || !question || !type) {
+        alert('❌ 章、タイプ、問題文は必須項目です。');
+        return;
+    }
+    
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 保存中...';
+    
+    const data = {
+        problem_id: parseInt(problemId),
+        chapter: chapter,
+        type: type,
+        university: document.getElementById('edit_university').value.trim() || '未指定',
+        year: parseInt(document.getElementById('edit_year').value) || 2025,
+        question: question,
+        answer: document.getElementById('edit_answer').value.trim() || '解答なし',
+        enabled: document.getElementById('edit_enabled').checked
+    };
+    
+    fetch('/admin/essay/update_problem', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            alert('✅ ' + data.message);
+            
+            // モーダルを閉じる
+            const modal = bootstrap.Modal.getInstance(document.getElementById('editEssayModal'));
+            modal.hide();
+            
+            // 問題一覧を更新
+            loadEssayProblems();
+            loadEssayStats();
+        } else {
+            alert('❌ エラー: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('保存エラー:', error);
+        alert('❌ 保存中にエラーが発生しました。');
+    })
+    .finally(() => {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
+    });
+}
+
+// フィルター機能を改善
+function filterEssayProblems() {
+    loadEssayProblems();
 }
 
 // 編集内容を保存
@@ -2088,7 +2398,7 @@ function toggleEssayProblem(problemId, currentEnabled) {
     const action = newStatus ? '有効' : '無効';
     
     if (confirm('この問題を' + action + 'にしますか？')) {
-        fetch('/admin/essay/toggle_problem', {
+        fetch('/admin/essay/toggle_enabled', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -2102,9 +2412,7 @@ function toggleEssayProblem(problemId, currentEnabled) {
             if (data.status === 'success') {
                 alert('✅ ' + data.message);
                 loadEssayProblems();
-                if (typeof loadEssayStats === 'function') {
-                    loadEssayStats();
-                }
+                loadEssayStats();
             } else {
                 alert('❌ エラー: ' + data.message);
             }
@@ -2207,7 +2515,43 @@ document.addEventListener('DOMContentLoaded', function() {
         clearTimeout(searchTimeout);
         searchTimeout = setTimeout(loadEssayProblems, 500);
     });
+    setTimeout(() => {
+        // 論述問題統計とリストを読み込み
+        if (document.getElementById('essay-stats-container')) {
+            loadEssayStats();
+        }
+        if (document.getElementById('essay-problems-container')) {
+            loadEssayProblems();
+        }
+    }, 1000);
+    
+    // 論述問題フィルター機能の初期化
+    const essayChapterFilter = document.getElementById('essayChapterFilter');
+    const essayTypeFilter = document.getElementById('essayTypeFilter');
+    const essaySearch = document.getElementById('essaySearch');
+    
+    if (essayChapterFilter) {
+        essayChapterFilter.addEventListener('change', filterEssayProblems);
+    }
+    if (essayTypeFilter) {
+        essayTypeFilter.addEventListener('change', filterEssayProblems);
+    }
+    if (essaySearch) {
+        essaySearch.addEventListener('input', debounce(filterEssayProblems, 500));
+    }
 });
+
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
 </script>
 
 <style>
@@ -2711,6 +3055,627 @@ document.addEventListener('DOMContentLoaded', function() {
     
     .essay-management-controls .col-md-4 {
         margin-bottom: 15px;
+    }
+}
+
+/* 統計セクション */
+.essay-stats-section {
+    background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 25px;
+    border: 1px solid #90caf9;
+}
+
+.essay-stats-section h4 {
+    color: #1565c0;
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* CSVインポートセクション */
+.csv-import-section {
+    background: linear-gradient(135deg, #e8f5e8 0%, #c8e6c9 100%);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 25px;
+    border: 1px solid #81c784;
+}
+
+.csv-import-section h4 {
+    color: #2e7d32;
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* CSVテンプレートセクション */
+.csv-template-section {
+    background: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.csv-template-section h5 {
+    color: #37474f;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.template-format {
+    background: #f5f5f5;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 15px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.85rem;
+    margin: 15px 0;
+    line-height: 1.6;
+}
+
+.template-format code {
+    background: #e8f5e8;
+    color: #2e7d32;
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-weight: bold;
+}
+
+/* CSVアップロードフォーム */
+.csv-upload-form {
+    background: white;
+    border-radius: 10px;
+    padding: 20px;
+    border: 1px solid #e0e0e0;
+}
+
+.upload-area {
+    border: 2px dashed #90caf9;
+    border-radius: 10px;
+    padding: 30px;
+    text-align: center;
+    background: #fafafa;
+    transition: all 0.3s ease;
+}
+
+.upload-area:hover {
+    border-color: #42a5f5;
+    background: #f0f8ff;
+}
+
+.file-input-wrapper {
+    position: relative;
+    margin-bottom: 20px;
+}
+
+.file-input-label {
+    display: block;
+    padding: 20px;
+    border: none;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #42a5f5 0%, #1e88e5 100%);
+    color: white;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-weight: 500;
+}
+
+.file-input-label:hover {
+    background: linear-gradient(135deg, #1e88e5 0%, #1565c0 100%);
+    transform: translateY(-2px);
+}
+
+.file-input-label i {
+    font-size: 1.5rem;
+    margin-bottom: 8px;
+    display: block;
+}
+
+#essay_csv_file {
+    position: absolute;
+    opacity: 0;
+    width: 100%;
+    height: 100%;
+    cursor: pointer;
+}
+
+.upload-options {
+    margin: 20px 0;
+}
+
+.upload-options .form-check {
+    background: #fff3e0;
+    border: 1px solid #ffcc02;
+    border-radius: 6px;
+    padding: 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.btn-upload {
+    background: linear-gradient(135deg, #66bb6a 0%, #43a047 100%);
+    border: none;
+    padding: 12px 30px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    border-radius: 25px;
+    color: white;
+    box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+    transition: all 0.3s ease;
+}
+
+.btn-upload:hover {
+    background: linear-gradient(135deg, #43a047 0%, #2e7d32 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4);
+}
+
+/* 個別論述問題登録セクション */
+.essay-form-section {
+    background: linear-gradient(135deg, #f3e5f5 0%, #e1bee7 100%);
+    border: 1px solid #ce93d8;
+    border-radius: 12px;
+    padding: 25px;
+    margin: 20px 0;
+}
+
+.essay-form-section h4 {
+    color: #7b1fa2;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 1.4rem;
+    font-weight: 600;
+}
+
+/* フォームコンテナ */
+.essay-form-container {
+    background: white;
+    border-radius: 10px;
+    padding: 25px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    border: 1px solid #e9ecef;
+}
+
+/* フォームグリッドレイアウト */
+.essay-form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.essay-form-full-width {
+    grid-column: 1 / -1;
+}
+
+/* 入力グループのスタイル */
+.essay-input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.essay-input-group label {
+    font-weight: 600;
+    color: #495057;
+    font-size: 0.95rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.essay-input-group label i {
+    color: #6c757d;
+    width: 16px;
+}
+
+.essay-input-group input,
+.essay-input-group select,
+.essay-input-group textarea {
+    padding: 12px 15px;
+    border: 2px solid #e9ecef;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    transition: all 0.3s ease;
+    background: #fafafa;
+    font-family: inherit;
+}
+
+.essay-input-group input:focus,
+.essay-input-group select:focus,
+.essay-input-group textarea:focus {
+    outline: none;
+    border-color: #7b1fa2;
+    background: white;
+    box-shadow: 0 0 0 3px rgba(123, 31, 162, 0.1);
+}
+
+.essay-question-input,
+.essay-answer-input {
+    min-height: 120px !important;
+    resize: vertical;
+    line-height: 1.6;
+}
+
+/* チェックボックス */
+.essay-checkbox-group {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border: 2px solid #e9ecef;
+    margin-bottom: 20px;
+}
+
+.essay-checkbox-group input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    margin: 0;
+    cursor: pointer;
+    accent-color: #7b1fa2;
+}
+
+.essay-checkbox-group label {
+    margin: 0;
+    font-weight: 500;
+    cursor: pointer;
+    color: #495057;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* 送信ボタン */
+.essay-submit-btn {
+    background: linear-gradient(135deg, #7b1fa2 0%, #9c27b0 100%);
+    color: white;
+    border: none;
+    padding: 15px 30px;
+    border-radius: 10px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    box-shadow: 0 4px 15px rgba(123, 31, 162, 0.3);
+}
+
+.essay-submit-btn:hover {
+    background: linear-gradient(135deg, #6a1b9a 0%, #8e24aa 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(123, 31, 162, 0.4);
+}
+
+.essay-submit-btn:disabled {
+    background: #6c757d;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+/* ヘルプテキスト */
+.essay-help-text {
+    font-size: 0.8rem;
+    color: #6c757d;
+    margin-top: 4px;
+    font-style: italic;
+}
+
+/* 論述問題管理セクション */
+.essay-management-section {
+    background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
+    border: 1px solid #ffb74d;
+    border-radius: 12px;
+    padding: 25px;
+    margin: 20px 0;
+}
+
+.essay-management-section h4 {
+    color: #ef6c00;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 1.4rem;
+    font-weight: 600;
+}
+
+/* フィルターセクション */
+.essay-filter-section {
+    background: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.essay-filter-section label {
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 5px;
+    display: block;
+}
+
+.essay-filter-section .form-control {
+    border: 2px solid #e9ecef;
+    border-radius: 6px;
+    padding: 8px 12px;
+    transition: border-color 0.3s ease;
+}
+
+.essay-filter-section .form-control:focus {
+    border-color: #ef6c00;
+    box-shadow: 0 0 0 2px rgba(239, 108, 0, 0.1);
+}
+
+/* 統計カード */
+.stat-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 20px;
+    border-radius: 10px;
+    text-align: center;
+    margin-bottom: 15px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    transition: transform 0.3s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-5px);
+}
+
+.stat-number {
+    font-size: 2.5rem;
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.stat-label {
+    font-size: 0.9rem;
+    opacity: 0.9;
+}
+
+/* 問題一覧テーブル */
+#essay-problems-container .table {
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+}
+
+#essay-problems-container .table th {
+    background: #ef6c00;
+    color: white;
+    border: none;
+    padding: 12px 8px;
+    font-weight: 600;
+}
+
+#essay-problems-container .table td {
+    padding: 10px 8px;
+    border-color: #f0f0f0;
+    vertical-align: middle;
+}
+
+#essay-problems-container .table tr:hover {
+    background-color: #fff3e0;
+}
+
+/* バッジスタイル */
+.badge {
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.bg-success {
+    background-color: #28a745 !important;
+}
+
+.bg-secondary {
+    background-color: #6c757d !important;
+}
+
+.bg-primary {
+    background-color: #007bff !important;
+}
+
+/* ボタンスタイル */
+.btn-sm {
+    padding: 4px 8px;
+    font-size: 0.75rem;
+    border-radius: 4px;
+    margin: 0 2px;
+}
+
+.btn-outline-primary {
+    border-color: #007bff;
+    color: #007bff;
+}
+
+.btn-outline-primary:hover {
+    background-color: #007bff;
+    color: white;
+}
+
+.btn-outline-danger {
+    border-color: #dc3545;
+    color: #dc3545;
+}
+
+.btn-outline-danger:hover {
+    background-color: #dc3545;
+    color: white;
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 768px) {
+    .essay-form-grid {
+        grid-template-columns: 1fr;
+        gap: 15px;
+    }
+    
+    .essay-form-container,
+    .csv-upload-form,
+    .csv-template-section,
+    .essay-filter-section {
+        padding: 15px;
+    }
+    
+    .essay-form-section,
+    .csv-import-section,
+    .essay-management-section,
+    .essay-stats-section {
+        padding: 15px;
+        margin: 15px 0;
+    }
+    
+    .stat-number {
+        font-size: 2rem;
+    }
+    
+    .stat-card {
+        padding: 15px;
+    }
+    
+    .template-format {
+        font-size: 0.75rem;
+        padding: 10px;
+    }
+    
+    .upload-area {
+        padding: 20px;
+    }
+    
+    .file-input-label {
+        padding: 15px;
+    }
+}
+
+@media (max-width: 480px) {
+    .essay-form-section,
+    .csv-import-section,
+    .essay-management-section,
+    .essay-stats-section {
+        padding: 10px;
+        margin: 10px 0;
+    }
+    
+    .essay-form-container,
+    .csv-upload-form {
+        padding: 12px;
+    }
+    
+    .essay-input-group input,
+    .essay-input-group select,
+    .essay-input-group textarea {
+        padding: 8px 10px;
+        font-size: 0.9rem;
+    }
+    
+    .essay-submit-btn,
+    .btn-upload {
+        padding: 10px 20px;
+        font-size: 0.95rem;
+    }
+    
+    .upload-area {
+        padding: 15px;
+    }
+    
+    .file-input-label i {
+        font-size: 1.2rem;
+    }
+    
+    /* テーブルを横スクロール可能に */
+    .table-responsive {
+        font-size: 0.8rem;
+    }
+    
+    .table th,
+    .table td {
+        padding: 6px 4px;
+        white-space: nowrap;
+    }
+}
+
+/* ダークモード対応 */
+@media (prefers-color-scheme: dark) {
+    .essay-stats-section {
+        background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+        border-color: #3b82f6;
+    }
+    
+    .csv-import-section {
+        background: linear-gradient(135deg, #166534 0%, #15803d 100%);
+        border-color: #22c55e;
+    }
+    
+    .essay-form-section {
+        background: linear-gradient(135deg, #581c87 0%, #7c2d12 100%);
+        border-color: #a855f7;
+    }
+    
+    .essay-management-section {
+        background: linear-gradient(135deg, #9a3412 0%, #c2410c 100%);
+        border-color: #f97316;
+    }
+    
+    .essay-form-container,
+    .csv-upload-form,
+    .csv-template-section,
+    .essay-filter-section {
+        background: #374151;
+        border-color: #6b7280;
+        color: #f9fafb;
+    }
+    
+    .essay-input-group input,
+    .essay-input-group select,
+    .essay-input-group textarea {
+        background: #4b5563;
+        border-color: #6b7280;
+        color: #f9fafb;
+    }
+    
+    .essay-input-group input:focus,
+    .essay-input-group select:focus,
+    .essay-input-group textarea:focus {
+        border-color: #8b5cf6;
+        background: #4b5563;
+    }
+    
+    .essay-checkbox-group {
+        background: #4b5563;
+        border-color: #6b7280;
+    }
+    
+    .upload-area {
+        background: #374151;
+        border-color: #6b7280;
+    }
+    
+    .template-format {
+        background: #4b5563;
+        border-color: #6b7280;
+        color: #f9fafb;
     }
 }
 </style>
