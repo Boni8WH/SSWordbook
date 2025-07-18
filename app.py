@@ -7308,13 +7308,27 @@ def admin_essay_get_problem(problem_id):
     """個別問題の詳細を取得"""
     try:
         if not session.get('admin_logged_in'):
-            return jsonify(status='error', message='管理者権限が必要です'), 403
+            return jsonify({'status': 'error', 'message': '管理者権限が必要です'}), 403
         
-        problem = EssayProblem.query.get_or_404(problem_id)
+        problem = EssayProblem.query.get(problem_id)
+        if not problem:
+            return jsonify({'status': 'error', 'message': '問題が見つかりません'}), 404
         
         return jsonify({
             'status': 'success',
-            'problem': problem.to_dict()
+            'problem': {
+                'id': problem.id,
+                'chapter': problem.chapter,
+                'type': problem.type,
+                'university': problem.university,
+                'year': problem.year,
+                'question': problem.question,
+                'answer': problem.answer,
+                'answer_length': problem.answer_length,
+                'enabled': problem.enabled,
+                'created_at': problem.created_at.isoformat() if problem.created_at else None,
+                'updated_at': problem.updated_at.isoformat() if problem.updated_at else None
+            }
         })
         
     except Exception as e:
