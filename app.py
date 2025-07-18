@@ -1826,6 +1826,58 @@ def emergency_create_essay_tables():
         print(f"緊急修復失敗: {e}")
         return f"<h1>💥 緊急修復失敗</h1><p>エラー: {str(e)}</p>"
 
+@app.route('/emergency_create_essay_progress_table')
+def emergency_create_essay_progress_table():
+    """緊急修復：EssayProgressテーブルを作成"""
+    try:
+        print("🆘 緊急EssayProgressテーブル作成開始...")
+        
+        with db.engine.connect() as conn:
+            # essay_progressテーブル作成
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS essay_progress (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+                    problem_id INTEGER NOT NULL REFERENCES essay_problems(id) ON DELETE CASCADE,
+                    viewed_answer BOOLEAN DEFAULT FALSE NOT NULL,
+                    understood BOOLEAN DEFAULT FALSE NOT NULL,
+                    difficulty_rating INTEGER,
+                    memo TEXT,
+                    review_flag BOOLEAN DEFAULT FALSE NOT NULL,
+                    viewed_at TIMESTAMP,
+                    understood_at TIMESTAMP,
+                    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(user_id, problem_id)
+                )
+            """))
+            
+            # essay_csv_filesテーブルも作成
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS essay_csv_files (
+                    id SERIAL PRIMARY KEY,
+                    filename VARCHAR(100) UNIQUE NOT NULL,
+                    original_filename VARCHAR(100) NOT NULL,
+                    content TEXT NOT NULL,
+                    file_size INTEGER NOT NULL,
+                    problem_count INTEGER DEFAULT 0 NOT NULL,
+                    upload_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            
+            conn.commit()
+            print("✅ 論述問題関連テーブル作成完了")
+            
+            return """
+            <h1>✅ 緊急修復完了</h1>
+            <p>論述問題関連テーブルの作成が完了しました。</p>
+            <p><a href="/essay">論述問題集を確認</a></p>
+            <p><a href="/admin">管理者ページに戻る</a></p>
+            """
+            
+    except Exception as e:
+        print(f"緊急修復失敗: {e}")
+        return f"<h1>💥 緊急修復失敗</h1><p>エラー: {str(e)}</p>"
+
 @app.route('/emergency_add_first_login_columns')
 def emergency_add_first_login_columns():
     """緊急修復：初回ログイン用カラムを追加"""
@@ -7583,67 +7635,127 @@ def update_essay_progress():
 # ========================================
 # Essay関連のヘルパー関数を追加
 # ========================================
-
 def get_essay_chapter_stats(user_id):
-    """章別の統計情報を取得"""
+    """章別の統計情報を取得（テーブル存在チェック付き）"""
     try:
-        # 章別の問題数と進捗を集計
-        stats_query = db.session.query(
-            EssayProblem.chapter,
-            func.count(EssayProblem.id).label('total_problems'),
-            func.count(EssayProgress.id).label('viewed_problems'),
-            func.sum(
-                db.case(
-                    (EssayProgress.understood == True, 1),
-                    else_=0
+        # EssayProgressテーブルの存在確認
+        inspector = inspect(db.engine)
+        has_progress_table = inspector.has_table('essay_progress')
+        
+        if has_progress_table:
+            # 章別の問題数と進捗を集計
+            stats_query = db.session.query(
+                EssayProblem.chapter,
+                func.count(EssayProblem.id).label('total_problems'),
+                func.count(EssayProgress.id).label('viewed_problems'),
+                func.sum(
+                    db.case(
+                        (EssayProgress.understood == True, 1),
+                        else_=0
+                    )
+                ).label('understood_problems')
+            ).outerjoin(
+                EssayProgress,
+                db.and_(
+                    EssayProblem.id == EssayProgress.problem_id,
+                    EssayProgress.user_id == user_id
                 )
-            ).label('understood_problems')
-        ).outerjoin(
-            EssayProgress,
-            db.and_(
-                EssayProblem.id == EssayProgress.problem_id,
-                EssayProgress.user_id == user_id
-            )
-        ).filter(
-            EssayProblem.enabled == True
-        ).group_by(
-            EssayProblem.chapter
-        ).order_by(
-            db.case(
-                (EssayProblem.chapter == 'com', 999),
-                else_=db.cast(EssayProblem.chapter, db.Integer)
-            )
-        ).all()
+            ).filter(
+                EssayProblem.enabled == True
+            ).group_by(
+                EssayProblem.chapter
+            ).order_by(
+                db.case(
+                    (EssayProblem.chapter == 'com', 999),
+                    else_=db.cast(EssayProblem.chapter, db.Integer)
+                )
+            ).all()
+        else:
+            # EssayProgressテーブルがない場合はEssayProblemのみで統計
+            stats_query = db.session.query(
+                EssayProblem.chapter,
+                func.count(EssayProblem.id).label('total_problems')
+            ).filter(
+                EssayProblem.enabled == True
+            ).group_by(
+                EssayProblem.chapter
+            ).order_by(
+                db.case(
+                    (EssayProblem.chapter == 'com', 999),
+                    else_=db.cast(EssayProblem.chapter, db.Integer)
+                )
+            ).all()
         
         chapter_stats = []
         for stat in stats_query:
-            chapter_stats.append({
-                'chapter': stat.chapter,
-                'chapter_name': f'第{stat.chapter}章' if stat.chapter != 'com' else '総合問題',
-                'total_problems': stat.total_problems,
-                'viewed_problems': stat.viewed_problems or 0,
-                'understood_problems': stat.understood_problems or 0,
-                'progress_rate': round((stat.understood_problems or 0) / stat.total_problems * 100, 1) if stat.total_problems > 0 else 0
-            })
+            if has_progress_table:
+                chapter_stats.append({
+                    'chapter': stat.chapter,
+                    'chapter_name': f'第{stat.chapter}章' if stat.chapter != 'com' else '総合問題',
+                    'total_problems': stat.total_problems,
+                    'viewed_problems': stat.viewed_problems or 0,
+                    'understood_problems': stat.understood_problems or 0,
+                    'progress_rate': round((stat.understood_problems or 0) / stat.total_problems * 100, 1) if stat.total_problems > 0 else 0
+                })
+            else:
+                chapter_stats.append({
+                    'chapter': stat.chapter,
+                    'chapter_name': f'第{stat.chapter}章' if stat.chapter != 'com' else '総合問題',
+                    'total_problems': stat.total_problems,
+                    'viewed_problems': 0,
+                    'understood_problems': 0,
+                    'progress_rate': 0
+                })
         
         return chapter_stats
         
     except Exception as e:
         logger.error(f"Error getting essay chapter stats: {e}")
-        return []
+        # エラー時もEssayProblemから基本情報を取得
+        try:
+            stats_query = db.session.query(
+                EssayProblem.chapter,
+                func.count(EssayProblem.id).label('total_problems')
+            ).filter(
+                EssayProblem.enabled == True
+            ).group_by(
+                EssayProblem.chapter
+            ).all()
+            
+            return [{
+                'chapter': stat.chapter,
+                'chapter_name': f'第{stat.chapter}章' if stat.chapter != 'com' else '総合問題',
+                'total_problems': stat.total_problems,
+                'viewed_problems': 0,
+                'understood_problems': 0,
+                'progress_rate': 0
+            } for stat in stats_query]
+        except:
+            return []
 
 def get_filtered_essay_problems(chapter, type_filter='', university_filter='', 
                                year_from=None, year_to=None, keyword='', user_id=None):
-    """フィルタリングされた問題一覧を取得"""
+    """フィルタリングされた問題一覧を取得（テーブル存在チェック付き）"""
     try:
-        query = db.session.query(EssayProblem, EssayProgress).outerjoin(
-            EssayProgress,
-            (EssayProblem.id == EssayProgress.problem_id) & 
-            (EssayProgress.user_id == user_id)
-        ).filter(
-            EssayProblem.chapter == chapter,
-            EssayProblem.enabled == True
-        )
+        # EssayProgressテーブルの存在確認
+        inspector = inspect(db.engine)
+        has_progress_table = inspector.has_table('essay_progress')
+        
+        if has_progress_table:
+            query = db.session.query(EssayProblem, EssayProgress).outerjoin(
+                EssayProgress,
+                (EssayProblem.id == EssayProgress.problem_id) & 
+                (EssayProgress.user_id == user_id)
+            ).filter(
+                EssayProblem.chapter == chapter,
+                EssayProblem.enabled == True
+            )
+        else:
+            # EssayProgressテーブルがない場合はEssayProblemのみ
+            query = db.session.query(EssayProblem).filter(
+                EssayProblem.chapter == chapter,
+                EssayProblem.enabled == True
+            )
         
         # フィルタリング
         if type_filter:
@@ -7677,7 +7789,13 @@ def get_filtered_essay_problems(chapter, type_filter='', university_filter='',
         results = query.all()
         
         problems = []
-        for problem, progress in results:
+        for result in results:
+            if has_progress_table:
+                problem, progress = result
+            else:
+                problem = result
+                progress = None
+            
             problem_data = problem.to_dict()
             problem_data['preview'] = problem.question[:100] + '...' if len(problem.question) > 100 else problem.question
             problem_data['progress'] = {
@@ -7693,7 +7811,7 @@ def get_filtered_essay_problems(chapter, type_filter='', university_filter='',
     except Exception as e:
         logger.error(f"Error getting filtered essay problems: {e}")
         return []
-
+    
 def get_essay_filter_data(chapter):
     """フィルター用のデータを取得"""
     try:
