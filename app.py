@@ -7324,15 +7324,22 @@ def admin_essay_get_problem(problem_id):
             'message': '問題の取得中にエラーが発生しました'
         }), 500
 
-@app.route('/admin/essay/problem/<int:problem_id>', methods=['PUT'])
-def admin_essay_update_problem(problem_id):
-    """問題を更新"""
+@app.route('/admin/essay/update_problem', methods=['POST'])
+def admin_essay_update_problem():
+    """問題を更新（POSTメソッド版）"""
     try:
         if not session.get('admin_logged_in'):
-            return jsonify(status='error', message='管理者権限が必要です'), 403
+            return jsonify({'status': 'error', 'message': '管理者権限が必要です'}), 403
         
-        problem = EssayProblem.query.get_or_404(problem_id)
         data = request.get_json()
+        problem_id = data.get('problem_id')
+        
+        if not problem_id:
+            return jsonify({'status': 'error', 'message': '問題IDが必要です'}), 400
+        
+        problem = EssayProblem.query.get(problem_id)
+        if not problem:
+            return jsonify({'status': 'error', 'message': '問題が見つかりません'}), 404
         
         # 更新可能なフィールド
         updatable_fields = ['chapter', 'type', 'university', 'year', 'question', 'answer', 'enabled']
@@ -7341,7 +7348,7 @@ def admin_essay_update_problem(problem_id):
             if field in data:
                 if field == 'answer':
                     problem.answer = data[field]
-                    problem.answer_length = len(data[field])  # answer_lengthも自動更新
+                    problem.answer_length = len(data[field])
                 else:
                     setattr(problem, field, data[field])
         
@@ -7355,7 +7362,7 @@ def admin_essay_update_problem(problem_id):
         })
         
     except Exception as e:
-        logger.error(f"Error updating essay problem {problem_id}: {e}")
+        logger.error(f"Error updating essay problem: {e}")
         db.session.rollback()
         return jsonify({
             'status': 'error',
@@ -7500,17 +7507,28 @@ def admin_essay_upload_csv():
             'message': 'CSVファイルの処理中にエラーが発生しました'
         }), 500
     
-@app.route('/admin/essay/problem/<int:problem_id>/delete', methods=['POST'])
-def admin_essay_delete_problem(problem_id):
-    """論述問題を削除"""
+@app.route('/admin/essay/delete_problem', methods=['POST'])
+def admin_essay_delete_problem():
+    """論述問題を削除（POSTメソッド版）"""
     try:
         if not session.get('admin_logged_in'):
-            return jsonify(status='error', message='管理者権限が必要です'), 403
+            return jsonify({'status': 'error', 'message': '管理者権限が必要です'}), 403
         
-        problem = EssayProblem.query.get_or_404(problem_id)
+        data = request.get_json()
+        problem_id = data.get('problem_id')
+        
+        if not problem_id:
+            return jsonify({'status': 'error', 'message': '問題IDが必要です'}), 400
+        
+        problem = EssayProblem.query.get(problem_id)
+        if not problem:
+            return jsonify({'status': 'error', 'message': '問題が見つかりません'}), 404
         
         # 関連する進捗データも削除
-        EssayProgress.query.filter_by(problem_id=problem_id).delete()
+        try:
+            EssayProgress.query.filter_by(problem_id=problem_id).delete()
+        except:
+            pass  # EssayProgressテーブルがない場合はスキップ
         
         db.session.delete(problem)
         db.session.commit()
@@ -7528,14 +7546,23 @@ def admin_essay_delete_problem(problem_id):
             'message': '問題の削除中にエラーが発生しました'
         }), 500
 
-@app.route('/admin/essay/problem/<int:problem_id>/toggle', methods=['POST'])
-def admin_essay_toggle_problem(problem_id):
-    """論述問題の有効/無効を切り替え"""
+@app.route('/admin/essay/toggle_problem', methods=['POST'])
+def admin_essay_toggle_problem():
+    """論述問題の有効/無効を切り替え（POSTメソッド版）"""
     try:
         if not session.get('admin_logged_in'):
-            return jsonify(status='error', message='管理者権限が必要です'), 403
+            return jsonify({'status': 'error', 'message': '管理者権限が必要です'}), 403
         
-        problem = EssayProblem.query.get_or_404(problem_id)
+        data = request.get_json()
+        problem_id = data.get('problem_id')
+        
+        if not problem_id:
+            return jsonify({'status': 'error', 'message': '問題IDが必要です'}), 400
+        
+        problem = EssayProblem.query.get(problem_id)
+        if not problem:
+            return jsonify({'status': 'error', 'message': '問題が見つかりません'}), 404
+        
         problem.enabled = not problem.enabled
         problem.updated_at = datetime.now(JST)
         
