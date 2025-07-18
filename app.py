@@ -7266,6 +7266,38 @@ def admin_essay_problems():
                 'enabled': problem.enabled
             })
         
+        # ★★★ ここから追加 ★★★
+        # 章リストを取得
+        all_chapters = db.session.query(EssayProblem.chapter)\
+            .distinct()\
+            .order_by(EssayProblem.chapter)\
+            .all()
+        
+        # 章リストを整形
+        chapter_list = []
+        for (ch,) in all_chapters:
+            if ch:  # NULLや空文字を除外
+                chapter_list.append(ch)
+        
+        # 数値と文字列を分けてソート
+        numeric_chapters = []
+        string_chapters = []
+        
+        for ch in chapter_list:
+            try:
+                numeric_chapters.append(int(ch))
+            except ValueError:
+                string_chapters.append(ch)
+        
+        numeric_chapters.sort()
+        string_chapters.sort()
+        if 'com' in string_chapters:
+            string_chapters.remove('com')
+            string_chapters.append('com')
+        
+        sorted_chapters = [str(ch) for ch in numeric_chapters] + string_chapters
+        # ★★★ ここまで追加 ★★★
+        
         return jsonify({
             'status': 'success',
             'problems': problems,
@@ -7276,7 +7308,8 @@ def admin_essay_problems():
                 'total': pagination.total,
                 'has_prev': pagination.has_prev,
                 'has_next': pagination.has_next
-            }
+            },
+            'chapters': sorted_chapters  # ★★★ この行を追加 ★★★
         })
         
     except Exception as e:
@@ -7449,22 +7482,45 @@ def admin_essay_chapters():
         if not session.get('admin_logged_in'):
             return jsonify({'status': 'error', 'message': '管理者権限が必要です'}), 403
         
-        # 使用されている章を取得（昇順でソート）
-        chapters_query = db.session.query(
-            EssayProblem.chapter
-        ).distinct().order_by(
-            # 数字の章を先に、'com'を最後にソート
-            case(
-                (EssayProblem.chapter == 'com', 999),
-                else_=cast(EssayProblem.chapter, Integer)
-            )
-        ).all()
+        # データベースから全ての章を取得（重複を除く）
+        chapters = db.session.query(EssayProblem.chapter)\
+            .distinct()\
+            .order_by(EssayProblem.chapter)\
+            .all()
         
-        chapter_list = [ch.chapter for ch in chapters_query if ch.chapter]
+        # 章リストを整形
+        chapter_list = []
+        for (chapter,) in chapters:
+            if chapter:  # NULLや空文字を除外
+                chapter_list.append(chapter)
+        
+        # 数値と文字列を分けてソート
+        numeric_chapters = []
+        string_chapters = []
+        
+        for ch in chapter_list:
+            try:
+                # 数値に変換できる場合
+                numeric_chapters.append(int(ch))
+            except ValueError:
+                # 文字列の場合（'com'など）
+                string_chapters.append(ch)
+        
+        # 数値の章を昇順でソート
+        numeric_chapters.sort()
+        
+        # 文字列の章をソート（'com'を最後に）
+        string_chapters.sort()
+        if 'com' in string_chapters:
+            string_chapters.remove('com')
+            string_chapters.append('com')
+        
+        # 結果を結合（数値を文字列に戻す）
+        sorted_chapters = [str(ch) for ch in numeric_chapters] + string_chapters
         
         return jsonify({
             'status': 'success',
-            'chapters': chapter_list
+            'chapters': sorted_chapters
         })
         
     except Exception as e:
