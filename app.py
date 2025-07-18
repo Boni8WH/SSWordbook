@@ -7449,6 +7449,31 @@ def admin_essay_bulk_delete():
             'message': '一括削除中にエラーが発生しました'
         }), 500
 
+@app.route('/admin/essay/chapters')
+def admin_essay_chapters():
+    """論述問題の章リストを取得"""
+    try:
+        if not session.get('admin_logged_in'):
+            return jsonify({'status': 'error', 'message': '管理者権限が必要です'}), 403
+        
+        # 使用されている章を取得
+        chapters = db.session.query(
+            EssayProblem.chapter
+        ).distinct().order_by(EssayProblem.chapter).all()
+        
+        chapter_list = [ch.chapter for ch in chapters if ch.chapter]
+        
+        return jsonify({
+            'status': 'success',
+            'chapters': chapter_list
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting essay chapters: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': '章リストの取得中にエラーが発生しました'
+        }), 500
 # ========================================
 # Essay関連のAPIルート（app.pyに追加してください）
 # ========================================
