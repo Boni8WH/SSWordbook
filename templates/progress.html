@@ -118,12 +118,10 @@
                 
                 <!-- 章の進捗バー -->
                 <div class="chapter-progress-bar-container">
-                    <div class="chapter-progress-bar-container">
-                        <div class="chapter-progress-bar" 
-                            data-total-mastered="{{ chapter_data.total_mastered }}"
-                            data-total-questions="{{ chapter_data.total_questions }}"
-                            style="width: 0%;"></div>
-                    </div>
+                    <div class="chapter-progress-bar" 
+                        data-total-mastered="{{ chapter_data.total_mastered }}"
+                        data-total-questions="{{ chapter_data.total_questions }}"
+                        style="width: 0%;"></div>
                 </div>
 
                 <!-- 単元詳細（初期状態は非表示） -->
@@ -178,6 +176,12 @@ async function loadRankingData() {
     try {
         console.log('🔄 ランキングデータを取得中...');
         
+        // ローディング表示
+        document.getElementById('ranking-loading').style.display = 'block';
+        document.getElementById('ranking-error').style.display = 'none';
+        document.getElementById('ranking-table-container').style.display = 'none';
+        
+        // APIエンドポイントを確認
         const response = await fetch('/api/get_ranking_data', {
             method: 'POST',
             headers: {
@@ -226,6 +230,12 @@ async function loadRankingData() {
         // エラー表示
         document.getElementById('ranking-loading').style.display = 'none';
         document.getElementById('ranking-error').style.display = 'block';
+        
+        // エラーメッセージを表示
+        const errorButton = document.querySelector('#ranking-error .btn');
+        if (errorButton) {
+            errorButton.textContent = `エラー: ${error.message}`;
+        }
     }
 }
 
@@ -320,8 +330,9 @@ function updateUserRank(rank, totalUsers) {
 }
 
 // ページ読み込み時にランキングデータを非同期取得
-// ページロード時に進捗バーを設定
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('📋 進捗ページ読み込み完了');
+    
     // 章の進捗バーを設定
     document.querySelectorAll('.chapter-progress-bar').forEach(function(bar) {
         const mastered = parseInt(bar.getAttribute('data-total-mastered') || '0');
@@ -337,6 +348,14 @@ document.addEventListener('DOMContentLoaded', function() {
         const percentage = total > 0 ? Math.round((mastered / total) * 100 * 10) / 10 : 0;
         bar.style.width = Math.max(0, Math.min(100, percentage)) + '%';
     });
+    
+    console.log('✅ 個人進捗表示完了');
+    
+    // ランキングデータを非同期で取得
+    setTimeout(() => {
+        console.log('🔄 ランキングデータ読み込み開始...');
+        loadRankingData();
+    }, 100); // 100ms後に開始（画面描画完了を待つ）
 });
 </script>
 
