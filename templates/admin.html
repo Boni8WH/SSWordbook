@@ -1900,10 +1900,20 @@ function updateChapterFilter(chapters) {
 
 // 論述問題編集
 function editEssayProblem(problemId) {
-    const newQuestion = prompt('問題文を入力してください:');
-    if (newQuestion && newQuestion.trim()) {
-        updateEssayProblem(problemId, { question: newQuestion.trim() });
-    }
+    // まず問題データを取得
+    fetch(`/admin/essay/problem/${problemId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                showEditDialog(data.problem);
+            } else {
+                alert('❌ エラー: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('問題取得エラー:', error);
+            alert('❌ 問題データの取得中にエラーが発生しました。');
+        });
 }
 
 // 論述問題更新（共通関数）
@@ -1941,7 +1951,7 @@ function showEditDialog(problem) {
     const modal = document.createElement('div');
     modal.innerHTML = `
         <div class="modal fade" id="editEssayModal" tabindex="-1" aria-hidden="true">
-            <div class="modal-dialog modal-lg">
+            <div class="modal-dialog modal-xl">
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title">論述問題編集 (ID: ${problem.id})</h5>
@@ -1952,11 +1962,12 @@ function showEditDialog(problem) {
                             <div class="row">
                                 <div class="col-md-6">
                                     <div class="mb-3">
-                                        <label class="form-label">章</label>
-                                        <input type="text" class="form-control" id="edit_chapter" value="${problem.chapter}" required>
+                                        <label class="form-label">章 <span class="text-danger">*</span></label>
+                                        <input type="text" class="form-control" id="edit_chapter" value="${problem.chapter || ''}" required>
+                                        <div class="form-text">例: 1, 2, 3, com（総合問題）</div>
                                     </div>
                                     <div class="mb-3">
-                                        <label class="form-label">タイプ</label>
+                                        <label class="form-label">タイプ <span class="text-danger">*</span></label>
                                         <select class="form-control" id="edit_type" required>
                                             <option value="A" ${problem.type === 'A' ? 'selected' : ''}>A（200字以上）</option>
                                             <option value="B" ${problem.type === 'B' ? 'selected' : ''}>B（100-150字程度）</option>
@@ -1966,28 +1977,28 @@ function showEditDialog(problem) {
                                     </div>
                                     <div class="mb-3">
                                         <label class="form-label">大学</label>
-                                        <input type="text" class="form-control" id="edit_university" value="${problem.university}" required>
+                                        <input type="text" class="form-control" id="edit_university" value="${problem.university || ''}" placeholder="大学名を入力">
                                     </div>
                                     <div class="mb-3">
                                         <label class="form-label">年度</label>
-                                        <input type="number" class="form-control" id="edit_year" value="${problem.year}" required min="2000" max="2030">
+                                        <input type="number" class="form-control" id="edit_year" value="${problem.year || 2025}" min="2000" max="2030">
                                     </div>
                                     <div class="mb-3">
                                         <div class="form-check">
                                             <input class="form-check-input" type="checkbox" id="edit_enabled" ${problem.enabled ? 'checked' : ''}>
-                                            <label class="form-check-label">有効にする</label>
+                                            <label class="form-check-label">問題を有効にする</label>
                                         </div>
                                     </div>
                                 </div>
                                 <div class="col-md-6">
                                     <div class="mb-3">
-                                        <label class="form-label">問題文</label>
-                                        <textarea class="form-control" id="edit_question" rows="5" required>${problem.question}</textarea>
+                                        <label class="form-label">問題文 <span class="text-danger">*</span></label>
+                                        <textarea class="form-control" id="edit_question" rows="6" required placeholder="問題文を入力してください">${problem.question || ''}</textarea>
                                     </div>
                                     <div class="mb-3">
                                         <label class="form-label">模範解答</label>
-                                        <textarea class="form-control" id="edit_answer" rows="8" required>${problem.answer}</textarea>
-                                        <small class="text-muted">文字数: <span id="answerLength">${problem.answer_length}</span>字</small>
+                                        <textarea class="form-control" id="edit_answer" rows="8" placeholder="模範解答を入力してください">${problem.answer || ''}</textarea>
+                                        <small class="text-muted">文字数: <span id="answerLength">${(problem.answer || '').length}</span>字</small>
                                     </div>
                                 </div>
                             </div>
