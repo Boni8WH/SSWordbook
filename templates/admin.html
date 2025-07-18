@@ -1669,6 +1669,11 @@ function downloadEssayTemplate() {
     link.click();
 }
 
+// 論述問題統計を読み込み（統一版）
+function loadEssayStats() {
+    updateEssayStatistics();
+}
+
 // 論述問題CSVアップロード
 document.getElementById('essayUploadForm').addEventListener('submit', function(e) {
     e.preventDefault();
@@ -1895,23 +1900,41 @@ function updateChapterFilter(chapters) {
 
 // 論述問題編集
 function editEssayProblem(problemId) {
-    // まず現在の問題データを取得
-    fetch(`/admin/essay/problem/${problemId}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.status === 'success') {
-                const problem = data.problem;
-                
-                // 編集ダイアログを表示
-                showEditDialog(problem);
-            } else {
-                alert('❌ 問題データの取得に失敗しました: ' + data.message);
-            }
+    const newQuestion = prompt('問題文を入力してください:');
+    if (newQuestion && newQuestion.trim()) {
+        updateEssayProblem(problemId, { question: newQuestion.trim() });
+    }
+}
+
+// 論述問題更新（共通関数）
+function updateEssayProblem(problemId, updateData) {
+    fetch('/admin/essay/update_problem', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            problem_id: problemId,
+            ...updateData
         })
-        .catch(error => {
-            console.error('問題取得エラー:', error);
-            alert('❌ 問題データの取得中にエラーが発生しました。');
-        });
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            alert('✅ ' + data.message);
+            loadEssayProblems();
+            // loadEssayStats関数が存在するかチェック
+            if (typeof loadEssayStats === 'function') {
+                loadEssayStats();
+            }
+        } else {
+            alert('❌ エラー: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('更新エラー:', error);
+        alert('❌ 更新中にエラーが発生しました。');
+    });
 }
 
 function showEditDialog(problem) {
@@ -2048,18 +2071,20 @@ function toggleEssayProblem(problemId, currentEnabled) {
     const action = newStatus ? '有効' : '無効';
     
     if (confirm('この問題を' + action + 'にしますか？')) {
-        fetch(`/admin/essay/problem/${problemId}/toggle`, {
+        fetch('/admin/essay/toggle_problem', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
-            }
+            },
+            body: JSON.stringify({
+                problem_id: problemId
+            })
         })
         .then(response => response.json())
         .then(data => {
             if (data.status === 'success') {
                 alert('✅ ' + data.message);
                 loadEssayProblems();
-                // loadEssayStats(); を以下に変更
                 if (typeof loadEssayStats === 'function') {
                     loadEssayStats();
                 }
@@ -2074,14 +2099,53 @@ function toggleEssayProblem(problemId, currentEnabled) {
     }
 }
 
+// loadEssayStats関数が定義されていない場合のフォールバック
+if (typeof loadEssayStats === 'undefined') {
+    window.loadEssayStats = function() {
+        console.log('loadEssayStats関数は現在利用できません');
+        // 統計の再読み込みを試行
+        if (typeof updateEssayStatistics === 'function') {
+            updateEssayStatistics();
+        }
+    };
+}
+
+function updateEssayStatistics() {
+    fetch('/admin/essay/stats')
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success' && data.stats) {
+                const statsElements = {
+                    'totalEssayProblems': data.stats.total_problems || 0,
+                    'enabledEssayProblems': data.stats.total_problems || 0,
+                    'totalChapters': data.stats.total_chapters || 0,
+                    'totalUniversities': data.stats.total_universities || 0
+                };
+                
+                Object.entries(statsElements).forEach(([id, value]) => {
+                    const element = document.getElementById(id);
+                    if (element) {
+                        element.textContent = value;
+                    }
+                });
+            }
+        })
+        .catch(error => {
+            console.error('統計更新エラー:', error);
+        });
+}
+
 // 論述問題削除
 function deleteEssayProblem(problemId) {
     if (confirm('この論述問題を削除しますか？\n\n⚠️ この操作は元に戻せません。')) {
-        fetch(`/admin/essay/problem/${problemId}`, {
-            method: 'DELETE',
+        fetch('/admin/essay/delete_problem', {
+            method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
-            }
+            },
+            body: JSON.stringify({
+                problem_id: problemId
+            })
         })
         .then(response => response.json())
         .then(data => {
