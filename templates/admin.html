@@ -1732,62 +1732,27 @@ function downloadEssayTemplate() {
     document.body.removeChild(link);
 }
 
-// 論述問題統計を読み込み（統一版）
+// 論述問題統計をロード
 function loadEssayStats() {
-    const statsContainer = document.getElementById('essay-stats-container');
-    if (!statsContainer) return;
-    
-    statsContainer.innerHTML = '<p class="text-info">📊 統計情報を読み込み中...</p>';
-    
     fetch('/admin/essay/stats')
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
-            }
-            return response.json();
-        })
+        .then(response => response.json())
         .then(data => {
             if (data.status === 'success') {
-                statsContainer.innerHTML = `
-                    <div class="row">
-                        <div class="col-md-3">
-                            <div class="stat-card">
-                                <div class="stat-number">${data.total_problems || 0}</div>
-                                <div class="stat-label">総問題数</div>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="stat-card">
-                                <div class="stat-number">${data.enabled_problems || 0}</div>
-                                <div class="stat-label">有効な問題</div>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="stat-card">
-                                <div class="stat-number">${data.chapters_count || 0}</div>
-                                <div class="stat-label">章数</div>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="stat-card">
-                                <div class="stat-number">${data.progress_records || 0}</div>
-                                <div class="stat-label">学習記録</div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            } else {
-                throw new Error(data.message || '統計データの取得に失敗');
+                updateEssayStatistics(data);
+                
+                // 章リストを取得して動的にフィルターを更新
+                fetch('/admin/essay/chapters')
+                    .then(response => response.json())
+                    .then(chaptersData => {
+                        if (chaptersData.status === 'success') {
+                            updateChapterFilter(chaptersData.chapters);
+                        }
+                    })
+                    .catch(error => console.error('章リスト取得エラー:', error));
             }
         })
         .catch(error => {
-            console.error('統計データ取得エラー:', error);
-            statsContainer.innerHTML = `
-                <div class="alert alert-warning">
-                    <i class="fas fa-exclamation-triangle"></i> 
-                    統計データの取得に失敗しました。論述問題管理機能のAPIが未実装の可能性があります。
-                </div>
-            `;
+            console.error('統計取得エラー:', error);
         });
 }
 
