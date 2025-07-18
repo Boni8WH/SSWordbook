@@ -7684,6 +7684,7 @@ def update_essay_progress():
 def get_essay_chapter_stats(user_id):
     """章別の統計情報を取得（テーブル存在チェック付き）"""
     try:
+        from sqlalchemy import inspect
         # EssayProgressテーブルの存在確認
         inspector = inspect(db.engine)
         has_progress_table = inspector.has_table('essay_progress')
@@ -7783,6 +7784,7 @@ def get_filtered_essay_problems(chapter, type_filter='', university_filter='',
                                year_from=None, year_to=None, keyword='', user_id=None):
     """フィルタリングされた問題一覧を取得（テーブル存在チェック付き）"""
     try:
+        from sqlalchemy import inspect
         # EssayProgressテーブルの存在確認
         inspector = inspect(db.engine)
         has_progress_table = inspector.has_table('essay_progress')
@@ -7857,6 +7859,7 @@ def get_filtered_essay_problems(chapter, type_filter='', university_filter='',
     except Exception as e:
         logger.error(f"Error getting filtered essay problems: {e}")
         return []
+
     
 def get_essay_filter_data(chapter):
     """フィルター用のデータを取得"""
