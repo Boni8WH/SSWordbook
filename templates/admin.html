@@ -2059,7 +2059,10 @@ function toggleEssayProblem(problemId, currentEnabled) {
             if (data.status === 'success') {
                 alert('✅ ' + data.message);
                 loadEssayProblems();
-                loadEssayStats();
+                // loadEssayStats(); を以下に変更
+                if (typeof loadEssayStats === 'function') {
+                    loadEssayStats();
+                }
             } else {
                 alert('❌ エラー: ' + data.message);
             }
@@ -2074,8 +2077,8 @@ function toggleEssayProblem(problemId, currentEnabled) {
 // 論述問題削除
 function deleteEssayProblem(problemId) {
     if (confirm('この論述問題を削除しますか？\n\n⚠️ この操作は元に戻せません。')) {
-        fetch(`/admin/essay/problem/${problemId}/delete`, {
-            method: 'POST',
+        fetch(`/admin/essay/problem/${problemId}`, {
+            method: 'DELETE',
             headers: {
                 'Content-Type': 'application/json'
             }
@@ -2085,7 +2088,9 @@ function deleteEssayProblem(problemId) {
             if (data.status === 'success') {
                 alert('✅ ' + data.message);
                 loadEssayProblems();
-                loadEssayStats();
+                if (typeof loadEssayStats === 'function') {
+                    loadEssayStats();
+                }
             } else {
                 alert('❌ エラー: ' + data.message);
             }
