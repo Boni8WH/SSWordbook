@@ -624,7 +624,7 @@
         <div class="question-section">
             <h3><i class="fas fa-question-circle"></i> 問題</h3>
             <div class="question-text">
-                {{ problem.question|safe|replace('\n', '<br>')|replace('\r', '') }}
+                {{ problem.question|replace('\n', '<br>')|replace('\r', '')|safe }}
             </div>
         </div>
 
@@ -640,7 +640,7 @@
             <div id="answerContent" class="answer-content" style="display: none;">
                 <h3><i class="fas fa-lightbulb"></i> 模範解答</h3>
                 <div class="answer-text">
-                    {{ problem.answer|safe|replace('\n', '<br>')|replace('\r', '') }}
+                    {{ problem.answer|replace('\n', '<br>')|replace('\r', '')|safe }}
                 </div>
                 <div class="answer-meta">
                     <small class="text-muted">文字数: {{ problem.answer_length }}字</small>
