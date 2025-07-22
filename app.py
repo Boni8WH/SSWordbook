@@ -8312,7 +8312,83 @@ def has_essay_image(problem_id):
 # ====================================================================
 # エラーハンドラー
 # ====================================================================
+# app.pyに一時的に追加するデバッグ用エンドポイント
 
+@app.route('/debug/image_upload', methods=['GET', 'POST'])
+def debug_image_upload():
+    """画像アップロードのデバッグ"""
+    if not session.get('admin_logged_in'):
+        return "管理者権限が必要です", 403
+    
+    if request.method == 'GET':
+        return '''
+        <!DOCTYPE html>
+        <html>
+        <head><title>画像アップロードテスト</title></head>
+        <body>
+            <h2>画像アップロードテスト</h2>
+            <form method="POST" enctype="multipart/form-data">
+                <input type="file" name="test_image" accept="image/*" required>
+                <button type="submit">テストアップロード</button>
+            </form>
+        </body>
+        </html>
+        '''
+    
+    # POST処理
+    try:
+        if 'test_image' not in request.files:
+            return "ファイルが選択されていません"
+        
+        image_file = request.files['test_image']
+        if not image_file.filename:
+            return "ファイルが選択されていません"
+        
+        # ファイル情報をログ出力
+        print(f"ファイル名: {image_file.filename}")
+        print(f"ファイルサイズ: {len(image_file.read())} bytes")
+        image_file.seek(0)  # ポインタをリセット
+        
+        # 安全なファイル名生成
+        filename = secure_filename(image_file.filename)
+        file_ext = filename.rsplit('.', 1)[1].lower() if '.' in filename else ''
+        
+        print(f"安全なファイル名: {filename}")
+        print(f"拡張子: {file_ext}")
+        
+        # 保存先ディレクトリの確保
+        upload_dir = os.path.join('static', 'uploads', 'essay_images')
+        os.makedirs(upload_dir, exist_ok=True)
+        print(f"アップロードディレクトリ: {upload_dir}")
+        print(f"ディレクトリ存在確認: {os.path.exists(upload_dir)}")
+        
+        # テスト用ファイル名
+        test_filename = f"test_upload_{datetime.now().strftime('%Y%m%d_%H%M%S')}.{file_ext}"
+        save_path = os.path.join(upload_dir, test_filename)
+        
+        print(f"保存パス: {save_path}")
+        
+        # ファイル保存
+        try:
+            image_file.save(save_path)
+            print(f"ファイル保存成功: {save_path}")
+            
+            # 保存確認
+            if os.path.exists(save_path):
+                file_size = os.path.getsize(save_path)
+                print(f"保存ファイル確認OK: サイズ={file_size} bytes")
+                return f"✅ 画像アップロード成功！<br>ファイル名: {test_filename}<br>サイズ: {file_size} bytes<br>パス: {save_path}"
+            else:
+                return "❌ ファイルが保存されませんでした"
+                
+        except Exception as save_error:
+            print(f"保存エラー: {save_error}")
+            return f"❌ 保存エラー: {save_error}"
+            
+    except Exception as e:
+        print(f"全般エラー: {e}")
+        return f"❌ エラー: {e}"
+    
 @app.errorhandler(500)
 def internal_error(error):
     print(f"500 Error: {error}")
@@ -8322,8 +8398,6 @@ def internal_error(error):
 @app.errorhandler(404)
 def not_found_error(error):
     return "Page Not Found", 404
-
-# app.pyに以下のデバッグ用ルートを追加
 
 @app.route('/debug/user_data')
 def debug_user_data():
