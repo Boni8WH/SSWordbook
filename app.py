@@ -6986,8 +6986,6 @@ class EssayProblem(db.Model):
     enabled = db.Column(db.Boolean, default=True, nullable=False)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))
-    image_filename = db.Column(db.String(255))  # 画像ファイル名
-    image_path = db.Column(db.String(500))      # 画像パス
     
     def to_dict(self):
         return {
