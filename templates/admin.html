@@ -1056,140 +1056,123 @@ function filterUsers() {
 // ========================================
 // 3. DOMContentLoaded イベントリスナー
 // ========================================
-
+// 個別論述問題追加
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('📋 管理者ページ読み込み完了');
+    const essayForm = document.getElementById('newEssayProblemForm');
     
-    // 折りたたみ機能初期化
-    initializeCollapseSections();
-    updateToggleIcons();
-    
-    // 初期ロード時にCSVファイル一覧とセレクトボックスを更新
-    setTimeout(() => {
-        console.log('🔄 初期データ読み込み開始');
-        loadCsvFilesList();
-        loadRoomSettings();
-    }, 500);
-
-    // ユーザーテーブル機能初期化
-    initializeUserTableSort();
-    initializeUserFiltering();
-
-    // 部屋設定保存ボタンのイベントリスナー
-    document.querySelectorAll('.save-room-setting-btn').forEach(button => {
-        button.addEventListener('click', function() {
-            const roomNumber = this.dataset.roomNumber;
-            const maxUnitInput = document.getElementById('maxUnit_' + roomNumber);
-            const csvFileSelect = document.getElementById('csvFile_' + roomNumber);
+    // フォームが存在する場合のみイベントリスナーを追加
+    if (essayForm) {
+        essayForm.addEventListener('submit', function(e) {
+            e.preventDefault();
             
-            console.log(`🔧 部屋設定保存開始: ${roomNumber}`);
+            const form = this;
+            const formData = new FormData(form);
             
-            if (!maxUnitInput || !csvFileSelect) {
-                alert('設定要素が見つかりません。');
-                console.error('❌ 設定要素が見つかりません:', {
-                    maxUnit: !!maxUnitInput,
-                    csvFile: !!csvFileSelect
-                });
+            // 必須項目の確認
+            const chapter = formData.get('chapter');
+            const question = formData.get('question');
+            const type = formData.get('type');
+            
+            if (!chapter || !question || !type) {
+                alert('❌ 章、タイプ、問題文は必須項目です。');
                 return;
             }
             
-            const maxUnit = maxUnitInput.value.trim();
-            const csvFilename = csvFileSelect.value;
+            // 有効フラグの処理
+            const enabledCheckbox = document.getElementById('new_essay_enabled');
+            if (enabledCheckbox && enabledCheckbox.checked) {
+                formData.set('enabled', 'on');
+            } else {
+                formData.delete('enabled');
+            }
             
-            console.log(`📝 保存する設定:`, {
-                roomNumber: roomNumber,
-                maxUnit: maxUnit,
-                csvFilename: csvFilename
-            });
-
-            // ボタンを無効化して重複実行を防ぐ
-            this.disabled = true;
-            this.textContent = '保存中...';
-
-            // 単元設定、CSVファイル設定を同時に更新
-            Promise.all([
-                fetch('{{ url_for("admin_update_room_unit_setting") }}', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        room_number: roomNumber,
-                        max_unit: maxUnit
-                    })
-                }),
-                fetch('{{ url_for("admin_update_room_csv_setting") }}', {
-                    method: 'POST', 
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        room_number: roomNumber,
-                        csv_filename: csvFilename
-                    })
-                })
-            ])
-            .then(responses => {
-                console.log('📡 サーバーレスポンス受信:', responses.map(r => r.status));
-                return Promise.all(responses.map(r => r.json()));
+            const submitBtn = form.querySelector('button[type="submit"]');
+            const originalText = submitBtn.innerHTML;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 追加中...';
+            
+            // FormDataで送信（画像ファイル対応）
+            fetch('/admin/essay/add_problem', {
+                method: 'POST',
+                body: formData
             })
-            .then(results => {
-                const unitResult = results[0];
-                const csvResult = results[1];
-                
-                console.log('📊 保存結果:', { unitResult, csvResult });
-                
-                if (unitResult.status === 'success' && csvResult.status === 'success') {
-                    alert(`✅ 部屋 ${roomNumber} の設定を更新しました:\n・最大単元: ${maxUnit}\n・CSVファイル: ${csvFilename}`);
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    let message = '✅ ' + data.message;
+                    if (data.has_image) {
+                        message += ' （画像付き）';
+                    }
+                    alert(message);
                     
-                    loadRoomSettings();
+                    // フォームをリセット
+                    form.reset();
+                    if (typeof clearImagePreview === 'function') {
+                        clearImagePreview();
+                    }
+                    document.getElementById('new_essay_enabled').checked = true;
+                    
+                    // 統計情報を更新
+                    if (typeof loadEssayStats === 'function') {
+                        loadEssayStats();
+                    }
+                    if (typeof loadEssayProblems === 'function') {
+                        loadEssayProblems();
+                    }
                 } else {
-                    const errorMsg = (unitResult.message || csvResult.message || '不明なエラー');
-                    alert('❌ 設定の保存中にエラーが発生しました: ' + errorMsg);
-                    console.error('❌ 保存エラー:', { unitResult, csvResult });
+                    alert('❌ エラー: ' + data.message);
                 }
             })
             .catch(error => {
-                console.error('❌ 保存処理中にエラー:', error);
-                alert('❌ 設定の保存中にエラーが発生しました: ' + error.message);
+                console.error('追加エラー:', error);
+                alert('❌ 追加中にエラーが発生しました。');
             })
             .finally(() => {
-                // ボタンを元に戻す
-                this.disabled = false;
-                this.textContent = '保存';
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
             });
         });
-    });
-
-    // ユーザー削除ボタンのイベントリスナー
-    document.querySelectorAll('.delete-user-btn').forEach(button => {
-        button.addEventListener('click', function() {
-            const userId = this.dataset.userId;
-            const username = this.dataset.username;
-            const roomNumber = this.dataset.room;
-
-            if (confirm(`ユーザー "${username}" (部屋: ${roomNumber}, ID: ${userId}) を本当に削除しますか？\n\n⚠️ この操作は元に戻せません。\n⚠️ ユーザーの学習履歴も完全に削除されます。`)) {
-                const form = document.createElement('form');
-                form.method = 'POST';
-                form.action = '{{ url_for("admin_delete_user", user_id=0) }}'.replace('0', userId);
-
-                document.body.appendChild(form);
-                form.submit();
-            }
-        });
-    });
-
-    // 部屋設定削除ボタンのイベントリスナー
-    document.querySelectorAll('.delete-room-setting-btn').forEach(button => {
-        button.addEventListener('click', function() {
-            const roomNumber = this.dataset.roomNumber;
-
-            if (confirm('部屋 "' + roomNumber + '" の設定を本当に削除しますか？\n\n⚠️ この部屋に属するユーザーの設定はデフォルトに戻ります。\n⚠️ この操作は元に戻せません。')) {
-                const form = document.createElement('form');
-                form.method = 'POST';
-                form.action = '{{ url_for("admin_delete_room_setting", room_number="_ROOM_NUMBER_") }}'.replace('_ROOM_NUMBER_', roomNumber);
-
-                document.body.appendChild(form);
-                form.submit();
-            }
-        });
-    });
+    }
+    
+    // 画像プレビュー機能も安全にチェック
+    window.previewImage = function(input) {
+        const previewDiv = document.getElementById('imagePreview');
+        if (!previewDiv) return;
+        
+        if (input.files && input.files[0]) {
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                previewDiv.innerHTML = `
+                    <div class="image-preview-container">
+                        <img src="${e.target.result}" alt="プレビュー" 
+                             style="max-width: 200px; max-height: 200px; border-radius: 8px; border: 1px solid #ddd;">
+                        <button type="button" class="btn btn-sm btn-outline-danger mt-2" 
+                                onclick="clearImagePreview()">
+                            <i class="fas fa-times"></i> 削除
+                        </button>
+                    </div>
+                `;
+            };
+            
+            reader.readAsDataURL(input.files[0]);
+        } else {
+            clearImagePreview();
+        }
+    };
+    
+    // 画像プレビューをクリア
+    window.clearImagePreview = function() {
+        const previewDiv = document.getElementById('imagePreview');
+        const imageInput = document.getElementById('new_essay_image');
+        
+        if (previewDiv) {
+            previewDiv.innerHTML = '';
+        }
+        if (imageInput) {
+            imageInput.value = '';
+        }
+    };
 });
 
 // ========================================
@@ -1848,7 +1831,7 @@ document.getElementById('essayUploadForm').addEventListener('submit', function(e
 });
 
 // 個別論述問題追加
-document.getElementById('essayAddForm').addEventListener('submit', function(e) {
+document.getElementById('newEssayProblemForm').addEventListener('submit', function(e) {
     e.preventDefault();
     
     const form = this;
