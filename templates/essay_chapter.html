@@ -242,16 +242,19 @@
     width: 100%;
 }
 
-/* タイプ別グループ化 */
+/* タイプ別グループ化 - Bootstrap競合回避版 */
 .type-group {
-    margin-bottom: 30px;
-    width: 100%;
+    margin-bottom: 30px !important;
+    width: 100% !important;
+    display: block !important; /* Bootstrap競合対策 */
+    flex: none !important; /* Bootstrapのflexboxを無効化 */
 }
 
 .type-header {
-    margin-bottom: 20px;
-    padding-bottom: 10px;
-    border-bottom: 2px solid #e1e8ed;
+    margin-bottom: 20px !important;
+    padding-bottom: 10px !important;
+    border-bottom: 2px solid #e1e8ed !important;
+    width: 100% !important;
 }
 
 .type-title {
@@ -277,31 +280,49 @@
 .type-c { background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); }
 .type-d { background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); }
 
-/* 問題グリッド */
+/* 問題グリッド - Bootstrap競合回避版 */
 .problems-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-    gap: 20px;
-    align-items: start;
+    display: grid !important; /* Bootstrap競合対策 */
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)) !important;
+    gap: 20px !important;
+    align-items: start !important;
+    justify-content: center !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+/* Bootstrap競合を回避 */
+.problems-grid > * {
+    flex: none !important; /* Bootstrapのflexboxを無効化 */
+    width: auto !important; /* Bootstrap幅制限を解除 */
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
 }
 
 @media (min-width: 1200px) {
     .problems-grid {
-        grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-        gap: 25px;
+        grid-template-columns: repeat(2, 1fr) !important;
+        max-width: 900px !important;
+        margin: 0 auto !important;
+        gap: 25px !important;
     }
 }
 
 @media (min-width: 1600px) {
     .problems-grid {
-        grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+        grid-template-columns: repeat(3, 1fr) !important;
+        max-width: 1400px !important;
+        gap: 30px !important;
     }
 }
 
 @media (min-width: 768px) and (max-width: 1199px) {
     .problems-grid {
-        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-        gap: 20px;
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)) !important;
+        gap: 20px !important;
+        justify-content: center !important;
     }
 }
 
@@ -596,42 +617,6 @@
     .indicator {
         padding: 2px 4px;
         font-size: 0.65rem;
-    }
-}
-
-/* ダークモード対応 */
-@media (prefers-color-scheme: dark) {
-    .filter-section,
-    .problem-card {
-        background: #2d3748;
-        border-color: #4a5568;
-        color: #e2e8f0;
-    }
-    
-    .filter-header h3,
-    .type-title,
-    .university {
-        color: #e2e8f0;
-    }
-    
-    .form-control {
-        background: #4a5568;
-        border-color: #718096;
-        color: #e2e8f0;
-    }
-    
-    .form-control:focus {
-        border-color: #667eea;
-    }
-    
-    .no-problems {
-        background: #2d3748;
-        border-color: #4a5568;
-    }
-    
-    .no-problems-content h3,
-    .no-problems-content p {
-        color: #cbd5e0;
     }
 }
 
