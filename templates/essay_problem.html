@@ -624,10 +624,10 @@
         <div class="question-section">
             <h3><i class="fas fa-question-circle"></i> 問題</h3>
             
-            <!-- 画像がある場合の表示 -->
-            {% if problem.image_filename %}
+            <!-- 画像表示（ファイル名規則方式） -->
+            {% if has_essay_image(problem.id) %}
             <div class="problem-image mb-3">
-                <img src="{{ url_for('static', filename='uploads/essay_images/' + problem.image_filename) }}" 
+                <img src="{{ url_for('static', filename=essay_image_path(problem.id)) }}" 
                     class="img-fluid" alt="問題画像" style="max-width: 100%; border-radius: 8px;">
             </div>
             {% endif %}
