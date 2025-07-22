@@ -11,6 +11,7 @@ import string
 from io import StringIO
 from datetime import datetime, timedelta
 from sqlalchemy import inspect, text, func, case, cast, Integer
+import glob
 
 # 外部ライブラリ
 import pytz
@@ -7533,45 +7534,101 @@ def admin_essay_chapters():
         }), 500
     
 # ========================================
-# Essay関連のAPIルート（app.pyに追加してください）
+# Essay関連のAPIルート
 # ========================================
 @app.route('/admin/essay/add_problem', methods=['POST'])
 def admin_essay_add_problem():
-    """論述問題を手動追加"""
+    """論述問題を手動追加（ファイル名規則方式）"""
     try:
         if not session.get('admin_logged_in'):
             return jsonify({'status': 'error', 'message': '管理者権限が必要です'}), 403
         
-        data = request.get_json()
+        # フォームデータから取得
+        chapter = request.form.get('chapter')
+        type_value = request.form.get('type', 'A')
+        university = request.form.get('university', '未指定')
+        year = request.form.get('year', 2025)
+        question = request.form.get('question')
+        answer = request.form.get('answer', '解答なし')
+        enabled = request.form.get('enabled') == 'on'
         
         # 必須フィールドの確認
-        required_fields = ['chapter', 'question']
-        for field in required_fields:
-            if not data.get(field):
-                return jsonify({
-                    'status': 'error',
-                    'message': f'{field}は必須です'
-                }), 400
+        if not chapter or not question:
+            return jsonify({
+                'status': 'error',
+                'message': '章と問題文は必須です'
+            }), 400
         
-        # 新しい問題を作成
+        # 年度の変換
+        try:
+            year = int(year)
+        except (ValueError, TypeError):
+            year = 2025
+        
+        # まず問題を作成
         new_problem = EssayProblem(
-            chapter=data['chapter'],
-            type=data.get('type', 'A'),
-            university=data.get('university', '未指定'),
-            year=data.get('year', 2025),
-            question=data['question'],
-            answer=data.get('answer', '解答なし'),
-            answer_length=len(data.get('answer', '解答なし')),
-            enabled=data.get('enabled', True)
+            chapter=chapter,
+            type=type_value,
+            university=university,
+            year=year,
+            question=question,
+            answer=answer,
+            answer_length=len(answer),
+            enabled=enabled
         )
         
         db.session.add(new_problem)
+        db.session.flush()  # IDを取得するためフラッシュ
+        
+        # 画像処理（問題IDをベースにしたファイル名）
+        image_saved = False
+        if 'image' in request.files:
+            image_file = request.files['image']
+            
+            if image_file and image_file.filename:
+                # 拡張子チェック
+                filename = secure_filename(image_file.filename)
+                allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+                file_ext = filename.rsplit('.', 1)[1].lower() if '.' in filename else ''
+                
+                if file_ext not in allowed_extensions:
+                    return jsonify({
+                        'status': 'error',
+                        'message': f'サポートされていない画像形式です。{", ".join(allowed_extensions)}を使用してください。'
+                    }), 400
+                
+                # 問題IDベースのファイル名を生成
+                image_filename = f"essay_problem_{new_problem.id}.{file_ext}"
+                
+                # 保存先ディレクトリの確保
+                upload_dir = os.path.join('static', 'uploads', 'essay_images')
+                os.makedirs(upload_dir, exist_ok=True)
+                
+                # ファイル保存
+                save_path = os.path.join(upload_dir, image_filename)
+                
+                try:
+                    image_file.save(save_path)
+                    image_saved = True
+                    logger.info(f"画像保存成功: {save_path}")
+                    
+                except Exception as save_error:
+                    logger.error(f"画像保存エラー: {save_error}")
+                    return jsonify({
+                        'status': 'error',
+                        'message': '画像の保存に失敗しました'
+                    }), 500
+        
+        # 全てをコミット
         db.session.commit()
+        
+        logger.info(f"論述問題追加成功: ID={new_problem.id}, 画像={image_saved}")
         
         return jsonify({
             'status': 'success',
             'message': '論述問題を追加しました',
-            'problem_id': new_problem.id
+            'problem_id': new_problem.id,
+            'has_image': image_saved
         })
         
     except Exception as e:
@@ -8225,6 +8282,34 @@ def get_adjacent_problems(problem):
     except Exception as e:
         logger.error(f"Error getting adjacent problems: {e}")
         return None, None
+
+def has_essay_problem_image(problem_id):
+    """論述問題に画像が存在するかチェック"""
+    upload_dir = os.path.join('static', 'uploads', 'essay_images')
+    pattern = os.path.join(upload_dir, f"essay_problem_{problem_id}.*")
+    return len(glob.glob(pattern)) > 0
+
+def get_essay_problem_image_path(problem_id):
+    """論述問題の画像パスを取得"""
+    upload_dir = os.path.join('static', 'uploads', 'essay_images')
+    pattern = os.path.join(upload_dir, f"essay_problem_{problem_id}.*")
+    matches = glob.glob(pattern)
+    if matches:
+        # staticからの相対パスを返す
+        relative_path = os.path.relpath(matches[0], 'static')
+        return relative_path.replace('\\', '/')  # Windows対応
+    return None
+
+# テンプレート関数として登録
+@app.template_global()
+def essay_image_path(problem_id):
+    """テンプレートから画像パスを取得"""
+    return get_essay_problem_image_path(problem_id)
+
+@app.template_global()
+def has_essay_image(problem_id):
+    """テンプレートから画像存在チェック"""
+    return has_essay_problem_image(problem_id)
 
 # ====================================================================
 # エラーハンドラー
