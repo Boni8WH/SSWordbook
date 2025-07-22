@@ -633,7 +633,7 @@
             {% endif %}
             
             <div class="question-text">
-                {{ problem.question|safe|replace('\n', '<br>')|replace('\r', '') }}
+                {{ problem.question|replace('\n', '<br>')|replace('\r', '')|safe }}
             </div>
         </div>
 
