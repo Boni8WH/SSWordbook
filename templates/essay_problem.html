@@ -1,788 +1,840 @@
 {% extends "base.html" %}
-{% block title %}{{ problem.university }} {{ problem.year }}年 - {{ app_name }}{% endblock %}
+{% block title %}論述問題集 - {{ chapter_name }} - {{ app_name }}{% endblock %}
 
 {% block head_extra %}
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
 /* ベーススタイル */
-.essay-problem-container {
-    max-width: 900px;
+.essay-chapter-container {
+    max-width: 1200px;
     margin: 0 auto;
     padding: 15px;
 }
 
-.problem-header {
+.chapter-header {
+    text-align: center;
+    margin-bottom: 30px;
+    padding: 25px 20px;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
-    padding: 25px 20px;
     border-radius: 15px;
-    margin-bottom: 25px;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+}
+
+.header-content {
+    max-width: 800px;
+    margin: 0 auto;
 }
 
 .breadcrumb {
-    margin-bottom: 20px;
+    margin-bottom: 15px;
     font-size: clamp(0.8rem, 2vw, 0.9rem);
+    opacity: 0.9;
 }
 
 .breadcrumb a {
-    color: rgba(255,255,255,0.8);
+    color: white;
     text-decoration: none;
+    opacity: 0.8;
+    transition: opacity 0.3s ease;
 }
 
 .breadcrumb a:hover {
-    color: white;
+    opacity: 1;
+    text-decoration: none;
 }
 
 .breadcrumb i {
-    margin: 0 6px;
+    margin: 0 8px;
     opacity: 0.6;
 }
 
-.problem-info h1 {
+.chapter-header h1 {
     margin: 0 0 15px 0;
-    font-size: clamp(1.6rem, 4vw, 2rem);
+    font-size: clamp(1.8rem, 4vw, 2.5rem);
     font-weight: 700;
     line-height: 1.2;
 }
 
-.problem-meta {
+.chapter-description {
+    font-size: clamp(0.9rem, 2.5vw, 1.1rem);
     margin-bottom: 20px;
+    opacity: 0.95;
+    line-height: 1.6;
+}
+
+.back-to-main {
     display: flex;
+    justify-content: center;
+    gap: 15px;
     flex-wrap: wrap;
+}
+
+.back-to-main .btn {
+    background: rgba(255,255,255,0.2);
+    border: 2px solid rgba(255,255,255,0.3);
+    color: white;
+    padding: 10px 20px;
+    border-radius: 25px;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: clamp(0.85rem, 2vw, 1rem);
+}
+
+.back-to-main .btn:hover {
+    background: rgba(255,255,255,0.3);
+    border-color: rgba(255,255,255,0.5);
+    color: white;
+    transform: translateY(-2px);
+}
+
+/* フィルターセクション */
+.filter-section {
+    background: white;
+    border-radius: 15px;
+    padding: 20px;
+    margin-bottom: 25px;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+    border: 1px solid #e1e8ed;
+    width: 100%;
+}
+
+.filter-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.filter-header h3 {
+    margin: 0;
+    color: #2d3748;
+    font-size: clamp(1.1rem, 2.5vw, 1.3rem);
+    display: flex;
+    align-items: center;
     gap: 8px;
 }
 
-.badge {
-    padding: 6px 12px;
-    border-radius: 20px;
-    font-weight: 600;
-    color: white;
-    font-size: clamp(0.75rem, 2vw, 0.85rem);
+.filter-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    align-items: end;
 }
 
-.badge-type-a { background: #dc3545; }
-.badge-type-b { background: #fd7e14; }
-.badge-type-c { background: #20c997; }
-.badge-type-d { background: #6f42c1; }
-.badge-secondary { background: #6c757d; }
+@media (min-width: 1200px) {
+    .filter-grid {
+        grid-template-columns: repeat(4, 1fr);
+        gap: 20px;
+    }
+    
+    .filter-group:last-child {
+        grid-column: span 2;
+    }
+}
 
-/* ナビゲーション */
-.problem-navigation {
+.filter-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.filter-group label {
+    margin-bottom: 5px;
+    font-weight: 500;
+    color: #4a5568;
+    font-size: clamp(0.85rem, 2vw, 0.9rem);
+}
+
+.form-control {
+    padding: 8px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: clamp(0.85rem, 2vw, 0.9rem);
+    transition: border-color 0.3s ease;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+}
+
+.year-range {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    max-width: 300px;
+}
+
+.year-range input {
+    flex: 1;
+    min-width: 80px;
+}
+
+.filter-actions {
     display: flex;
     gap: 10px;
+    margin-top: 15px;
     justify-content: center;
-    flex-wrap: wrap;
 }
 
+/* ボタンスタイル */
 .btn {
-    padding: 10px 16px;
-    border-radius: 10px;
-    border: none;
+    padding: 8px 16px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    background: white;
+    color: #374151;
     cursor: pointer;
+    transition: all 0.3s ease;
     text-decoration: none;
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    font-weight: 600;
-    transition: all 0.3s ease;
     font-size: clamp(0.8rem, 2vw, 0.9rem);
 }
 
-.btn-back-to-list {
-    background: #ffd700;
-    color: #333;
-    box-shadow: 0 3px 10px rgba(255, 215, 0, 0.3);
+.btn:hover {
+    background: #f9fafb;
+    border-color: #9ca3af;
+    color: #374151;
+    text-decoration: none;
 }
 
-.btn-back-to-list:hover {
-    background: #ffed4a;
-    transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(255, 215, 0, 0.4);
-}
-
-.btn-nav {
-    background: rgba(255,255,255,0.2);
+.btn-primary {
+    background: #667eea;
+    border-color: #667eea;
     color: white;
-    border: 2px solid rgba(255,255,255,0.4);
 }
 
-.btn-nav:hover {
-    background: rgba(255,255,255,0.3);
-    border-color: rgba(255,255,255,0.6);
-    transform: translateY(-2px);
-}
-
-.problem-content {
-    background: white;
-    border-radius: 15px;
-    padding: 25px 20px;
-    box-shadow: 0 5px 20px rgba(0,0,0,0.08);
-}
-
-.question-section {
-    margin-bottom: 25px;
-}
-
-.question-section h3 {
-    color: #2d3748;
-    margin-bottom: 15px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: clamp(1.1rem, 2.5vw, 1.3rem);
-}
-
-.question-text {
-    background: #f8f9fa;
-    padding: 20px;
-    border-radius: 12px;
-    line-height: 1.8;
-    font-size: clamp(1rem, 2.5vw, 1.1rem);
-    border-left: 4px solid #667eea;
-}
-
-/* 解答表示ボタン */
-.answer-toggle-section {
-    text-align: center;
-    padding: 25px 15px;
-    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-    border-radius: 12px;
-    margin-bottom: 25px;
-}
-
-.btn-show-answer {
-    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+.btn-primary:hover {
+    background: #5a67d8;
+    border-color: #5a67d8;
     color: white;
-    font-size: clamp(1rem, 2.5vw, 1.1rem);
-    padding: 12px 24px;
-    border-radius: 25px;
-    box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
-    margin-bottom: 8px;
 }
 
-.btn-show-answer:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(40, 167, 69, 0.4);
+.btn-outline-secondary {
+    border-color: #6b7280;
+    color: #6b7280;
 }
 
-.btn-hide-answer {
-    background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
+.btn-outline-secondary:hover {
+    background: #6b7280;
     color: white;
-    font-size: clamp(1rem, 2.5vw, 1.1rem);
-    padding: 12px 24px;
-    border-radius: 25px;
-    box-shadow: 0 4px 15px rgba(108, 117, 125, 0.3);
-    margin-bottom: 8px;
 }
 
-.btn-hide-answer:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(108, 117, 125, 0.4);
+.btn-outline-primary {
+    border-color: #667eea;
+    color: #667eea;
 }
 
-.answer-hint {
-    color: #6c757d;
-    font-size: clamp(0.8rem, 2vw, 0.9rem);
-    margin: 0;
-    font-style: italic;
+.btn-outline-primary:hover {
+    background: #667eea;
+    color: white;
 }
 
-.answer-section {
-    margin-bottom: 30px;
-}
-
-.answer-content h3 {
-    color: #2d3748;
-    margin-bottom: 15px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: clamp(1.1rem, 2.5vw, 1.3rem);
-}
-
-.answer-text {
-    background: #fff3cd;
-    padding: 20px;
-    border-radius: 12px;
-    line-height: 1.8;
-    font-size: clamp(1rem, 2.5vw, 1.1rem);
-    border-left: 4px solid #ffc107;
-    margin-bottom: 10px;
-}
-
-.answer-meta {
-    text-align: right;
-    padding: 0 8px;
-}
-
-.progress-section h3 {
-    color: #2d3748;
-    margin-bottom: 15px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: clamp(1.1rem, 2.5vw, 1.3rem);
-}
-
-.progress-controls {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 15px;
-    margin-bottom: 15px;
-}
-
-.custom-checkbox {
-    display: flex;
-    align-items: center;
-    cursor: pointer;
-    font-weight: 500;
-    font-size: clamp(0.9rem, 2vw, 1rem);
-}
-
-.custom-checkbox input {
-    margin-right: 8px;
-    transform: scale(1.2);
-}
-
-.difficulty-control {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-
-.difficulty-control label {
-    font-weight: 500;
-    font-size: clamp(0.9rem, 2vw, 1rem);
-}
-
-.difficulty-control select {
-    padding: 8px 10px;
-    border: 2px solid #e2e8f0;
-    border-radius: 6px;
-    font-size: clamp(0.85rem, 2vw, 0.9rem);
-}
-
-.memo-section {
-    margin-top: 20px;
-}
-
-.memo-section label {
-    display: block;
-    margin-bottom: 8px;
-    font-weight: 500;
-    font-size: clamp(0.9rem, 2vw, 1rem);
-}
-
-.memo-section textarea {
+/* 問題一覧セクション */
+.problems-section {
+    margin-top: 30px;
     width: 100%;
-    padding: 12px;
-    border: 2px solid #e2e8f0;
-    border-radius: 8px;
-    font-family: inherit;
-    font-size: clamp(0.9rem, 2vw, 1rem);
-    line-height: 1.5;
-    resize: vertical;
-    min-height: 80px;
 }
 
-.memo-section textarea:focus {
-    outline: none;
+/* タイプ別グループ化 - 修正版 */
+.type-group {
+    margin-bottom: 40px !important;
+    width: 100% !important;
+}
+
+.type-header {
+    margin-bottom: 25px !important;
+    padding-bottom: 15px !important;
+    border-bottom: 2px solid #e1e8ed !important;
+}
+
+.type-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+    font-size: clamp(1.2rem, 3vw, 1.4rem);
+    color: #2d3748;
+    font-weight: 600;
+}
+
+.type-badge {
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-weight: 700;
+    font-size: clamp(0.9rem, 2vw, 1rem);
+    color: white;
+}
+
+.type-a { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
+.type-b { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
+.type-c { background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); }
+.type-d { background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); }
+
+/* 問題グリッド - シンプル版（Bootstrap競合解決） */
+.problems-grid {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)) !important;
+    gap: 20px !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+/* 大画面でのカード幅制限 */
+@media (min-width: 1200px) {
+    .problems-grid {
+        grid-template-columns: repeat(auto-fit, minmax(400px, max-content)) !important;
+        justify-content: center !important;
+        gap: 25px !important;
+    }
+}
+
+@media (min-width: 1600px) {
+    .problems-grid {
+        grid-template-columns: repeat(auto-fit, minmax(450px, max-content)) !important;
+        gap: 30px !important;
+    }
+}
+
+@media (min-width: 768px) and (max-width: 1199px) {
+    .problems-grid {
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)) !important;
+        gap: 20px !important;
+    }
+}
+
+/* 問題カードリンク */
+.problem-card-link {
+    text-decoration: none;
+    color: inherit;
+    display: block;
+}
+
+.problem-card-link:hover {
+    text-decoration: none;
+    color: inherit;
+}
+
+/* 問題カード */
+.problem-card {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+    border: 1px solid #e1e8ed;
+    transition: all 0.3s ease;
+    position: relative;
+    height: fit-content;
+}
+
+.problem-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.12);
     border-color: #667eea;
 }
 
-/* レスポンシブ対応 */
+.problem-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 15px;
+}
+
+.university-year {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.university {
+    font-size: clamp(1.1rem, 2.5vw, 1.2rem);
+    font-weight: 600;
+    color: #2d3748;
+    margin: 0;
+}
+
+.year {
+    font-size: clamp(0.9rem, 2vw, 1rem);
+    color: #718096;
+    margin: 0;
+}
+
+.progress-indicators {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.indicator {
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: clamp(0.7rem, 1.5vw, 0.75rem);
+    font-weight: 500;
+    text-align: center;
+    min-width: 35px;
+}
+
+.viewed {
+    background: #e0f2fe;
+    color: #0369a1;
+}
+
+.understood {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.review {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.difficulty {
+    background: #f3e8ff;
+    color: #7c3aed;
+}
+
+.problem-content {
+    margin-bottom: 15px;
+}
+
+.problem-preview {
+    margin-bottom: 12px;
+    line-height: 1.6;
+    color: #4a5568;
+    font-size: clamp(0.85rem, 2vw, 0.95rem);
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.problem-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #f1f5f9;
+}
+
+.answer-length {
+    background: #f7fafc;
+    color: #4a5568;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: clamp(0.75rem, 1.5vw, 0.8rem);
+    font-weight: 500;
+}
+
+.problem-footer {
+    text-align: center;
+    padding-top: 12px;
+    border-top: 1px solid #f1f5f9;
+}
+
+.read-more {
+    color: #4f46e5;
+    font-weight: 500;
+    font-size: clamp(0.8rem, 2vw, 0.9rem);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    opacity: 0.8;
+    transition: opacity 0.3s ease;
+}
+
+.problem-card:hover .read-more {
+    opacity: 1;
+}
+
+/* 問題がない場合 */
+.no-problems {
+    text-align: center;
+    padding: 40px 20px;
+    background: #f8f9fa;
+    border-radius: 15px;
+    border: 2px dashed #dee2e6;
+    grid-column: 1 / -1;
+}
+
+.no-problems-content i {
+    font-size: clamp(2.5rem, 6vw, 3rem);
+    color: #adb5bd;
+    margin-bottom: 20px;
+}
+
+.no-problems-content h3 {
+    color: #6c757d;
+    margin: 15px 0 10px 0;
+    font-size: clamp(1.2rem, 3vw, 1.5rem);
+}
+
+.no-problems-content p {
+    color: #6c757d;
+    margin-bottom: 20px;
+    font-size: clamp(0.9rem, 2.5vw, 1rem);
+}
+
+/* タブレット向け調整 */
+@media (max-width: 1024px) and (min-width: 769px) {
+    .essay-chapter-container {
+        padding: 20px;
+    }
+    
+    .filter-grid {
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    }
+    
+    .problems-grid {
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    }
+}
+
+/* スマートフォン向け調整 */
 @media (max-width: 768px) {
-    .essay-problem-container {
+    .essay-chapter-container {
         padding: 10px;
     }
     
-    .problem-header {
+    .chapter-header {
         padding: 20px 15px;
     }
     
-    .problem-navigation {
+    .filter-section {
+        padding: 15px;
+        margin-bottom: 20px;
+    }
+    
+    .filter-header {
         flex-direction: column;
-        align-items: center;
-        gap: 8px;
+        align-items: flex-start;
+        gap: 15px;
     }
     
-    .btn {
-        width: 100%;
-        max-width: 200px;
-        justify-content: center;
-    }
-    
-    .problem-content {
-        padding: 20px 15px;
-    }
-    
-    .progress-controls {
+    .filter-grid {
         grid-template-columns: 1fr;
         gap: 12px;
     }
     
-    .custom-checkbox {
-        justify-content: center;
+    .year-range {
+        flex-direction: column;
+        gap: 8px;
+        align-items: stretch;
+        max-width: none;
     }
     
-    .difficulty-control {
-        text-align: center;
-    }
-}
-
-@media (max-width: 480px) {
-    .essay-problem-container {
-        padding: 8px;
-    }
-    
-    .problem-header {
-        padding: 15px 10px;
-    }
-    
-    .problem-content {
-        padding: 15px 10px;
-    }
-    
-    .question-text,
-    .answer-text {
-        padding: 15px;
-    }
-    
-    .nav-text,
-    .btn-text {
+    .year-range span {
         display: none;
     }
     
-    .memo-section textarea {
-        min-height: 60px;
-    }
-}
-
-/* ダークモード対応 */
-@media (prefers-color-scheme: dark) {
-    .problem-content {
-        background: #2d3748;
-        color: #e2e8f0;
-    }
-    
-    .question-section h3,
-    .answer-content h3,
-    .progress-section h3 {
-        color: #e2e8f0;
-    }
-    
-    .question-text {
-        background: #4a5568;
-        border-left-color: #667eea;
-    }
-    
-    .answer-text {
-        background: #744210;
-        border-left-color: #ffc107;
-        color: #fef3cd;
-    }
-    
-    .memo-section textarea,
-    .difficulty-control select {
-        background: #4a5568;
-        border-color: #718096;
-        color: #e2e8f0;
-    }
-}
-
-/* =======================================
-   論述問題画面のレイアウト修正
-   ======================================= */
-
-/* 1. 模範解答の表示位置修正 - 大画面対応 */
-.essay-problem-container {
-    max-width: 900px;
-    margin: 0 auto;
-    padding: 15px;
-}
-
-.problem-content {
-    background: white;
-    border-radius: 15px;
-    padding: 25px 20px;
-    box-shadow: 0 5px 20px rgba(0,0,0,0.08);
-    display: flex;
-    flex-direction: column; /* 縦並びで順序を保持 */
-}
-
-/* 問題セクション */
-.question-section {
-    order: 1; /* 最初に表示 */
-    margin-bottom: 25px;
-}
-
-/* 解答表示ボタンセクション */
-.answer-toggle-section {
-    order: 2; /* 問題の次に表示 */
-    text-align: center;
-    padding: 25px 15px;
-    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-    border-radius: 12px;
-    margin-bottom: 25px;
-}
-
-/* 模範解答セクション */
-.answer-section {
-    order: 3; /* ボタンの次に表示 */
-    margin-bottom: 30px;
-    width: 100%; /* 全幅使用 */
-    position: static !important; /* 固定位置を解除 */
-}
-
-/* 学習進捗セクション */
-.progress-section {
-    order: 4; /* 最後に表示 */
-}
-
-/* 模範解答コンテンツの位置調整 */
-.answer-content {
-    position: static !important; /* 固定位置を完全に解除 */
-    float: none !important;
-    width: 100% !important;
-    max-width: none !important;
-    left: auto !important;
-    right: auto !important;
-    top: auto !important;
-    bottom: auto !important;
-    margin: 0 !important;
-    transform: none !important;
-}
-
-/* 2. スマホでのボタンテキスト表示修正 */
-@media (max-width: 767px) {
-    /* ナビゲーションボタンのテキストを常に表示 */
-    .nav-text {
-        display: inline !important; /* 強制的に表示 */
-    }
-    
-    .btn-text {
-        display: inline !important; /* 強制的に表示 */
-    }
-    
-    /* ボタンのサイズ調整 */
-    .btn {
-        padding: 8px 12px !important;
-        font-size: 0.8rem !important;
-        white-space: nowrap; /* テキストの改行を防ぐ */
-        min-width: auto !important;
-    }
-    
-    /* ナビゲーションエリアの調整 */
-    .problem-navigation {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-        justify-content: center;
-        align-items: center;
-    }
-    
-    /* ボタンアイコンとテキストの間隔調整 */
-    .btn i {
-        margin-right: 4px !important;
-    }
-    
-    /* 戻るボタンの特別対応 */
-    .btn-back-to-list {
-        flex: 1 1 auto;
-        max-width: 200px;
+    .filter-actions {
+        flex-direction: column;
         text-align: center;
     }
     
-    /* 前後ボタンの調整 */
-    .btn-nav {
-        flex: 0 1 auto;
-        min-width: 80px;
-    }
-}
-
-/* 3. 極小画面（480px以下）での対応 */
-@media (max-width: 480px) {
-    /* テキストを小さくしてでも表示 */
-    .nav-text,
-    .btn-text {
-        display: inline !important;
-        font-size: 0.7rem !important;
+    .problems-grid {
+        grid-template-columns: 1fr;
+        gap: 15px;
     }
     
-    .btn {
-        padding: 6px 8px !important;
-        font-size: 0.7rem !important;
+    .problem-card {
+        padding: 15px;
     }
     
-    /* ナビゲーションを縦並びに */
-    .problem-navigation {
+    .problem-header {
         flex-direction: column;
-        gap: 6px;
+        align-items: flex-start;
+        gap: 10px;
     }
     
-    .btn {
-        width: 100%;
-        max-width: 180px;
-        justify-content: center;
-    }
-}
-
-/* 4. 追加の安全対策 - 模範解答の位置固定防止 */
-.answer-content,
-.answer-content * {
-    position: static !important;
-    float: none !important;
-}
-
-/* 模範解答セクション全体の位置確保 */
-.answer-section {
-    clear: both;
-    display: block;
-    width: 100%;
-}
-
-/* 5. レスポンシブ対応の強化 */
-@media (min-width: 768px) {
-    /* 大画面では模範解答を問題文の下に確実に配置 */
-    .answer-section {
-        margin-top: 20px;
-        margin-bottom: 30px;
+    .progress-indicators {
+        justify-content: flex-start;
+        align-self: stretch;
     }
     
-    .answer-content {
-        margin-top: 0 !important;
+    .type-title {
+        flex-direction: column;
+        gap: 8px;
+        text-align: center;
     }
 }
 
-/* 6. ダークモード対応の維持 */
-@media (prefers-color-scheme: dark) {
-    .answer-toggle-section {
-        background: linear-gradient(135deg, #4a5568 0%, #2d3748 100%);
+/* 小さいスマートフォン向け */
+@media (max-width: 480px) {
+    .essay-chapter-container {
+        padding: 8px;
     }
     
-    .btn-show-answer,
-    .btn-hide-answer {
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    .chapter-header {
+        padding: 15px 10px;
+    }
+    
+    .filter-section {
+        padding: 12px;
+    }
+    
+    .problem-card {
+        padding: 12px;
+    }
+    
+    .back-to-main {
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .progress-indicators {
+        gap: 4px;
+    }
+    
+    .indicator {
+        padding: 2px 4px;
+        font-size: 0.65rem;
+    }
+}
+
+/* 大画面でのコンテンツ幅制限 */
+@media (min-width: 1400px) {
+    .essay-chapter-container {
+        max-width: 1400px;
+        padding: 20px 30px;
     }
 }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="essay-problem-container">
+<div class="essay-chapter-container">
     <!-- ヘッダー -->
-    <div class="problem-header">
-        <div class="breadcrumb">
-            <a href="{{ url_for('essay_index') }}">
-                <i class="fas fa-edit"></i> 論述問題集
-            </a>
-            <i class="fas fa-chevron-right"></i>
-            <a href="{{ url_for('essay_chapter', chapter=problem.chapter) }}">
-                {% if problem.chapter == 'com' %}総合問題{% else %}第{{ problem.chapter }}章{% endif %}
-            </a>
-            <i class="fas fa-chevron-right"></i>
-            <span>問題 {{ problem.id }}</span>
-        </div>
-        
-        <div class="problem-info">
-            <h1>{{ problem.university }} {{ problem.year }}年</h1>
-            <div class="problem-meta">
-                <span class="badge badge-type-{{ problem.type.lower() }}">
-                    タイプ{{ problem.type }}
-                    {% if problem.type == 'A' %}（200字以上）
-                    {% elif problem.type == 'B' %}（100-150字程度）
-                    {% elif problem.type == 'C' %}（50-75字程度）
-                    {% elif problem.type == 'D' %}（30字程度）
-                    {% endif %}
-                </span>
-                <span class="badge badge-secondary">{{ problem.answer_length }}字</span>
+    <div class="chapter-header">
+        <div class="header-content">
+            <div class="breadcrumb">
+                <a href="{{ url_for('essay_index') }}">
+                    <i class="fas fa-edit"></i> 論述問題集
+                </a>
+                <i class="fas fa-chevron-right"></i>
+                <span>{{ chapter_name }}</span>
             </div>
-        </div>
-        
-        <!-- ナビゲーション -->
-        <div class="problem-navigation">
-            {% if prev_problem %}
-            <a href="{{ url_for('essay_problem', problem_id=prev_problem.id) }}" class="btn btn-nav">
-                <i class="fas fa-chevron-left"></i> <span class="nav-text">前の問題</span>
-            </a>
-            {% endif %}
-            
-            <a href="{{ url_for('essay_chapter', chapter=problem.chapter) }}" class="btn btn-back-to-list">
-                <i class="fas fa-list"></i> <span class="nav-text">一覧に戻る</span>
-            </a>
-            
-            {% if next_problem %}
-            <a href="{{ url_for('essay_problem', problem_id=next_problem.id) }}" class="btn btn-nav">
-                <span class="nav-text">次の問題</span> <i class="fas fa-chevron-right"></i>
-            </a>
-            {% endif %}
+            <h1>{{ chapter_name }}</h1>
+            <p class="chapter-description">
+                {% if chapter == 'com' %}
+                複数の章にまたがる総合的な論述問題です。
+                {% else %}
+                第{{ chapter }}章の論述問題一覧です。文字数別（A〜D）に整理されています。
+                {% endif %}
+            </p>
+            <div class="back-to-main">
+                <a href="{{ url_for('index') }}" class="btn btn-sm">
+                    <i class="fas fa-home"></i> {{ app_name }}
+                </a>
+                <a href="{{ url_for('essay_index') }}" class="btn btn-sm">
+                    <i class="fas fa-arrow-left"></i> 論述問題集
+                </a>
+            </div>
         </div>
     </div>
 
-    <!-- 問題内容 -->
-    <div class="problem-content">
-        <div class="question-section">
-            <h3><i class="fas fa-question-circle"></i> 問題</h3>
-            
-            <!-- 画像表示（ファイル名規則方式） -->
-            {% if has_essay_image(problem.id) %}
-            <div class="problem-image mb-3">
-                <img src="{{ url_for('static', filename=essay_image_path(problem.id)) }}" 
-                    class="img-fluid" alt="問題画像" style="max-width: 100%; border-radius: 8px;">
-            </div>
-            {% endif %}
-            
-            <div class="question-text">
-                {{ problem.question|replace('\n', '<br>')|replace('\r', '')|safe }}
-            </div>
-        </div>
-
-        <!-- 解答表示ボタン -->
-        <div class="answer-toggle-section">
-            <button id="toggleAnswer" class="btn btn-show-answer" onclick="toggleAnswer()">
-                <i class="fas fa-eye"></i> <span class="btn-text">解答を表示</span>
+    <!-- フィルターセクション -->
+    <div class="filter-section">
+        <div class="filter-header">
+            <h3><i class="fas fa-filter"></i> 絞り込み条件</h3>
+            <button class="btn btn-sm btn-outline-secondary" onclick="clearAllFilters()">
+                <i class="fas fa-times"></i> 条件をクリア
             </button>
-            <p class="answer-hint">まず自分で考えてから解答を確認しましょう</p>
         </div>
-
-        <div class="answer-section">
-            <div id="answerContent" class="answer-content" style="display: none;">
-                <h3><i class="fas fa-lightbulb"></i> 模範解答</h3>
-                <div class="answer-text">
-                    {{ problem.answer|replace('\n', '<br>')|replace('\r', '')|safe }}
-                </div>
-                <div class="answer-meta">
-                    <small class="text-muted">文字数: {{ problem.answer_length }}字</small>
-                </div>
-            </div>
-        </div>
-
-        <!-- 学習進捗 -->
-        <div class="progress-section">
-            <h3><i class="fas fa-chart-line"></i> 学習進捗</h3>
-            
-            <div class="progress-controls">
-                <div class="understanding-control">
-                    <label class="custom-checkbox">
-                        <input type="checkbox" id="understoodCheck" 
-                               {% if progress.understood %}checked{% endif %}
-                               onchange="updateUnderstanding()">
-                        <span class="checkmark"></span>
-                        <span class="checkbox-text">理解した</span>
-                    </label>
-                </div>
-                
-                <div class="difficulty-control">
-                    <label for="difficultyRating">難易度評価:</label>
-                    <select id="difficultyRating" onchange="updateDifficulty()">
-                        <option value="">選択してください</option>
-                        <option value="1" {% if progress.difficulty_rating == 1 %}selected{% endif %}>1 (易しい)</option>
-                        <option value="2" {% if progress.difficulty_rating == 2 %}selected{% endif %}>2</option>
-                        <option value="3" {% if progress.difficulty_rating == 3 %}selected{% endif %}>3 (普通)</option>
-                        <option value="4" {% if progress.difficulty_rating == 4 %}selected{% endif %}>4</option>
-                        <option value="5" {% if progress.difficulty_rating == 5 %}selected{% endif %}>5 (難しい)</option>
+        
+        <form method="GET" id="filterForm" class="filter-form">
+            <div class="filter-grid">
+                <!-- タイプフィルター -->
+                <div class="filter-group">
+                    <label for="typeFilter">問題タイプ</label>
+                    <select id="typeFilter" name="type" class="form-control">
+                        <option value="">全てのタイプ</option>
+                        <option value="A" {% if current_filters.type == 'A' %}selected{% endif %}>A（200字以上）</option>
+                        <option value="B" {% if current_filters.type == 'B' %}selected{% endif %}>B（100-150字程度）</option>
+                        <option value="C" {% if current_filters.type == 'C' %}selected{% endif %}>C（50-75字程度）</option>
+                        <option value="D" {% if current_filters.type == 'D' %}selected{% endif %}>D（30字程度）</option>
                     </select>
                 </div>
-                
-                <div class="review-control">
-                    <label class="custom-checkbox">
-                        <input type="checkbox" id="reviewFlag" 
-                               {% if progress.review_flag %}checked{% endif %}
-                               onchange="updateReviewFlag()">
-                        <span class="checkmark"></span>
-                        <span class="checkbox-text">復習フラグ</span>
-                    </label>
+
+                <!-- 大学フィルター -->
+                <div class="filter-group">
+                    <label for="universityFilter">大学</label>
+                    <select id="universityFilter" name="university" class="form-control">
+                        <option value="">全ての大学</option>
+                        {% for university in filter_data.universities %}
+                        <option value="{{ university }}" {% if current_filters.university == university %}selected{% endif %}>
+                            {{ university }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- 年度範囲 -->
+                <div class="filter-group">
+                    <label for="yearFrom">年度範囲</label>
+                    <div class="year-range">
+                        <input type="number" id="yearFrom" name="year_from" 
+                               value="{{ current_filters.year_from or '' }}"
+                               min="{{ filter_data.year_range.min }}" 
+                               max="{{ filter_data.year_range.max }}"
+                               placeholder="開始年" class="form-control">
+                        <span>〜</span>
+                        <input type="number" id="yearTo" name="year_to" 
+                               value="{{ current_filters.year_to or '' }}"
+                               min="{{ filter_data.year_range.min }}" 
+                               max="{{ filter_data.year_range.max }}"
+                               placeholder="終了年" class="form-control">
+                    </div>
+                </div>
+
+                <!-- キーワード検索 -->
+                <div class="filter-group">
+                    <label for="keywordFilter">キーワード検索</label>
+                    <input type="text" id="keywordFilter" name="keyword" 
+                           value="{{ current_filters.keyword or '' }}"
+                           placeholder="問題文・解答文から検索" class="form-control">
                 </div>
             </div>
             
-            <div class="memo-section">
-                <label for="memoText">メモ:</label>
-                <textarea id="memoText" rows="3" placeholder="この問題について気づいたことや覚えておきたいことを記録しましょう..." onchange="updateMemo()">{{ progress.memo or '' }}</textarea>
+            <div class="filter-actions">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-search"></i> 絞り込み
+                </button>
+                <span class="filter-count">{{ problems|length }}問が見つかりました</span>
             </div>
-        </div>
+        </form>
+    </div>
+
+    <!-- 問題一覧 -->
+    <div class="problems-section">
+        {% if problems %}
+            <!-- 全問題を1つのグリッドで表示 -->
+            <div class="problems-grid">
+                {% for problem in problems %}
+                    <!-- 問題カード -->
+                    <a href="{{ url_for('essay_problem', problem_id=problem.id) }}" class="problem-card-link">
+                        <div class="problem-card">
+                            <!-- タイプバッジを問題カード内に表示 -->
+                            <div class="problem-header">
+                                <div class="university-year">
+                                    <div class="type-info">
+                                        <span class="type-badge type-{{ problem.type.lower() }}">
+                                            {{ problem.type }}
+                                            {% if problem.type == 'A' %}（200字以上）
+                                            {% elif problem.type == 'B' %}（100-150字程度）
+                                            {% elif problem.type == 'C' %}（50-75字程度）
+                                            {% elif problem.type == 'D' %}（30字程度）
+                                            {% endif %}
+                                        </span>
+                                    </div>
+                                    <span class="university">{{ problem.university }}</span>
+                                    <span class="year">{{ problem.year }}年</span>
+                                </div>
+                                <div class="progress-indicators">
+                                    {% if problem.progress.viewed_answer %}
+                                        <span class="indicator viewed" title="解答閲覧済み">
+                                            <i class="fas fa-eye"></i>
+                                        </span>
+                                    {% endif %}
+                                    {% if problem.progress.understood %}
+                                        <span class="indicator understood" title="理解済み">
+                                            <i class="fas fa-check-circle"></i>
+                                        </span>
+                                    {% endif %}
+                                    {% if problem.progress.review_flag %}
+                                        <span class="indicator review" title="復習フラグ">
+                                            <i class="fas fa-flag"></i>
+                                        </span>
+                                    {% endif %}
+                                    {% if problem.progress.difficulty_rating %}
+                                        <span class="indicator difficulty" title="難易度: {{ problem.progress.difficulty_rating }}/5">
+                                            <i class="fas fa-star"></i>{{ problem.progress.difficulty_rating }}
+                                        </span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <div class="problem-content">
+                                <p class="problem-preview">{{ problem.preview }}</p>
+                                <div class="problem-meta">
+                                    <span class="answer-length">解答: {{ problem.answer_length }}字</span>
+                                </div>
+                            </div>
+                            
+                            <div class="problem-footer">
+                                <span class="read-more">
+                                    <i class="fas fa-arrow-right"></i> 問題を見る
+                                </span>
+                            </div>
+                        </div>
+                    </a>
+                {% endfor %}
+            </div>
+        {% else %}
+            <!-- 問題がない場合 -->
+            <div class="no-problems">
+                <div class="no-problems-content">
+                    <i class="fas fa-search"></i>
+                    <h3>条件に合う問題が見つかりませんでした</h3>
+                    <p>フィルター条件を変更して再度検索してください。</p>
+                    <button class="btn btn-outline-primary" onclick="clearAllFilters()">
+                        <i class="fas fa-refresh"></i> 条件をリセット
+                    </button>
+                </div>
+            </div>
+        {% endif %}
     </div>
 </div>
 
-<!-- データを安全にJavaScriptに渡す -->
-<script id="problem-data" type="application/json">
-{
-    "problemId": {{ problem.id }},
-    "viewedAnswer": {% if progress.viewed_answer %}true{% else %}false{% endif %}
-}
-</script>
-
 <script>
-// データを安全に取得
-const essayProblemData = JSON.parse(document.getElementById('problem-data').textContent);
-let essayAnswerVisible = essayProblemData.viewedAnswer;
-
-function toggleAnswer() {
-    const content = document.getElementById('answerContent');
-    const button = document.getElementById('toggleAnswer');
-    
-    if (essayAnswerVisible) {
-        content.style.display = 'none';
-        button.innerHTML = '<i class="fas fa-eye"></i> <span class="btn-text">解答を表示</span>';
-        button.className = 'btn btn-show-answer';
-        essayAnswerVisible = false;
-    } else {
-        content.style.display = 'block';
-        button.innerHTML = '<i class="fas fa-eye-slash"></i> <span class="btn-text">解答を非表示</span>';
-        button.className = 'btn btn-hide-answer';
-        essayAnswerVisible = true;
-        
-        // 初回表示時は進捗を更新
-        updateProgress({ viewed_answer: true });
-    }
-}
-
-function updateUnderstanding() {
-    const understood = document.getElementById('understoodCheck').checked;
-    updateProgress({ understood: understood });
-}
-
-function updateDifficulty() {
-    const rating = document.getElementById('difficultyRating').value;
-    updateProgress({ difficulty_rating: rating ? parseInt(rating) : null });
-}
-
-function updateReviewFlag() {
-    const flag = document.getElementById('reviewFlag').checked;
-    updateProgress({ review_flag: flag });
-}
-
-function updateMemo() {
-    const memo = document.getElementById('memoText').value;
-    updateProgress({ memo: memo });
-}
-
-function updateProgress(updates) {
-    fetch('/api/essay/progress/update', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            problem_id: essayProblemData.problemId,
-            updates: updates
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.status !== 'success') {
-            console.error('進捗更新エラー:', data.message);
+// フィルターのクリア
+function clearAllFilters() {
+    const form = document.getElementById('filterForm');
+    const inputs = form.querySelectorAll('input, select');
+    inputs.forEach(input => {
+        if (input.type === 'text' || input.type === 'number') {
+            input.value = '';
+        } else if (input.tagName === 'SELECT') {
+            input.selectedIndex = 0;
         }
-    })
-    .catch(error => {
-        console.error('進捗更新エラー:', error);
     });
+    form.submit();
 }
 
-// 初期状態で解答が表示済みの場合
+// リアルタイム検索（デバウンス付き）
+let searchTimeout;
 document.addEventListener('DOMContentLoaded', function() {
-    if (essayProblemData.viewedAnswer) {
-        toggleAnswer();
+    const keywordFilter = document.getElementById('keywordFilter');
+    if (keywordFilter) {
+        keywordFilter.addEventListener('input', function() {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                document.getElementById('filterForm').submit();
+            }, 1000);
+        });
     }
 });
+
+// フィルター変更時の自動送信
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('#typeFilter, #universityFilter').forEach(select => {
+        select.addEventListener('change', () => {
+            document.getElementById('filterForm').submit();
+        });
+    });
+});
 </script>
+
 {% endblock %}
