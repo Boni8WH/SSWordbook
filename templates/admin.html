@@ -350,6 +350,117 @@
             </div>
         </div>
     </div>
+    <div class="admin-section">
+        <div class="section-header" data-bs-toggle="collapse" data-bs-target="#section-essay-visibility" aria-expanded="false">
+            <h3><i class="fas fa-eye"></i> 論述問題公開設定 <i class="fas fa-chevron-down toggle-icon"></i></h3>
+        </div>
+        <div class="collapse" id="section-essay-visibility">
+            <div class="section-content">
+                <p>部屋ごとに章・問題タイプ別で論述問題の公開/非公開を設定できます。</p>
+                
+                <!-- 部屋選択 -->
+                <div class="visibility-room-selector">
+                    <div class="row align-items-center mb-3">
+                        <div class="col-md-4">
+                            <label for="visibilityRoomSelect" class="form-label">
+                                <i class="fas fa-door-open"></i> 設定対象の部屋
+                            </label>
+                            <select id="visibilityRoomSelect" class="form-select">
+                                <option value="">部屋を選択してください</option>
+                            </select>
+                        </div>
+                        <div class="col-md-8">
+                            <div class="btn-group" role="group">
+                                <button id="loadVisibilitySettings" class="btn btn-primary" disabled>
+                                    <i class="fas fa-download"></i> 設定を読み込み
+                                </button>
+                                <button id="saveVisibilitySettings" class="btn btn-success" disabled>
+                                    <i class="fas fa-save"></i> 設定を保存
+                                </button>
+                                <button id="resetVisibilitySettings" class="btn btn-warning" disabled>
+                                    <i class="fas fa-undo"></i> 全て公開にリセット
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 設定マトリックス -->
+                <div id="visibilityMatrix" class="visibility-matrix" style="display: none;">
+                    <div class="matrix-header">
+                        <h4><i class="fas fa-table"></i> 公開設定マトリックス</h4>
+                        <p class="text-muted">各セルをクリックして公開/非公開を切り替えできます</p>
+                    </div>
+                    
+                    <!-- 一括操作ボタン -->
+                    <div class="bulk-operations mb-3">
+                        <div class="btn-group btn-group-sm" role="group">
+                            <button class="btn btn-outline-success" onclick="setAllVisible(true)">
+                                <i class="fas fa-eye"></i> 全て公開
+                            </button>
+                            <button class="btn btn-outline-danger" onclick="setAllVisible(false)">
+                                <i class="fas fa-eye-slash"></i> 全て非公開
+                            </button>
+                        </div>
+                        <div class="btn-group btn-group-sm ms-2" role="group">
+                            <button class="btn btn-outline-info" onclick="setTypeVisible('A', true)">A問題を公開</button>
+                            <button class="btn btn-outline-info" onclick="setTypeVisible('B', true)">B問題を公開</button>
+                            <button class="btn btn-outline-info" onclick="setTypeVisible('C', true)">C問題を公開</button>
+                            <button class="btn btn-outline-info" onclick="setTypeVisible('D', true)">D問題を公開</button>
+                        </div>
+                    </div>
+                    
+                    <!-- マトリックステーブル -->
+                    <div class="table-responsive">
+                        <table id="visibilityTable" class="table table-bordered visibility-table">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th style="width: 120px;">章</th>
+                                    <th class="text-center">A問題<br><small>(200字以上)</small></th>
+                                    <th class="text-center">B問題<br><small>(100-150字)</small></th>
+                                    <th class="text-center">C問題<br><small>(50-75字)</small></th>
+                                    <th class="text-center">D問題<br><small>(30字程度)</small></th>
+                                </tr>
+                            </thead>
+                            <tbody id="visibilityTableBody">
+                                <!-- JavaScriptで動的生成 -->
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- 設定状況サマリー -->
+                    <div class="settings-summary mt-3">
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <h6><i class="fas fa-chart-pie"></i> 設定状況</h6>
+                                <div class="row">
+                                    <div class="col-md-3">
+                                        <span class="badge bg-success me-1">公開:</span>
+                                        <span id="visibleCount">0</span>件
+                                    </div>
+                                    <div class="col-md-3">
+                                        <span class="badge bg-danger me-1">非公開:</span>
+                                        <span id="hiddenCount">0</span>件
+                                    </div>
+                                    <div class="col-md-3">
+                                        <span class="badge bg-info me-1">総数:</span>
+                                        <span id="totalCount">0</span>件
+                                    </div>
+                                    <div class="col-md-3">
+                                        <span class="badge bg-primary me-1">公開率:</span>
+                                        <span id="visibilityRate">0%</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 状態表示 -->
+                <div id="visibilityStatus" class="mt-3"></div>
+            </div>
+        </div>
+    </div>
 
     <!-- 論述問題集管理セクション　-->
     <div class="admin-section">
@@ -2559,6 +2670,319 @@ function addEssayProblem() {
         alert('❌ 問題の追加中にエラーが発生しました');
     });
 }
+
+// 論述問題公開設定管理のJavaScript
+
+let currentVisibilitySettings = {};
+let availableChapters = [];
+let availableTypes = ['A', 'B', 'C', 'D'];
+
+// 初期化
+document.addEventListener('DOMContentLoaded', function() {
+    initializeVisibilitySettings();
+});
+
+function initializeVisibilitySettings() {
+    // 部屋一覧を読み込み
+    loadRoomList();
+    
+    // イベントリスナーを設定
+    document.getElementById('visibilityRoomSelect').addEventListener('change', function() {
+        const selectedRoom = this.value;
+        const loadBtn = document.getElementById('loadVisibilitySettings');
+        const saveBtn = document.getElementById('saveVisibilitySettings');
+        const resetBtn = document.getElementById('resetVisibilitySettings');
+        
+        if (selectedRoom) {
+            loadBtn.disabled = false;
+            saveBtn.disabled = false;
+            resetBtn.disabled = false;
+        } else {
+            loadBtn.disabled = true;
+            saveBtn.disabled = true;
+            resetBtn.disabled = true;
+            document.getElementById('visibilityMatrix').style.display = 'none';
+        }
+    });
+    
+    document.getElementById('loadVisibilitySettings').addEventListener('click', loadVisibilitySettings);
+    document.getElementById('saveVisibilitySettings').addEventListener('click', saveVisibilitySettings);
+    document.getElementById('resetVisibilitySettings').addEventListener('click', resetVisibilitySettings);
+}
+
+function loadRoomList() {
+    fetch('/admin/get_room_list')
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                const select = document.getElementById('visibilityRoomSelect');
+                
+                // 既存オプションをクリア（最初のオプションは残す）
+                while (select.children.length > 1) {
+                    select.removeChild(select.lastChild);
+                }
+                
+                // 部屋番号を追加
+                data.rooms.forEach(room => {
+                    const option = document.createElement('option');
+                    option.value = room;
+                    option.textContent = `部屋 ${room}`;
+                    select.appendChild(option);
+                });
+            }
+        })
+        .catch(error => {
+            console.error('部屋一覧読み込みエラー:', error);
+            showVisibilityStatus('error', '部屋一覧の読み込みに失敗しました');
+        });
+}
+
+function loadVisibilitySettings() {
+    const roomNumber = document.getElementById('visibilityRoomSelect').value;
+    if (!roomNumber) return;
+    
+    showVisibilityStatus('info', '設定を読み込み中...');
+    
+    fetch(`/admin/essay_visibility_settings/${roomNumber}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                currentVisibilitySettings = data.settings;
+                availableChapters = data.chapters;
+                createVisibilityMatrix();
+                updateSettingsSummary();
+                showVisibilityStatus('success', `部屋 ${roomNumber} の設定を読み込みました`);
+            } else {
+                showVisibilityStatus('error', data.message);
+            }
+        })
+        .catch(error => {
+            console.error('設定読み込みエラー:', error);
+            showVisibilityStatus('error', '設定の読み込みに失敗しました');
+        });
+}
+
+function createVisibilityMatrix() {
+    const tbody = document.getElementById('visibilityTableBody');
+    tbody.innerHTML = '';
+    
+    availableChapters.forEach(chapter => {
+        const row = document.createElement('tr');
+        
+        // 章名セル
+        const chapterCell = document.createElement('td');
+        chapterCell.className = 'chapter-name';
+        chapterCell.textContent = chapter === 'com' ? '総合問題' : `第${chapter}章`;
+        row.appendChild(chapterCell);
+        
+        // 各タイプのセル
+        availableTypes.forEach(type => {
+            const cell = document.createElement('td');
+            cell.className = 'visibility-cell';
+            cell.dataset.chapter = chapter;
+            cell.dataset.type = type;
+            
+            // 現在の設定状態を取得
+            const isVisible = getVisibilitySetting(chapter, type);
+            updateCellAppearance(cell, isVisible);
+            
+            // クリックイベント
+            cell.addEventListener('click', function() {
+                toggleVisibility(chapter, type, cell);
+            });
+            
+            row.appendChild(cell);
+        });
+        
+        tbody.appendChild(row);
+    });
+    
+    document.getElementById('visibilityMatrix').style.display = 'block';
+}
+
+function getVisibilitySetting(chapter, type) {
+    // 設定が存在する場合はその値、存在しない場合はデフォルトでtrue（公開）
+    if (currentVisibilitySettings[chapter] && currentVisibilitySettings[chapter][type] !== undefined) {
+        return currentVisibilitySettings[chapter][type];
+    }
+    return true;
+}
+
+function updateCellAppearance(cell, isVisible) {
+    cell.classList.remove('visible', 'hidden');
+    cell.classList.add(isVisible ? 'visible' : 'hidden');
+    
+    const iconClass = isVisible ? 'fas fa-eye' : 'fas fa-eye-slash';
+    const statusText = isVisible ? '公開' : '非公開';
+    
+    cell.innerHTML = `
+        <div class="status-icon">
+            <i class="${iconClass}"></i>
+        </div>
+        <div class="status-text">${statusText}</div>
+    `;
+}
+
+function toggleVisibility(chapter, type, cell) {
+    const currentState = getVisibilitySetting(chapter, type);
+    const newState = !currentState;
+    
+    // 設定を更新
+    if (!currentVisibilitySettings[chapter]) {
+        currentVisibilitySettings[chapter] = {};
+    }
+    currentVisibilitySettings[chapter][type] = newState;
+    
+    // セルの外観を更新
+    updateCellAppearance(cell, newState);
+    cell.classList.add('changed');
+    
+    // アニメーション終了後にクラスを削除
+    setTimeout(() => {
+        cell.classList.remove('changed');
+    }, 500);
+    
+    // サマリーを更新
+    updateSettingsSummary();
+}
+
+function setAllVisible(isVisible) {
+    availableChapters.forEach(chapter => {
+        availableTypes.forEach(type => {
+            if (!currentVisibilitySettings[chapter]) {
+                currentVisibilitySettings[chapter] = {};
+            }
+            currentVisibilitySettings[chapter][type] = isVisible;
+            
+            // セルを更新
+            const cell = document.querySelector(`[data-chapter="${chapter}"][data-type="${type}"]`);
+            if (cell) {
+                updateCellAppearance(cell, isVisible);
+                cell.classList.add('changed');
+                setTimeout(() => cell.classList.remove('changed'), 500);
+            }
+        });
+    });
+    
+    updateSettingsSummary();
+}
+
+function setTypeVisible(targetType, isVisible) {
+    availableChapters.forEach(chapter => {
+        if (!currentVisibilitySettings[chapter]) {
+            currentVisibilitySettings[chapter] = {};
+        }
+        currentVisibilitySettings[chapter][targetType] = isVisible;
+        
+        // セルを更新
+        const cell = document.querySelector(`[data-chapter="${chapter}"][data-type="${targetType}"]`);
+        if (cell) {
+            updateCellAppearance(cell, isVisible);
+            cell.classList.add('changed');
+            setTimeout(() => cell.classList.remove('changed'), 500);
+        }
+    });
+    
+    updateSettingsSummary();
+}
+
+function updateSettingsSummary() {
+    let visibleCount = 0;
+    let totalCount = 0;
+    
+    availableChapters.forEach(chapter => {
+        availableTypes.forEach(type => {
+            totalCount++;
+            if (getVisibilitySetting(chapter, type)) {
+                visibleCount++;
+            }
+        });
+    });
+    
+    const hiddenCount = totalCount - visibleCount;
+    const visibilityRate = totalCount > 0 ? Math.round((visibleCount / totalCount) * 100) : 0;
+    
+    document.getElementById('visibleCount').textContent = visibleCount;
+    document.getElementById('hiddenCount').textContent = hiddenCount;
+    document.getElementById('totalCount').textContent = totalCount;
+    document.getElementById('visibilityRate').textContent = visibilityRate + '%';
+}
+
+function saveVisibilitySettings() {
+    const roomNumber = document.getElementById('visibilityRoomSelect').value;
+    if (!roomNumber) return;
+    
+    showVisibilityStatus('info', '設定を保存中...');
+    
+    fetch('/admin/essay_visibility_settings/save', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            room_number: roomNumber,
+            settings: currentVisibilitySettings
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            showVisibilityStatus('success', `部屋 ${roomNumber} の設定を保存しました`);
+        } else {
+            showVisibilityStatus('error', data.message);
+        }
+    })
+    .catch(error => {
+        console.error('設定保存エラー:', error);
+        showVisibilityStatus('error', '設定の保存に失敗しました');
+    });
+}
+
+function resetVisibilitySettings() {
+    if (!confirm('全ての設定を公開状態にリセットしますか？')) {
+        return;
+    }
+    
+    setAllVisible(true);
+    showVisibilityStatus('info', '全ての設定を公開状態にリセットしました');
+}
+
+function showVisibilityStatus(type, message) {
+    const statusDiv = document.getElementById('visibilityStatus');
+    const iconClass = {
+        'success': 'fas fa-check-circle',
+        'error': 'fas fa-exclamation-circle',
+        'info': 'fas fa-info-circle',
+        'warning': 'fas fa-exclamation-triangle'
+    }[type] || 'fas fa-info-circle';
+    
+    const alertClass = {
+        'success': 'alert-success',
+        'error': 'alert-danger',
+        'info': 'alert-info',
+        'warning': 'alert-warning'
+    }[type] || 'alert-info';
+    
+    statusDiv.innerHTML = `
+        <div class="alert ${alertClass} alert-dismissible fade show" role="alert">
+            <i class="${iconClass}"></i> ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+    
+    // 5秒後に自動で非表示
+    setTimeout(() => {
+        const alert = statusDiv.querySelector('.alert');
+        if (alert) {
+            alert.classList.remove('show');
+            setTimeout(() => {
+                if (alert.parentNode) {
+                    alert.parentNode.removeChild(alert);
+                }
+            }, 150);
+        }
+    }, 5000);
+}
 </script>
 
 <style>
@@ -3866,6 +4290,132 @@ function addEssayProblem() {
 .stat-label {
     font-size: 0.85rem;
     color: #6c757d;
+}
+
+/* 論述問題公開設定用CSS */
+.visibility-matrix {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-radius: 10px;
+    padding: 20px;
+    margin-top: 20px;
+}
+
+.matrix-header h4 {
+    color: #495057;
+    font-weight: 600;
+}
+
+.visibility-table {
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.visibility-table th {
+    background: linear-gradient(135deg, #343a40 0%, #495057 100%);
+    color: white;
+    font-weight: 600;
+    text-align: center;
+    vertical-align: middle;
+}
+
+.visibility-cell {
+    position: relative;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-align: center;
+    vertical-align: middle;
+    padding: 15px;
+    min-height: 60px;
+}
+
+.visibility-cell:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.visibility-cell.visible {
+    background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+    border: 2px solid #28a745;
+    color: #155724;
+}
+
+.visibility-cell.hidden {
+    background: linear-gradient(135deg, #f8d7da 0%, #f1b0b7 100%);
+    border: 2px solid #dc3545;
+    color: #721c24;
+}
+
+.visibility-cell .status-icon {
+    font-size: 1.5em;
+    display: block;
+    margin-bottom: 5px;
+}
+
+.visibility-cell .status-text {
+    font-weight: 600;
+    font-size: 0.9em;
+}
+
+.chapter-name {
+    font-weight: 600;
+    color: #495057;
+    background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%);
+    text-align: center;
+    vertical-align: middle;
+}
+
+.bulk-operations {
+    background: rgba(255, 255, 255, 0.8);
+    padding: 15px;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+}
+
+.settings-summary .card {
+    border: none;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.visibility-room-selector {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 768px) {
+    .visibility-table {
+        font-size: 0.8em;
+    }
+    
+    .visibility-cell {
+        padding: 10px;
+        min-height: 50px;
+    }
+    
+    .bulk-operations .btn-group {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+    }
+    
+    .bulk-operations .btn-group .btn {
+        margin-bottom: 5px;
+    }
+}
+
+/* アニメーション */
+@keyframes settingChanged {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+}
+
+.visibility-cell.changed {
+    animation: settingChanged 0.5s ease;
 }
 </style>
 {% endblock %}
