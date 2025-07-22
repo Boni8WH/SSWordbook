@@ -1380,6 +1380,7 @@ def create_tables_and_admin_user():
             
             # テーブル作成
             db.create_all()
+            create_essay_visibility_table_auto()
             logger.info("✅ テーブルを確認/作成しました。")
             
             # ★重要：user_statsテーブルを確実に作成
@@ -1436,6 +1437,134 @@ def create_tables_and_admin_user():
     except Exception as e:
         logger.error(f"❌ データベース初期化エラー: {e}")
         raise
+
+def create_essay_visibility_table_auto():
+    """essay_visibility_settingテーブルを自動作成"""
+    try:
+        print("🔧 essay_visibility_settingテーブル確認中...")
+        
+        from sqlalchemy import inspect
+        inspector = inspect(db.engine)
+        
+        if not inspector.has_table('essay_visibility_setting'):
+            print("🔧 essay_visibility_settingテーブルを作成中...")
+            
+            # 直接SQLでテーブル作成
+            with db.engine.connect() as conn:
+                if is_postgres:
+                    # PostgreSQL用
+                    conn.execute(text("""
+                        CREATE TABLE essay_visibility_setting (
+                            id SERIAL PRIMARY KEY,
+                            room_number VARCHAR(50) NOT NULL,
+                            chapter VARCHAR(10) NOT NULL,
+                            problem_type VARCHAR(1) NOT NULL,
+                            is_visible BOOLEAN NOT NULL DEFAULT TRUE,
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            UNIQUE(room_number, chapter, problem_type)
+                        )
+                    """))
+                else:
+                    # SQLite用
+                    conn.execute(text("""
+                        CREATE TABLE essay_visibility_setting (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            room_number VARCHAR(50) NOT NULL,
+                            chapter VARCHAR(10) NOT NULL,
+                            problem_type VARCHAR(1) NOT NULL,
+                            is_visible BOOLEAN NOT NULL DEFAULT 1,
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            UNIQUE(room_number, chapter, problem_type)
+                        )
+                    """))
+                
+                conn.commit()
+            
+            print("✅ essay_visibility_settingテーブル作成完了")
+            
+            # デフォルト設定の作成を試行
+            try:
+                create_default_visibility_settings()
+            except Exception as default_error:
+                print(f"⚠️ デフォルト設定作成エラー（スキップ）: {default_error}")
+                
+        else:
+            print("ℹ️ essay_visibility_settingテーブルは既に存在します")
+            
+    except Exception as e:
+        print(f"❌ essay_visibility_settingテーブル作成エラー: {e}")
+
+def create_default_visibility_settings():
+    """デフォルトの公開設定を作成"""
+    try:
+        print("🔧 デフォルト公開設定を作成中...")
+        
+        # 部屋一覧を取得
+        with db.engine.connect() as conn:
+            # ユーザーテーブルから部屋番号を取得
+            rooms_result = conn.execute(text("""
+                SELECT DISTINCT room_number 
+                FROM "user" 
+                WHERE room_number IS NOT NULL
+            """))
+            rooms = [row[0] for row in rooms_result.fetchall()]
+            
+            if not rooms:
+                print("⚠️ 部屋が見つからないため、デフォルト設定をスキップします")
+                return
+            
+            # essay_problemsテーブルから章・タイプを取得
+            try:
+                problems_result = conn.execute(text("""
+                    SELECT DISTINCT chapter, type 
+                    FROM essay_problems 
+                    WHERE enabled = true
+                """))
+                chapter_types = problems_result.fetchall()
+            except:
+                print("⚠️ essay_problemsテーブルが見つからないため、サンプル設定を作成します")
+                # サンプル設定
+                chapter_types = [('1', 'A'), ('1', 'B'), ('1', 'C'), ('1', 'D')]
+            
+            if not chapter_types:
+                print("⚠️ 論述問題が見つからないため、デフォルト設定をスキップします")
+                return
+            
+            # デフォルト設定を作成
+            created_count = 0
+            for room_number in rooms:
+                for chapter, problem_type in chapter_types:
+                    if chapter and problem_type:
+                        # 既存チェック
+                        check_result = conn.execute(text("""
+                            SELECT COUNT(*) FROM essay_visibility_setting 
+                            WHERE room_number = :room AND chapter = :chapter AND problem_type = :type
+                        """), {
+                            'room': room_number,
+                            'chapter': chapter,
+                            'type': problem_type
+                        })
+                        
+                        if check_result.fetchone()[0] == 0:
+                            # 新規作成
+                            conn.execute(text("""
+                                INSERT INTO essay_visibility_setting 
+                                (room_number, chapter, problem_type, is_visible) 
+                                VALUES (:room, :chapter, :type, true)
+                            """), {
+                                'room': room_number,
+                                'chapter': chapter,
+                                'type': problem_type
+                            })
+                            created_count += 1
+            
+            conn.commit()
+            print(f"✅ デフォルト公開設定を{created_count}件作成しました")
+            
+    except Exception as e:
+        print(f"❌ デフォルト設定作成エラー: {e}")
 
 @app.route('/create_missing_tables')
 def create_missing_tables():
