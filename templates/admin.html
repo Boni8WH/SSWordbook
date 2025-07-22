@@ -489,11 +489,18 @@
                                             required></textarea>
                                     <small class="essay-help-text">出題する問題の内容を詳しく記入</small>
                                 </div>
-                                <div class="form-group">
-                                    <label for="problemImage">問題画像（グラフ・地図等）</label>
-                                    <input type="file" class="form-control-file" id="problemImage" 
-                                        accept="image/*" onchange="previewImage(this)">
+                                <!-- 問題画像アップロード -->
+                                <div class="essay-input-group essay-form-full-width">
+                                    <label for="new_essay_image">
+                                        <i class="fas fa-image"></i> 問題画像（グラフ・地図等）
+                                    </label>
+                                    <input type="file" 
+                                        id="new_essay_image" 
+                                        name="image" 
+                                        accept="image/*" 
+                                        onchange="previewImage(this)">
                                     <div id="imagePreview" class="mt-2"></div>
+                                    <small class="essay-help-text">JPG、PNG、GIF形式の画像ファイル（任意）</small>
                                 </div>
                                 <!-- 解答（全幅） -->
                                 <div class="essay-input-group essay-form-full-width">
@@ -2570,6 +2577,38 @@ function debounce(func, wait) {
         clearTimeout(timeout);
         timeout = setTimeout(later, wait);
     };
+}
+
+// 画像プレビュー機能
+function previewImage(input) {
+    const previewDiv = document.getElementById('imagePreview');
+    
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        
+        reader.onload = function(e) {
+            previewDiv.innerHTML = `
+                <div class="image-preview-container">
+                    <img src="${e.target.result}" alt="プレビュー" 
+                         style="max-width: 200px; max-height: 200px; border-radius: 8px; border: 1px solid #ddd;">
+                    <button type="button" class="btn btn-sm btn-outline-danger mt-2" 
+                            onclick="clearImagePreview()">
+                        <i class="fas fa-times"></i> 削除
+                    </button>
+                </div>
+            `;
+        };
+        
+        reader.readAsDataURL(input.files[0]);
+    } else {
+        clearImagePreview();
+    }
+}
+
+// 画像プレビューをクリア
+function clearImagePreview() {
+    document.getElementById('imagePreview').innerHTML = '';
+    document.getElementById('new_essay_image').value = '';
 }
 </script>
 
