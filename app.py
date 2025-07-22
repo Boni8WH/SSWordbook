@@ -14,7 +14,7 @@ from sqlalchemy import inspect, text, func, case, cast, Integer
 import glob
 
 # 既存のmodelsからのインポート文を見つけて、EssayVisibilitySettingを追加
-from models import User, AdminUser, RoomSetting, EssayProblem, EssayVisibilitySetting
+from models import User, AdminUser, RoomSetting, EssayVisibilitySetting
 
 # 外部ライブラリ
 import pytz

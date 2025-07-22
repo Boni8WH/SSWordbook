@@ -1,4 +1,4 @@
-# create_essay_visibility_table.py - 簡易マイグレーションスクリプト
+# create_essay_visibility_table.py - 修正版
 
 import sys
 import os
@@ -13,9 +13,9 @@ def main():
     print("=" * 60)
     
     try:
-        # appとdbをインポート（既存のプロジェクト構造に合わせる）
-        from app import app, db
-        from models import EssayVisibilitySetting, EssayProblem, RoomSetting, User
+        # appとdbをインポート（修正版：EssayProblemはapp.pyから）
+        from app import app, db, EssayProblem
+        from models import EssayVisibilitySetting, RoomSetting, User
         from sqlalchemy import text, inspect
         
         with app.app_context():
@@ -43,16 +43,28 @@ def main():
             # 3. デフォルト設定の作成
             print("🔧 デフォルト設定を作成中...")
             
+            # EssayProblemテーブルが存在するかチェック
+            if not inspector.has_table('essay_problems'):
+                print("⚠️ essay_problemsテーブルが見つからないため、デフォルト設定作成をスキップします")
+                print("   論述問題が登録された後に、再度このスクリプトを実行してください")
+                return True
+            
             # 既存の章とタイプを取得
-            chapters_types = db.session.query(
-                EssayProblem.chapter,
-                EssayProblem.type
-            ).filter(
-                EssayProblem.enabled == True
-            ).distinct().all()
+            try:
+                chapters_types = db.session.query(
+                    EssayProblem.chapter,
+                    EssayProblem.type
+                ).filter(
+                    EssayProblem.enabled == True
+                ).distinct().all()
+            except Exception as e:
+                print(f"⚠️ 論述問題データ取得エラー: {e}")
+                print("   論述問題が登録されていない可能性があります")
+                chapters_types = []
             
             if not chapters_types:
                 print("⚠️ 論述問題が見つからないため、デフォルト設定作成をスキップします")
+                print("   論述問題を先に登録してから、再度このスクリプトを実行してください")
                 return True
             
             print(f"📊 発見された章・タイプ組み合わせ: {len(chapters_types)}件")
@@ -76,6 +88,7 @@ def main():
             
             if not room_list:
                 print("⚠️ 部屋が見つからないため、デフォルト設定作成をスキップします")
+                print("   ユーザーが登録された後に、再度このスクリプトを実行してください")
                 return True
             
             print(f"📋 発見された部屋番号: {len(room_list)}件")
@@ -128,14 +141,17 @@ def main():
                     print(f"   - 部屋{setting.room_number} 第{setting.chapter}章 タイプ{setting.problem_type}: {status}")
             
             print("\n" + "=" * 60)
-            print("🎉 テーブル作成とデフォルト設定が正常に完了しました！")
-            print("管理画面で論述問題公開設定を使用できるようになりました。")
+            print("🎉 テーブル作成が正常に完了しました！")
+            if created_count > 0:
+                print("管理画面で論述問題公開設定を使用できるようになりました。")
+            else:
+                print("論述問題とユーザーが登録された後、再度実行して設定を作成してください。")
             print("=" * 60)
             return True
             
     except ImportError as e:
         print(f"❌ インポートエラー: {e}")
-        print("app.py または models.py にEssayVisibilitySettingが正しく追加されているか確認してください。")
+        print("app.py または models.py の修正を確認してください。")
         return False
     except Exception as e:
         print(f"❌ 実行エラー: {e}")
