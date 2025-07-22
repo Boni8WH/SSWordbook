@@ -1851,7 +1851,8 @@ document.getElementById('essayUploadForm').addEventListener('submit', function(e
 document.getElementById('essayAddForm').addEventListener('submit', function(e) {
     e.preventDefault();
     
-    const formData = new FormData(this);
+    const form = this;
+    const formData = new FormData(form);  // FormDataを使用
     
     // 必須項目の確認
     const chapter = formData.get('chapter');
@@ -1863,36 +1864,36 @@ document.getElementById('essayAddForm').addEventListener('submit', function(e) {
         return;
     }
     
-    // FormDataをJSONオブジェクトに変換
-    const data = {
-        chapter: chapter.trim(),
-        type: type,
-        university: formData.get('university') || '未指定',
-        year: parseInt(formData.get('year')) || 2025,
-        question: question.trim(),
-        answer: formData.get('answer') || '解答なし',
-        enabled: formData.get('enabled') === 'on'
-    };
+    // 有効フラグの処理
+    const enabledCheckbox = document.getElementById('new_essay_enabled');
+    if (enabledCheckbox && enabledCheckbox.checked) {
+        formData.set('enabled', 'on');
+    } else {
+        formData.delete('enabled');
+    }
     
-    const submitBtn = this.querySelector('button[type="submit"]');
+    const submitBtn = form.querySelector('button[type="submit"]');
     const originalText = submitBtn.innerHTML;
     submitBtn.disabled = true;
     submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 追加中...';
     
+    // FormDataで送信（画像ファイル対応）
     fetch('/admin/essay/add_problem', {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(data)
+        body: formData  // JSONではなくFormDataを送信
     })
     .then(response => response.json())
     .then(data => {
         if (data.status === 'success') {
-            alert('✅ ' + data.message);
+            let message = '✅ ' + data.message;
+            if (data.has_image) {
+                message += ' （画像付き）';
+            }
+            alert(message);
             
             // フォームをリセット
-            this.reset();
+            form.reset();
+            clearImagePreview();  // 画像プレビューもクリア
             document.getElementById('new_essay_enabled').checked = true;
             
             // 統計情報を更新
