@@ -6244,9 +6244,6 @@ def admin_update_all_rankings_to_5():
             'message': f'更新エラー: {str(e)}'
         }), 500
 
-# CSV管理
-# app.pyのadmin_upload_room_csvルートをデバッグ版に置き換え
-
 @app.route('/admin/upload_room_csv', methods=['POST'])
 def admin_upload_room_csv():
     try:
@@ -6753,6 +6750,102 @@ def api_check_special_status(chapter_num):
 # ====================================================================
 # デバッグ・管理機能
 # ====================================================================
+@app.route('/admin/debug_essay_visibility/<room_number>')
+def debug_essay_visibility(room_number):
+    """論述問題公開設定のデバッグ情報を取得"""
+    try:
+        if not session.get('admin_logged_in'):
+            return jsonify({'status': 'error', 'message': '管理者権限が必要です'}), 403
+        
+        debug_info = {}
+        
+        # 1. データベース接続確認
+        try:
+            with db.engine.connect() as conn:
+                conn.execute(text('SELECT 1'))
+            debug_info['database_connection'] = 'OK'
+        except Exception as db_error:
+            debug_info['database_connection'] = f'ERROR: {str(db_error)}'
+        
+        # 2. テーブル存在確認
+        try:
+            from sqlalchemy import inspect
+            inspector = inspect(db.engine)
+            tables = inspector.get_table_names()
+            debug_info['all_tables'] = tables
+            debug_info['essay_visibility_table_exists'] = 'essay_visibility_setting' in tables
+            debug_info['essay_problems_table_exists'] = 'essay_problems' in tables
+        except Exception as table_error:
+            debug_info['table_check_error'] = str(table_error)
+        
+        # 3. essay_visibility_settingテーブルの詳細確認
+        if debug_info.get('essay_visibility_table_exists'):
+            try:
+                with db.engine.connect() as conn:
+                    # テーブル構造確認
+                    if is_postgres:
+                        structure_result = conn.execute(text("""
+                            SELECT column_name, data_type 
+                            FROM information_schema.columns 
+                            WHERE table_name = 'essay_visibility_setting'
+                            ORDER BY ordinal_position
+                        """))
+                    else:
+                        structure_result = conn.execute(text("PRAGMA table_info(essay_visibility_setting)"))
+                    
+                    debug_info['table_structure'] = [dict(row) for row in structure_result.fetchall()]
+                    
+                    # レコード数確認
+                    count_result = conn.execute(text("SELECT COUNT(*) FROM essay_visibility_setting"))
+                    debug_info['total_records'] = count_result.fetchone()[0]
+                    
+                    # 指定部屋の設定確認
+                    room_result = conn.execute(text("""
+                        SELECT chapter, problem_type, is_visible 
+                        FROM essay_visibility_setting 
+                        WHERE room_number = :room_number
+                    """), {'room_number': room_number})
+                    debug_info['room_settings'] = [dict(row) for row in room_result.fetchall()]
+                    
+            except Exception as detail_error:
+                debug_info['table_detail_error'] = str(detail_error)
+        
+        # 4. essay_problemsテーブルの確認
+        if debug_info.get('essay_problems_table_exists'):
+            try:
+                with db.engine.connect() as conn:
+                    chapters_result = conn.execute(text("""
+                        SELECT DISTINCT chapter 
+                        FROM essay_problems 
+                        WHERE enabled = true 
+                        ORDER BY chapter
+                    """))
+                    debug_info['available_chapters'] = [row[0] for row in chapters_result.fetchall()]
+                    
+                    problems_count = conn.execute(text("SELECT COUNT(*) FROM essay_problems WHERE enabled = true"))
+                    debug_info['enabled_problems_count'] = problems_count.fetchone()[0]
+                    
+            except Exception as problems_error:
+                debug_info['problems_table_error'] = str(problems_error)
+        
+        # 5. 環境情報
+        debug_info['is_postgres'] = is_postgres
+        debug_info['render_env'] = os.environ.get('RENDER') == 'true'
+        debug_info['room_number_requested'] = room_number
+        
+        return jsonify({
+            'status': 'success',
+            'debug_info': debug_info
+        })
+        
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'status': 'error',
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        }), 500
+    
 @app.route('/admin/debug_progress')
 def admin_debug_progress():
     """進捗データの整合性を確認するデバッグページ"""
@@ -7517,34 +7610,51 @@ def admin_get_room_list():
 
 @app.route('/admin/essay_visibility_settings/<room_number>')
 def admin_get_essay_visibility_settings(room_number):
-    """特定部屋の論述問題公開設定を取得（シンプル修正版）"""
+    """特定部屋の論述問題公開設定を取得（強化版）"""
     try:
+        print(f"📊 部屋 {room_number} の論述問題公開設定を取得開始")
+        
         if not session.get('admin_logged_in'):
+            print("❌ 管理者権限なし")
             return jsonify({'status': 'error', 'message': '管理者権限が必要です'}), 403
         
-        print(f"📊 部屋 {room_number} の論述問題公開設定を取得中...")
-        
-        # app.pyのdbインスタンスを明示的に使用
+        # デバッグ情報をまず確認
         from sqlalchemy import inspect
         inspector = inspect(db.engine)
         
-        # テーブル存在確認
+        print(f"🔍 データベーステーブル一覧: {inspector.get_table_names()}")
+        
         if not inspector.has_table('essay_visibility_setting'):
-            print("❌ essay_visibility_settingテーブルが存在しません")
+            print("❌ essay_visibility_settingテーブルが存在しません - 自動作成を試行")
+            
+            # 自動作成を試行
+            try:
+                create_essay_visibility_table_auto()
+                print("✅ テーブル自動作成完了")
+            except Exception as create_error:
+                print(f"❌ テーブル自動作成失敗: {create_error}")
+                return jsonify({
+                    'status': 'error', 
+                    'message': f'テーブルが存在せず、自動作成にも失敗しました: {str(create_error)}'
+                }), 500
+        
+        # 設定データを取得
+        try:
+            with db.engine.connect() as conn:
+                result = conn.execute(text("""
+                    SELECT chapter, problem_type, is_visible 
+                    FROM essay_visibility_setting 
+                    WHERE room_number = :room_number
+                """), {'room_number': room_number})
+                
+                settings_data = result.fetchall()
+                print(f"📋 部屋 {room_number} の設定: {len(settings_data)}件取得")
+        except Exception as query_error:
+            print(f"❌ 設定データ取得エラー: {query_error}")
             return jsonify({
                 'status': 'error', 
-                'message': 'essay_visibility_settingテーブルが存在しません。マイグレーションを実行してください。'
+                'message': f'設定データの取得に失敗しました: {str(query_error)}'
             }), 500
-        
-        # 直接SQLで設定を取得（モデルのdbインスタンス問題を回避）
-        with db.engine.connect() as conn:
-            result = conn.execute(text("""
-                SELECT chapter, problem_type, is_visible 
-                FROM essay_visibility_setting 
-                WHERE room_number = :room_number
-            """), {'room_number': room_number})
-            
-            settings_data = result.fetchall()
         
         # 設定を辞書形式に変換
         visibility_dict = {}
@@ -7552,11 +7662,10 @@ def admin_get_essay_visibility_settings(room_number):
             chapter, problem_type, is_visible = row
             if chapter not in visibility_dict:
                 visibility_dict[chapter] = {}
-            visibility_dict[problem_type] = is_visible
+            visibility_dict[chapter][problem_type] = is_visible
         
-        print(f"📋 取得した設定: {len(settings_data)}件")
-        
-        # 章リストを取得（EssayProblemテーブルから）
+        # 章リストを取得
+        chapters = []
         try:
             with db.engine.connect() as conn:
                 chapters_result = conn.execute(text("""
@@ -7565,12 +7674,12 @@ def admin_get_essay_visibility_settings(room_number):
                     WHERE enabled = true 
                     ORDER BY chapter
                 """))
-                
-                chapters_data = chapters_result.fetchall()
-                chapters = [row[0] for row in chapters_data if row[0]]
-        except Exception as chapter_error:
-            print(f"⚠️ 章データ取得エラー: {chapter_error}")
-            chapters = []  # essay_problemsテーブルがない場合
+                chapters = [row[0] for row in chapters_result.fetchall() if row[0]]
+                print(f"📊 利用可能な章: {chapters}")
+        except Exception as chapters_error:
+            print(f"⚠️ 章データ取得エラー: {chapters_error}")
+            # デフォルト章を設定
+            chapters = ['1', '2', '3', '4', '5', 'com']
         
         # 章をソート
         numeric_chapters = []
@@ -7585,7 +7694,7 @@ def admin_get_essay_visibility_settings(room_number):
         sorted_chapters = [ch for _, ch in sorted(numeric_chapters)]
         sorted_chapters.extend(sorted(string_chapters))
         
-        print(f"📊 利用可能な章: {sorted_chapters}")
+        print(f"✅ 設定取得完了 - 章: {sorted_chapters}, 設定: {len(settings_data)}件")
         
         return jsonify({
             'status': 'success',
@@ -7595,10 +7704,13 @@ def admin_get_essay_visibility_settings(room_number):
         })
         
     except Exception as e:
-        print(f"❌ Error getting essay visibility settings: {e}")
+        print(f"❌ 論述問題公開設定取得エラー: {e}")
         import traceback
-        traceback.print_exc()
-        return jsonify({'status': 'error', 'message': f'設定の取得に失敗しました: {str(e)}'}), 500
+        print(traceback.format_exc())
+        return jsonify({
+            'status': 'error', 
+            'message': f'予期しないエラーが発生しました: {str(e)}'
+        }), 500
 
 @app.route('/admin/essay_visibility_settings/save', methods=['POST'])
 def admin_save_essay_visibility_settings():
