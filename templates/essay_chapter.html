@@ -241,19 +241,28 @@
 
 .problems-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
     gap: 20px;
+    align-items: start;
 }
 
 .problem-card {
     background: white;
-    border-radius: 12px;
-    padding: 18px;
-    box-shadow: 0 3px 15px rgba(0,0,0,0.08);
-    border: 1px solid #e2e8f0;
+    border-radius: 15px;
+    padding: 20px;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+    border: 1px solid #e1e8ed;
     cursor: pointer;
     transition: all 0.3s ease;
-    position: relative;
+    display: flex; /* 追加 */
+    flex-direction: column; /* 追加 */
+    height: 100%; /* 追加：カードの高さを統一 */
+}
+
+/* 問題内容部分を柔軟に */
+.problem-excerpt {
+    flex: 1; /* 追加：残りスペースを埋める */
+    margin-bottom: 15px;
 }
 
 .problem-card:hover {
@@ -414,7 +423,7 @@
     }
     
     .problems-grid {
-        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
     }
 }
 
@@ -621,6 +630,24 @@
     .filter-group:last-child {  /* キーワード検索フィールド */
         grid-column: span 2;  /* 2列分の幅を使用 */
     }
+}
+
+/* base.htmlのフッターを確実に表示するための調整 */
+.essay-chapter-container {
+    max-width: 100%;
+    margin: 0 auto;
+    padding: 15px;
+    min-height: calc(100vh - 200px); /* フッター用のスペースを確保 */
+}
+
+/* フッターが隠れないよう、コンテナの下にマージンを確保 */
+body {
+    padding-bottom: 0 !important; /* base.htmlのフッター用スペースを確保 */
+}
+
+/* base.htmlのフッタースタイルを上書きしないよう調整 */
+.footer {
+    margin-top: 50px !important; /* 十分な上マージンを確保 */
 }
 </style>
 {% endblock %}
@@ -858,13 +885,6 @@
         width: 100%;
     }
 
-    .problems-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-        gap: 20px;
-        width: 100%;
-    }
-
     /* 大画面用の調整 */
     @media (min-width: 1200px) {
         .problems-grid {
@@ -932,4 +952,8 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 </script>
+
+<!-- base.htmlのフッターが表示されることを確認 -->
+<div style="margin-bottom: 30px;"></div> <!-- フッター前のスペース確保 -->
+
 {% endblock %}
