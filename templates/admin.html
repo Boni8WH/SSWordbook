@@ -489,7 +489,7 @@
                                             required></textarea>
                                     <small class="essay-help-text">出題する問題の内容を詳しく記入</small>
                                 </div>
-                                <!-- 問題画像アップロード -->
+                                <!-- 問題画像アップロード -->                     
                                 <div class="essay-input-group essay-form-full-width">
                                     <label for="new_essay_image">
                                         <i class="fas fa-image"></i> 問題画像（グラフ・地図等）
@@ -2609,6 +2609,37 @@ function previewImage(input) {
 function clearImagePreview() {
     document.getElementById('imagePreview').innerHTML = '';
     document.getElementById('new_essay_image').value = '';
+}
+
+function addEssayProblem() {
+    const form = document.getElementById('newEssayProblemForm');
+    const formData = new FormData(form);
+    
+    // 有効フラグの処理
+    const enabledCheckbox = document.getElementById('new_essay_enabled');
+    if (enabledCheckbox.checked) {
+        formData.set('enabled', 'on');
+    }
+    
+    fetch('/admin/essay/add_problem', {
+        method: 'POST',
+        body: formData  // JSONではなくFormDataを送信
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            alert(`✅ ${data.message}`);
+            form.reset();
+            clearImagePreview();  // 画像プレビューもクリア
+            loadEssayProblems();  // 問題一覧を再読み込み
+        } else {
+            alert(`❌ エラー: ${data.message}`);
+        }
+    })
+    .catch(error => {
+        console.error('問題追加エラー:', error);
+        alert('❌ 問題の追加中にエラーが発生しました');
+    });
 }
 </script>
 
