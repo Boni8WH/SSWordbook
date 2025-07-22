@@ -6,25 +6,30 @@
 <style>
 /* ベーススタイル */
 .essay-chapter-container {
-    max-width: 100%;
+    max-width: 1200px;
     margin: 0 auto;
     padding: 15px;
 }
 
-/* ヘッダー */
 .chapter-header {
-    background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
-    color: white;
+    text-align: center;
+    margin-bottom: 30px;
     padding: 25px 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
     border-radius: 15px;
-    margin-bottom: 25px;
     box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+}
+
+.header-content {
+    max-width: 800px;
+    margin: 0 auto;
 }
 
 .breadcrumb {
     margin-bottom: 15px;
-    opacity: 0.9;
     font-size: clamp(0.8rem, 2vw, 0.9rem);
+    opacity: 0.9;
 }
 
 .breadcrumb a {
@@ -36,52 +41,54 @@
 
 .breadcrumb a:hover {
     opacity: 1;
+    text-decoration: none;
 }
 
-.breadcrumb i.fa-chevron-right {
+.breadcrumb i {
     margin: 0 8px;
     opacity: 0.6;
 }
 
 .chapter-header h1 {
-    margin: 0 0 10px 0;
-    font-size: clamp(1.8rem, 4vw, 2.2rem);
+    margin: 0 0 15px 0;
+    font-size: clamp(1.8rem, 4vw, 2.5rem);
     font-weight: 700;
     line-height: 1.2;
 }
 
 .chapter-description {
-    margin: 0 0 20px 0;
     font-size: clamp(0.9rem, 2.5vw, 1.1rem);
-    opacity: 0.9;
-    line-height: 1.5;
+    margin-bottom: 20px;
+    opacity: 0.95;
+    line-height: 1.6;
 }
 
 .back-to-main {
     display: flex;
-    gap: 10px;
     justify-content: center;
+    gap: 15px;
     flex-wrap: wrap;
 }
 
 .back-to-main .btn {
-    border-radius: 20px;
-    transition: all 0.3s ease;
-    padding: 8px 16px;
     background: rgba(255,255,255,0.2);
     border: 2px solid rgba(255,255,255,0.3);
     color: white;
+    padding: 10px 20px;
+    border-radius: 25px;
+    transition: all 0.3s ease;
     text-decoration: none;
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    font-size: clamp(0.8rem, 2vw, 0.9rem);
+    gap: 8px;
+    font-size: clamp(0.85rem, 2vw, 1rem);
 }
 
 .back-to-main .btn:hover {
-    transform: translateY(-1px);
     background: rgba(255,255,255,0.3);
     border-color: rgba(255,255,255,0.5);
+    color: white;
+    transform: translateY(-2px);
 }
 
 /* フィルターセクション */
@@ -92,6 +99,7 @@
     margin-bottom: 25px;
     box-shadow: 0 5px 20px rgba(0,0,0,0.08);
     border: 1px solid #e1e8ed;
+    width: 100%;
 }
 
 .filter-header {
@@ -99,204 +107,258 @@
     justify-content: space-between;
     align-items: center;
     margin-bottom: 20px;
-    padding-bottom: 15px;
-    border-bottom: 2px solid #f5f7fa;
-    flex-wrap: wrap;
-    gap: 10px;
 }
 
 .filter-header h3 {
     margin: 0;
     color: #2d3748;
+    font-size: clamp(1.1rem, 2.5vw, 1.3rem);
     display: flex;
     align-items: center;
-    gap: 10px;
-    font-size: clamp(1.1rem, 2.5vw, 1.3rem);
+    gap: 8px;
 }
 
 .filter-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 15px;
-    margin-bottom: 20px;
+    align-items: end;
+}
+
+@media (min-width: 1200px) {
+    .filter-grid {
+        grid-template-columns: repeat(4, 1fr);
+        gap: 20px;
+    }
+    
+    .filter-group:last-child {
+        grid-column: span 2;
+    }
+}
+
+.filter-group {
+    display: flex;
+    flex-direction: column;
 }
 
 .filter-group label {
-    display: block;
-    margin-bottom: 8px;
-    font-weight: 600;
+    margin-bottom: 5px;
+    font-weight: 500;
     color: #4a5568;
-    font-size: clamp(0.8rem, 2vw, 0.9rem);
+    font-size: clamp(0.85rem, 2vw, 0.9rem);
 }
 
 .form-control {
-    width: 100%;
-    padding: 10px 12px;
-    border: 2px solid #e2e8f0;
-    border-radius: 8px;
+    padding: 8px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
     font-size: clamp(0.85rem, 2vw, 0.9rem);
     transition: border-color 0.3s ease;
 }
 
 .form-control:focus {
     outline: none;
-    border-color: #4f46e5;
-    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+    border-color: #667eea;
+    box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
 }
 
 .year-range {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
+    max-width: 300px;
 }
 
 .year-range input {
     flex: 1;
-    min-width: 0;
-}
-
-.year-range span {
-    color: #718096;
-    font-weight: 500;
-    white-space: nowrap;
+    min-width: 80px;
 }
 
 .filter-actions {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding-top: 15px;
-    border-top: 1px solid #e2e8f0;
-    flex-wrap: wrap;
     gap: 10px;
+    margin-top: 15px;
+    justify-content: center;
 }
 
-.filter-count {
-    color: #4a5568;
-    font-weight: 500;
-    font-size: clamp(0.8rem, 2vw, 0.9rem);
-}
-
+/* ボタンスタイル */
 .btn {
-    padding: 10px 20px;
-    border-radius: 8px;
-    border: none;
+    padding: 8px 16px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    background: white;
+    color: #374151;
     cursor: pointer;
+    transition: all 0.3s ease;
     text-decoration: none;
     display: inline-flex;
     align-items: center;
-    gap: 8px;
-    font-weight: 500;
-    transition: all 0.3s ease;
+    gap: 6px;
     font-size: clamp(0.8rem, 2vw, 0.9rem);
 }
 
+.btn:hover {
+    background: #f9fafb;
+    border-color: #9ca3af;
+    color: #374151;
+    text-decoration: none;
+}
+
 .btn-primary {
-    background: #4f46e5;
+    background: #667eea;
+    border-color: #667eea;
     color: white;
 }
 
 .btn-primary:hover {
-    background: #4338ca;
-    transform: translateY(-1px);
+    background: #5a67d8;
+    border-color: #5a67d8;
+    color: white;
 }
 
-/* 問題セクション */
+.btn-outline-secondary {
+    border-color: #6b7280;
+    color: #6b7280;
+}
+
+.btn-outline-secondary:hover {
+    background: #6b7280;
+    color: white;
+}
+
+.btn-outline-primary {
+    border-color: #667eea;
+    color: #667eea;
+}
+
+.btn-outline-primary:hover {
+    background: #667eea;
+    color: white;
+}
+
+/* 問題一覧セクション */
+.problems-section {
+    margin-top: 30px;
+    width: 100%;
+}
+
+/* タイプ別グループ化 */
 .type-group {
     margin-bottom: 30px;
+    width: 100%;
 }
 
 .type-header {
-    margin-bottom: 15px;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #e1e8ed;
 }
 
 .type-title {
-    margin: 0;
     display: flex;
     align-items: center;
     gap: 10px;
+    margin: 0;
+    font-size: clamp(1.2rem, 3vw, 1.4rem);
     color: #2d3748;
-    font-size: clamp(1.2rem, 3vw, 1.3rem);
     font-weight: 600;
-    flex-wrap: wrap;
 }
 
 .type-badge {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: clamp(35px, 8vw, 40px);
-    height: clamp(35px, 8vw, 40px);
-    border-radius: 50%;
-    color: white;
+    padding: 6px 12px;
+    border-radius: 20px;
     font-weight: 700;
-    font-size: clamp(1rem, 2.5vw, 1.2rem);
-    flex-shrink: 0;
+    font-size: clamp(0.9rem, 2vw, 1rem);
+    color: white;
 }
 
-.type-badge.type-a { background: linear-gradient(135deg, #dc3545, #c82333); }
-.type-badge.type-b { background: linear-gradient(135deg, #fd7e14, #e55a00); }
-.type-badge.type-c { background: linear-gradient(135deg, #ffc107, #e0a800); }
-.type-badge.type-d { background: linear-gradient(135deg, #28a745, #1e7e34); }
+.type-a { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
+.type-b { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
+.type-c { background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); }
+.type-d { background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); }
 
+/* 問題グリッド */
 .problems-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
     gap: 20px;
     align-items: start;
 }
 
-.problem-card {
-    background: white;
-    border-radius: 15px;
-    padding: 20px;
-    box-shadow: 0 5px 20px rgba(0,0,0,0.08);
-    border: 1px solid #e1e8ed;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    display: flex; /* 追加 */
-    flex-direction: column; /* 追加 */
-    height: 100%; /* 追加：カードの高さを統一 */
+@media (min-width: 1200px) {
+    .problems-grid {
+        grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+        gap: 25px;
+    }
 }
 
-/* 問題内容部分を柔軟に */
-.problem-excerpt {
-    flex: 1; /* 追加：残りスペースを埋める */
-    margin-bottom: 15px;
+@media (min-width: 1600px) {
+    .problems-grid {
+        grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+    }
+}
+
+@media (min-width: 768px) and (max-width: 1199px) {
+    .problems-grid {
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+        gap: 20px;
+    }
+}
+
+/* 問題カードリンク */
+.problem-card-link {
+    text-decoration: none;
+    color: inherit;
+    display: block;
+}
+
+.problem-card-link:hover {
+    text-decoration: none;
+    color: inherit;
+}
+
+/* 問題カード */
+.problem-card {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+    border: 1px solid #e1e8ed;
+    transition: all 0.3s ease;
+    position: relative;
+    height: fit-content;
 }
 
 .problem-card:hover {
     transform: translateY(-3px);
-    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
-    border-color: #4f46e5;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.12);
+    border-color: #667eea;
 }
 
 .problem-header {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    margin-bottom: 12px;
-    gap: 10px;
+    margin-bottom: 15px;
 }
 
 .university-year {
     display: flex;
     flex-direction: column;
-    gap: 5px;
-    flex: 1;
-    min-width: 0;
+    gap: 2px;
 }
 
 .university {
+    font-size: clamp(1.1rem, 2.5vw, 1.2rem);
     font-weight: 600;
     color: #2d3748;
-    font-size: clamp(0.9rem, 2vw, 0.95rem);
-    line-height: 1.2;
+    margin: 0;
 }
 
 .year {
-    font-size: clamp(0.8rem, 2vw, 0.85rem);
+    font-size: clamp(0.9rem, 2vw, 1rem);
     color: #718096;
+    margin: 0;
 }
 
 .progress-indicators {
@@ -307,51 +369,58 @@
 }
 
 .indicator {
-    padding: 3px 6px;
-    border-radius: 10px;
+    padding: 4px 8px;
+    border-radius: 12px;
     font-size: clamp(0.7rem, 1.5vw, 0.75rem);
     font-weight: 500;
-    display: flex;
-    align-items: center;
-    gap: 3px;
-    white-space: nowrap;
+    text-align: center;
+    min-width: 35px;
 }
 
-.indicator.viewed {
-    background: #e3f2fd;
-    color: #1565c0;
+.viewed {
+    background: #e0f2fe;
+    color: #0369a1;
 }
 
-.indicator.understood {
-    background: #e8f5e8;
-    color: #2e7d32;
+.understood {
+    background: #d1fae5;
+    color: #065f46;
 }
 
-.indicator.review {
-    background: #fff3e0;
-    color: #ef6c00;
+.review {
+    background: #fef3c7;
+    color: #92400e;
 }
 
-.indicator.difficulty {
-    background: #fce4ec;
-    color: #c2185b;
+.difficulty {
+    background: #f3e8ff;
+    color: #7c3aed;
 }
 
 .problem-content {
-    margin-bottom: 12px;
+    margin-bottom: 15px;
 }
 
 .problem-preview {
-    margin: 0 0 10px 0;
-    color: #4a5568;
+    margin-bottom: 12px;
     line-height: 1.6;
+    color: #4a5568;
     font-size: clamp(0.85rem, 2vw, 0.95rem);
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .problem-meta {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #f1f5f9;
 }
 
 .answer-length {
@@ -392,6 +461,7 @@
     background: #f8f9fa;
     border-radius: 15px;
     border: 2px dashed #dee2e6;
+    grid-column: 1 / -1;
 }
 
 .no-problems-content i {
@@ -423,7 +493,7 @@
     }
     
     .problems-grid {
-        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
     }
 }
 
@@ -457,6 +527,7 @@
         flex-direction: column;
         gap: 8px;
         align-items: stretch;
+        max-width: none;
     }
     
     .year-range span {
@@ -564,90 +635,12 @@
     }
 }
 
-/* 大画面でのコンテンツ幅制限（オプション） */
+/* 大画面でのコンテンツ幅制限 */
 @media (min-width: 1400px) {
     .essay-chapter-container {
-        max-width: 1400px;  /* より広い最大幅 */
-        padding: 20px 30px;  /* より広いパディング */
+        max-width: 1400px;
+        padding: 20px 30px;
     }
-}
-
-/* 2. problems-grid のグリッド設定も改善 */
-.problems-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));  /* 300px から 350px に変更 */
-    gap: 20px;
-}
-
-/* 3. 大画面での問題カードの最適化 */
-@media (min-width: 1200px) {
-    .problems-grid {
-        grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));  /* より大きなカード */
-        gap: 25px;
-    }
-}
-
-/* 4. フィルターセクションも画面幅に合わせて調整 */
-.filter-section {
-    background: white;
-    border-radius: 15px;
-    padding: 20px;
-    margin-bottom: 25px;
-    box-shadow: 0 5px 20px rgba(0,0,0,0.08);
-    border: 1px solid #e1e8ed;
-    width: 100%;  /* 幅を100%に */
-}
-
-/* 5. filter-grid のレスポンシブ対応を改善 */
-.filter-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));  /* より柔軟なグリッド */
-    gap: 15px;
-}
-
-@media (min-width: 1200px) {
-    .filter-grid {
-        grid-template-columns: repeat(4, 1fr);  /* 大画面では4列固定 */
-        gap: 20px;
-    }
-}
-
-/* 6. 年度範囲入力フィールドの改善 */
-.year-range {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    max-width: 300px;  /* 最大幅を設定 */
-}
-
-.year-range input {
-    flex: 1;
-    min-width: 80px;
-}
-
-/* 7. 検索フィールドの最適化 */
-@media (min-width: 1200px) {
-    .filter-group:last-child {  /* キーワード検索フィールド */
-        grid-column: span 2;  /* 2列分の幅を使用 */
-    }
-}
-
-/* base.htmlのフッターを確実に表示するための調整 */
-.essay-chapter-container {
-    max-width: 100%;
-    margin: 0 auto;
-    padding: 15px;
-    min-height: calc(100vh - 200px); /* フッター用のスペースを確保 */
-}
-
-/* フッターが隠れないよう、コンテナの下にマージンを確保 */
-body {
-    padding-bottom: 0 !important; /* base.htmlのフッター用スペースを確保 */
-}
-
-/* base.htmlのフッタースタイルを上書きしないよう調整 */
-.footer {
-    margin-top: 50px !important; /* 十分な上マージンを確保 */
 }
 </style>
 {% endblock %}
@@ -763,7 +756,8 @@ body {
             {% for problem in problems %}
                 {% if problem.type != current_type %}
                     {% if current_type != '' %}
-                        </div> <!-- 前のtype-groupを閉じる -->
+                        </div> <!-- 前のproblems-gridを閉じる -->
+                    </div> <!-- 前のtype-groupを閉じる -->
                     {% endif %}
                     {% set current_type = problem.type %}
                     <div class="type-group">
@@ -780,7 +774,7 @@ body {
                         <div class="problems-grid">
                 {% endif %}
                 
-                <!-- 個別問題カード（aタグで囲む） -->
+                <!-- 個別問題カード -->
                 <a href="{{ url_for('essay_problem', problem_id=problem.id) }}" class="problem-card-link">
                     <div class="problem-card">
                         <div class="problem-header">
@@ -846,60 +840,6 @@ body {
             </div>
         {% endif %}
     </div>
-
-    <!-- JavaScriptセクションから以下のコードを削除 -->
-    <script>
-    // 問題カードのクリックイベント（削除してください）
-    document.addEventListener('DOMContentLoaded', function() {
-        document.querySelectorAll('.problem-card').forEach(card => {
-            card.addEventListener('click', function() {
-                const url = this.getAttribute('data-problem-url');
-                if (url) {
-                    window.location.href = url;
-                }
-            });
-        });
-    });
-    </script>
-
-    <!-- スタイルセクションに以下を追加 -->
-    <style>
-    /* リンクのスタイル調整 */
-    .problem-card-link {
-        text-decoration: none;
-        color: inherit;
-        display: block;
-    }
-
-    .problem-card-link:hover {
-        text-decoration: none;
-    }
-
-    /* problems-grid を広げる */
-    .problems-section {
-        width: 100%;
-    }
-
-    .type-group {
-        margin-bottom: 30px;
-        width: 100%;
-    }
-
-    /* 大画面用の調整 */
-    @media (min-width: 1200px) {
-        .problems-grid {
-            grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
-            gap: 25px;
-        }
-    }
-
-    /* 超大画面用（1600px以上） */
-    @media (min-width: 1600px) {
-        .problems-grid {
-            grid-template-columns: repeat(auto-fill, minmax(450px, 1fr));
-        }
-    }
-    </style>
 </div>
 
 <script>
@@ -916,18 +856,6 @@ function clearAllFilters() {
     });
     form.submit();
 }
-
-// 問題カードのクリックイベント
-document.addEventListener('DOMContentLoaded', function() {
-    document.querySelectorAll('.problem-card').forEach(card => {
-        card.addEventListener('click', function() {
-            const url = this.dataset.problemUrl;
-            if (url) {
-                location.href = url;
-            }
-        });
-    });
-});
 
 // リアルタイム検索（デバウンス付き）
 let searchTimeout;
@@ -952,8 +880,5 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 </script>
-
-<!-- base.htmlのフッターが表示されることを確認 -->
-<div style="margin-bottom: 30px;"></div> <!-- フッター前のスペース確保 -->
 
 {% endblock %}
