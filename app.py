@@ -49,12 +49,6 @@ if os.environ.get('RENDER') == 'true':
 logger = logging.getLogger(__name__)
 logger.info(f"ログレベル設定: {logging.getLevelName(log_level)} ({'本番' if os.environ.get('RENDER') == 'true' else 'ローカル'}環境)")
 
-from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, Response
-from flask_sqlalchemy import SQLAlchemy
-from werkzeug.security import generate_password_hash, check_password_hash
-from werkzeug.utils import secure_filename
-from sqlalchemy import inspect, text
-
 # 日本時間のタイムゾーンオブジェクトを作成
 JST = pytz.timezone('Asia/Tokyo')
 
@@ -7394,46 +7388,75 @@ def admin_get_room_list():
 
 @app.route('/admin/essay_visibility_settings/<room_number>')
 def admin_get_essay_visibility_settings(room_number):
-    """特定部屋の論述問題公開設定を取得"""
+    """特定部屋の論述問題公開設定を取得（シンプル修正版）"""
     try:
         if not session.get('admin_logged_in'):
             return jsonify({'status': 'error', 'message': '管理者権限が必要です'}), 403
         
-        # 部屋の設定を取得
-        settings = EssayVisibilitySetting.query.filter_by(room_number=room_number).all()
+        print(f"📊 部屋 {room_number} の論述問題公開設定を取得中...")
+        
+        # app.pyのdbインスタンスを明示的に使用
+        from sqlalchemy import inspect
+        inspector = inspect(db.engine)
+        
+        # テーブル存在確認
+        if not inspector.has_table('essay_visibility_setting'):
+            print("❌ essay_visibility_settingテーブルが存在しません")
+            return jsonify({
+                'status': 'error', 
+                'message': 'essay_visibility_settingテーブルが存在しません。マイグレーションを実行してください。'
+            }), 500
+        
+        # 直接SQLで設定を取得（モデルのdbインスタンス問題を回避）
+        with db.engine.connect() as conn:
+            result = conn.execute(text("""
+                SELECT chapter, problem_type, is_visible 
+                FROM essay_visibility_setting 
+                WHERE room_number = :room_number
+            """), {'room_number': room_number})
+            
+            settings_data = result.fetchall()
         
         # 設定を辞書形式に変換
         visibility_dict = {}
-        for setting in settings:
-            if setting.chapter not in visibility_dict:
-                visibility_dict[setting.chapter] = {}
-            visibility_dict[setting.chapter][setting.problem_type] = setting.is_visible
+        for row in settings_data:
+            chapter, problem_type, is_visible = row
+            if chapter not in visibility_dict:
+                visibility_dict[chapter] = {}
+            visibility_dict[problem_type] = is_visible
         
-        # 利用可能な章を取得
-        chapters_query = db.session.query(EssayProblem.chapter).filter(
-            EssayProblem.enabled == True
-        ).distinct().order_by(EssayProblem.chapter).all()
+        print(f"📋 取得した設定: {len(settings_data)}件")
         
-        chapters = []
-        for (ch,) in chapters_query:
-            if ch:  # NULLや空文字を除外
-                chapters.append(ch)
+        # 章リストを取得（EssayProblemテーブルから）
+        try:
+            with db.engine.connect() as conn:
+                chapters_result = conn.execute(text("""
+                    SELECT DISTINCT chapter 
+                    FROM essay_problems 
+                    WHERE enabled = true 
+                    ORDER BY chapter
+                """))
+                
+                chapters_data = chapters_result.fetchall()
+                chapters = [row[0] for row in chapters_data if row[0]]
+        except Exception as chapter_error:
+            print(f"⚠️ 章データ取得エラー: {chapter_error}")
+            chapters = []  # essay_problemsテーブルがない場合
         
-        # 章を適切にソート（数値章 + 'com'）
+        # 章をソート
         numeric_chapters = []
         string_chapters = []
         
         for ch in chapters:
             try:
-                # 数値に変換できる場合
                 numeric_chapters.append((int(ch), ch))
             except ValueError:
-                # 数値に変換できない場合（'com'など）
                 string_chapters.append(ch)
         
-        # 数値章をソートして文字列に戻し、文字列章を追加
         sorted_chapters = [ch for _, ch in sorted(numeric_chapters)]
         sorted_chapters.extend(sorted(string_chapters))
+        
+        print(f"📊 利用可能な章: {sorted_chapters}")
         
         return jsonify({
             'status': 'success',
@@ -7443,8 +7466,10 @@ def admin_get_essay_visibility_settings(room_number):
         })
         
     except Exception as e:
-        print(f"Error getting essay visibility settings: {e}")
-        return jsonify({'status': 'error', 'message': '設定の取得に失敗しました'}), 500
+        print(f"❌ Error getting essay visibility settings: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'status': 'error', 'message': f'設定の取得に失敗しました: {str(e)}'}), 500
 
 @app.route('/admin/essay_visibility_settings/save', methods=['POST'])
 def admin_save_essay_visibility_settings():
