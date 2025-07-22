@@ -115,6 +115,39 @@ class AppInfo(db.Model):
     # 最後に更新した管理者
     updated_by = db.Column(db.String(80), default="system")
 
+# models.py の最後に追加するコード（既存のインポートとクラスは変更しない）
+
+# 論述問題の部屋別公開設定モデル
+class EssayVisibilitySetting(db.Model):
+    __tablename__ = 'essay_visibility_setting'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    room_number = db.Column(db.String(50), nullable=False)
+    chapter = db.Column(db.String(10), nullable=False)  # '1', '2', 'com' など
+    problem_type = db.Column(db.String(1), nullable=False)  # 'A', 'B', 'C', 'D'
+    is_visible = db.Column(db.Boolean, nullable=False, default=True)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(JST), onupdate=lambda: datetime.now(JST))
+    
+    # 複合ユニーク制約（部屋・章・タイプの組み合わせは一意）
+    __table_args__ = (
+        db.UniqueConstraint('room_number', 'chapter', 'problem_type', name='uq_room_chapter_type'),
+    )
+    
+    def __repr__(self):
+        return f'<EssayVisibilitySetting Room:{self.room_number} Ch:{self.chapter} Type:{self.problem_type} Visible:{self.is_visible}>'
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'room_number': self.room_number,
+            'chapter': self.chapter,
+            'problem_type': self.problem_type,
+            'is_visible': self.is_visible,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
+
     @classmethod
     def get_current_info(cls):
         """現在のアプリ情報を取得。存在しない場合はデフォルトを作成"""

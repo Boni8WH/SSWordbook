@@ -13,6 +13,9 @@ from datetime import datetime, timedelta
 from sqlalchemy import inspect, text, func, case, cast, Integer
 import glob
 
+# 既存のmodelsからのインポート文を見つけて、EssayVisibilitySettingを追加
+from models import User, AdminUser, RoomSetting, EssayProblem, EssayVisibilitySetting
+
 # 外部ライブラリ
 import pytz
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, Response
@@ -6965,8 +6968,6 @@ def debug_room_setting_model():
         
     except Exception as e:
         return f"<h1>診断エラー: {str(e)}</h1>"
-    
-# app.py に追加する論述問題集用ルート
 
 # ========================================
 # 論述問題集用データベースモデル
@@ -7162,6 +7163,405 @@ def essay_problem(problem_id):
         flash('問題の読み込み中にエラーが発生しました。', 'danger')
         return redirect(url_for('essay_index'))
 
+# app.py の既存のmodelsインポート文に EssayVisibilitySetting を追加
+# 例：from models import User, AdminUser, RoomSetting, EssayProblem, EssayVisibilitySetting
+
+# app.py の最後に追加するコード（既存のコードは変更しない）
+
+# ========================================
+# 論述問題公開設定 ヘルパー関数
+# ========================================
+
+def is_essay_problem_visible(room_number, chapter, problem_type):
+    """特定の部屋で論述問題が公開されているかチェック"""
+    try:
+        setting = EssayVisibilitySetting.query.filter_by(
+            room_number=room_number,
+            chapter=chapter,
+            problem_type=problem_type
+        ).first()
+        
+        # 設定がない場合はデフォルトで公開
+        return setting.is_visible if setting else True
+        
+    except Exception as e:
+        print(f"Error checking essay visibility: {e}")
+        return True  # エラー時はデフォルトで公開
+
+def get_essay_visibility_settings(room_number):
+    """部屋の論述問題公開設定を全て取得"""
+    try:
+        settings = EssayVisibilitySetting.query.filter_by(room_number=room_number).all()
+        
+        # 設定を辞書形式に変換
+        visibility_dict = {}
+        for setting in settings:
+            if setting.chapter not in visibility_dict:
+                visibility_dict[setting.chapter] = {}
+            visibility_dict[setting.chapter][setting.problem_type] = setting.is_visible
+        
+        return visibility_dict
+        
+    except Exception as e:
+        print(f"Error getting essay visibility settings: {e}")
+        return {}
+
+def set_essay_visibility_setting(room_number, chapter, problem_type, is_visible):
+    """論述問題の公開設定を更新または作成"""
+    try:
+        setting = EssayVisibilitySetting.query.filter_by(
+            room_number=room_number,
+            chapter=chapter,
+            problem_type=problem_type
+        ).first()
+        
+        if setting:
+            # 既存設定を更新
+            setting.is_visible = is_visible
+            setting.updated_at = datetime.now(JST)
+        else:
+            # 新規設定を作成
+            setting = EssayVisibilitySetting(
+                room_number=room_number,
+                chapter=chapter,
+                problem_type=problem_type,
+                is_visible=is_visible
+            )
+            db.session.add(setting)
+        
+        db.session.commit()
+        return True
+        
+    except Exception as e:
+        print(f"Error setting essay visibility: {e}")
+        db.session.rollback()
+        return False
+
+def get_filtered_essay_problems_with_visibility(chapter, room_number, type_filter=None, university_filter=None, year_from=None, year_to=None, keyword=None, user_id=None):
+    """部屋の公開設定を考慮した論述問題の取得"""
+    try:
+        # ベースクエリ
+        query = EssayProblem.query.filter(
+            EssayProblem.chapter == chapter,
+            EssayProblem.enabled == True
+        )
+        
+        # フィルタリング
+        if type_filter:
+            query = query.filter(EssayProblem.type == type_filter)
+        
+        if university_filter:
+            query = query.filter(EssayProblem.university.ilike(f'%{university_filter}%'))
+        
+        if year_from:
+            query = query.filter(EssayProblem.year >= year_from)
+        
+        if year_to:
+            query = query.filter(EssayProblem.year <= year_to)
+        
+        if keyword:
+            keyword_filter = f'%{keyword}%'
+            query = query.filter(
+                db.or_(
+                    EssayProblem.question.ilike(keyword_filter),
+                    EssayProblem.answer.ilike(keyword_filter)
+                )
+            )
+        
+        # ソート
+        query = query.order_by(
+            EssayProblem.type,
+            EssayProblem.year.desc(),
+            EssayProblem.university
+        )
+        
+        results = query.all()
+        
+        # 結果を処理し、公開設定でフィルタリング
+        problems = []
+        for problem in results:
+            # 公開設定をチェック
+            if not is_essay_problem_visible(room_number, problem.chapter, problem.type):
+                continue  # 非公開の問題はスキップ
+            
+            problem_data = problem.to_dict()
+            problem_data['preview'] = problem.question[:100] + '...' if len(problem.question) > 100 else problem.question
+            problem_data['progress'] = {
+                'viewed_answer': False,
+                'understood': False,
+                'difficulty_rating': None,
+                'review_flag': False
+            }
+            problems.append(problem_data)
+        
+        return problems
+        
+    except Exception as e:
+        print(f"Error getting filtered essay problems with visibility: {e}")
+        return []
+
+def get_essay_chapter_stats_with_visibility(user_id, room_number):
+    """公開設定を考慮した章別統計情報を取得"""
+    try:
+        # 章別の問題数を集計
+        stats_query = db.session.query(
+            EssayProblem.chapter,
+            EssayProblem.type,
+            func.count(EssayProblem.id).label('total_problems')
+        ).filter(
+            EssayProblem.enabled == True
+        ).group_by(
+            EssayProblem.chapter,
+            EssayProblem.type
+        ).all()
+        
+        # 章別に統計をまとめ、公開設定を適用
+        chapter_stats = {}
+        
+        for chapter, problem_type, total_problems in stats_query:
+            # 公開設定をチェック
+            if not is_essay_problem_visible(room_number, chapter, problem_type):
+                continue  # 非公開の場合はスキップ
+            
+            if chapter not in chapter_stats:
+                chapter_stats[chapter] = {
+                    'chapter_name': '総合問題' if chapter == 'com' else f'第{chapter}章',
+                    'total_problems': 0,
+                    'viewed_problems': 0,
+                    'understood_problems': 0,
+                    'types': {}
+                }
+            
+            # 章全体の統計を更新
+            chapter_stats[chapter]['total_problems'] += total_problems or 0
+            
+            # タイプ別統計
+            chapter_stats[chapter]['types'][problem_type] = {
+                'total_problems': total_problems or 0,
+                'viewed_problems': 0,
+                'understood_problems': 0
+            }
+        
+        # 章をソート
+        sorted_chapters = []
+        for chapter_key in sorted(chapter_stats.keys(), key=lambda x: (x != 'com', x)):
+            chapter_data = chapter_stats[chapter_key]
+            chapter_data['chapter'] = chapter_key
+            
+            # 進捗率を計算（現在は0%）
+            chapter_data['progress_rate'] = 0
+            chapter_data['mastery_rate'] = 0
+            
+            sorted_chapters.append(chapter_data)
+        
+        return sorted_chapters
+        
+    except Exception as e:
+        print(f"Error getting essay chapter stats with visibility: {e}")
+        return []
+
+# ========================================
+# 論述問題公開設定 API エンドポイント
+# ========================================
+
+@app.route('/admin/get_room_list')
+def admin_get_room_list():
+    """管理画面用：全部屋番号のリストを取得"""
+    try:
+        if not session.get('admin_logged_in'):
+            return jsonify({'status': 'error', 'message': '管理者権限が必要です'}), 403
+        
+        # RoomSettingから部屋番号を取得
+        room_settings = db.session.query(RoomSetting.room_number).distinct().all()
+        rooms_from_settings = [r[0] for r in room_settings]
+        
+        # Userテーブルからも部屋番号を取得
+        user_rooms = db.session.query(User.room_number).distinct().all()
+        rooms_from_users = [r[0] for r in user_rooms if r[0]]
+        
+        # 重複を除去してマージ
+        all_rooms = list(set(rooms_from_settings + rooms_from_users))
+        all_rooms.sort()
+        
+        return jsonify({
+            'status': 'success',
+            'rooms': all_rooms
+        })
+        
+    except Exception as e:
+        print(f"Error getting room list: {e}")
+        return jsonify({'status': 'error', 'message': '部屋一覧の取得に失敗しました'}), 500
+
+@app.route('/admin/essay_visibility_settings/<room_number>')
+def admin_get_essay_visibility_settings(room_number):
+    """特定部屋の論述問題公開設定を取得"""
+    try:
+        if not session.get('admin_logged_in'):
+            return jsonify({'status': 'error', 'message': '管理者権限が必要です'}), 403
+        
+        # 部屋の設定を取得
+        settings = EssayVisibilitySetting.query.filter_by(room_number=room_number).all()
+        
+        # 設定を辞書形式に変換
+        visibility_dict = {}
+        for setting in settings:
+            if setting.chapter not in visibility_dict:
+                visibility_dict[setting.chapter] = {}
+            visibility_dict[setting.chapter][setting.problem_type] = setting.is_visible
+        
+        # 利用可能な章を取得
+        chapters_query = db.session.query(EssayProblem.chapter).filter(
+            EssayProblem.enabled == True
+        ).distinct().order_by(EssayProblem.chapter).all()
+        
+        chapters = []
+        for (ch,) in chapters_query:
+            if ch:  # NULLや空文字を除外
+                chapters.append(ch)
+        
+        # 章を適切にソート（数値章 + 'com'）
+        numeric_chapters = []
+        string_chapters = []
+        
+        for ch in chapters:
+            try:
+                # 数値に変換できる場合
+                numeric_chapters.append((int(ch), ch))
+            except ValueError:
+                # 数値に変換できない場合（'com'など）
+                string_chapters.append(ch)
+        
+        # 数値章をソートして文字列に戻し、文字列章を追加
+        sorted_chapters = [ch for _, ch in sorted(numeric_chapters)]
+        sorted_chapters.extend(sorted(string_chapters))
+        
+        return jsonify({
+            'status': 'success',
+            'settings': visibility_dict,
+            'chapters': sorted_chapters,
+            'types': ['A', 'B', 'C', 'D']
+        })
+        
+    except Exception as e:
+        print(f"Error getting essay visibility settings: {e}")
+        return jsonify({'status': 'error', 'message': '設定の取得に失敗しました'}), 500
+
+@app.route('/admin/essay_visibility_settings/save', methods=['POST'])
+def admin_save_essay_visibility_settings():
+    """論述問題公開設定を保存"""
+    try:
+        if not session.get('admin_logged_in'):
+            return jsonify({'status': 'error', 'message': '管理者権限が必要です'}), 403
+        
+        data = request.get_json()
+        room_number = data.get('room_number')
+        settings = data.get('settings', {})
+        
+        if not room_number:
+            return jsonify({'status': 'error', 'message': '部屋番号が指定されていません'}), 400
+        
+        saved_count = 0
+        updated_count = 0
+        
+        # 設定を一つずつ保存
+        for chapter, chapter_settings in settings.items():
+            for problem_type, is_visible in chapter_settings.items():
+                # 既存設定があるかチェック
+                existing_setting = EssayVisibilitySetting.query.filter_by(
+                    room_number=room_number,
+                    chapter=chapter,
+                    problem_type=problem_type
+                ).first()
+                
+                if existing_setting:
+                    # 既存設定を更新
+                    if existing_setting.is_visible != is_visible:
+                        existing_setting.is_visible = is_visible
+                        existing_setting.updated_at = datetime.now(JST)
+                        updated_count += 1
+                else:
+                    # 新規設定を作成
+                    new_setting = EssayVisibilitySetting(
+                        room_number=room_number,
+                        chapter=chapter,
+                        problem_type=problem_type,
+                        is_visible=is_visible
+                    )
+                    db.session.add(new_setting)
+                    saved_count += 1
+        
+        db.session.commit()
+        
+        message = f'設定を保存しました（新規: {saved_count}件, 更新: {updated_count}件）'
+        
+        return jsonify({
+            'status': 'success',
+            'message': message,
+            'saved_count': saved_count,
+            'updated_count': updated_count
+        })
+        
+    except Exception as e:
+        print(f"Error saving essay visibility settings: {e}")
+        db.session.rollback()
+        return jsonify({'status': 'error', 'message': '設定の保存に失敗しました'}), 500
+
+# ========================================
+# 既存の論述問題ルートの修正部分
+# ========================================
+
+# 既存の essay_chapter ルートがある場合は、以下の関数で置き換える
+# （存在しない場合は、そのまま追加）
+
+def get_essay_filter_data_with_visibility(chapter, room_number):
+    """公開設定を考慮したフィルター用データを取得"""
+    try:
+        # まず公開されているタイプを確認
+        visible_types = []
+        for type_char in ['A', 'B', 'C', 'D']:
+            if is_essay_problem_visible(room_number, chapter, type_char):
+                visible_types.append(type_char)
+        
+        if not visible_types:
+            # 公開されているタイプがない場合
+            return {
+                'universities': [],
+                'year_range': {'min': 2020, 'max': 2025},
+                'types': []
+            }
+        
+        # 公開されているタイプの問題のみを対象に集計
+        base_query = EssayProblem.query.filter(
+            EssayProblem.chapter == chapter,
+            EssayProblem.enabled == True,
+            EssayProblem.type.in_(visible_types)
+        )
+        
+        # 大学一覧
+        universities = base_query.with_entities(EssayProblem.university).distinct().order_by(EssayProblem.university).all()
+        
+        # 年度範囲
+        year_range = base_query.with_entities(
+            func.min(EssayProblem.year).label('min_year'),
+            func.max(EssayProblem.year).label('max_year')
+        ).first()
+        
+        return {
+            'universities': [u[0] for u in universities if u[0]],
+            'year_range': {
+                'min': year_range.min_year or 2020,
+                'max': year_range.max_year or 2025
+            },
+            'types': visible_types
+        }
+        
+    except Exception as e:
+        print(f"Error getting essay filter data with visibility: {e}")
+        return {
+            'universities': [],
+            'year_range': {'min': 2020, 'max': 2025},
+            'types': []
+        }
 # ========================================
 # 不足しているEssay関連ルート（app.pyに追加）
 # ========================================
