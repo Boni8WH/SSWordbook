@@ -623,8 +623,17 @@
     <div class="problem-content">
         <div class="question-section">
             <h3><i class="fas fa-question-circle"></i> 問題</h3>
+            
+            <!-- 画像がある場合の表示 -->
+            {% if problem.image_filename %}
+            <div class="problem-image mb-3">
+                <img src="{{ url_for('static', filename='uploads/essay_images/' + problem.image_filename) }}" 
+                    class="img-fluid" alt="問題画像" style="max-width: 100%; border-radius: 8px;">
+            </div>
+            {% endif %}
+            
             <div class="question-text">
-                {{ problem.question|replace('\n', '<br>')|replace('\r', '')|safe }}
+                {{ problem.question|safe|replace('\n', '<br>')|replace('\r', '') }}
             </div>
         </div>
 

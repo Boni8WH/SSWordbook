@@ -489,7 +489,12 @@
                                             required></textarea>
                                     <small class="essay-help-text">出題する問題の内容を詳しく記入</small>
                                 </div>
-
+                                <div class="form-group">
+                                    <label for="problemImage">問題画像（グラフ・地図等）</label>
+                                    <input type="file" class="form-control-file" id="problemImage" 
+                                        accept="image/*" onchange="previewImage(this)">
+                                    <div id="imagePreview" class="mt-2"></div>
+                                </div>
                                 <!-- 解答（全幅） -->
                                 <div class="essay-input-group essay-form-full-width">
                                     <label for="new_essay_answer">
