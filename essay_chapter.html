@@ -1,5 +1,619 @@
 {% extends "base.html" %}
-{% block title %}論述問題集 - {{ app_name }}{% endblock %}
+{% block title %}論述問題集 - {{ chapter_name }} - {{ app_name }}{% endblock %}
+
+{% block head_extra %}
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+/* ベーススタイル */
+.essay-chapter-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 15px;
+}
+
+.chapter-header {
+    text-align: center;
+    margin-bottom: 30px;
+    padding: 25px 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 15px;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+}
+
+.header-content {
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.breadcrumb {
+    margin-bottom: 15px;
+    font-size: clamp(0.8rem, 2vw, 0.9rem);
+    opacity: 0.9;
+}
+
+.breadcrumb a {
+    color: white;
+    text-decoration: none;
+    opacity: 0.8;
+    transition: opacity 0.3s ease;
+}
+
+.breadcrumb a:hover {
+    opacity: 1;
+    text-decoration: none;
+}
+
+.breadcrumb i {
+    margin: 0 8px;
+    opacity: 0.6;
+}
+
+.chapter-header h1 {
+    margin: 0 0 15px 0;
+    font-size: clamp(1.8rem, 4vw, 2.5rem);
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.chapter-description {
+    font-size: clamp(0.9rem, 2.5vw, 1.1rem);
+    margin-bottom: 20px;
+    opacity: 0.95;
+    line-height: 1.6;
+}
+
+.back-to-main {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    flex-wrap: wrap;
+}
+
+.back-to-main .btn {
+    background: rgba(255,255,255,0.2);
+    border: 2px solid rgba(255,255,255,0.3);
+    color: white;
+    padding: 10px 20px;
+    border-radius: 25px;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: clamp(0.85rem, 2vw, 1rem);
+}
+
+.back-to-main .btn:hover {
+    background: rgba(255,255,255,0.3);
+    border-color: rgba(255,255,255,0.5);
+    color: white;
+    transform: translateY(-2px);
+}
+
+/* フィルターセクション */
+.filter-section {
+    background: white;
+    border-radius: 15px;
+    padding: 20px;
+    margin-bottom: 25px;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+    border: 1px solid #e1e8ed;
+    width: 100%;
+}
+
+.filter-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.filter-header h3 {
+    margin: 0;
+    color: #2d3748;
+    font-size: clamp(1.1rem, 2.5vw, 1.3rem);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.filter-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    align-items: end;
+}
+
+@media (min-width: 1200px) {
+    .filter-grid {
+        grid-template-columns: repeat(4, 1fr);
+        gap: 20px;
+    }
+    
+    .filter-group:last-child {
+        grid-column: span 2;
+    }
+}
+
+.filter-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.filter-group label {
+    margin-bottom: 5px;
+    font-weight: 500;
+    color: #4a5568;
+    font-size: clamp(0.85rem, 2vw, 0.9rem);
+}
+
+.form-control {
+    padding: 8px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: clamp(0.85rem, 2vw, 0.9rem);
+    transition: border-color 0.3s ease;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+}
+
+.year-range {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    max-width: 300px;
+}
+
+.year-range input {
+    flex: 1;
+    min-width: 80px;
+}
+
+.filter-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+    justify-content: center;
+}
+
+/* ボタンスタイル */
+.btn {
+    padding: 8px 16px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    background: white;
+    color: #374151;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: clamp(0.8rem, 2vw, 0.9rem);
+}
+
+.btn:hover {
+    background: #f9fafb;
+    border-color: #9ca3af;
+    color: #374151;
+    text-decoration: none;
+}
+
+.btn-primary {
+    background: #667eea;
+    border-color: #667eea;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #5a67d8;
+    border-color: #5a67d8;
+    color: white;
+}
+
+.btn-outline-secondary {
+    border-color: #6b7280;
+    color: #6b7280;
+}
+
+.btn-outline-secondary:hover {
+    background: #6b7280;
+    color: white;
+}
+
+.btn-outline-primary {
+    border-color: #667eea;
+    color: #667eea;
+}
+
+.btn-outline-primary:hover {
+    background: #667eea;
+    color: white;
+}
+
+/* 問題一覧セクション */
+.problems-section {
+    margin-top: 30px;
+    width: 100%;
+}
+
+/* タイプ別グループ化 */
+.type-group {
+    margin-bottom: 30px;
+    width: 100%;
+}
+
+.type-header {
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #e1e8ed;
+}
+
+.type-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+    font-size: clamp(1.2rem, 3vw, 1.4rem);
+    color: #2d3748;
+    font-weight: 600;
+}
+
+.type-badge {
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-weight: 700;
+    font-size: clamp(0.9rem, 2vw, 1rem);
+    color: white;
+}
+
+.type-a { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
+.type-b { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
+.type-c { background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); }
+.type-d { background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); }
+
+/* 問題グリッド - 修正版 */
+.problems-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 20px;
+    align-items: start;
+    justify-content: center; /* グリッド全体を中央寄せ */
+}
+
+@media (min-width: 1200px) {
+    .problems-grid {
+        grid-template-columns: repeat(2, 1fr); /* 大画面では2列固定 */
+        max-width: 900px; /* 最大幅を制限 */
+        margin: 0 auto; /* 中央寄せ */
+        gap: 25px;
+    }
+}
+
+@media (min-width: 1600px) {
+    .problems-grid {
+        grid-template-columns: repeat(3, 1fr); /* 超大画面では3列 */
+        max-width: 1400px;
+        gap: 30px;
+    }
+}
+
+@media (min-width: 768px) and (max-width: 1199px) {
+    .problems-grid {
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        gap: 20px;
+        justify-content: center;
+    }
+}
+
+/* 問題カードリンク */
+.problem-card-link {
+    text-decoration: none;
+    color: inherit;
+    display: block;
+}
+
+.problem-card-link:hover {
+    text-decoration: none;
+    color: inherit;
+}
+
+/* 問題カード */
+.problem-card {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+    border: 1px solid #e1e8ed;
+    transition: all 0.3s ease;
+    position: relative;
+    height: fit-content;
+}
+
+.problem-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.12);
+    border-color: #667eea;
+}
+
+.problem-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 15px;
+}
+
+.university-year {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.university {
+    font-size: clamp(1.1rem, 2.5vw, 1.2rem);
+    font-weight: 600;
+    color: #2d3748;
+    margin: 0;
+}
+
+.year {
+    font-size: clamp(0.9rem, 2vw, 1rem);
+    color: #718096;
+    margin: 0;
+}
+
+.progress-indicators {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.indicator {
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: clamp(0.7rem, 1.5vw, 0.75rem);
+    font-weight: 500;
+    text-align: center;
+    min-width: 35px;
+}
+
+.viewed {
+    background: #e0f2fe;
+    color: #0369a1;
+}
+
+.understood {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.review {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.difficulty {
+    background: #f3e8ff;
+    color: #7c3aed;
+}
+
+.problem-content {
+    margin-bottom: 15px;
+}
+
+.problem-preview {
+    margin-bottom: 12px;
+    line-height: 1.6;
+    color: #4a5568;
+    font-size: clamp(0.85rem, 2vw, 0.95rem);
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.problem-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #f1f5f9;
+}
+
+.answer-length {
+    background: #f7fafc;
+    color: #4a5568;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: clamp(0.75rem, 1.5vw, 0.8rem);
+    font-weight: 500;
+}
+
+.problem-footer {
+    text-align: center;
+    padding-top: 12px;
+    border-top: 1px solid #f1f5f9;
+}
+
+.read-more {
+    color: #4f46e5;
+    font-weight: 500;
+    font-size: clamp(0.8rem, 2vw, 0.9rem);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    opacity: 0.8;
+    transition: opacity 0.3s ease;
+}
+
+.problem-card:hover .read-more {
+    opacity: 1;
+}
+
+/* 問題がない場合 */
+.no-problems {
+    text-align: center;
+    padding: 40px 20px;
+    background: #f8f9fa;
+    border-radius: 15px;
+    border: 2px dashed #dee2e6;
+    grid-column: 1 / -1;
+}
+
+.no-problems-content i {
+    font-size: clamp(2.5rem, 6vw, 3rem);
+    color: #adb5bd;
+    margin-bottom: 20px;
+}
+
+.no-problems-content h3 {
+    color: #6c757d;
+    margin: 15px 0 10px 0;
+    font-size: clamp(1.2rem, 3vw, 1.5rem);
+}
+
+.no-problems-content p {
+    color: #6c757d;
+    margin-bottom: 20px;
+    font-size: clamp(0.9rem, 2.5vw, 1rem);
+}
+
+/* タブレット向け調整 */
+@media (max-width: 1024px) and (min-width: 769px) {
+    .essay-chapter-container {
+        padding: 20px;
+    }
+    
+    .filter-grid {
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    }
+    
+    .problems-grid {
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    }
+}
+
+/* スマートフォン向け調整 */
+@media (max-width: 768px) {
+    .essay-chapter-container {
+        padding: 10px;
+    }
+    
+    .chapter-header {
+        padding: 20px 15px;
+    }
+    
+    .filter-section {
+        padding: 15px;
+        margin-bottom: 20px;
+    }
+    
+    .filter-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 15px;
+    }
+    
+    .filter-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+    
+    .year-range {
+        flex-direction: column;
+        gap: 8px;
+        align-items: stretch;
+        max-width: none;
+    }
+    
+    .year-range span {
+        display: none;
+    }
+    
+    .filter-actions {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .problems-grid {
+        grid-template-columns: 1fr;
+        gap: 15px;
+    }
+    
+    .problem-card {
+        padding: 15px;
+    }
+    
+    .problem-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+    
+    .progress-indicators {
+        justify-content: flex-start;
+        align-self: stretch;
+    }
+    
+    .type-title {
+        flex-direction: column;
+        gap: 8px;
+        text-align: center;
+    }
+}
+
+/* 小さいスマートフォン向け */
+@media (max-width: 480px) {
+    .essay-chapter-container {
+        padding: 8px;
+    }
+    
+    .chapter-header {
+        padding: 15px 10px;
+    }
+    
+    .filter-section {
+        padding: 12px;
+    }
+    
+    .problem-card {
+        padding: 12px;
+    }
+    
+    .back-to-main {
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .progress-indicators {
+        gap: 4px;
+    }
+    
+    .indicator {
+        padding: 2px 4px;
+        font-size: 0.65rem;
+    }
+}
+
+/* 大画面でのコンテンツ幅制限 */
+@media (min-width: 1400px) {
+    .essay-chapter-container {
+        max-width: 1400px;
+        padding: 20px 30px;
+    }
+}
+</style>
+{% endblock %}
 
 {% block content %}
 <div class="essay-chapter-container">
@@ -22,10 +636,10 @@
                 {% endif %}
             </p>
             <div class="back-to-main">
-                <a href="{{ url_for('index') }}" class="btn btn-outline-light btn-sm me-2">
+                <a href="{{ url_for('index') }}" class="btn btn-sm">
                     <i class="fas fa-home"></i> {{ app_name }}
                 </a>
-                <a href="{{ url_for('essay_index') }}" class="btn btn-outline-light btn-sm">
+                <a href="{{ url_for('essay_index') }}" class="btn btn-sm">
                     <i class="fas fa-arrow-left"></i> 論述問題集
                 </a>
             </div>
@@ -76,13 +690,13 @@
                                value="{{ current_filters.year_from or '' }}"
                                min="{{ filter_data.year_range.min }}" 
                                max="{{ filter_data.year_range.max }}"
-                               placeholder="開始年">
+                               placeholder="開始年" class="form-control">
                         <span>〜</span>
                         <input type="number" id="yearTo" name="year_to" 
                                value="{{ current_filters.year_to or '' }}"
                                min="{{ filter_data.year_range.min }}" 
                                max="{{ filter_data.year_range.max }}"
-                               placeholder="終了年">
+                               placeholder="終了年" class="form-control">
                     </div>
                 </div>
 
@@ -112,7 +726,8 @@
             {% for problem in problems %}
                 {% if problem.type != current_type %}
                     {% if current_type != '' %}
-                        </div> <!-- 前のtype-groupを閉じる -->
+                        </div> <!-- 前のproblems-gridを閉じる -->
+                    </div> <!-- 前のtype-groupを閉じる -->
                     {% endif %}
                     {% set current_type = problem.type %}
                     <div class="type-group">
@@ -130,49 +745,51 @@
                 {% endif %}
                 
                 <!-- 個別問題カード -->
-                <div class="problem-card" data-problem-url="{{ url_for('essay_problem', problem_id=problem.id) }}">
-                    <div class="problem-header">
-                        <div class="university-year">
-                            <span class="university">{{ problem.university }}</span>
-                            <span class="year">{{ problem.year }}年</span>
+                <a href="{{ url_for('essay_problem', problem_id=problem.id) }}" class="problem-card-link">
+                    <div class="problem-card">
+                        <div class="problem-header">
+                            <div class="university-year">
+                                <span class="university">{{ problem.university }}</span>
+                                <span class="year">{{ problem.year }}年</span>
+                            </div>
+                            <div class="progress-indicators">
+                                {% if problem.progress.viewed_answer %}
+                                    <span class="indicator viewed" title="解答閲覧済み">
+                                        <i class="fas fa-eye"></i>
+                                    </span>
+                                {% endif %}
+                                {% if problem.progress.understood %}
+                                    <span class="indicator understood" title="理解済み">
+                                        <i class="fas fa-check-circle"></i>
+                                    </span>
+                                {% endif %}
+                                {% if problem.progress.review_flag %}
+                                    <span class="indicator review" title="復習フラグ">
+                                        <i class="fas fa-flag"></i>
+                                    </span>
+                                {% endif %}
+                                {% if problem.progress.difficulty_rating %}
+                                    <span class="indicator difficulty" title="難易度: {{ problem.progress.difficulty_rating }}/5">
+                                        <i class="fas fa-star"></i>{{ problem.progress.difficulty_rating }}
+                                    </span>
+                                {% endif %}
+                            </div>
                         </div>
-                        <div class="progress-indicators">
-                            {% if problem.progress.viewed_answer %}
-                                <span class="indicator viewed" title="解答閲覧済み">
-                                    <i class="fas fa-eye"></i>
-                                </span>
-                            {% endif %}
-                            {% if problem.progress.understood %}
-                                <span class="indicator understood" title="理解済み">
-                                    <i class="fas fa-check-circle"></i>
-                                </span>
-                            {% endif %}
-                            {% if problem.progress.review_flag %}
-                                <span class="indicator review" title="復習フラグ">
-                                    <i class="fas fa-flag"></i>
-                                </span>
-                            {% endif %}
-                            {% if problem.progress.difficulty_rating %}
-                                <span class="indicator difficulty" title="難易度: {{ problem.progress.difficulty_rating }}/5">
-                                    <i class="fas fa-star"></i>{{ problem.progress.difficulty_rating }}
-                                </span>
-                            {% endif %}
+                        
+                        <div class="problem-content">
+                            <p class="problem-preview">{{ problem.preview }}</p>
+                            <div class="problem-meta">
+                                <span class="answer-length">解答: {{ problem.answer_length }}字</span>
+                            </div>
+                        </div>
+                        
+                        <div class="problem-footer">
+                            <span class="read-more">
+                                <i class="fas fa-arrow-right"></i> 問題を見る
+                            </span>
                         </div>
                     </div>
-                    
-                    <div class="problem-content">
-                        <p class="problem-preview">{{ problem.preview }}</p>
-                        <div class="problem-meta">
-                            <span class="answer-length">解答: {{ problem.answer_length }}字</span>
-                        </div>
-                    </div>
-                    
-                    <div class="problem-footer">
-                        <span class="read-more">
-                            <i class="fas fa-arrow-right"></i> 問題を見る
-                        </span>
-                    </div>
-                </div>
+                </a>
                 
                 {% if loop.last %}
                         </div> <!-- 最後のproblems-gridを閉じる -->
@@ -194,9 +811,7 @@
         {% endif %}
     </div>
 </div>
-{% endblock %}
 
-{% block scripts %}
 <script>
 // フィルターのクリア
 function clearAllFilters() {
@@ -211,18 +826,6 @@ function clearAllFilters() {
     });
     form.submit();
 }
-
-// 問題カードのクリックイベント
-document.addEventListener('DOMContentLoaded', function() {
-    document.querySelectorAll('.problem-card').forEach(card => {
-        card.addEventListener('click', function() {
-            const url = this.dataset.problemUrl;
-            if (url) {
-                location.href = url;
-            }
-        });
-    });
-});
 
 // リアルタイム検索（デバウンス付き）
 let searchTimeout;
@@ -247,435 +850,5 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 </script>
-{% endblock %}
 
-{% block head_extra %}
-<style>
-.essay-chapter-container {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 20px;
-}
-
-.back-to-main {
-    margin-top: 15px;
-    display: flex;
-    gap: 10px;
-    justify-content: center;
-    flex-wrap: wrap;
-}
-
-.back-to-main .btn {
-    border-radius: 20px;
-    transition: all 0.3s ease;
-}
-
-.back-to-main .btn:hover {
-    transform: translateY(-1px);
-}
-
-.chapter-header {
-    background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
-    color: white;
-    padding: 30px;
-    border-radius: 15px;
-    margin-bottom: 30px;
-    box-shadow: 0 8px 25px rgba(0,0,0,0.1);
-}
-
-.breadcrumb {
-    margin-bottom: 15px;
-    opacity: 0.9;
-}
-
-.breadcrumb a {
-    color: white;
-    text-decoration: none;
-    opacity: 0.8;
-    transition: opacity 0.3s ease;
-}
-
-.breadcrumb a:hover {
-    opacity: 1;
-}
-
-.breadcrumb i.fa-chevron-right {
-    margin: 0 10px;
-    opacity: 0.6;
-}
-
-.chapter-header h1 {
-    margin: 0 0 10px 0;
-    font-size: 2.2rem;
-    font-weight: 700;
-}
-
-.chapter-description {
-    margin: 0;
-    font-size: 1.1rem;
-    opacity: 0.9;
-    line-height: 1.5;
-}
-
-.filter-section {
-    background: white;
-    border-radius: 15px;
-    padding: 25px;
-    margin-bottom: 30px;
-    box-shadow: 0 5px 20px rgba(0,0,0,0.08);
-    border: 1px solid #e1e8ed;
-}
-
-.filter-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
-    padding-bottom: 15px;
-    border-bottom: 2px solid #f5f7fa;
-}
-
-.filter-header h3 {
-    margin: 0;
-    color: #2d3748;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.filter-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 20px;
-    margin-bottom: 20px;
-}
-
-.filter-group label {
-    display: block;
-    margin-bottom: 8px;
-    font-weight: 600;
-    color: #4a5568;
-    font-size: 0.9rem;
-}
-
-.form-control {
-    padding: 10px 12px;
-    border: 2px solid #e2e8f0;
-    border-radius: 8px;
-    font-size: 0.9rem;
-    transition: border-color 0.3s ease;
-}
-
-.form-control:focus {
-    outline: none;
-    border-color: #4f46e5;
-    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
-}
-
-.year-range {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.year-range input {
-    flex: 1;
-}
-
-.year-range span {
-    color: #718096;
-    font-weight: 500;
-}
-
-.filter-actions {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding-top: 15px;
-    border-top: 1px solid #e2e8f0;
-}
-
-.filter-count {
-    color: #4a5568;
-    font-weight: 500;
-    font-size: 0.9rem;
-}
-
-.type-group {
-    margin-bottom: 40px;
-}
-
-.type-header {
-    margin-bottom: 20px;
-}
-
-.type-title {
-    margin: 0;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    color: #2d3748;
-    font-size: 1.3rem;
-    font-weight: 600;
-}
-
-.type-badge {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    color: white;
-    font-weight: 700;
-    font-size: 1.2rem;
-}
-
-.type-badge.type-a { background: linear-gradient(135deg, #dc3545, #c82333); }
-.type-badge.type-b { background: linear-gradient(135deg, #fd7e14, #e55a00); }
-.type-badge.type-c { background: linear-gradient(135deg, #ffc107, #e0a800); }
-.type-badge.type-d { background: linear-gradient(135deg, #28a745, #1e7e34); }
-
-.problems-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-    gap: 20px;
-}
-
-.problem-card {
-    background: white;
-    border-radius: 12px;
-    padding: 20px;
-    box-shadow: 0 3px 15px rgba(0,0,0,0.08);
-    border: 1px solid #e2e8f0;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    position: relative;
-}
-
-.problem-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
-    border-color: #4f46e5;
-}
-
-.problem-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 15px;
-}
-
-.university-year {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-}
-
-.university {
-    font-weight: 600;
-    color: #2d3748;
-    font-size: 0.95rem;
-}
-
-.year {
-    font-size: 0.85rem;
-    color: #718096;
-}
-
-.progress-indicators {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-}
-
-.indicator {
-    padding: 4px 8px;
-    border-radius: 12px;
-    font-size: 0.75rem;
-    font-weight: 500;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-}
-
-.indicator.viewed {
-    background: #e3f2fd;
-    color: #1565c0;
-}
-
-.indicator.understood {
-    background: #e8f5e8;
-    color: #2e7d32;
-}
-
-.indicator.review {
-    background: #fff3e0;
-    color: #ef6c00;
-}
-
-.indicator.difficulty {
-    background: #fce4ec;
-    color: #c2185b;
-}
-
-.problem-content {
-    margin-bottom: 15px;
-}
-
-.problem-preview {
-    margin: 0 0 10px 0;
-    color: #4a5568;
-    line-height: 1.6;
-    font-size: 0.95rem;
-}
-
-.problem-meta {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.answer-length {
-    background: #f7fafc;
-    color: #4a5568;
-    padding: 4px 8px;
-    border-radius: 6px;
-    font-size: 0.8rem;
-    font-weight: 500;
-}
-
-.problem-footer {
-    text-align: center;
-    padding-top: 15px;
-    border-top: 1px solid #f1f5f9;
-}
-
-.read-more {
-    color: #4f46e5;
-    font-weight: 500;
-    font-size: 0.9rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    opacity: 0.8;
-    transition: opacity 0.3s ease;
-}
-
-.problem-card:hover .read-more {
-    opacity: 1;
-}
-
-.no-problems {
-    text-align: center;
-    padding: 60px 20px;
-    background: #f8f9fa;
-    border-radius: 15px;
-    border: 2px dashed #dee2e6;
-}
-
-.no-problems-content i {
-    font-size: 3rem;
-    color: #adb5bd;
-    margin-bottom: 20px;
-}
-
-.no-problems-content h3 {
-    color: #6c757d;
-    margin: 15px 0 10px 0;
-}
-
-.no-problems-content p {
-    color: #6c757d;
-    margin-bottom: 20px;
-}
-
-/* レスポンシブデザイン */
-@media (max-width: 768px) {
-    .essay-chapter-container {
-        padding: 15px;
-    }
-    
-    .chapter-header {
-        padding: 20px;
-    }
-    
-    .chapter-header h1 {
-        font-size: 1.8rem;
-    }
-    
-    .filter-section {
-        padding: 20px;
-    }
-    
-    .filter-grid {
-        grid-template-columns: 1fr;
-        gap: 15px;
-    }
-    
-    .filter-actions {
-        flex-direction: column;
-        gap: 15px;
-        text-align: center;
-    }
-    
-    .problems-grid {
-        grid-template-columns: 1fr;
-        gap: 15px;
-    }
-    
-    .problem-card {
-        padding: 15px;
-    }
-    
-    .problem-header {
-        flex-direction: column;
-        gap: 10px;
-    }
-    
-    .progress-indicators {
-        justify-content: flex-start;
-    }
-}
-
-@media (max-width: 480px) {
-    .year-range {
-        flex-direction: column;
-        gap: 8px;
-    }
-    
-    .year-range span {
-        display: none;
-    }
-    
-    .type-title {
-        flex-direction: column;
-        gap: 8px;
-        text-align: center;
-    }
-}
-
-/* ダークモード対応 */
-@media (prefers-color-scheme: dark) {
-    .filter-section,
-    .problem-card {
-        background: #2d3748;
-        border-color: #4a5568;
-        color: #e2e8f0;
-    }
-    
-    .filter-header h3,
-    .type-title,
-    .university {
-        color: #e2e8f0;
-    }
-    
-    .form-control {
-        background: #4a5568;
-        border-color: #718096;
-        color: #e2e8f0;
-    }
-}
-</style>
 {% endblock %}
