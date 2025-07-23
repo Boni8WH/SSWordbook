@@ -502,8 +502,40 @@
 document.addEventListener('DOMContentLoaded', function() {
     console.log('📋 論述問題集ページ初期化開始');
     
-    // 論述問題集固有の初期化処理のみ実行
-    // 管理者機能（initializeUserTable, initializeUserFiltering）は呼び出さない
+    // 章カードのクリックイベントを設定
+    const chapterCards = document.querySelectorAll('.chapter-card');
+    console.log('📁 見つかった章カード数:', chapterCards.length);
+    
+    chapterCards.forEach((card, index) => {
+        const chapterUrl = card.getAttribute('data-chapter-url');
+        console.log(`📂 章カード${index + 1}: URL = ${chapterUrl}`);
+        
+        if (chapterUrl) {
+            // クリックイベントを追加
+            card.addEventListener('click', function(e) {
+                e.preventDefault();
+                console.log('🖱️ 章カードがクリックされました:', chapterUrl);
+                window.location.href = chapterUrl;
+            });
+            
+            // ホバー効果のためのマウスイベント
+            card.addEventListener('mouseenter', function() {
+                console.log('🖱️ マウスが章カードに入りました:', chapterUrl);
+            });
+            
+            // キーボードでのアクセシビリティ
+            card.setAttribute('tabindex', '0');
+            card.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    console.log('⌨️ キーで章カードが選択されました:', chapterUrl);
+                    window.location.href = chapterUrl;
+                }
+            });
+        } else {
+            console.error('❌ 章カードにURLが設定されていません:', card);
+        }
+    });
     
     console.log('✅ 論述問題集ページ初期化完了');
 });
