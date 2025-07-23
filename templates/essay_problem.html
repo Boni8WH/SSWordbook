@@ -473,7 +473,7 @@
     </div>
 
     <!-- 解答表示ボタン -->
-    <button class="show-answer-btn" onclick="showAnswer()" id="showAnswerBtn">
+    <button class="show-answer-btn" id="showAnswerBtn">
         <i class="fas fa-eye"></i>
         解答を表示
     </button>
@@ -520,8 +520,7 @@
                 <div class="rating-group">
                     {% for i in range(1, 6) %}
                     <span class="star-rating {% if problem.progress and problem.progress.difficulty_rating and i <= problem.progress.difficulty_rating %}active{% endif %}" 
-                          data-rating="{{ i }}" 
-                          onclick="setRating(this.getAttribute('data-rating'))">★</span>
+                          data-rating="{{ i }}">★</span>
                     {% endfor %}
                 </div>
             </div>
@@ -534,7 +533,7 @@
             </div>
         </div>
         
-        <button class="save-progress-btn" onclick="saveProgress()">
+        <button class="save-progress-btn" id="saveProgressBtn">
             <i class="fas fa-save"></i>
             進捗を保存
         </button>
@@ -595,6 +594,26 @@ document.addEventListener('DOMContentLoaded', function() {
     // 星評価の初期化
     if (currentRating > 0) {
         setRating(currentRating);
+    }
+    
+    // イベントリスナーの設定
+    var showAnswerBtn = document.getElementById('showAnswerBtn');
+    if (showAnswerBtn) {
+        showAnswerBtn.addEventListener('click', showAnswer);
+    }
+    
+    var saveProgressBtn = document.getElementById('saveProgressBtn');
+    if (saveProgressBtn) {
+        saveProgressBtn.addEventListener('click', saveProgress);
+    }
+    
+    // 星評価のクリックイベント
+    var stars = document.querySelectorAll('.star-rating');
+    for (var i = 0; i < stars.length; i++) {
+        stars[i].addEventListener('click', function() {
+            var rating = this.getAttribute('data-rating');
+            setRating(rating);
+        });
     }
 });
 
