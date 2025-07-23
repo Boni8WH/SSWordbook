@@ -17,10 +17,15 @@
 .chapter-header {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
-    padding: 20px; /* 30px → 20px に削減 */
+    padding: 15px 20px; /* 縦方向をさらに削減 */
     border-radius: 15px;
     margin-bottom: 30px;
     box-shadow: 0 5px 20px rgba(102, 126, 234, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 15px;
 }
 
 .breadcrumb {
@@ -43,28 +48,35 @@
 }
 
 .chapter-title {
-    margin: 0 0 15px 0; /* 20px → 15px に削減 */
-    font-size: 2rem; /* 2.2rem → 2rem に少し削減 */
+    margin: 0;
+    font-size: 2rem;
     font-weight: 700;
+    color: white; /* 黒色 → 白色に変更 */
+    flex: 1;
+    min-width: 200px;
 }
 
 .chapter-stats {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 12px; /* 15px → 12px に削減 */
-    margin-top: 15px; /* 20px → 15px に削減 */
+    display: flex; /* grid → flex に変更して横並び */
+    gap: 20px;
+    align-items: center;
+    flex-wrap: wrap;
 }
 
 .stat-item {
-    background: rgba(255, 255, 255, 0.1);
-    padding: 12px; /* 15px → 12px に削減 */
-    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.15);
+    padding: 8px 12px; /* より薄く、横長に */
+    border-radius: 8px;
     backdrop-filter: blur(10px);
+    text-align: center;
+    min-width: 80px; /* 最小幅設定 */
+    font-size: 0.9rem;
 }
 
 .stat-item i {
-    margin-right: 8px;
-    opacity: 0.8;
+    margin-right: 6px;
+    opacity: 0.9;
+    font-size: 0.9rem;
 }
 
 /* フィルターセクション */
@@ -331,18 +343,22 @@
     }
     
     .chapter-header {
-        padding: 15px; /* スマホではさらに削減 */
+        padding: 12px 15px;
         margin-bottom: 20px;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
     }
 
     .chapter-title {
-        font-size: 1.6rem; /* スマホではさらに小さく */
-        margin-bottom: 10px;
+        font-size: 1.6rem;
+        width: 100%;
     }
     
     .chapter-stats {
-        gap: 10px;
-        margin-top: 10px;
+        gap: 12px;
+        width: 100%;
+        justify-content: space-between;
     }
     
     .filter-grid {
@@ -372,29 +388,41 @@
     }
 
     .stat-item {
-        padding: 10px;
+        padding: 6px 8px;
+        font-size: 0.8rem;
+        min-width: 70px;
+        flex: 1;
+    }
+
+    .stat-item i {
+        font-size: 0.8rem;
+        margin-right: 4px;
     }
 }
 
 @media (max-width: 480px) {
     .chapter-header {
-        padding: 12px; /* さらに小さく */
+        padding: 10px 12px;
         margin-bottom: 15px;
     }
     
     .chapter-title {
         font-size: 1.4rem;
-        margin-bottom: 8px;
     }
     
     .chapter-stats {
         gap: 8px;
-        margin-top: 8px;
     }
     
     .stat-item {
-        padding: 8px;
-        font-size: 0.9rem;
+        padding: 5px 6px;
+        font-size: 0.75rem;
+        min-width: 60px;
+    }
+    
+    .stat-item i {
+        font-size: 0.75rem;
+        margin-right: 3px;
     }
 }
 
