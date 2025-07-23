@@ -463,12 +463,37 @@
         </h2>
         <p class="question-text">{{ problem.question }}</p>
         
+        <!-- 画像表示部分を修正 -->
         {% if image_path %}
         <div class="question-image">
             <img src="{{ url_for('static', filename=image_path) }}" 
-                 alt="問題図" 
-                 loading="lazy">
+                alt="問題図" 
+                loading="lazy"
+                onerror="console.error('画像読み込みエラー:', this.src); this.style.display='none';"
+                onload="console.log('画像読み込み成功:', this.src);">
         </div>
+        {% else %}
+        <!-- デバッグ用：画像パスが存在しない場合の表示 -->
+        {% if has_essay_image(problem.id) %}
+        <div class="question-image">
+            <p style="color: red; background: #ffe6e6; padding: 10px; border-radius: 5px;">
+                ⚠️ 画像ファイルは存在しますが、パスの生成に問題があります。<br>
+                問題ID: {{ problem.id }}<br>
+                テンプレート関数での画像パス: {{ essay_image_path(problem.id) }}
+            </p>
+            <!-- 直接テンプレート関数を使用して表示を試行 -->
+            {% if essay_image_path(problem.id) %}
+            <img src="{{ url_for('static', filename=essay_image_path(problem.id)) }}" 
+                alt="問題図" 
+                loading="lazy"
+                style="max-width: 100%; border: 2px solid red;"
+                onerror="console.error('テンプレート関数での画像読み込みエラー:', this.src);"
+                onload="console.log('テンプレート関数での画像読み込み成功:', this.src);">
+            {% endif %}
+        </div>
+        {% else %}
+        <!-- 画像が存在しない場合は何も表示しない -->
+        {% endif %}
         {% endif %}
     </div>
 
