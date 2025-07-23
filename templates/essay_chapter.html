@@ -10,7 +10,7 @@
     margin: 0 auto;
     padding: 20px;
     background: #f8f9fa;
-    min-height: 100vh;
+    /* min-height削除 - フッター問題の原因 */
 }
 
 /* ヘッダー */
@@ -134,12 +134,31 @@
     font-weight: 600;
 }
 
-/* 問題グリッド - 改善されたレイアウト */
+/* 問題グリッド - 大幅改善 */
 .problems-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+    /* より柔軟なグリッド設定 */
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
     gap: 20px;
+    /* 重要: カードを上部に揃える */
     align-items: start;
+    /* グリッドの行の高さを自動調整 */
+    grid-auto-rows: min-content;
+}
+
+/* 大画面での最適化 */
+@media (min-width: 1200px) {
+    .problems-grid {
+        /* 大画面では最大3列に制限 */
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (min-width: 768px) and (max-width: 1199px) {
+    .problems-grid {
+        /* 中画面では2列 */
+        grid-template-columns: repeat(2, 1fr);
+    }
 }
 
 /* 問題カード */
@@ -147,6 +166,8 @@
     text-decoration: none;
     color: inherit;
     display: block;
+    /* カード全体の高さを統一 */
+    height: 100%;
 }
 
 .problem-card {
@@ -156,9 +177,13 @@
     padding: 20px;
     transition: all 0.3s ease;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-    height: 100%;
+    /* フレックスボックスでカード内容を整理 */
     display: flex;
     flex-direction: column;
+    /* カードの高さを100%に設定 */
+    height: 100%;
+    /* 最小高さを設定して統一感を出す */
+    min-height: 200px;
     position: relative;
 }
 
@@ -195,7 +220,7 @@
     font-size: 0.9rem;
 }
 
-/* 進捗インジケーター - より目立つように改善 */
+/* 進捗インジケーター */
 .progress-indicators {
     display: flex;
     flex-wrap: wrap;
@@ -244,9 +269,11 @@
 
 /* 問題コンテンツ */
 .problem-content {
+    /* フレックスで残りスペースを埋める */
     flex: 1;
     display: flex;
     flex-direction: column;
+    justify-content: space-between;
 }
 
 .problem-preview {
@@ -254,12 +281,15 @@
     line-height: 1.6;
     color: #4a5568;
     font-size: 0.95rem;
+    /* テキスト省略の改善 */
     display: -webkit-box;
-    -webkit-line-clamp: 3;
-    line-clamp: 3;
+    -webkit-line-clamp: 4;
+    line-clamp: 4;
     -webkit-box-orient: vertical;
     overflow: hidden;
     text-overflow: ellipsis;
+    /* フレックスで成長させる */
+    flex-grow: 1;
 }
 
 /* 問題がない場合 */
@@ -301,17 +331,24 @@
     }
     
     .problems-grid {
+        /* モバイルでは1列 */
         grid-template-columns: 1fr;
         gap: 15px;
     }
     
     .problem-card {
         padding: 15px;
+        min-height: 180px;
     }
     
     .indicator {
         font-size: 0.7rem;
         padding: 3px 6px;
+    }
+    
+    .problem-preview {
+        -webkit-line-clamp: 3;
+        line-clamp: 3;
     }
 }
 
@@ -331,6 +368,12 @@
 @keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
+}
+
+/* フッター対応のための追加スタイル */
+.problems-section {
+    /* 最後のセクションに下部マージンを追加 */
+    margin-bottom: 40px;
 }
 </style>
 {% endblock %}
