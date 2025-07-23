@@ -7252,69 +7252,84 @@ class EssayCsvFile(db.Model):
 # ========================================
 @app.route('/essay')
 def essay_index():
-    """論述問題集のメインページ"""
+    """論述問題集トップページ（公開設定対応版）"""
     try:
         if 'user_id' not in session:
-            flash('論述問題集を利用するにはログインしてください。', 'info')
+            flash('論述問題を閲覧するにはログインしてください。', 'info')
             return redirect(url_for('login_page'))
-        
+
         current_user = User.query.get(session['user_id'])
         if not current_user:
             flash('ユーザーが見つかりません。', 'danger')
             return redirect(url_for('logout'))
-        
-        # 章別の問題数と進捗を取得
-        chapter_stats = get_essay_chapter_stats(current_user.id)
-        
-        context = get_template_context()
-        context.update({
-            'chapter_stats': chapter_stats,
-            'current_user': current_user
-        })
-        
-        return render_template('essay_index.html', **context)
-        
-    except Exception as e:
-        logger.error(f"Error in essay_index: {e}")
-        flash('論述問題集の読み込み中にエラーが発生しました。', 'danger')
-        return redirect(url_for('index'))
 
+        print(f"📊 論述問題集トップページ - ユーザー: {current_user.username}, 部屋: {current_user.room_number}")
+
+        # 公開設定を考慮した章別統計を取得
+        chapter_stats = get_essay_chapter_stats_with_visibility(current_user.id, current_user.room_number)
+        
+        print(f"📋 表示される章: {len(chapter_stats)}章")
+
+        context = get_template_context(current_user.id, current_user.username, current_user.room_number)
+        context.update({
+            'chapter_stats': chapter_stats
+        })
+
+        return render_template('essay_index.html', **context)
+
+    except Exception as e:
+        print(f"Error in essay_index: {e}")
+        flash('論述問題集の表示中にエラーが発生しました。', 'danger')
+        return redirect(url_for('index'))
+    
 @app.route('/essay/chapter/<chapter>')
 def essay_chapter(chapter):
-    """章別問題一覧"""
+    """章別論述問題一覧（公開設定対応版）"""
     try:
         if 'user_id' not in session:
+            flash('論述問題を閲覧するにはログインしてください。', 'info')
             return redirect(url_for('login_page'))
-        
+
         current_user = User.query.get(session['user_id'])
         if not current_user:
+            flash('ユーザーが見つかりません。', 'danger')
             return redirect(url_for('logout'))
-        
-        # フィルタリングパラメータ
-        type_filter = request.args.get('type', '')
-        university_filter = request.args.get('university', '')
+
+        print(f"📊 章別論述問題一覧 - 第{chapter}章, ユーザー: {current_user.username}, 部屋: {current_user.room_number}")
+
+        # フィルターパラメータの取得
+        type_filter = request.args.get('type', '').strip()
+        university_filter = request.args.get('university', '').strip()
         year_from = request.args.get('year_from', type=int)
         year_to = request.args.get('year_to', type=int)
-        keyword = request.args.get('keyword', '')
-        
-        # 問題一覧を取得
-        problems = get_filtered_essay_problems(
+        keyword = request.args.get('keyword', '').strip()
+
+        print(f"🔍 フィルター - タイプ: {type_filter}, 大学: {university_filter}, 年度: {year_from}-{year_to}, キーワード: {keyword}")
+
+        # 公開設定を考慮した問題取得
+        problems = get_filtered_essay_problems_with_visibility(
             chapter=chapter,
-            type_filter=type_filter,
-            university_filter=university_filter,
+            room_number=current_user.room_number,
+            type_filter=type_filter or None,
+            university_filter=university_filter or None,
             year_from=year_from,
             year_to=year_to,
-            keyword=keyword,
+            keyword=keyword or None,
             user_id=current_user.id
         )
-        
-        # フィルター用データ
-        filter_data = get_essay_filter_data(chapter)
-        
-        context = get_template_context()
+
+        print(f"📋 公開設定適用後の問題数: {len(problems)}件")
+
+        # フィルター用のデータを取得（公開設定対応版）
+        filter_data = get_essay_filter_data_with_visibility(chapter, current_user.room_number)
+
+        # 章名の決定
+        chapter_name = '総合問題' if chapter == 'com' else f'第{chapter}章'
+
+        context = get_template_context(current_user.id, current_user.username, current_user.room_number)
         context.update({
             'chapter': chapter,
-            'chapter_name': f'第{chapter}章' if chapter != 'com' else '総合問題',
+            'chapter_name': chapter_name,
             'problems': problems,
             'filter_data': filter_data,
             'current_filters': {
@@ -7325,84 +7340,140 @@ def essay_chapter(chapter):
                 'keyword': keyword
             }
         })
-        
+
         return render_template('essay_chapter.html', **context)
-        
+
     except Exception as e:
-        logger.error(f"Error in essay_chapter: {e}")
-        flash('問題一覧の読み込み中にエラーが発生しました。', 'danger')
+        print(f"Error in essay_chapter: {e}")
+        flash('論述問題の取得中にエラーが発生しました。', 'danger')
         return redirect(url_for('essay_index'))
 
 @app.route('/essay/problem/<int:problem_id>')
 def essay_problem(problem_id):
-    """個別問題表示"""
+    """個別論述問題表示（公開設定チェック付き）"""
     try:
         if 'user_id' not in session:
+            flash('論述問題を閲覧するにはログインしてください。', 'info')
             return redirect(url_for('login_page'))
-        
+
         current_user = User.query.get(session['user_id'])
         if not current_user:
+            flash('ユーザーが見つかりません。', 'danger')
             return redirect(url_for('logout'))
-        
-        # 問題を取得
+
         problem = EssayProblem.query.get_or_404(problem_id)
         
-        # 進捗を取得または作成
-        progress = EssayProgress.query.filter_by(
-            user_id=current_user.id,
-            problem_id=problem_id
-        ).first()
+        print(f"📊 個別問題表示 - ID: {problem_id}, 第{problem.chapter}章 タイプ{problem.type}, ユーザー: {current_user.username}, 部屋: {current_user.room_number}")
         
-        if not progress:
-            progress = EssayProgress(
-                user_id=current_user.id,
-                problem_id=problem_id
-            )
-            db.session.add(progress)
-            db.session.commit()
+        # 公開設定をチェック
+        if not is_essay_problem_visible(current_user.room_number, problem.chapter, problem.type):
+            print(f"❌ 非公開問題へのアクセス - ID: {problem_id}, 第{problem.chapter}章 タイプ{problem.type}")
+            flash('この問題は現在公開されていません。', 'warning')
+            return redirect(url_for('essay_index'))
         
-        # 同じ章の前後の問題を取得
-        prev_problem, next_problem = get_adjacent_problems(problem)
+        print(f"✅ 公開問題へのアクセス - ID: {problem_id}")
         
-        context = get_template_context()
+        # 前後の問題を取得（公開されているもののみ）
+        prev_problem, next_problem = get_adjacent_problems_with_visibility(problem, current_user.room_number)
+        
+        # 画像パスを取得
+        image_path = None
+        if has_essay_problem_image(problem_id):
+            image_path = get_essay_problem_image_path(problem_id)
+        
+        context = get_template_context(current_user.id, current_user.username, current_user.room_number)
         context.update({
             'problem': problem,
-            'progress': progress,
             'prev_problem': prev_problem,
-            'next_problem': next_problem
+            'next_problem': next_problem,
+            'image_path': image_path
         })
         
         return render_template('essay_problem.html', **context)
-        
+
     except Exception as e:
-        logger.error(f"Error in essay_problem: {e}")
-        flash('問題の読み込み中にエラーが発生しました。', 'danger')
+        print(f"Error in essay_problem: {e}")
+        flash('論述問題の表示中にエラーが発生しました。', 'danger')
         return redirect(url_for('essay_index'))
 
-# app.py の既存のmodelsインポート文に EssayVisibilitySetting を追加
-# 例：from models import User, AdminUser, RoomSetting, EssayProblem, EssayVisibilitySetting
+def get_adjacent_problems_with_visibility(problem, room_number):
+    """公開設定を考慮した前後の問題を取得"""
+    try:
+        print(f"🔍 前後問題取得 - 第{problem.chapter}章, 部屋: {room_number}")
+        
+        # 同じ章の公開されている問題を type → year → university の順でソート
+        ordered_problems = EssayProblem.query.filter(
+            EssayProblem.chapter == problem.chapter,
+            EssayProblem.enabled == True
+        ).order_by(
+            EssayProblem.type,
+            EssayProblem.year.desc(),
+            EssayProblem.university
+        ).all()
+        
+        # 公開設定でフィルタリング
+        visible_problems = []
+        for p in ordered_problems:
+            if is_essay_problem_visible(room_number, p.chapter, p.type):
+                visible_problems.append(p)
+        
+        print(f"📋 公開問題数: {len(visible_problems)}件（全体: {len(ordered_problems)}件）")
+        
+        current_index = None
+        for i, p in enumerate(visible_problems):
+            if p.id == problem.id:
+                current_index = i
+                break
+        
+        if current_index is None:
+            print("⚠️ 現在の問題が公開問題リストに見つかりません")
+            return None, None
+        
+        prev_problem = visible_problems[current_index - 1] if current_index > 0 else None
+        next_problem = visible_problems[current_index + 1] if current_index < len(visible_problems) - 1 else None
+        
+        print(f"📍 前の問題: {prev_problem.id if prev_problem else 'なし'}, 次の問題: {next_problem.id if next_problem else 'なし'}")
+        
+        return prev_problem, next_problem
+        
+    except Exception as e:
+        print(f"Error getting adjacent problems with visibility: {e}")
+        return None, None
 
-# app.py の最後に追加するコード（既存のコードは変更しない）
+def is_essay_problem_visible_sql(room_number, chapter, problem_type):
+    """SQLベースの公開設定チェック（モデル問題回避版）"""
+    try:
+        with db.engine.connect() as conn:
+            result = conn.execute(text("""
+                SELECT is_visible 
+                FROM essay_visibility_setting 
+                WHERE room_number = :room_number 
+                AND chapter = :chapter 
+                AND problem_type = :problem_type
+            """), {
+                'room_number': room_number,
+                'chapter': chapter,
+                'problem_type': problem_type
+            })
+            
+            row = result.fetchone()
+            if row:
+                is_visible = row[0]
+                print(f"📊 公開設定確認 - 部屋{room_number} 第{chapter}章 タイプ{problem_type}: {'公開' if is_visible else '非公開'}")
+                return is_visible
+            else:
+                print(f"⚠️ 公開設定なし - 部屋{room_number} 第{chapter}章 タイプ{problem_type}: デフォルト公開")
+                return True  # 設定がない場合はデフォルトで公開
+    except Exception as e:
+        print(f"Error checking essay visibility (SQL): {e}")
+        return True  # エラー時はデフォルトで公開
 
 # ========================================
 # 論述問題公開設定 ヘルパー関数
 # ========================================
-
 def is_essay_problem_visible(room_number, chapter, problem_type):
-    """特定の部屋で論述問題が公開されているかチェック"""
-    try:
-        setting = EssayVisibilitySetting.query.filter_by(
-            room_number=room_number,
-            chapter=chapter,
-            problem_type=problem_type
-        ).first()
-        
-        # 設定がない場合はデフォルトで公開
-        return setting.is_visible if setting else True
-        
-    except Exception as e:
-        print(f"Error checking essay visibility: {e}")
-        return True  # エラー時はデフォルトで公開
+    """特定の部屋で論述問題が公開されているかチェック（SQL版）"""
+    return is_essay_problem_visible_sql(room_number, chapter, problem_type)
 
 def get_essay_visibility_settings(room_number):
     """部屋の論述問題公開設定を全て取得"""
