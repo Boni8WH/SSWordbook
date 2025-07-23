@@ -7402,6 +7402,9 @@ def essay_problem(problem_id):
         # テンプレートコンテキストを取得（引数なし）
         context = get_template_context()
         
+        # フィルター用のデータを取得（公開設定対応版）
+        filter_data = get_essay_filter_data_with_visibility(problem.chapter, current_user.room_number)
+        
         # 必要な情報を追加
         context.update({
             'problem': problem,
@@ -7419,7 +7422,14 @@ def essay_problem(problem_id):
                 'year_from': None,
                 'year_to': None,
                 'keyword': ''
-            }
+            },
+            # ★ filter_data を追加
+            'filter_data': filter_data,
+            # ★ 章情報も追加
+            'chapter': problem.chapter,
+            'chapter_name': '総合問題' if problem.chapter == 'com' else f'第{problem.chapter}章',
+            # ★ problems を空の配列として追加（個別問題表示なので不要だが、テンプレートエラー回避）
+            'problems': []
         })
         
         return render_template('essay_problem.html', **context)
