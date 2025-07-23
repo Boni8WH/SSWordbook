@@ -218,8 +218,11 @@
                                         {% endif %}
                                     </td>
                                     <td>
-                                        <button type="button" class="btn btn-danger btn-sm delete-user-btn" 
-                                                onclick="deleteUser({{ user.id }}, '{{ user.username }}')">
+                                        <button type="button" 
+                                                class="btn btn-danger btn-sm delete-user-btn" 
+                                                data-user-id="{{ user.id }}" 
+                                                data-username="{{ user.username|e }}"
+                                                onclick="deleteUserSafe(this)">
                                             <i class="fas fa-trash"></i> 削除
                                         </button>
                                     </td>
@@ -1116,18 +1119,22 @@ function initializeUserTableSort() {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('📋 管理者ページ初期化開始');
-    
-    // 他の既存初期化関数があれば維持
-    // 例: initializeOtherFeatures();
-    
-    // ユーザーテーブルの機能を初期化
-    initializeUserTable();
-    
-    // フィルタリング機能を初期化
-    initializeUserFiltering();
-    
-    console.log('✅ 管理者ページ初期化完了');
+    // 削除ボタンのイベント委譲
+    document.addEventListener('click', function(event) {
+        if (event.target.closest('.delete-user-btn')) {
+            event.preventDefault();
+            
+            const button = event.target.closest('.delete-user-btn');
+            const userId = button.getAttribute('data-user-id');
+            const username = button.getAttribute('data-username');
+            
+            if (userId && username) {
+                deleteUserSafe(button);
+            } else {
+                alert('❌ ユーザー情報の取得に失敗しました。');
+            }
+        }
+    });
 });
 
 function initializeUserTable() {
