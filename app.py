@@ -5563,8 +5563,6 @@ def admin_force_create_user_stats():
 # ====================================================================
 # 管理者ページ
 # ====================================================================
-# app.py の admin_page ルートを以下に置き換えてください
-
 @app.route('/admin')
 def admin_page():
     try:
@@ -6748,7 +6746,51 @@ def api_check_special_status(chapter_num):
 # ====================================================================
 # デバッグ・管理機能
 # ====================================================================
-# app.py に追加するデバッグ用関数
+@app.route('/debug/essay_progress_stats/<int:user_id>')
+def debug_essay_progress_stats_fixed(user_id):
+    """修正版の論述問題進捗統計デバッグ"""
+    if not session.get('admin_logged_in'):
+        return "管理者権限が必要です", 403
+    
+    try:
+        user = User.query.get(user_id)
+        if not user:
+            return "ユーザーが見つかりません", 404
+        
+        # 修正版の統計関数を使用
+        chapter_stats = get_essay_chapter_stats_with_visibility(user_id, user.room_number)
+        
+        # 詳細な進捗データも取得
+        all_progress = EssayProgress.query.filter_by(user_id=user_id).all()
+        
+        debug_info = {
+            'user_info': {
+                'id': user.id,
+                'username': user.username,
+                'room_number': user.room_number
+            },
+            'progress_summary': {
+                'total_progress_entries': len(all_progress),
+                'viewed_count': sum(1 for p in all_progress if p.viewed_answer),
+                'understood_count': sum(1 for p in all_progress if p.understood)
+            },
+            'chapter_stats_fixed': chapter_stats,
+            'raw_progress_data': [
+                {
+                    'problem_id': p.problem_id,
+                    'viewed_answer': p.viewed_answer,
+                    'understood': p.understood,
+                    'viewed_at': p.viewed_at.isoformat() if p.viewed_at else None,
+                    'understood_at': p.understood_at.isoformat() if p.understood_at else None
+                }
+                for p in all_progress
+            ]
+        }
+        
+        return f"<pre>{json.dumps(debug_info, indent=2, ensure_ascii=False)}</pre>"
+        
+    except Exception as e:
+        return f"エラー: {str(e)}", 500
 
 @app.route('/debug/essay_progress/<int:user_id>')
 def debug_essay_progress(user_id):
@@ -7865,63 +7907,83 @@ def get_filtered_essay_problems_with_visibility(chapter, room_number, type_filte
         return []
 
 def get_essay_chapter_stats_with_visibility(user_id, room_number):
-    """公開設定を考慮した章別統計情報を取得"""
+    """公開設定を考慮した章別統計情報を取得（進捗データ修正版）"""
     try:
-        # 章別の問題数を集計
-        stats_query = db.session.query(
+        # 1. 公開設定を考慮したすべての問題を取得
+        all_problems_query = db.session.query(
             EssayProblem.chapter,
             EssayProblem.type,
-            func.count(EssayProblem.id).label('total_problems')
+            EssayProblem.id
         ).filter(
             EssayProblem.enabled == True
-        ).group_by(
-            EssayProblem.chapter,
-            EssayProblem.type
         ).all()
         
-        # 章別に統計をまとめ、公開設定を適用
-        chapter_stats = {}
+        # 公開設定でフィルタリング
+        visible_problems = []
+        for problem in all_problems_query:
+            if is_essay_problem_visible(room_number, problem.chapter, problem.type):
+                visible_problems.append(problem)
         
-        for chapter, problem_type, total_problems in stats_query:
-            # 公開設定をチェック
-            if not is_essay_problem_visible(room_number, chapter, problem_type):
-                continue  # 非公開の場合はスキップ
+        # 2. 章別に問題をグループ化
+        chapter_problems = {}
+        for problem in visible_problems:
+            if problem.chapter not in chapter_problems:
+                chapter_problems[problem.chapter] = []
+            chapter_problems[problem.chapter].append(problem.id)
+        
+        # 3. 各章の進捗データを取得
+        chapter_stats = {}
+        for chapter, problem_ids in chapter_problems.items():
+            # 該当章の進捗データを取得
+            progress_query = db.session.query(
+                func.count(EssayProgress.id).label('total_progress'),
+                func.sum(
+                    db.case(
+                        (EssayProgress.viewed_answer == True, 1),
+                        else_=0
+                    )
+                ).label('viewed_count'),
+                func.sum(
+                    db.case(
+                        (EssayProgress.understood == True, 1),
+                        else_=0
+                    )
+                ).label('understood_count')
+            ).filter(
+                EssayProgress.user_id == user_id,
+                EssayProgress.problem_id.in_(problem_ids)
+            ).first()
             
-            if chapter not in chapter_stats:
-                chapter_stats[chapter] = {
-                    'chapter_name': '総合問題' if chapter == 'com' else f'第{chapter}章',
-                    'total_problems': 0,
-                    'viewed_problems': 0,
-                    'understood_problems': 0,
-                    'types': {}
-                }
+            total_problems = len(problem_ids)
+            viewed_problems = int(progress_query.viewed_count or 0)
+            understood_problems = int(progress_query.understood_count or 0)
             
-            # 章全体の統計を更新
-            chapter_stats[chapter]['total_problems'] += total_problems or 0
-            
-            # タイプ別統計
-            chapter_stats[chapter]['types'][problem_type] = {
-                'total_problems': total_problems or 0,
-                'viewed_problems': 0,
-                'understood_problems': 0
+            chapter_stats[chapter] = {
+                'chapter_name': '総合問題' if chapter == 'com' else f'第{chapter}章',
+                'total_problems': total_problems,
+                'viewed_problems': viewed_problems,
+                'understood_problems': understood_problems,
+                'progress_rate': round((understood_problems / total_problems * 100) if total_problems > 0 else 0, 1)
             }
         
-        # 章をソート
+        # 4. ソートして返す
         sorted_chapters = []
         for chapter_key in sorted(chapter_stats.keys(), key=lambda x: (x != 'com', x)):
             chapter_data = chapter_stats[chapter_key]
             chapter_data['chapter'] = chapter_key
-            
-            # 進捗率を計算（現在は0%）
-            chapter_data['progress_rate'] = 0
-            chapter_data['mastery_rate'] = 0
-            
             sorted_chapters.append(chapter_data)
+        
+        print(f"📊 章別統計（修正版）: {len(sorted_chapters)}章")
+        for chapter_data in sorted_chapters:
+            print(f"  {chapter_data['chapter_name']}: 総数={chapter_data['total_problems']}, "
+                  f"閲覧={chapter_data['viewed_problems']}, 理解={chapter_data['understood_problems']}")
         
         return sorted_chapters
         
     except Exception as e:
-        print(f"Error getting essay chapter stats with visibility: {e}")
+        print(f"Error getting essay chapter stats with visibility (fixed): {e}")
+        import traceback
+        traceback.print_exc()
         return []
 
 # ========================================
