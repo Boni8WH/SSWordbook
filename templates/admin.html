@@ -2810,18 +2810,25 @@ function getVisibilitySetting(chapter, type) {
 }
 
 function updateCellAppearance(cell, isVisible) {
+    // 既存のクラスを削除
     cell.classList.remove('visible', 'hidden');
+    
+    // 新しい状態のクラスを追加
     cell.classList.add(isVisible ? 'visible' : 'hidden');
     
     const iconClass = isVisible ? 'fas fa-eye' : 'fas fa-eye-slash';
     const statusText = isVisible ? '公開' : '非公開';
     
+    // セルの内容を更新
     cell.innerHTML = `
         <div class="status-icon">
             <i class="${iconClass}"></i>
         </div>
         <div class="status-text">${statusText}</div>
     `;
+    
+    // デバッグ用ログ
+    console.log(`🎨 セル更新: ${cell.dataset.chapter}章${cell.dataset.type}問題 → ${isVisible ? '公開' : '非公開'}`);
 }
 
 function toggleIndividualVisibility(chapter, type, cell) {
@@ -2850,6 +2857,8 @@ function toggleIndividualVisibility(chapter, type, cell) {
     
     // 変更をユーザーに通知
     showVisibilityStatus('info', `第${chapter}章 タイプ${type}問題を${newState ? '公開' : '非公開'}に変更しました`);
+    
+    console.log('🔧 更新後の設定:', currentVisibilitySettings);
 }
 
 function setAllVisible(isVisible) {
@@ -2918,7 +2927,19 @@ function updateSettingsSummary() {
 
 function saveVisibilitySettings() {
     const roomNumber = document.getElementById('visibilityRoomSelect').value;
-    if (!roomNumber) return;
+    if (!roomNumber) {
+        alert('部屋を選択してください');
+        return;
+    }
+    
+    console.log('💾 保存開始:', roomNumber);
+    console.log('📊 現在の設定:', currentVisibilitySettings);
+    
+    // 保存ボタンを無効化して連続クリックを防止
+    const saveBtn = document.getElementById('saveVisibilitySettings');
+    const originalText = saveBtn.innerHTML;
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 保存中...';
     
     showVisibilityStatus('info', '設定を保存中...');
     
@@ -2932,17 +2953,29 @@ function saveVisibilitySettings() {
             settings: currentVisibilitySettings
         })
     })
-    .then(response => response.json())
+    .then(response => {
+        console.log('📡 レスポンス受信:', response.status, response.statusText);
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        return response.json();
+    })
     .then(data => {
+        console.log('✅ 保存レスポンス:', data);
         if (data.status === 'success') {
-            showVisibilityStatus('success', `部屋 ${roomNumber} の設定を保存しました`);
+            showVisibilityStatus('success', `${data.message}`);
         } else {
-            showVisibilityStatus('error', data.message);
+            showVisibilityStatus('error', data.message || '保存に失敗しました');
         }
     })
     .catch(error => {
-        console.error('設定保存エラー:', error);
-        showVisibilityStatus('error', '設定の保存に失敗しました');
+        console.error('❌ 保存エラー:', error);
+        showVisibilityStatus('error', `保存に失敗しました: ${error.message}`);
+    })
+    .finally(() => {
+        // ボタンを元に戻す
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = originalText;
     });
 }
 
@@ -2957,6 +2990,11 @@ function resetVisibilitySettings() {
 
 function showVisibilityStatus(type, message) {
     const statusDiv = document.getElementById('visibilityStatus');
+    if (!statusDiv) {
+        console.error('❌ visibilityStatus要素が見つかりません');
+        return;
+    }
+    
     const iconClass = {
         'success': 'fas fa-check-circle',
         'error': 'fas fa-exclamation-circle',
@@ -2978,6 +3016,9 @@ function showVisibilityStatus(type, message) {
         </div>
     `;
     
+    // コンソールにも出力
+    console.log(`📢 ステータス [${type.toUpperCase()}]: ${message}`);
+    
     // 5秒後に自動で非表示
     setTimeout(() => {
         const alert = statusDiv.querySelector('.alert');
@@ -2991,6 +3032,69 @@ function showVisibilityStatus(type, message) {
         }
     }, 5000);
 }
+
+// デバッグ用ヘルパー関数
+function debugVisibilitySettings() {
+    console.log('🔍 === 論述問題公開設定デバッグ情報 ===');
+    console.log('📋 currentVisibilitySettings:', currentVisibilitySettings);
+    console.log('📊 availableChapters:', availableChapters);
+    console.log('🎯 availableTypes:', availableTypes);
+    
+    // 各セルの状態をチェック
+    availableChapters.forEach(chapter => {
+        availableTypes.forEach(type => {
+            const cell = document.querySelector(`[data-chapter="${chapter}"][data-type="${type}"]`);
+            const setting = getVisibilitySetting(chapter, type);
+            console.log(`📱 第${chapter}章 タイプ${type}: 設定=${setting}, セル存在=${!!cell}`);
+            if (cell) {
+                console.log(`   → セルクラス: ${cell.className}`);
+                console.log(`   → セル内容: ${cell.innerHTML.replace(/\s+/g, ' ').trim()}`);
+            }
+        });
+    });
+    
+    console.log('🔚 === デバッグ情報終了 ===');
+}
+
+// テスト用の関数
+function testIndividualClick(chapter, type) {
+    console.log(`🧪 テスト: 第${chapter}章 タイプ${type}をクリック`);
+    const cell = document.querySelector(`[data-chapter="${chapter}"][data-type="${type}"]`);
+    if (cell) {
+        cell.click();
+    } else {
+        console.error(`❌ セルが見つかりません: 第${chapter}章 タイプ${type}`);
+    }
+}
+
+// 設定状況を表示する関数
+function showCurrentSettings() {
+    const roomNumber = document.getElementById('visibilityRoomSelect').value;
+    if (!roomNumber) {
+        console.log('⚠️ 部屋が選択されていません');
+        return;
+    }
+    
+    console.log(`📊 部屋 ${roomNumber} の現在の設定:`);
+    console.table(currentVisibilitySettings);
+}
+
+// コンソールからデバッグ関数を呼び出せるようにグローバルに設定
+window.debugVisibilitySettings = debugVisibilitySettings;
+window.testIndividualClick = testIndividualClick;
+window.showCurrentSettings = showCurrentSettings;
+
+// ページ読み込み後に自動デバッグ情報出力（開発時のみ）
+document.addEventListener('DOMContentLoaded', function() {
+    // デバッグモードの場合のみ（本番では削除推奨）
+    if (window.location.hostname === 'localhost' || window.location.hostname.includes('127.0.0.1')) {
+        console.log('🔧 デバッグモードが有効です');
+        console.log('📝 使用可能なデバッグコマンド:');
+        console.log('   debugVisibilitySettings() - 設定状況を表示');
+        console.log('   testIndividualClick(章, タイプ) - 個別クリックをテスト');
+        console.log('   showCurrentSettings() - 現在の設定を表示');
+    }
+});
 </script>
 
 <style>
@@ -4317,6 +4421,8 @@ function showVisibilityStatus(type, message) {
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     border-radius: 8px;
     overflow: hidden;
+    width: 100%;
+    table-layout: fixed; /* ★重要：テーブルレイアウト固定 */
 }
 
 .visibility-table th {
@@ -4325,6 +4431,15 @@ function showVisibilityStatus(type, message) {
     font-weight: 600;
     text-align: center;
     vertical-align: middle;
+    padding: 12px 8px;
+}
+
+.visibility-table th:first-child {
+    width: 120px; /* 章名セルの幅固定 */
+}
+
+.visibility-table th:not(:first-child) {
+    width: calc((100% - 120px) / 4); /* 残りを4等分 */
 }
 
 .visibility-cell {
@@ -4333,24 +4448,28 @@ function showVisibilityStatus(type, message) {
     transition: all 0.3s ease;
     text-align: center;
     vertical-align: middle;
-    padding: 15px;
+    padding: 15px 8px;
     min-height: 60px;
+    width: auto; /* ★重要：幅を自動調整 */
+    display: table-cell; /* ★重要：テーブルセル表示 */
+    border: 2px solid transparent;
 }
 
 .visibility-cell:hover {
-    transform: scale(1.05);
+    transform: scale(1.02);
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    z-index: 1;
 }
 
 .visibility-cell.visible {
     background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
-    border: 2px solid #28a745;
+    border-color: #28a745;
     color: #155724;
 }
 
 .visibility-cell.hidden {
     background: linear-gradient(135deg, #f8d7da 0%, #f1b0b7 100%);
-    border: 2px solid #dc3545;
+    border-color: #dc3545;
     color: #721c24;
 }
 
@@ -4358,11 +4477,14 @@ function showVisibilityStatus(type, message) {
     font-size: 1.5em;
     display: block;
     margin-bottom: 5px;
+    line-height: 1; /* ★重要：行高さ固定 */
 }
 
 .visibility-cell .status-text {
     font-weight: 600;
     font-size: 0.9em;
+    line-height: 1; /* ★重要：行高さ固定 */
+    white-space: nowrap; /* ★重要：テキスト改行防止 */
 }
 
 .chapter-name {
@@ -4371,6 +4493,9 @@ function showVisibilityStatus(type, message) {
     background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%);
     text-align: center;
     vertical-align: middle;
+    padding: 15px 8px;
+    width: 120px; /* ★重要：幅固定 */
+    white-space: nowrap; /* ★重要：テキスト改行防止 */
 }
 
 .bulk-operations {
@@ -4378,6 +4503,7 @@ function showVisibilityStatus(type, message) {
     padding: 15px;
     border-radius: 8px;
     border: 1px solid #dee2e6;
+    margin-bottom: 15px;
 }
 
 .settings-summary .card {
@@ -4391,6 +4517,18 @@ function showVisibilityStatus(type, message) {
     border-radius: 8px;
     border: 1px solid #dee2e6;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    margin-bottom: 20px;
+}
+
+/* アニメーション効果 */
+@keyframes settingChanged {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3); }
+    100% { transform: scale(1); }
+}
+
+.visibility-cell.changed {
+    animation: settingChanged 0.5s ease;
 }
 
 /* レスポンシブ対応 */
@@ -4400,8 +4538,21 @@ function showVisibilityStatus(type, message) {
     }
     
     .visibility-cell {
-        padding: 10px;
+        padding: 10px 4px;
         min-height: 50px;
+    }
+    
+    .visibility-cell .status-icon {
+        font-size: 1.2em;
+    }
+    
+    .visibility-cell .status-text {
+        font-size: 0.8em;
+    }
+    
+    .chapter-name {
+        padding: 10px 4px;
+        font-size: 0.9em;
     }
     
     .bulk-operations .btn-group {
@@ -4415,15 +4566,36 @@ function showVisibilityStatus(type, message) {
     }
 }
 
-/* アニメーション */
-@keyframes settingChanged {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.1); }
-    100% { transform: scale(1); }
+/* ダークモード対応の維持 */
+@media (prefers-color-scheme: dark) {
+    .visibility-matrix {
+        background: linear-gradient(135deg, #4a5568 0%, #2d3748 100%);
+    }
+    
+    .visibility-cell.visible {
+        background: linear-gradient(135deg, #2d5a34 0%, #1e3a20 100%);
+        color: #c6f6d5;
+    }
+    
+    .visibility-cell.hidden {
+        background: linear-gradient(135deg, #742a2a 0%, #4a1818 100%);
+        color: #fed7d7;
+    }
 }
 
-.visibility-cell.changed {
-    animation: settingChanged 0.5s ease;
+/* デバッグ用（開発時のみ使用） */
+.debug-info {
+    position: fixed;
+    bottom: 10px;
+    right: 10px;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 10px;
+    border-radius: 5px;
+    font-size: 12px;
+    max-width: 300px;
+    z-index: 9999;
+    display: none; /* 本番では非表示 */
 }
 </style>
 {% endblock %}
