@@ -12,13 +12,12 @@ from io import StringIO
 from datetime import datetime, timedelta
 from sqlalchemy import inspect, text, func, case, cast, Integer
 import glob
-
-# 既存のmodelsからのインポート文を見つけて、EssayVisibilitySettingを追加
-from models import User, AdminUser, RoomSetting, EssayVisibilitySetting
+from flask import Response 
+from models import User, AdminUser, RoomSetting, EssayVisibilitySetting, EssayProblemImage 
 
 # 外部ライブラリ
 import pytz
-from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, Response
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, Response, abort
 from flask_sqlalchemy import SQLAlchemy
 from flask_mail import Mail, Message
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -7746,8 +7745,14 @@ def get_filtered_essay_problems_with_visibility(chapter, room_number, type_filte
         return []
 
 def get_essay_chapter_stats_with_visibility(user_id, room_number):
-    """公開設定を考慮した章別統計情報を取得"""
+    """公開設定を考慮した章別統計情報を取得（修正版）"""
     try:
+        # EssayProgressテーブルの存在確認
+        inspector = inspect(db.engine)
+        has_progress_table = inspector.has_table('essay_progress')
+        
+        print(f"📊 EssayProgressテーブル存在: {has_progress_table}")
+        
         # 章別の問題数を集計
         stats_query = db.session.query(
             EssayProblem.chapter,
@@ -7787,27 +7792,186 @@ def get_essay_chapter_stats_with_visibility(user_id, room_number):
                 'understood_problems': 0
             }
         
+        # 進捗情報を取得（EssayProgressテーブルが存在する場合のみ）
+        if has_progress_table and user_id:
+            try:
+                # 各章・タイプごとの進捗を取得
+                for chapter in chapter_stats.keys():
+                    for problem_type in chapter_stats[chapter]['types'].keys():
+                        # 該当する問題のIDを取得
+                        problem_ids = db.session.query(EssayProblem.id).filter(
+                            EssayProblem.chapter == chapter,
+                            EssayProblem.type == problem_type,
+                            EssayProblem.enabled == True
+                        ).all()
+                        
+                        problem_id_list = [p.id for p in problem_ids]
+                        
+                        if problem_id_list:
+                            # 進捗情報を集計
+                            progress_stats = db.session.query(
+                                func.count(EssayProgress.id).label('viewed_count'),
+                                func.sum(
+                                    db.case(
+                                        (EssayProgress.understood == True, 1),
+                                        else_=0
+                                    )
+                                ).label('understood_count')
+                            ).filter(
+                                EssayProgress.user_id == user_id,
+                                EssayProgress.problem_id.in_(problem_id_list),
+                                EssayProgress.viewed_answer == True
+                            ).first()
+                            
+                            # タイプ別統計を更新
+                            chapter_stats[chapter]['types'][problem_type]['viewed_problems'] = progress_stats.viewed_count or 0
+                            chapter_stats[chapter]['types'][problem_type]['understood_problems'] = progress_stats.understood_count or 0
+                            
+                            # 章全体の統計を更新
+                            chapter_stats[chapter]['viewed_problems'] += progress_stats.viewed_count or 0
+                            chapter_stats[chapter]['understood_problems'] += progress_stats.understood_count or 0
+                
+                print(f"📊 進捗情報取得完了 - ユーザーID: {user_id}")
+                
+            except Exception as progress_error:
+                print(f"⚠️ 進捗情報取得エラー: {progress_error}")
+                # エラーが発生した場合は進捗を0のまま継続
+        
         # 章をソート
         sorted_chapters = []
         for chapter_key in sorted(chapter_stats.keys(), key=lambda x: (x != 'com', x)):
             chapter_data = chapter_stats[chapter_key]
             chapter_data['chapter'] = chapter_key
             
-            # 進捗率を計算（現在は0%）
-            chapter_data['progress_rate'] = 0
-            chapter_data['mastery_rate'] = 0
+            # 進捗率を計算
+            total = chapter_data['total_problems']
+            understood = chapter_data['understood_problems']
+            chapter_data['progress_rate'] = round((understood / total * 100) if total > 0 else 0, 1)
+            
+            print(f"📊 第{chapter_key}章: 総数{total}, 閲覧済み{chapter_data['viewed_problems']}, 理解済み{understood}, 進捗率{chapter_data['progress_rate']}%")
             
             sorted_chapters.append(chapter_data)
         
         return sorted_chapters
         
     except Exception as e:
-        print(f"Error getting essay chapter stats with visibility: {e}")
+        print(f"❌ Error getting essay chapter stats with visibility: {e}")
+        import traceback
+        traceback.print_exc()
         return []
 
 # ========================================
 # 論述問題公開設定 API エンドポイント
 # ========================================
+@app.route('/essay_image/<int:problem_id>')
+def essay_image(problem_id):
+    """データベースから画像を取得して表示"""
+    try:
+        image = EssayProblemImage.query.filter_by(problem_id=problem_id).first()
+        
+        if not image:
+            print(f"画像が見つかりません: problem_id={problem_id}")
+            abort(404)
+        
+        print(f"画像を表示: problem_id={problem_id}, filename={image.image_filename}")
+        
+        return Response(
+            image.image_data,
+            mimetype=image.image_content_type,
+            headers={
+                'Content-Disposition': f'inline; filename="{image.image_filename}"',
+                'Cache-Control': 'public, max-age=3600'  # 1時間キャッシュ
+            }
+        )
+    except Exception as e:
+        print(f"画像表示エラー: {e}")
+        abort(500)
+
+@app.route('/admin/add_essay_problem', methods=['POST'])
+def admin_add_essay_problem():
+    """論述問題を追加（画像DB保存対応版）"""
+    try:
+        if not session.get('admin_logged_in'):
+            return jsonify({'status': 'error', 'message': '管理者権限が必要です'}), 403
+
+        # フォームデータを取得
+        chapter = request.form.get('chapter')
+        type_letter = request.form.get('type')
+        university = request.form.get('university')
+        year = request.form.get('year')
+        question = request.form.get('question')
+        answer = request.form.get('answer')
+        answer_length = request.form.get('answer_length')
+        enabled = request.form.get('enabled') == 'true'
+
+        # バリデーション
+        if not all([chapter, type_letter, university, year, question, answer, answer_length]):
+            return jsonify({'status': 'error', 'message': '必須項目が入力されていません'}), 400
+
+        try:
+            year = int(year)
+            answer_length = int(answer_length)
+        except ValueError:
+            return jsonify({'status': 'error', 'message': '年度と文字数は数値で入力してください'}), 400
+
+        # 問題を作成
+        problem = EssayProblem(
+            chapter=chapter,
+            type=type_letter,
+            university=university,
+            year=year,
+            question=question,
+            answer=answer,
+            answer_length=answer_length,
+            enabled=enabled
+        )
+
+        db.session.add(problem)
+        db.session.flush()  # IDを取得するためフラッシュ
+
+        # 画像があるかチェックして保存
+        has_image = False
+        if 'essay_image' in request.files:
+            image_file = request.files['essay_image']
+            if image_file and image_file.filename:
+                try:
+                    # 画像データを読み込み
+                    image_data = image_file.read()
+                    if len(image_data) > 0:
+                        # 安全なファイル名を生成
+                        from werkzeug.utils import secure_filename
+                        filename = secure_filename(image_file.filename)
+                        
+                        # 画像を保存
+                        problem_image = EssayProblemImage(
+                            problem_id=problem.id,
+                            image_data=image_data,
+                            image_filename=filename,
+                            image_content_type=image_file.content_type or 'image/jpeg'
+                        )
+                        
+                        db.session.add(problem_image)
+                        has_image = True
+                        print(f"画像を保存: problem_id={problem.id}, filename={filename}, size={len(image_data)} bytes")
+                    
+                except Exception as img_error:
+                    print(f"画像保存エラー: {img_error}")
+                    # 画像エラーがあっても問題は保存する
+
+        db.session.commit()
+
+        return jsonify({
+            'status': 'success',
+            'message': f'論述問題を追加しました（ID: {problem.id}）',
+            'has_image': has_image,
+            'problem_id': problem.id
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"論述問題追加エラー: {e}")
+        return jsonify({'status': 'error', 'message': f'追加に失敗しました: {str(e)}'}), 500
+
 @app.route('/debug/essay_images')
 def debug_essay_images():
     """論述問題の画像状況をデバッグ"""
@@ -9316,43 +9480,19 @@ def get_adjacent_problems(problem):
         return None, None
 
 def has_essay_problem_image(problem_id):
-    """論述問題に画像が存在するかチェック"""
-    upload_dir = os.path.join('static', 'uploads', 'essay_images')
-    pattern = os.path.join(upload_dir, f"essay_problem_{problem_id}.*")
-    return len(glob.glob(pattern)) > 0
+    """論述問題に画像があるかチェック（DB版）"""
+    try:
+        image = EssayProblemImage.query.filter_by(problem_id=problem_id).first()
+        return image is not None
+    except Exception as e:
+        print(f"画像存在チェックエラー: {e}")
+        return False
 
 def get_essay_problem_image_path(problem_id):
-    """論述問題の画像パスを取得（修正版）"""
-    import glob
-    import os
-    
-    upload_dir = os.path.join('static', 'uploads', 'essay_images')
-    pattern = os.path.join(upload_dir, f"essay_problem_{problem_id}.*")
-    matches = glob.glob(pattern)
-    
-    if matches:
-        # staticディレクトリからの相対パスを正しく生成
-        abs_path = os.path.abspath(matches[0])
-        static_abs = os.path.abspath('static')
-        
-        # static以下の相対パスを取得
-        try:
-            relative_path = os.path.relpath(abs_path, static_abs)
-            # Windowsのバックスラッシュをスラッシュに変換
-            relative_path = relative_path.replace('\\', '/')
-            
-            # デバッグ用ログ出力
-            print(f"画像パス生成 - 問題ID: {problem_id}")
-            print(f"  絶対パス: {abs_path}")
-            print(f"  相対パス: {relative_path}")
-            print(f"  ファイル存在確認: {os.path.exists(abs_path)}")
-            
-            return relative_path
-        except ValueError as e:
-            print(f"パス変換エラー - 問題ID {problem_id}: {e}")
-            return None
-    
-    print(f"画像ファイルが見つかりません - 問題ID: {problem_id}, パターン: {pattern}")
+    """論述問題の画像パスを取得（DB版では不要だが互換性のため）"""
+    # データベース版では直接URLを生成
+    if has_essay_problem_image(problem_id):
+        return f"essay_image/{problem_id}"
     return None
 
 # テンプレート関数として登録
@@ -9366,10 +9506,200 @@ def has_essay_image(problem_id):
     """テンプレートから画像存在チェック"""
     return has_essay_problem_image(problem_id)
 
+# app.py に追加する手動テーブル作成機能
+
+@app.route('/admin/setup_image_table')
+def setup_image_table():
+    """画像テーブルを手動でセットアップ"""
+    if not session.get('admin_logged_in'):
+        return "管理者権限が必要です", 403
+    
+    try:
+        from models import EssayProblemImage
+        from sqlalchemy import inspect
+        
+        # テーブル存在確認
+        inspector = inspect(db.engine)
+        
+        if inspector.has_table('essay_problem_images'):
+            return """
+            <h2>✅ 画像テーブル確認</h2>
+            <p>essay_problem_images テーブルは既に存在します。</p>
+            <p><strong>次のステップ:</strong></p>
+            <ul>
+                <li><a href="/admin/migrate_images_to_db">既存画像をデータベースに移行</a></li>
+                <li><a href="/admin">管理者ページに戻る</a></li>
+            </ul>
+            """
+        
+        # テーブルを手動で作成
+        try:
+            # SQLAlchemyのcreate_allを使用
+            EssayProblemImage.__table__.create(db.engine)
+            
+            # 作成確認
+            if inspector.has_table('essay_problem_images'):
+                success_msg = "✅ essay_problem_images テーブルを作成しました！"
+            else:
+                # 直接SQLで作成を試行
+                with db.engine.connect() as conn:
+                    conn.execute(text("""
+                        CREATE TABLE essay_problem_images (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            problem_id INTEGER NOT NULL UNIQUE,
+                            image_data BLOB NOT NULL,
+                            image_filename VARCHAR(255) NOT NULL,
+                            image_content_type VARCHAR(100) NOT NULL,
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        )
+                    """))
+                    conn.commit()
+                success_msg = "✅ essay_problem_images テーブルを直接SQLで作成しました！"
+            
+            return f"""
+            <h2>{success_msg}</h2>
+            <p>これで画像をデータベースに保存できるようになりました。</p>
+            <p><strong>次のステップ:</strong></p>
+            <ul>
+                <li><a href="/admin/migrate_images_to_db">既存画像をデータベースに移行</a></li>
+                <li>新しい論述問題で画像アップロードをテスト</li>
+                <li><a href="/admin">管理者ページに戻る</a></li>
+            </ul>
+            
+            <h3>📊 テーブル詳細</h3>
+            <p>作成されたテーブル構造:</p>
+            <pre>
+            - id: 主キー
+            - problem_id: 論述問題ID（一意）
+            - image_data: 画像バイナリデータ
+            - image_filename: 元のファイル名
+            - image_content_type: MIME type
+            - created_at: 作成日時
+            </pre>
+            """
+            
+        except Exception as create_error:
+            return f"""
+            <h2>❌ テーブル作成エラー</h2>
+            <p>エラー詳細: {str(create_error)}</p>
+            <p><a href="/admin">管理者ページに戻る</a></p>
+            """
+            
+    except ImportError as import_error:
+        return f"""
+        <h2>❌ インポートエラー</h2>
+        <p>models.pyのEssayProblemImageクラスが見つかりません。</p>
+        <p>エラー詳細: {str(import_error)}</p>
+        <p>まず models.py に EssayProblemImage クラスを追加してください。</p>
+        <p><a href="/admin">管理者ページに戻る</a></p>
+        """
+        
+    except Exception as e:
+        return f"""
+        <h2>❌ 一般エラー</h2>
+        <p>エラー詳細: {str(e)}</p>
+        <p><a href="/admin">管理者ページに戻る</a></p>
+        """
 # ====================================================================
 # エラーハンドラー
 # ====================================================================
-# app.pyに一時的に追加するデバッグ用エンドポイント
+# app.pyに以下のデバッグ用ルートを追加してください
+
+@app.route('/debug/tables')
+def debug_tables():
+    """デバッグ: テーブル存在確認"""
+    if not session.get('admin_logged_in'):
+        return "管理者権限が必要です", 403
+    
+    try:
+        from sqlalchemy import inspect, text
+        
+        # テーブル一覧を取得
+        inspector = inspect(db.engine)
+        all_tables = inspector.get_table_names()
+        
+        # essay_progressテーブルの存在確認
+        has_essay_progress = 'essay_progress' in all_tables
+        
+        # 直接SQLで確認
+        result = db.session.execute(text("SHOW TABLES LIKE 'essay_progress'")).fetchall()
+        sql_check = len(result) > 0
+        
+        # EssayProgressテーブルが存在する場合、レコード数もチェック
+        record_count = 0
+        sample_records = []
+        if has_essay_progress:
+            try:
+                record_count = db.session.execute(text("SELECT COUNT(*) FROM essay_progress")).scalar()
+                sample_records = db.session.execute(text("SELECT * FROM essay_progress LIMIT 5")).fetchall()
+            except Exception as e:
+                sample_records = [f"エラー: {e}"]
+        
+        debug_info = f"""
+        <h2>テーブル存在確認</h2>
+        <p><strong>全テーブル数:</strong> {len(all_tables)}</p>
+        <p><strong>essay_progressテーブル存在 (inspector):</strong> {has_essay_progress}</p>
+        <p><strong>essay_progressテーブル存在 (SQL):</strong> {sql_check}</p>
+        <p><strong>essay_progressレコード数:</strong> {record_count}</p>
+        
+        <h3>全テーブル一覧:</h3>
+        <ul>
+        """
+        
+        for table in sorted(all_tables):
+            debug_info += f"<li>{table}</li>"
+        
+        debug_info += "</ul>"
+        
+        if sample_records:
+            debug_info += "<h3>essay_progress サンプルレコード:</h3><pre>"
+            for record in sample_records:
+                debug_info += f"{record}\n"
+            debug_info += "</pre>"
+        
+        return debug_info
+        
+    except Exception as e:
+        return f"エラー: {e}"
+
+@app.route('/debug/create_essay_progress')
+def debug_create_essay_progress():
+    """デバッグ: essay_progressテーブルを作成"""
+    if not session.get('admin_logged_in'):
+        return "管理者権限が必要です", 403
+    
+    try:
+        from sqlalchemy import text
+        
+        # テーブル作成SQL
+        create_sql = """
+        CREATE TABLE IF NOT EXISTS essay_progress (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            problem_id INT NOT NULL,
+            viewed_answer BOOLEAN DEFAULT FALSE NOT NULL,
+            understood BOOLEAN DEFAULT FALSE NOT NULL,
+            difficulty_rating INT,
+            memo TEXT,
+            review_flag BOOLEAN DEFAULT FALSE NOT NULL,
+            viewed_at DATETIME,
+            understood_at DATETIME,
+            last_updated DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY unique_user_problem (user_id, problem_id),
+            FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE,
+            FOREIGN KEY (problem_id) REFERENCES essay_problems(id) ON DELETE CASCADE
+        )
+        """
+        
+        # テーブル作成実行
+        db.session.execute(text(create_sql))
+        db.session.commit()
+        
+        return "essay_progressテーブルを作成しました。<a href='/debug/tables'>テーブル確認</a>"
+        
+    except Exception as e:
+        db.session.rollback()
+        return f"テーブル作成エラー: {e}"
 
 @app.route('/debug/image_upload', methods=['GET', 'POST'])
 def debug_image_upload():
