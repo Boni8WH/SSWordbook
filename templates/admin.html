@@ -2671,7 +2671,7 @@ function addEssayProblem() {
     });
 }
 
-// 論述問題公開設定管理のJavaScript
+// 論述問題公開設定管理のJavaScript（改善版）
 
 let currentVisibilitySettings = {};
 let availableChapters = [];
@@ -2786,9 +2786,10 @@ function createVisibilityMatrix() {
             const isVisible = getVisibilitySetting(chapter, type);
             updateCellAppearance(cell, isVisible);
             
-            // クリックイベント
-            cell.addEventListener('click', function() {
-                toggleVisibility(chapter, type, cell);
+            // ★重要：個別クリックイベント
+            cell.addEventListener('click', function(event) {
+                event.stopPropagation(); // イベントの伝播を停止
+                toggleIndividualVisibility(chapter, type, cell);
             });
             
             row.appendChild(cell);
@@ -2823,9 +2824,11 @@ function updateCellAppearance(cell, isVisible) {
     `;
 }
 
-function toggleVisibility(chapter, type, cell) {
+function toggleIndividualVisibility(chapter, type, cell) {
     const currentState = getVisibilitySetting(chapter, type);
-    const newState = !currentState;
+    const newState = !currentState; // トグル（反転）
+    
+    console.log(`🔄 個別切り替え: 第${chapter}章 タイプ${type} ${currentState ? '公開' : '非公開'} → ${newState ? '公開' : '非公開'}`);
     
     // 設定を更新
     if (!currentVisibilitySettings[chapter]) {
@@ -2844,6 +2847,9 @@ function toggleVisibility(chapter, type, cell) {
     
     // サマリーを更新
     updateSettingsSummary();
+    
+    // 変更をユーザーに通知
+    showVisibilityStatus('info', `第${chapter}章 タイプ${type}問題を${newState ? '公開' : '非公開'}に変更しました`);
 }
 
 function setAllVisible(isVisible) {
@@ -2865,6 +2871,7 @@ function setAllVisible(isVisible) {
     });
     
     updateSettingsSummary();
+    showVisibilityStatus('success', `全ての問題を${isVisible ? '公開' : '非公開'}に設定しました`);
 }
 
 function setTypeVisible(targetType, isVisible) {
@@ -2884,6 +2891,7 @@ function setTypeVisible(targetType, isVisible) {
     });
     
     updateSettingsSummary();
+    showVisibilityStatus('success', `全ての${targetType}問題を${isVisible ? '公開' : '非公開'}に設定しました`);
 }
 
 function updateSettingsSummary() {
