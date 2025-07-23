@@ -7380,6 +7380,33 @@ def essay_problem(problem_id):
             return redirect(url_for('logout'))
 
         problem = EssayProblem.query.get_or_404(problem_id)
+
+        # 現在のユーザーの進捗情報を取得
+        progress = EssayProgress.query.filter_by(
+            user_id=current_user.id,
+            problem_id=problem_id
+        ).first()
+        
+        # デフォルトの進捗情報を設定
+        default_progress = {
+            'viewed_answer': False,
+            'understood': False,
+            'difficulty_rating': None,
+            'memo': None,
+            'review_flag': False
+        }
+        
+        # 問題オブジェクトに進捗情報を追加
+        if progress:
+            problem.progress = {
+                'viewed_answer': progress.viewed_answer,
+                'understood': progress.understood,
+                'difficulty_rating': progress.difficulty_rating,
+                'memo': progress.memo,
+                'review_flag': progress.review_flag
+            }
+        else:
+            problem.progress = default_progress
         
         print(f"📊 個別問題表示 - ID: {problem_id}, 第{problem.chapter}章 タイプ{problem.type}, ユーザー: {current_user.username}, 部屋: {current_user.room_number}")
         
