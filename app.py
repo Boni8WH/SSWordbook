@@ -12,12 +12,13 @@ from io import StringIO
 from datetime import datetime, timedelta
 from sqlalchemy import inspect, text, func, case, cast, Integer
 import glob
-from flask import Response 
-from models import User, AdminUser, RoomSetting, EssayVisibilitySetting, EssayProblemImage 
+
+# 既存のmodelsからのインポート文を見つけて、EssayVisibilitySettingを追加
+from models import User, AdminUser, RoomSetting, EssayVisibilitySetting
 
 # 外部ライブラリ
 import pytz
-from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, Response, abort
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, Response
 from flask_sqlalchemy import SQLAlchemy
 from flask_mail import Mail, Message
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -7807,115 +7808,6 @@ def get_essay_chapter_stats_with_visibility(user_id, room_number):
 # ========================================
 # 論述問題公開設定 API エンドポイント
 # ========================================
-@app.route('/essay_image/<int:problem_id>')
-def essay_image(problem_id):
-    """データベースから画像を取得して表示"""
-    try:
-        image = EssayProblemImage.query.filter_by(problem_id=problem_id).first()
-        
-        if not image:
-            print(f"画像が見つかりません: problem_id={problem_id}")
-            abort(404)
-        
-        print(f"画像を表示: problem_id={problem_id}, filename={image.image_filename}")
-        
-        return Response(
-            image.image_data,
-            mimetype=image.image_content_type,
-            headers={
-                'Content-Disposition': f'inline; filename="{image.image_filename}"',
-                'Cache-Control': 'public, max-age=3600'  # 1時間キャッシュ
-            }
-        )
-    except Exception as e:
-        print(f"画像表示エラー: {e}")
-        abort(500)
-
-@app.route('/admin/add_essay_problem', methods=['POST'])
-def admin_add_essay_problem():
-    """論述問題を追加（画像DB保存対応版）"""
-    try:
-        if not session.get('admin_logged_in'):
-            return jsonify({'status': 'error', 'message': '管理者権限が必要です'}), 403
-
-        # フォームデータを取得
-        chapter = request.form.get('chapter')
-        type_letter = request.form.get('type')
-        university = request.form.get('university')
-        year = request.form.get('year')
-        question = request.form.get('question')
-        answer = request.form.get('answer')
-        answer_length = request.form.get('answer_length')
-        enabled = request.form.get('enabled') == 'true'
-
-        # バリデーション
-        if not all([chapter, type_letter, university, year, question, answer, answer_length]):
-            return jsonify({'status': 'error', 'message': '必須項目が入力されていません'}), 400
-
-        try:
-            year = int(year)
-            answer_length = int(answer_length)
-        except ValueError:
-            return jsonify({'status': 'error', 'message': '年度と文字数は数値で入力してください'}), 400
-
-        # 問題を作成
-        problem = EssayProblem(
-            chapter=chapter,
-            type=type_letter,
-            university=university,
-            year=year,
-            question=question,
-            answer=answer,
-            answer_length=answer_length,
-            enabled=enabled
-        )
-
-        db.session.add(problem)
-        db.session.flush()  # IDを取得するためフラッシュ
-
-        # 画像があるかチェックして保存
-        has_image = False
-        if 'essay_image' in request.files:
-            image_file = request.files['essay_image']
-            if image_file and image_file.filename:
-                try:
-                    # 画像データを読み込み
-                    image_data = image_file.read()
-                    if len(image_data) > 0:
-                        # 安全なファイル名を生成
-                        from werkzeug.utils import secure_filename
-                        filename = secure_filename(image_file.filename)
-                        
-                        # 画像を保存
-                        problem_image = EssayProblemImage(
-                            problem_id=problem.id,
-                            image_data=image_data,
-                            image_filename=filename,
-                            image_content_type=image_file.content_type or 'image/jpeg'
-                        )
-                        
-                        db.session.add(problem_image)
-                        has_image = True
-                        print(f"画像を保存: problem_id={problem.id}, filename={filename}, size={len(image_data)} bytes")
-                    
-                except Exception as img_error:
-                    print(f"画像保存エラー: {img_error}")
-                    # 画像エラーがあっても問題は保存する
-
-        db.session.commit()
-
-        return jsonify({
-            'status': 'success',
-            'message': f'論述問題を追加しました（ID: {problem.id}）',
-            'has_image': has_image,
-            'problem_id': problem.id
-        })
-
-    except Exception as e:
-        db.session.rollback()
-        print(f"論述問題追加エラー: {e}")
-        return jsonify({'status': 'error', 'message': f'追加に失敗しました: {str(e)}'}), 500
-
 @app.route('/debug/essay_images')
 def debug_essay_images():
     """論述問題の画像状況をデバッグ"""
@@ -9424,19 +9316,43 @@ def get_adjacent_problems(problem):
         return None, None
 
 def has_essay_problem_image(problem_id):
-    """論述問題に画像があるかチェック（DB版）"""
-    try:
-        image = EssayProblemImage.query.filter_by(problem_id=problem_id).first()
-        return image is not None
-    except Exception as e:
-        print(f"画像存在チェックエラー: {e}")
-        return False
+    """論述問題に画像が存在するかチェック"""
+    upload_dir = os.path.join('static', 'uploads', 'essay_images')
+    pattern = os.path.join(upload_dir, f"essay_problem_{problem_id}.*")
+    return len(glob.glob(pattern)) > 0
 
 def get_essay_problem_image_path(problem_id):
-    """論述問題の画像パスを取得（DB版では不要だが互換性のため）"""
-    # データベース版では直接URLを生成
-    if has_essay_problem_image(problem_id):
-        return f"essay_image/{problem_id}"
+    """論述問題の画像パスを取得（修正版）"""
+    import glob
+    import os
+    
+    upload_dir = os.path.join('static', 'uploads', 'essay_images')
+    pattern = os.path.join(upload_dir, f"essay_problem_{problem_id}.*")
+    matches = glob.glob(pattern)
+    
+    if matches:
+        # staticディレクトリからの相対パスを正しく生成
+        abs_path = os.path.abspath(matches[0])
+        static_abs = os.path.abspath('static')
+        
+        # static以下の相対パスを取得
+        try:
+            relative_path = os.path.relpath(abs_path, static_abs)
+            # Windowsのバックスラッシュをスラッシュに変換
+            relative_path = relative_path.replace('\\', '/')
+            
+            # デバッグ用ログ出力
+            print(f"画像パス生成 - 問題ID: {problem_id}")
+            print(f"  絶対パス: {abs_path}")
+            print(f"  相対パス: {relative_path}")
+            print(f"  ファイル存在確認: {os.path.exists(abs_path)}")
+            
+            return relative_path
+        except ValueError as e:
+            print(f"パス変換エラー - 問題ID {problem_id}: {e}")
+            return None
+    
+    print(f"画像ファイルが見つかりません - 問題ID: {problem_id}, パターン: {pattern}")
     return None
 
 # テンプレート関数として登録
