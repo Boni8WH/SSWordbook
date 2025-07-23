@@ -436,29 +436,46 @@
     <!-- ナビゲーション -->
     <div class="problem-navigation">
         {% if prev_problem %}
-            <a href="{{ url_for('essay_problem', problem_id=prev_problem.id) }}" class="nav-button">
+            <a href="{{ url_for('essay_problem', problem_id=prev_problem.id) }}" class="nav-button" style="pointer-events: auto !important;">
                 <i class="fas fa-chevron-left"></i>
                 前の問題
             </a>
         {% else %}
-            <span class="nav-button disabled">
+            <span class="nav-button disabled" style="pointer-events: none !important;">
                 <i class="fas fa-chevron-left"></i>
                 前の問題
             </span>
         {% endif %}
 
-        <a href="{{ url_for('essay_chapter', chapter=problem.chapter) if problem.chapter else url_for('essay_index') }}" class="nav-button back-to-chapter">
+        <!-- 修正: JavaScriptフォールバック付きの章一覧ボタン -->
+        {% set chapter_url = url_for('essay_chapter', chapter=problem.chapter) if problem.chapter else url_for('essay_index') %}
+        <a href="{{ chapter_url }}" 
+        class="nav-button back-to-chapter" 
+        style="pointer-events: auto !important; cursor: pointer !important; border: 2px solid red !important;"
+        onclick="console.log('クリックされました:', this.href); return true;"
+        onmouseover="console.log('マウスオーバー:', this.href);"
+        data-chapter="{{ problem.chapter }}"
+        data-url="{{ chapter_url }}">
             <i class="fas fa-list"></i>
             {% if problem.chapter == 'com' %}総合問題一覧に戻る{% else %}第{{ problem.chapter }}章一覧に戻る{% endif %}
         </a>
 
+        <!-- さらにフォールバック用のボタンも追加 -->
+        <button type="button" 
+                class="nav-button back-to-chapter-fallback" 
+                style="margin-left: 10px; background: orange; color: white; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer;"
+                onclick="window.location.href='{{ chapter_url }}'; console.log('フォールバックボタン実行:', '{{ chapter_url }}');">
+            <i class="fas fa-list"></i>
+            テスト用戻るボタン
+        </button>
+
         {% if next_problem %}
-            <a href="{{ url_for('essay_problem', problem_id=next_problem.id) }}" class="nav-button">
+            <a href="{{ url_for('essay_problem', problem_id=next_problem.id) }}" class="nav-button" style="pointer-events: auto !important;">
                 次の問題
                 <i class="fas fa-chevron-right"></i>
             </a>
         {% else %}
-            <span class="nav-button disabled">
+            <span class="nav-button disabled" style="pointer-events: none !important;">
                 次の問題
                 <i class="fas fa-chevron-right"></i>
             </span>
