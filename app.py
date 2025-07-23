@@ -7714,49 +7714,93 @@ def admin_get_essay_visibility_settings(room_number):
 
 @app.route('/admin/essay_visibility_settings/save', methods=['POST'])
 def admin_save_essay_visibility_settings():
-    """論述問題公開設定を保存"""
+    """論述問題公開設定を保存（修正版）"""
     try:
+        print("💾 論述問題公開設定保存開始")
+        
         if not session.get('admin_logged_in'):
+            print("❌ 管理者権限なし")
             return jsonify({'status': 'error', 'message': '管理者権限が必要です'}), 403
         
         data = request.get_json()
+        if not data:
+            print("❌ JSONデータなし")
+            return jsonify({'status': 'error', 'message': 'JSONデータが必要です'}), 400
+        
         room_number = data.get('room_number')
         settings = data.get('settings', {})
+        
+        print(f"📊 保存対象: 部屋{room_number}, 設定数: {len(settings)}")
         
         if not room_number:
             return jsonify({'status': 'error', 'message': '部屋番号が指定されていません'}), 400
         
+        # テーブル存在確認
+        from sqlalchemy import inspect
+        inspector = inspect(db.engine)
+        if not inspector.has_table('essay_visibility_setting'):
+            print("❌ テーブルが存在しません - 自動作成を試行")
+            try:
+                create_essay_visibility_table_auto()
+            except Exception as create_error:
+                print(f"❌ テーブル作成失敗: {create_error}")
+                return jsonify({'status': 'error', 'message': 'テーブルが存在せず、作成にも失敗しました'}), 500
+        
         saved_count = 0
         updated_count = 0
         
-        # 設定を一つずつ保存
-        for chapter, chapter_settings in settings.items():
-            for problem_type, is_visible in chapter_settings.items():
-                # 既存設定があるかチェック
-                existing_setting = EssayVisibilitySetting.query.filter_by(
-                    room_number=room_number,
-                    chapter=chapter,
-                    problem_type=problem_type
-                ).first()
+        # 直接SQLで設定を保存（モデルの問題を回避）
+        try:
+            with db.engine.connect() as conn:
+                for chapter, chapter_settings in settings.items():
+                    for problem_type, is_visible in chapter_settings.items():
+                        print(f"🔧 処理中: 部屋{room_number} 第{chapter}章 タイプ{problem_type} -> {'公開' if is_visible else '非公開'}")
+                        
+                        # 既存設定があるかチェック
+                        check_result = conn.execute(text("""
+                            SELECT COUNT(*) FROM essay_visibility_setting 
+                            WHERE room_number = :room AND chapter = :chapter AND problem_type = :type
+                        """), {
+                            'room': room_number,
+                            'chapter': chapter,
+                            'type': problem_type
+                        })
+                        
+                        exists = check_result.fetchone()[0] > 0
+                        
+                        if exists:
+                            # 既存設定を更新
+                            conn.execute(text("""
+                                UPDATE essay_visibility_setting 
+                                SET is_visible = :visible, updated_at = CURRENT_TIMESTAMP 
+                                WHERE room_number = :room AND chapter = :chapter AND problem_type = :type
+                            """), {
+                                'visible': is_visible,
+                                'room': room_number,
+                                'chapter': chapter,
+                                'type': problem_type
+                            })
+                            updated_count += 1
+                        else:
+                            # 新規設定を作成
+                            conn.execute(text("""
+                                INSERT INTO essay_visibility_setting 
+                                (room_number, chapter, problem_type, is_visible) 
+                                VALUES (:room, :chapter, :type, :visible)
+                            """), {
+                                'room': room_number,
+                                'chapter': chapter,
+                                'type': problem_type,
+                                'visible': is_visible
+                            })
+                            saved_count += 1
                 
-                if existing_setting:
-                    # 既存設定を更新
-                    if existing_setting.is_visible != is_visible:
-                        existing_setting.is_visible = is_visible
-                        existing_setting.updated_at = datetime.now(JST)
-                        updated_count += 1
-                else:
-                    # 新規設定を作成
-                    new_setting = EssayVisibilitySetting(
-                        room_number=room_number,
-                        chapter=chapter,
-                        problem_type=problem_type,
-                        is_visible=is_visible
-                    )
-                    db.session.add(new_setting)
-                    saved_count += 1
+                conn.commit()
+                print(f"✅ 保存完了: 新規{saved_count}件, 更新{updated_count}件")
         
-        db.session.commit()
+        except Exception as save_error:
+            print(f"❌ 保存エラー: {save_error}")
+            return jsonify({'status': 'error', 'message': f'設定の保存に失敗しました: {str(save_error)}'}), 500
         
         message = f'設定を保存しました（新規: {saved_count}件, 更新: {updated_count}件）'
         
@@ -7768,9 +7812,10 @@ def admin_save_essay_visibility_settings():
         })
         
     except Exception as e:
-        print(f"Error saving essay visibility settings: {e}")
-        db.session.rollback()
-        return jsonify({'status': 'error', 'message': '設定の保存に失敗しました'}), 500
+        print(f"❌ 論述問題公開設定保存エラー: {e}")
+        import traceback
+        print(traceback.format_exc())
+        return jsonify({'status': 'error', 'message': f'予期しないエラーが発生しました: {str(e)}'}), 500
 
 # ========================================
 # 既存の論述問題ルートの修正部分
