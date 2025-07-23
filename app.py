@@ -7415,7 +7415,7 @@ def essay_problem(problem_id):
             'current_username': current_user.username,
             'current_room_number': current_user.room_number,
             'is_logged_in': True,
-            # ★ current_filters を追加（空の辞書でも可）
+            # ★ テンプレートエラー回避のため追加
             'current_filters': {
                 'type': '',
                 'university': '',
@@ -7423,13 +7423,10 @@ def essay_problem(problem_id):
                 'year_to': None,
                 'keyword': ''
             },
-            # ★ filter_data を追加
             'filter_data': filter_data,
-            # ★ 章情報も追加
             'chapter': problem.chapter,
             'chapter_name': '総合問題' if problem.chapter == 'com' else f'第{problem.chapter}章',
-            # ★ problems を空の配列として追加（個別問題表示なので不要だが、テンプレートエラー回避）
-            'problems': []
+            'problems': [problem]  # ★ 個別問題を配列で渡す（テンプレートが{% if problems %}をチェックするため）
         })
         
         return render_template('essay_problem.html', **context)
