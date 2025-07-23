@@ -563,25 +563,21 @@
         </div>
     </div>
 </div>
+
+<!-- データ属性でJavaScriptに値を渡す -->
+<div id="problem-data" 
+     data-problem-id="{{ problem.id }}"
+     data-current-rating="{% if problem.progress and problem.progress.difficulty_rating %}{{ problem.progress.difficulty_rating }}{% else %}0{% endif %}"
+     data-viewed-answer="{% if problem.progress and problem.progress.viewed_answer %}true{% else %}false{% endif %}"
+     style="display: none;"></div>
 {% endblock %}
 
-<!-- データをJSONで安全に渡す -->
-<script type="application/json" id="problem-data">
-{
-    "id": {{ problem.id|tojson }},
-    "progress": {
-        "difficulty_rating": {{ (problem.progress.difficulty_rating if problem.progress and problem.progress.difficulty_rating else 0)|tojson }},
-        "viewed_answer": {{ (problem.progress.viewed_answer if problem.progress and problem.progress.viewed_answer else false)|tojson }}
-    }
-}
-</script>
-
 <script>
-// JSONデータから安全に変数を取得
-var problemData = JSON.parse(document.getElementById('problem-data').textContent);
-var currentRating = problemData.progress.difficulty_rating || 0;
-var problemId = problemData.id || 0;
-var viewedAnswer = problemData.progress.viewed_answer || false;
+// HTMLのdata属性からJavaScript変数を取得
+var problemData = document.getElementById('problem-data');
+var problemId = parseInt(problemData.getAttribute('data-problem-id'));
+var currentRating = parseInt(problemData.getAttribute('data-current-rating'));
+var viewedAnswer = problemData.getAttribute('data-viewed-answer') === 'true';
 
 document.addEventListener('DOMContentLoaded', function() {
     console.log('DOMContentLoaded実行開始');
@@ -601,30 +597,23 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // イベントリスナーの設定
     var showAnswerBtn = document.getElementById('showAnswerBtn');
-    console.log('解答表示ボタン:', showAnswerBtn);
     if (showAnswerBtn) {
         showAnswerBtn.addEventListener('click', function() {
             console.log('解答表示ボタンがクリックされました');
             showAnswer();
         });
-    } else {
-        console.error('解答表示ボタンが見つかりません');
     }
     
     var saveProgressBtn = document.getElementById('saveProgressBtn');
-    console.log('進捗保存ボタン:', saveProgressBtn);
     if (saveProgressBtn) {
         saveProgressBtn.addEventListener('click', function() {
             console.log('進捗保存ボタンがクリックされました');
             saveProgress();
         });
-    } else {
-        console.error('進捗保存ボタンが見つかりません');
     }
     
     // 星評価のクリックイベント
     var stars = document.querySelectorAll('.star-rating');
-    console.log('星の数:', stars.length);
     for (var i = 0; i < stars.length; i++) {
         stars[i].addEventListener('click', function() {
             var rating = this.getAttribute('data-rating');
@@ -641,9 +630,6 @@ function showAnswer() {
     var answerSection = document.getElementById('answerSection');
     var showBtn = document.getElementById('showAnswerBtn');
     
-    console.log('answerSection:', answerSection);
-    console.log('showBtn:', showBtn);
-    
     if (answerSection && showBtn) {
         console.log('解答セクションを表示します');
         answerSection.classList.add('show');
@@ -651,8 +637,6 @@ function showAnswer() {
         
         // 解答閲覧を記録
         updateProgress({ viewed_answer: true });
-    } else {
-        console.error('必要な要素が見つかりません');
     }
 }
 
@@ -663,7 +647,6 @@ function setRating(rating) {
         currentRating = ratingNum;
         console.log('新しい評価を設定:', currentRating);
         var stars = document.querySelectorAll('.star-rating');
-        console.log('星の要素数:', stars.length);
         for (var i = 0; i < stars.length; i++) {
             if (i < ratingNum) {
                 stars[i].classList.add('active');
@@ -671,8 +654,6 @@ function setRating(rating) {
                 stars[i].classList.remove('active');
             }
         }
-    } else {
-        console.error('無効な評価値:', rating);
     }
 }
 
@@ -681,10 +662,6 @@ function saveProgress() {
     var understoodEl = document.getElementById('understood');
     var reviewFlagEl = document.getElementById('reviewFlag');
     var memoEl = document.getElementById('memo');
-    
-    console.log('understood要素:', understoodEl);
-    console.log('reviewFlag要素:', reviewFlagEl);
-    console.log('memo要素:', memoEl);
     
     if (!understoodEl || !reviewFlagEl || !memoEl) {
         console.error('フォーム要素が見つかりません');
