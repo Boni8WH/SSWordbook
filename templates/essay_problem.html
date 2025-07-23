@@ -1,27 +1,26 @@
 {% extends "base.html" %}
 
-{% block title %}{{ problem.university }} {{ problem.year }}年 - 論述問題{% endblock %}
+{% block title %}{{ chapter_name }} - 論述問題{% endblock %}
 
 {% block head_extra %}
 <style>
-/* 個別論述問題表示用スタイル */
-.essay-problem-container {
-    max-width: 900px;
+/* 論述問題章ページ用スタイル */
+.essay-chapter-container {
+    max-width: 1200px;
     margin: 0 auto;
-    padding: 20px;
+    padding: 25px;
     background: #ffffff;
     min-height: calc(100vh - 100px);
 }
 
 /* ヘッダー部分 */
-.problem-header {
+.chapter-header {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
-    padding: 25px;
+    padding: 30px 25px;
     border-radius: 15px;
-    margin-bottom: 25px;
+    margin-bottom: 30px;
     box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
-    position: relative;
 }
 
 .breadcrumb {
@@ -43,1002 +42,725 @@
     opacity: 0.8;
 }
 
-.problem-title {
+.chapter-title {
     margin: 0;
-    font-size: clamp(1.3rem, 4vw, 1.8rem);
+    font-size: clamp(1.5rem, 4vw, 2.2rem);
     font-weight: 600;
+    margin-bottom: 10px;
+}
+
+.chapter-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    align-items: center;
+    margin-top: 15px;
+}
+
+.stat-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255, 255, 255, 0.15);
+    padding: 8px 15px;
+    border-radius: 20px;
+    font-size: 0.95rem;
+}
+
+/* フィルター部分 */
+.filter-section {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 12px;
+    margin-bottom: 25px;
+    border: 1px solid #e9ecef;
+}
+
+.filter-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    align-items: center;
+}
+
+.filter-item {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.filter-label {
+    font-weight: 600;
+    color: #495057;
+    font-size: 0.9rem;
+}
+
+.filter-select {
+    padding: 8px 12px;
+    border: 1px solid #ced4da;
+    border-radius: 6px;
+    background: white;
+    color: #495057;
+    font-size: 0.9rem;
+}
+
+/* 問題グリッド - 修正されたレイアウト */
+.problems-section {
+    margin-bottom: 30px;
+}
+
+.type-section {
+    margin-bottom: 40px;
+}
+
+.type-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+    padding: 15px 20px;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-radius: 10px;
+    border-left: 4px solid #667eea;
+}
+
+.type-badge {
+    background: #667eea;
+    color: white;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    min-width: 100px;
+    text-align: center;
+}
+
+.type-title {
+    margin: 0;
+    color: #2c3e50;
+    font-size: 1.3rem;
+    font-weight: 600;
+}
+
+/* グリッドレイアウトを改善 */
+.problems-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 20px;
+    align-items: start;
+}
+
+/* 問題カード */
+.problem-card-link {
+    text-decoration: none;
+    color: inherit;
+    display: block;
+}
+
+.problem-card {
+    background: white;
+    border: 1px solid #e9ecef;
+    border-radius: 12px;
+    padding: 20px;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.problem-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 20px rgba(102, 126, 234, 0.15);
+    border-color: #667eea;
+}
+
+.problem-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
     margin-bottom: 15px;
+    gap: 15px;
+}
+
+.university-year {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+}
+
+.university {
+    font-weight: 600;
+    color: #2c3e50;
+    font-size: 1.05rem;
+    line-height: 1.2;
+}
+
+.year {
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+
+/* 進捗インジケーター - より目立つように改善 */
+.progress-indicators {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: flex-start;
+    justify-content: flex-end;
+    min-width: 120px;
+}
+
+.indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-align: center;
+    white-space: nowrap;
+    border: 1px solid transparent;
+}
+
+.indicator.viewed {
+    background: #e3f2fd;
+    color: #1565c0;
+    border-color: #bbdefb;
+}
+
+.indicator.understood {
+    background: #e8f5e8;
+    color: #2e7d32;
+    border-color: #c8e6c9;
+}
+
+.indicator.review {
+    background: #fff3e0;
+    color: #f57c00;
+    border-color: #ffcc02;
+}
+
+.indicator.difficulty {
+    background: #f3e5f5;
+    color: #7b1fa2;
+    border-color: #ce93d8;
+}
+
+/* 問題コンテンツ */
+.problem-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.problem-preview {
+    margin-bottom: 15px;
+    line-height: 1.6;
+    color: #4a5568;
+    font-size: 0.95rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* 画像プレビュー追加 */
+.problem-image-preview {
+    margin: 10px 0;
+    text-align: center;
+}
+
+.problem-image-preview img {
+    max-width: 100%;
+    max-height: 150px;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.problem-image-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: #6c757d;
+    font-size: 0.85rem;
+    margin: 10px 0;
+    padding: 6px 12px;
+    background: #f8f9fa;
+    border-radius: 15px;
+    border: 1px solid #e9ecef;
 }
 
 .problem-meta {
     display: flex;
-    flex-wrap: wrap;
-    gap: 15px;
-    align-items: center;
-    margin-bottom: 15px;
-}
-
-.meta-item {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    background: rgba(255, 255, 255, 0.15);
-    padding: 6px 12px;
-    border-radius: 20px;
-    font-size: 0.9rem;
-}
-
-/* 現在の進捗表示をヘッダーに追加 */
-.header-progress {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-top: 10px;
-}
-
-.header-progress .progress-indicator {
-    padding: 4px 10px;
-    border-radius: 12px;
-    font-size: 0.8rem;
-    font-weight: 500;
-    background: rgba(255, 255, 255, 0.2);
-    color: white;
-    border: 1px solid rgba(255, 255, 255, 0.3);
-}
-
-.header-progress .progress-indicator.viewed {
-    background: rgba(33, 150, 243, 0.8);
-}
-
-.header-progress .progress-indicator.understood {
-    background: rgba(76, 175, 80, 0.8);
-}
-
-.header-progress .progress-indicator.review {
-    background: rgba(255, 193, 7, 0.8);
-}
-
-.header-progress .progress-indicator.difficulty {
-    background: rgba(156, 39, 176, 0.8);
-}
-
-/* ナビゲーション */
-.problem-navigation {
-    display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 25px;
-    gap: 15px;
+    margin-top: auto;
+    padding-top: 15px;
+    border-top: 1px solid #f1f5f9;
 }
 
-.nav-button {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 10px 15px;
-    background: #f8f9fa;
-    color: #495057;
-    text-decoration: none;
-    border-radius: 8px;
-    transition: all 0.3s ease;
-    border: 1px solid #dee2e6;
-    font-size: 0.9rem;
+.answer-length {
+    background: #f7fafc;
+    color: #4a5568;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 0.8rem;
     font-weight: 500;
 }
 
-.nav-button:hover {
-    background: #e9ecef;
-    color: #495057;
-    text-decoration: none;
-    transform: translateY(-1px);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+.problem-footer {
+    text-align: center;
+    padding-top: 12px;
 }
 
-.nav-button:disabled,
-.nav-button.disabled {
+.read-more {
+    color: #4f46e5;
+    font-weight: 500;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    opacity: 0.8;
+    transition: opacity 0.3s ease;
+}
+
+.problem-card:hover .read-more {
+    opacity: 1;
+}
+
+/* 問題がない場合 */
+.no-problems {
+    text-align: center;
+    padding: 60px 20px;
     background: #f8f9fa;
-    color: #6c757d;
-    cursor: not-allowed;
-    transform: none;
-    box-shadow: none;
+    border-radius: 15px;
+    border: 2px dashed #dee2e6;
+    grid-column: 1 / -1;
 }
 
-.back-to-chapter {
+.no-problems-content {
+    color: #6c757d;
+}
+
+.no-problems-content i {
+    font-size: 3rem;
+    margin-bottom: 20px;
+    opacity: 0.5;
+}
+
+.no-problems-content h3 {
+    margin: 15px 0 10px 0;
+    font-size: 1.5rem;
+}
+
+.no-problems-content p {
+    margin-bottom: 20px;
+    font-size: 1rem;
+}
+
+.btn-primary {
     background: #667eea;
     color: white;
-    border-color: #667eea;
+    padding: 10px 20px;
+    border-radius: 8px;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: background 0.3s ease;
 }
 
-.back-to-chapter:hover {
+.btn-primary:hover {
     background: #5a6fd8;
     color: white;
-}
-
-/* 問題文セクション */
-.question-section {
-    background: #f8f9fa;
-    border-radius: 12px;
-    padding: 25px;
-    margin-bottom: 25px;
-    border-left: 4px solid #667eea;
-}
-
-.section-title {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 20px;
-    color: #2c3e50;
-    font-size: 1.2rem;
-    font-weight: 600;
-}
-
-.question-text {
-    line-height: 1.8;
-    color: #2c3e50;
-    font-size: 1.05rem;
-    white-space: pre-wrap;
-    margin: 0;
-}
-
-/* 問題画像 - 改善された表示 */
-.question-image {
-    margin: 20px 0;
-    text-align: center;
-    background: white;
-    padding: 15px;
-    border-radius: 8px;
-    border: 1px solid #dee2e6;
-}
-
-.question-image img {
-    max-width: 100%;
-    height: auto;
-    border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-
-.image-caption {
-    margin-top: 10px;
-    font-size: 0.9rem;
-    color: #6c757d;
-    font-style: italic;
-}
-
-/* 解答セクション */
-.answer-section {
-    background: #fff8e1;
-    border-radius: 12px;
-    padding: 25px;
-    margin-bottom: 25px;
-    border-left: 4px solid #ff9800;
-    display: none;
-    animation: fadeIn 0.3s ease;
-}
-
-.answer-section.show {
-    display: block;
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
-.answer-text {
-    line-height: 1.8;
-    color: #2c3e50;
-    font-size: 1.05rem;
-    white-space: pre-wrap;
-    margin: 0;
-}
-
-/* 解答表示ボタン */
-.show-answer-btn {
-    background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
-    color: white;
-    border: none;
-    padding: 12px 25px;
-    border-radius: 25px;
-    font-size: 1rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 25px;
-    box-shadow: 0 4px 15px rgba(255, 152, 0, 0.3);
-}
-
-.show-answer-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(255, 152, 0, 0.4);
-}
-
-.show-answer-btn:disabled {
-    background: #6c757d;
-    cursor: not-allowed;
-    transform: none;
-    box-shadow: none;
-}
-
-/* 進捗管理セクション - 改善されたデザイン */
-.progress-section {
-    background: white;
-    border: 1px solid #dee2e6;
-    border-radius: 12px;
-    padding: 25px;
-    margin-bottom: 25px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-}
-
-.progress-controls {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 20px;
-    margin-bottom: 20px;
-}
-
-.control-group {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-.control-group label {
-    font-weight: 600;
-    color: #495057;
-    font-size: 0.95rem;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
-.checkbox-group {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 8px 12px;
-    background: #f8f9fa;
-    border-radius: 8px;
-    border: 1px solid #dee2e6;
-    transition: all 0.3s ease;
-}
-
-.checkbox-group:hover {
-    background: #e9ecef;
-}
-
-.checkbox-group input[type="checkbox"] {
-    width: 18px;
-    height: 18px;
-    cursor: pointer;
-    accent-color: #667eea;
-}
-
-.checkbox-label {
-    font-weight: 500;
-    cursor: pointer;
-    flex: 1;
-}
-
-.rating-group {
-    display: flex;
-    gap: 5px;
-    padding: 8px 12px;
-    background: #f8f9fa;
-    border-radius: 8px;
-    border: 1px solid #dee2e6;
-    justify-content: center;
-}
-
-.star-rating {
-    color: #ddd;
-    font-size: 1.5rem;
-    cursor: pointer;
-    transition: color 0.2s ease, transform 0.2s ease;
-}
-
-.star-rating.active,
-.star-rating:hover {
-    color: #ffc107;
-    transform: scale(1.1);
-}
-
-.memo-input {
-    width: 100%;
-    min-height: 80px;
-    padding: 12px;
-    border: 1px solid #ced4da;
-    border-radius: 8px;
-    font-family: inherit;
-    font-size: 0.95rem;
-    resize: vertical;
-    transition: border-color 0.3s ease;
-}
-
-.memo-input:focus {
-    outline: none;
-    border-color: #667eea;
-    box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
-}
-
-.save-progress-btn {
-    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
-    color: white;
-    border: none;
-    padding: 12px 25px;
-    border-radius: 8px;
-    cursor: pointer;
-    font-size: 0.95rem;
-    font-weight: 600;
-    transition: all 0.3s ease;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    justify-self: center;
-    box-shadow: 0 2px 8px rgba(40, 167, 69, 0.3);
-}
-
-.save-progress-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 15px rgba(40, 167, 69, 0.4);
-}
-
-/* 現在の進捗表示 */
-.current-progress {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    margin-top: 20px;
-    padding-top: 20px;
-    border-top: 1px solid #dee2e6;
-}
-
-.progress-indicator {
-    padding: 6px 12px;
-    border-radius: 15px;
-    font-size: 0.85rem;
-    font-weight: 500;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
-.progress-indicator.viewed {
-    background: #e3f2fd;
-    color: #1976d2;
-    border: 1px solid #bbdefb;
-}
-
-.progress-indicator.understood {
-    background: #e8f5e8;
-    color: #2e7d32;
-    border: 1px solid #c8e6c9;
-}
-
-.progress-indicator.review {
-    background: #fff3e0;
-    color: #f57c00;
-    border: 1px solid #ffcc02;
-}
-
-.progress-indicator.difficulty {
-    background: #f3e5f5;
-    color: #7b1fa2;
-    border: 1px solid #ce93d8;
-}
-
-/* 成功メッセージ */
-.save-success {
-    background: #d4edda;
-    color: #155724;
-    padding: 10px 15px;
-    border-radius: 8px;
-    margin-top: 10px;
-    border: 1px solid #c3e6cb;
-    display: none;
-    animation: slideDown 0.3s ease;
-}
-
-@keyframes slideDown {
-    from { opacity: 0; transform: translateY(-10px); }
-    to { opacity: 1; transform: translateY(0); }
+    text-decoration: none;
 }
 
 /* レスポンシブ対応 */
+@media (max-width: 1024px) {
+    .problems-grid {
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 15px;
+    }
+}
+
 @media (max-width: 768px) {
-    .essay-problem-container {
+    .essay-chapter-container {
         padding: 15px;
     }
     
-    .problem-header {
-        padding: 20px;
+    .chapter-header {
+        padding: 20px 15px;
     }
     
-    .problem-navigation {
-        flex-direction: column;
-        align-items: stretch;
-    }
-    
-    .nav-button {
-        justify-content: center;
-    }
-    
-    .problem-meta {
-        justify-content: center;
-    }
-    
-    .question-section,
-    .answer-section,
-    .progress-section {
-        padding: 20px;
-    }
-    
-    .progress-controls {
+    .filter-grid {
         grid-template-columns: 1fr;
+        gap: 10px;
     }
     
-    .rating-group {
+    .problems-grid {
+        grid-template-columns: 1fr;
+        gap: 15px;
+    }
+    
+    .problem-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+    
+    .progress-indicators {
         justify-content: flex-start;
+        min-width: auto;
+    }
+    
+    .chapter-stats {
+        justify-content: center;
     }
 }
 
 @media (max-width: 480px) {
-    .essay-problem-container {
+    .essay-chapter-container {
         padding: 10px;
     }
     
-    .problem-header {
+    .chapter-header {
         padding: 15px;
     }
     
-    .question-section,
-    .answer-section,
-    .progress-section {
+    .problem-card {
         padding: 15px;
     }
     
-    .star-rating {
-        font-size: 1.3rem;
-    }
-    
-    .header-progress {
-        justify-content: center;
+    .indicator {
+        font-size: 0.7rem;
+        padding: 3px 6px;
     }
 }
 
-/* 印刷対応 */
-@media print {
-    .problem-navigation,
-    .progress-section,
-    .show-answer-btn {
-        display: none;
-    }
-    
-    .answer-section {
-        display: block !important;
-    }
+/* ローディング状態のスタイル */
+.loading {
+    text-align: center;
+    padding: 40px;
+    color: #6c757d;
+}
+
+.loading i {
+    font-size: 2rem;
+    margin-bottom: 15px;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
 }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="essay-problem-container">
+<div class="essay-chapter-container">
     <!-- ヘッダー -->
-    <div class="problem-header">
+    <div class="chapter-header">
         <div class="breadcrumb">
             <a href="{{ url_for('essay_index') }}">
                 <i class="fas fa-edit"></i> 論述問題集
             </a>
             <i class="fas fa-chevron-right"></i>
-            <a href="{{ url_for('essay_chapter', chapter=problem.chapter) }}">
-                第{{ problem.chapter }}章
-            </a>
-            <i class="fas fa-chevron-right"></i>
-            <span>問題{{ problem.id }}</span>
+            <span>{{ chapter_name }}</span>
         </div>
         
-        <h1 class="problem-title">
-            {{ problem.university }} {{ problem.year }}年 
-            {% if problem.type == 'A' %}（200字以上）
-            {% elif problem.type == 'B' %}（100-150字程度）
-            {% elif problem.type == 'C' %}（50-75字程度）
-            {% elif problem.type == 'D' %}（30字程度）
-            {% endif %}
+        <h1 class="chapter-title">
+            <i class="fas fa-book"></i>
+            {{ chapter_name }}
         </h1>
         
-        <div class="problem-meta">
-            <div class="meta-item">
-                <i class="fas fa-book"></i>
-                第{{ problem.chapter }}章
+        <div class="chapter-stats">
+            <div class="stat-item">
+                <i class="fas fa-list"></i>
+                総問題数: {{ problems|length }}問
             </div>
-            <div class="meta-item">
-                <i class="fas fa-graduation-cap"></i>
-                {{ problem.university }}
+            <div class="stat-item">
+                <i class="fas fa-eye"></i>
+                閲覧済み: {{ problems|selectattr('progress.viewed_answer')|list|length }}問
             </div>
-            <div class="meta-item">
-                <i class="fas fa-calendar"></i>
-                {{ problem.year }}年
+            <div class="stat-item">
+                <i class="fas fa-check-circle"></i>
+                理解済み: {{ problems|selectattr('progress.understood')|list|length }}問
             </div>
-            <div class="meta-item">
-                <i class="fas fa-tag"></i>
-                タイプ{{ problem.type }}
+            <div class="stat-item">
+                <i class="fas fa-percentage"></i>
+                進捗率: {{ ((problems|selectattr('progress.understood')|list|length / problems|length * 100)|round(1)) if problems|length > 0 else 0 }}%
             </div>
-        </div>
-
-        <!-- ヘッダーに現在の進捗表示 -->
-        <div class="header-progress">
-            {% if problem.progress and problem.progress.viewed_answer %}
-            <span class="progress-indicator viewed">
-                <i class="fas fa-eye"></i> 解答閲覧済み
-            </span>
-            {% endif %}
-            {% if problem.progress and problem.progress.understood %}
-            <span class="progress-indicator understood">
-                <i class="fas fa-check-circle"></i> 理解済み
-            </span>
-            {% endif %}
-            {% if problem.progress and problem.progress.review_flag %}
-            <span class="progress-indicator review">
-                <i class="fas fa-flag"></i> 復習予定
-            </span>
-            {% endif %}
-            {% if problem.progress and problem.progress.difficulty_rating %}
-            <span class="progress-indicator difficulty">
-                <i class="fas fa-star"></i> 難易度{{ problem.progress.difficulty_rating }}/5
-            </span>
-            {% endif %}
         </div>
     </div>
 
-    <!-- ナビゲーション -->
-    <div class="problem-navigation">
-        {% if prev_problem %}
-            <a href="{{ url_for('essay_problem', problem_id=prev_problem.id) }}" class="nav-button">
-                <i class="fas fa-chevron-left"></i>
-                前の問題
-            </a>
+    <!-- フィルター -->
+    {% if filter_data and (filter_data.universities or filter_data.types) %}
+    <div class="filter-section">
+        <div class="filter-grid">
+            {% if filter_data.universities %}
+            <div class="filter-item">
+                <label class="filter-label">大学で絞り込み</label>
+                <select class="filter-select" id="universityFilter">
+                    <option value="">すべての大学</option>
+                    {% for university in filter_data.universities %}
+                    <option value="{{ university }}" {% if current_filters.university == university %}selected{% endif %}>
+                        {{ university }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
+            
+            <div class="filter-item">
+                <label class="filter-label">年度で絞り込み</label>
+                <select class="filter-select" id="yearFilter">
+                    <option value="">すべての年度</option>
+                    {% for year in range(filter_data.year_range.max, filter_data.year_range.min - 1, -1) %}
+                    <option value="{{ year }}" {% if current_filters.year_from == year %}selected{% endif %}>
+                        {{ year }}年
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="filter-item">
+                <label class="filter-label">進捗状況</label>
+                <select class="filter-select" id="progressFilter">
+                    <option value="">すべて</option>
+                    <option value="viewed" {% if current_filters.progress == 'viewed' %}selected{% endif %}>閲覧済み</option>
+                    <option value="understood" {% if current_filters.progress == 'understood' %}selected{% endif %}>理解済み</option>
+                    <option value="review" {% if current_filters.progress == 'review' %}selected{% endif %}>復習予定</option>
+                    <option value="unviewed" {% if current_filters.progress == 'unviewed' %}selected{% endif %}>未閲覧</option>
+                </select>
+            </div>
+            
+            {% if filter_data.types %}
+            <div class="filter-item">
+                <label class="filter-label">タイプ</label>
+                <select class="filter-select" id="typeFilter">
+                    <option value="">すべてのタイプ</option>
+                    {% for type_char in filter_data.types %}
+                    <option value="{{ type_char }}" {% if current_filters.type == type_char %}selected{% endif %}>
+                        タイプ{{ type_char }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- 問題一覧 -->
+    <div class="problems-section">
+        {% if problems %}
+            {% set current_type = '' %}
+            {% for problem in problems %}
+                {% if current_type != problem.type %}
+                    {% if current_type != '' %}
+                        </div> <!-- 前のproblems-gridを閉じる -->
+                    </div> <!-- 前のtype-sectionを閉じる -->
+                    {% endif %}
+                    
+                    {% set current_type = problem.type %}
+                    <div class="type-section">
+                        <div class="type-header">
+                            <div class="type-badge">
+                                タイプ{{ problem.type }}
+                            </div>
+                            <h2 class="type-title">
+                                {% if problem.type == 'A' %}200字以上
+                                {% elif problem.type == 'B' %}100-150字程度
+                                {% elif problem.type == 'C' %}50-75字程度
+                                {% elif problem.type == 'D' %}30字程度
+                                {% endif %}
+                            </h2>
+                        </div>
+                        <div class="problems-grid">
+                {% endif %}
+                
+                <a href="{{ url_for('essay_problem', problem_id=problem.id) }}" class="problem-card-link">
+                    <div class="problem-card" 
+                         data-university="{{ problem.university }}" 
+                         data-year="{{ problem.year }}"
+                         data-viewed="{{ 'true' if problem.progress and problem.progress.viewed_answer else 'false' }}"
+                         data-understood="{{ 'true' if problem.progress and problem.progress.understood else 'false' }}"
+                         data-review="{{ 'true' if problem.progress and problem.progress.review_flag else 'false' }}"
+                         data-difficulty="{{ problem.progress.difficulty_rating if problem.progress and problem.progress.difficulty_rating else '0' }}">
+                        
+                        <div class="problem-header">
+                            <div class="university-year">
+                                <div class="university">{{ problem.university }}</div>
+                                <div class="year">{{ problem.year }}年</div>
+                            </div>
+                            <div class="progress-indicators">
+                                {% if problem.progress and problem.progress.viewed_answer %}
+                                    <span class="indicator viewed" title="解答閲覧済み">
+                                        <i class="fas fa-eye"></i>
+                                        <span class="indicator-text">閲覧済</span>
+                                    </span>
+                                {% endif %}
+                                {% if problem.progress and problem.progress.understood %}
+                                    <span class="indicator understood" title="理解済み">
+                                        <i class="fas fa-check-circle"></i>
+                                        <span class="indicator-text">理解済</span>
+                                    </span>
+                                {% endif %}
+                                {% if problem.progress and problem.progress.review_flag %}
+                                    <span class="indicator review" title="復習フラグ">
+                                        <i class="fas fa-flag"></i>
+                                        <span class="indicator-text">復習</span>
+                                    </span>
+                                {% endif %}
+                                {% if problem.progress and problem.progress.difficulty_rating %}
+                                    <span class="indicator difficulty" title="難易度: {{ problem.progress.difficulty_rating }}/5">
+                                        <i class="fas fa-star"></i>
+                                        <span class="indicator-text">{{ problem.progress.difficulty_rating }}</span>
+                                    </span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <div class="problem-content">
+                            <p class="problem-preview">{{ problem.preview or (problem.question[:100] + '...' if problem.question|length > 100 else problem.question) }}</p>
+                            
+                            <!-- 画像付き問題の表示改善 -->
+                            {% if has_essay_image(problem.id) %}
+                                <div class="problem-image-preview">
+                                    <img src="{{ url_for('static', filename=essay_image_path(problem.id)) }}" 
+                                         alt="問題図" 
+                                         loading="lazy">
+                                </div>
+                            {% endif %}
+                            
+                            <div class="problem-meta">
+                                <div class="answer-length">
+                                    {% if problem.type == 'A' %}200字以上
+                                    {% elif problem.type == 'B' %}100-150字程度
+                                    {% elif problem.type == 'C' %}50-75字程度
+                                    {% elif problem.type == 'D' %}30字程度
+                                    {% endif %}
+                                </div>
+                                <div class="problem-footer">
+                                    <span class="read-more">
+                                        問題を見る
+                                        <i class="fas fa-arrow-right"></i>
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </a>
+                
+                {% if loop.last %}
+                    </div> <!-- 最後のproblems-gridを閉じる -->
+                </div> <!-- 最後のtype-sectionを閉じる -->
+                {% endif %}
+            {% endfor %}
         {% else %}
-            <span class="nav-button disabled">
-                <i class="fas fa-chevron-left"></i>
-                前の問題
-            </span>
-        {% endif %}
-
-        <a href="{{ url_for('essay_chapter', chapter=problem.chapter) }}" class="nav-button back-to-chapter">
-            <i class="fas fa-list"></i>
-            第{{ problem.chapter }}章一覧に戻る
-        </a>
-
-        {% if next_problem %}
-            <a href="{{ url_for('essay_problem', problem_id=next_problem.id) }}" class="nav-button">
-                次の問題
-                <i class="fas fa-chevron-right"></i>
-            </a>
-        {% else %}
-            <span class="nav-button disabled">
-                次の問題
-                <i class="fas fa-chevron-right"></i>
-            </span>
-        {% endif %}
-    </div>
-
-    <!-- 問題文セクション -->
-    <div class="question-section">
-        <h2 class="section-title">
-            <i class="fas fa-question-circle"></i>
-            問題文
-        </h2>
-        <p class="question-text">{{ problem.question }}</p>
-        
-        <!-- 改善された画像表示 -->
-        {% if image_path %}
-        <div class="question-image">
-            <img src="{{ url_for('static', filename=image_path) }}" 
-                 alt="問題図" 
-                 loading="lazy">
-            <div class="image-caption">問題図</div>
-        </div>
-        {% elif has_essay_image(problem.id) %}
-        <div class="question-image">
-            <img src="{{ url_for('static', filename=essay_image_path(problem.id)) }}" 
-                 alt="問題図" 
-                 loading="lazy">
-            <div class="image-caption">問題図</div>
-        </div>
-        {% endif %}
-    </div>
-
-    <!-- 解答表示ボタン -->
-    <button class="show-answer-btn" id="showAnswerBtn">
-        <i class="fas fa-eye"></i>
-        解答を表示
-    </button>
-
-    <!-- 解答セクション -->
-    <div class="answer-section" id="answerSection">
-        <h2 class="section-title">
-            <i class="fas fa-lightbulb"></i>
-            模範解答 ({{ problem.answer_length }}字)
-        </h2>
-        <p class="answer-text">{{ problem.answer }}</p>
-    </div>
-
-    <!-- 進捗管理セクション -->
-    <div class="progress-section">
-        <h2 class="section-title">
-            <i class="fas fa-chart-line"></i>
-            学習の記録
-        </h2>
-        
-        <div class="progress-controls">
-            <div class="control-group">
-                <label>
-                    <i class="fas fa-check-circle"></i>
-                    理解度
-                </label>
-                <div class="checkbox-group">
-                    <input type="checkbox" id="understoodCheck">
-                    <label for="understoodCheck" class="checkbox-label">この問題を理解した</label>
+            <div class="no-problems">
+                <div class="no-problems-content">
+                    <i class="fas fa-info-circle"></i>
+                    <h3>この章の問題はまだ登録されていません</h3>
+                    <p>管理者によって問題が登録されるまでお待ちください。</p>
+                    <a href="{{ url_for('essay_index') }}" class="btn-primary">
+                        <i class="fas fa-arrow-left"></i> 論述問題集に戻る
+                    </a>
                 </div>
             </div>
-            
-            <div class="control-group">
-                <label>
-                    <i class="fas fa-flag"></i>
-                    復習設定
-                </label>
-                <div class="checkbox-group">
-                    <input type="checkbox" id="reviewCheck">
-                    <label for="reviewCheck" class="checkbox-label">後で復習する</label>
-                </div>
-            </div>
-            
-            <div class="control-group">
-                <label>
-                    <i class="fas fa-star"></i>
-                    難易度評価
-                </label>
-                <div class="rating-group" id="difficultyRating">
-                    <span class="star-rating" data-rating="1">★</span>
-                    <span class="star-rating" data-rating="2">★</span>
-                    <span class="star-rating" data-rating="3">★</span>
-                    <span class="star-rating" data-rating="4">★</span>
-                    <span class="star-rating" data-rating="5">★</span>
-                </div>
-            </div>
-            
-            <div class="control-group">
-                <label for="memoInput">
-                    <i class="fas fa-sticky-note"></i>
-                    メモ・学習ポイント
-                </label>
-                <textarea class="memo-input" id="memoInput" placeholder="重要なポイントや気づきを記録しましょう..."></textarea>
-            </div>
-        </div>
-        
-        <button class="save-progress-btn" id="saveProgressBtn">
-            <i class="fas fa-save"></i>
-            学習記録を保存
-        </button>
-
-        <div class="save-success" id="saveSuccess">
-            <i class="fas fa-check-circle"></i>
-            学習記録を保存しました！
-        </div>
-        
-        <!-- 現在の進捗表示 -->
-        <div class="current-progress">
-            {% if problem.progress and problem.progress.viewed_answer %}
-            <span class="progress-indicator viewed">
-                <i class="fas fa-eye"></i> 解答閲覧済み
-            </span>
-            {% endif %}
-            {% if problem.progress and problem.progress.understood %}
-            <span class="progress-indicator understood">
-                <i class="fas fa-check-circle"></i> 理解済み
-            </span>
-            {% endif %}
-            {% if problem.progress and problem.progress.review_flag %}
-            <span class="progress-indicator review">
-                <i class="fas fa-flag"></i> 復習予定
-            </span>
-            {% endif %}
-            {% if problem.progress and problem.progress.difficulty_rating %}
-            <span class="progress-indicator difficulty">
-                <i class="fas fa-star"></i> 難易度{{ problem.progress.difficulty_rating }}/5
-            </span>
-            {% endif %}
-        </div>
+        {% endif %}
     </div>
 </div>
-{% endblock %}
-
-{% block scripts %}
-<!-- データ属性でJavaScriptに値を渡す -->
-<div id="problem-data" 
-     data-problem-id="{{ problem.id }}"
-     data-current-rating="{% if problem.progress and problem.progress.difficulty_rating %}{{ problem.progress.difficulty_rating }}{% else %}0{% endif %}"
-     data-viewed-answer="{% if problem.progress and problem.progress.viewed_answer %}true{% else %}false{% endif %}"
-     data-understood="{% if problem.progress and problem.progress.understood %}true{% else %}false{% endif %}"
-     data-review-flag="{% if problem.progress and problem.progress.review_flag %}true{% else %}false{% endif %}"
-     data-memo="{% if problem.progress and problem.progress.memo %}{{ problem.progress.memo }}{% else %}{% endif %}"
-     style="display: none;"></div>
 
 <script>
-console.log('論述問題個別ページ初期化開始');
-
 document.addEventListener('DOMContentLoaded', function() {
-    // データ取得
-    const problemData = document.getElementById('problem-data');
-    if (!problemData) {
-        console.error('problem-data要素が見つかりません');
-        return;
-    }
+    console.log('論述問題章ページ初期化開始');
     
-    const problemId = parseInt(problemData.getAttribute('data-problem-id'));
-    const currentRating = parseInt(problemData.getAttribute('data-current-rating')) || 0;
-    const viewedAnswer = problemData.getAttribute('data-viewed-answer') === 'true';
-    const understood = problemData.getAttribute('data-understood') === 'true';
-    const reviewFlag = problemData.getAttribute('data-review-flag') === 'true';
-    const memo = problemData.getAttribute('data-memo') || '';
+    // フィルター機能の実装
+    const universityFilter = document.getElementById('universityFilter');
+    const yearFilter = document.getElementById('yearFilter');
+    const progressFilter = document.getElementById('progressFilter');
+    const typeFilter = document.getElementById('typeFilter');
+    const problemCards = document.querySelectorAll('.problem-card');
     
-    console.log('初期化データ:', { problemId, currentRating, viewedAnswer, understood, reviewFlag, memo });
-    
-    // DOM要素取得
-    const showAnswerBtn = document.getElementById('showAnswerBtn');
-    const answerSection = document.getElementById('answerSection');
-    const saveProgressBtn = document.getElementById('saveProgressBtn');
-    const saveSuccess = document.getElementById('saveSuccess');
-    const understoodCheck = document.getElementById('understoodCheck');
-    const reviewCheck = document.getElementById('reviewCheck');
-    const memoInput = document.getElementById('memoInput');
-    const difficultyStars = document.querySelectorAll('.star-rating');
-    
-    // 初期値設定
-    if (understood) understoodCheck.checked = true;
-    if (reviewFlag) reviewCheck.checked = true;
-    if (memo) memoInput.value = memo;
-    
-    // 難易度評価の初期設定
-    updateStarRating(currentRating);
-    
-    // 解答が既に閲覧済みの場合は表示
-    if (viewedAnswer && answerSection && showAnswerBtn) {
-        answerSection.classList.add('show');
-        showAnswerBtn.style.display = 'none';
-    }
-    
-    // 解答表示ボタンのイベント
-    if (showAnswerBtn && answerSection) {
-        showAnswerBtn.addEventListener('click', function() {
-            answerSection.classList.add('show');
-            showAnswerBtn.style.display = 'none';
+    // フィルター関数
+    function applyFilters() {
+        const universityValue = universityFilter ? universityFilter.value : '';
+        const yearValue = yearFilter ? yearFilter.value : '';
+        const progressValue = progressFilter ? progressFilter.value : '';
+        const typeValue = typeFilter ? typeFilter.value : '';
+        
+        problemCards.forEach(card => {
+            let show = true;
             
-            // 解答閲覧フラグを即座に保存
-            saveViewedAnswer();
-        });
-    }
-    
-    // 星評価のイベント
-    difficultyStars.forEach(star => {
-        star.addEventListener('click', function() {
-            const rating = parseInt(this.getAttribute('data-rating'));
-            updateStarRating(rating === currentRating ? 0 : rating);
-        });
-        
-        star.addEventListener('mouseenter', function() {
-            const rating = parseInt(this.getAttribute('data-rating'));
-            highlightStars(rating);
-        });
-    });
-    
-    // 星評価エリアのマウスリーブ
-    document.getElementById('difficultyRating').addEventListener('mouseleave', function() {
-        updateStarRating(currentRating);
-    });
-    
-    // 進捗保存ボタンのイベント
-    if (saveProgressBtn) {
-        saveProgressBtn.addEventListener('click', saveProgress);
-    }
-    
-    // 関数定義
-    function updateStarRating(rating) {
-        currentRating = rating;
-        difficultyStars.forEach((star, index) => {
-            star.classList.toggle('active', index < rating);
-        });
-    }
-    
-    function highlightStars(rating) {
-        difficultyStars.forEach((star, index) => {
-            star.style.color = index < rating ? '#ffc107' : '#ddd';
-        });
-    }
-    
-    function saveViewedAnswer() {
-        fetch(`/essay/progress/${problemId}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                viewed_answer: true
-            })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.status === 'success') {
-                console.log('解答閲覧フラグ保存成功');
-                // ヘッダーの進捗表示を更新
-                updateHeaderProgress();
+            // 大学フィルター
+            if (universityValue && card.dataset.university !== universityValue) {
+                show = false;
             }
-        })
-        .catch(error => {
-            console.error('解答閲覧フラグ保存エラー:', error);
+            
+            // 年度フィルター
+            if (yearValue && card.dataset.year !== yearValue) {
+                show = false;
+            }
+            
+            // タイプフィルター
+            if (typeValue) {
+                const cardType = card.closest('.type-section').querySelector('.type-badge').textContent.replace('タイプ', '');
+                if (cardType !== typeValue) {
+                    show = false;
+                }
+            }
+            
+            // 進捗フィルター
+            if (progressValue) {
+                switch (progressValue) {
+                    case 'viewed':
+                        if (card.dataset.viewed !== 'true') show = false;
+                        break;
+                    case 'understood':
+                        if (card.dataset.understood !== 'true') show = false;
+                        break;
+                    case 'review':
+                        if (card.dataset.review !== 'true') show = false;
+                        break;
+                    case 'unviewed':
+                        if (card.dataset.viewed === 'true') show = false;
+                        break;
+                }
+            }
+            
+            // カードの表示/非表示
+            const cardLink = card.closest('.problem-card-link');
+            if (cardLink) {
+                cardLink.style.display = show ? 'block' : 'none';
+            }
+        });
+        
+        // 空のセクションの処理
+        const typeSections = document.querySelectorAll('.type-section');
+        typeSections.forEach(section => {
+            const visibleCards = section.querySelectorAll('.problem-card-link[style="display: block"], .problem-card-link:not([style*="display: none"])');
+            section.style.display = visibleCards.length > 0 ? 'block' : 'none';
         });
     }
     
-    function saveProgress() {
-        const progressData = {
-            understood: understoodCheck.checked,
-            review_flag: reviewCheck.checked,
-            difficulty_rating: currentRating || null,
-            memo: memoInput.value.trim() || null
-        };
-        
-        console.log('保存データ:', progressData);
-        
-        // ボタンを無効化
-        saveProgressBtn.disabled = true;
-        saveProgressBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 保存中...';
-        
-        fetch(`/essay/progress/${problemId}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(progressData)
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.status === 'success') {
-                console.log('進捗保存成功');
-                showSaveSuccess();
-                updateHeaderProgress();
-                updateCurrentProgress();
-            } else {
-                console.error('進捗保存失敗:', data.message);
-                alert('保存に失敗しました: ' + data.message);
-            }
-        })
-        .catch(error => {
-            console.error('進捗保存エラー:', error);
-            alert('保存中にエラーが発生しました');
-        })
-        .finally(() => {
-            // ボタンを有効化
-            saveProgressBtn.disabled = false;
-            saveProgressBtn.innerHTML = '<i class="fas fa-save"></i> 学習記録を保存';
-        });
-    }
+    // フィルターイベントリスナー
+    if (universityFilter) universityFilter.addEventListener('change', applyFilters);
+    if (yearFilter) yearFilter.addEventListener('change', applyFilters);
+    if (progressFilter) progressFilter.addEventListener('change', applyFilters);
+    if (typeFilter) typeFilter.addEventListener('change', applyFilters);
     
-    function showSaveSuccess() {
-        saveSuccess.style.display = 'block';
-        setTimeout(() => {
-            saveSuccess.style.display = 'none';
-        }, 3000);
-    }
-    
-    function updateHeaderProgress() {
-        // ヘッダーの進捗表示を動的に更新
-        const headerProgress = document.querySelector('.header-progress');
-        if (!headerProgress) return;
-        
-        // 既存の進捗インジケーターをクリア
-        headerProgress.innerHTML = '';
-        
-        // 解答閲覧済み
-        if (viewedAnswer || answerSection.classList.contains('show')) {
-            const viewedIndicator = document.createElement('span');
-            viewedIndicator.className = 'progress-indicator viewed';
-            viewedIndicator.innerHTML = '<i class="fas fa-eye"></i> 解答閲覧済み';
-            headerProgress.appendChild(viewedIndicator);
-        }
-        
-        // 理解済み
-        if (understoodCheck.checked) {
-            const understoodIndicator = document.createElement('span');
-            understoodIndicator.className = 'progress-indicator understood';
-            understoodIndicator.innerHTML = '<i class="fas fa-check-circle"></i> 理解済み';
-            headerProgress.appendChild(understoodIndicator);
-        }
-        
-        // 復習フラグ
-        if (reviewCheck.checked) {
-            const reviewIndicator = document.createElement('span');
-            reviewIndicator.className = 'progress-indicator review';
-            reviewIndicator.innerHTML = '<i class="fas fa-flag"></i> 復習予定';
-            headerProgress.appendChild(reviewIndicator);
-        }
-        
-        // 難易度
-        if (currentRating > 0) {
-            const difficultyIndicator = document.createElement('span');
-            difficultyIndicator.className = 'progress-indicator difficulty';
-            difficultyIndicator.innerHTML = `<i class="fas fa-star"></i> 難易度${currentRating}/5`;
-            headerProgress.appendChild(difficultyIndicator);
-        }
-    }
-    
-    function updateCurrentProgress() {
-        // フッターの現在の進捗表示を更新
-        const currentProgress = document.querySelector('.current-progress');
-        if (!currentProgress) return;
-        
-        // 既存の進捗インジケーターをクリア
-        currentProgress.innerHTML = '';
-        
-        // 解答閲覧済み
-        if (viewedAnswer || answerSection.classList.contains('show')) {
-            const viewedIndicator = document.createElement('span');
-            viewedIndicator.className = 'progress-indicator viewed';
-            viewedIndicator.innerHTML = '<i class="fas fa-eye"></i> 解答閲覧済み';
-            currentProgress.appendChild(viewedIndicator);
-        }
-        
-        // 理解済み
-        if (understoodCheck.checked) {
-            const understoodIndicator = document.createElement('span');
-            understoodIndicator.className = 'progress-indicator understood';
-            understoodIndicator.innerHTML = '<i class="fas fa-check-circle"></i> 理解済み';
-            currentProgress.appendChild(understoodIndicator);
-        }
-        
-        // 復習フラグ
-        if (reviewCheck.checked) {
-            const reviewIndicator = document.createElement('span');
-            reviewIndicator.className = 'progress-indicator review';
-            reviewIndicator.innerHTML = '<i class="fas fa-flag"></i> 復習予定';
-            currentProgress.appendChild(reviewIndicator);
-        }
-        
-        // 難易度
-        if (currentRating > 0) {
-            const difficultyIndicator = document.createElement('span');
-            difficultyIndicator.className = 'progress-indicator difficulty';
-            difficultyIndicator.innerHTML = `<i class="fas fa-star"></i> 難易度${currentRating}/5`;
-            currentProgress.appendChild(difficultyIndicator);
-        }
-    }
-    
-    // キーボードショートカット
-    document.addEventListener('keydown', function(e) {
-        // Ctrl+S で保存
-        if (e.ctrlKey && e.key === 's') {
-            e.preventDefault();
-            saveProgress();
-        }
-        
-        // スペースキーで解答表示/非表示
-        if (e.key === ' ' && e.target.tagName !== 'TEXTAREA') {
-            e.preventDefault();
-            if (showAnswerBtn && showAnswerBtn.style.display !== 'none') {
-                showAnswerBtn.click();
-            }
-        }
-        
-        // 数字キー1-5で難易度設定
-        if (e.key >= '1' && e.key <= '5') {
-            const rating = parseInt(e.key);
-            updateStarRating(rating === currentRating ? 0 : rating);
-        }
-    });
-    
-    console.log('論述問題個別ページ初期化完了');
+    console.log('フィルター機能初期化完了');
+    console.log('問題カード数:', problemCards.length);
 });
 </script>
 {% endblock %}
