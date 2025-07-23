@@ -527,149 +527,111 @@
 
     <!-- 問題一覧 -->
     <div class="problems-section">
-        {% set current_type = '' %}
-        {% for problem in problems %}
-        {% if current_type != problem.type %}
-            {% if current_type != '' %}
-                </div> <!-- problems-grid -->
-            </div> <!-- type-section -->
-            {% endif %}
-            {% set current_type = problem.type %}
-        <div class="type-section">
-            <div class="type-header">
-                <div class="type-badge">
-                    タイプ{{ type_group.type }}
-                </div>
-                <h2 class="type-title">
-                    {% if type_group.type == 'A' %}200字以上
-                    {% elif type_group.type == 'B' %}100-150字程度
-                    {% elif type_group.type == 'C' %}50-75字程度
-                    {% elif type_group.type == 'D' %}30字程度
+        {% if problems %}
+            {% set current_type = '' %}
+            {% for problem in problems %}
+                {% if current_type != problem.type %}
+                    {% if current_type != '' %}
+                        </div> <!-- problems-grid -->
+                    </div> <!-- type-section -->
                     {% endif %}
-                </h2>
-            </div>
-            
-            <!-- 問題一覧 -->
-            <div class="problems-section">
-            {% if problems %}
-                {% set current_type = '' %}
-                {% for problem in problems %}
-                    {% if current_type != problem.type %}
-                        {% if current_type != '' %}
-                            </div> <!-- problems-grid -->
-                        </div> <!-- type-section -->
-                        {% endif %}
-                        {% set current_type = problem.type %}
-                        <div class="type-section">
-                            <div class="type-header">
-                                <div class="type-badge">
-                                    タイプ{{ problem.type }}
-                                </div>
-                                <h2 class="type-title">
+                    {% set current_type = problem.type %}
+                    <div class="type-section">
+                        <div class="type-header">
+                            <div class="type-badge">
+                                タイプ{{ problem.type }}
+                            </div>
+                            <h2 class="type-title">
+                                {% if problem.type == 'A' %}200字以上
+                                {% elif problem.type == 'B' %}100-150字程度
+                                {% elif problem.type == 'C' %}50-75字程度
+                                {% elif problem.type == 'D' %}30字程度
+                                {% endif %}
+                            </h2>
+                        </div>
+                        <div class="problems-grid">
+                {% endif %}
+                
+                <!-- 個別問題カード -->
+                <a href="{{ url_for('essay_problem', problem_id=problem.id) }}" class="problem-card-link">
+                    <div class="problem-card">
+                        <div class="problem-header">
+                            <div class="university-year">
+                                <span class="university">{{ problem.university }}</span>
+                                <span class="year">{{ problem.year }}年</span>
+                            </div>
+                            <div class="progress-indicators">
+                                {% if problem.progress and problem.progress.viewed_answer %}
+                                    <span class="indicator viewed" title="解答閲覧済み">
+                                        <i class="fas fa-eye"></i>
+                                    </span>
+                                {% endif %}
+                                {% if problem.progress and problem.progress.understood %}
+                                    <span class="indicator understood" title="理解済み">
+                                        <i class="fas fa-check-circle"></i>
+                                    </span>
+                                {% endif %}
+                                {% if problem.progress and problem.progress.review_flag %}
+                                    <span class="indicator review" title="復習フラグ">
+                                        <i class="fas fa-flag"></i>
+                                    </span>
+                                {% endif %}
+                                {% if problem.progress and problem.progress.difficulty_rating %}
+                                    <span class="indicator difficulty" title="難易度: {{ problem.progress.difficulty_rating }}/5">
+                                        <i class="fas fa-star"></i>{{ problem.progress.difficulty_rating }}
+                                    </span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <div class="problem-content">
+                            <p class="problem-preview">{{ problem.preview or (problem.question[:100] + '...' if problem.question|length > 100 else problem.question) }}</p>
+                            
+                            {% if has_essay_image(problem.id) %}
+                            <div class="problem-image-preview">
+                                <img src="{{ url_for('static', filename=essay_image_path(problem.id)) }}" 
+                                    alt="問題図" 
+                                    loading="lazy">
+                            </div>
+                            {% endif %}
+                            
+                            <div class="problem-meta">
+                                <div class="answer-length">
                                     {% if problem.type == 'A' %}200字以上
                                     {% elif problem.type == 'B' %}100-150字程度
                                     {% elif problem.type == 'C' %}50-75字程度
                                     {% elif problem.type == 'D' %}30字程度
                                     {% endif %}
-                                </h2>
-                            </div>
-                            <div class="problems-grid">
-                    {% endif %}
-                    
-                    <!-- 個別問題カード -->
-                    <a href="{{ url_for('essay_problem', problem_id=problem.id) }}" class="problem-card-link">
-                        <div class="problem-card">
-                            <div class="problem-header">
-                                <div class="university-year">
-                                    <span class="university">{{ problem.university }}</span>
-                                    <span class="year">{{ problem.year }}年</span>
                                 </div>
-                                <div class="progress-indicators">
-                                    {% if problem.progress.viewed_answer %}
-                                        <span class="indicator viewed" title="解答閲覧済み">
-                                            <i class="fas fa-eye"></i>
-                                        </span>
-                                    {% endif %}
-                                    {% if problem.progress.understood %}
-                                        <span class="indicator understood" title="理解済み">
-                                            <i class="fas fa-check-circle"></i>
-                                        </span>
-                                    {% endif %}
-                                    {% if problem.progress.review_flag %}
-                                        <span class="indicator review" title="復習フラグ">
-                                            <i class="fas fa-flag"></i>
-                                        </span>
-                                    {% endif %}
-                                    {% if problem.progress.difficulty_rating %}
-                                        <span class="indicator difficulty" title="難易度: {{ problem.progress.difficulty_rating }}/5">
-                                            <i class="fas fa-star"></i>{{ problem.progress.difficulty_rating }}
-                                        </span>
-                                    {% endif %}
-                                </div>
-                            </div>
-                            
-                            <div class="problem-content">
-                                <p class="problem-preview">{{ problem.preview }}</p>
-                                
-                                {% if has_essay_image(problem.id) %}
-                                <div class="problem-image-preview">
-                                    <img src="{{ url_for('static', filename=essay_image_path(problem.id)) }}" 
-                                            alt="問題図" 
-                                            loading="lazy">
-                                </div>
-                                {% endif %}
-                                
-                                <div class="problem-meta">
-                                    <div class="answer-length">
-                                        {% if problem.type == 'A' %}200字以上
-                                        {% elif problem.type == 'B' %}100-150字程度
-                                        {% elif problem.type == 'C' %}50-75字程度
-                                        {% elif problem.type == 'D' %}30字程度
-                                        {% endif %}
-                                    </div>
-                                    <div class="problem-footer">
-                                        <span class="read-more">
-                                            問題を見る
-                                            <i class="fas fa-arrow-right"></i>
-                                        </span>
-                                    </div>
+                                <div class="problem-footer">
+                                    <span class="read-more">
+                                        問題を見る
+                                        <i class="fas fa-arrow-right"></i>
+                                    </span>
                                 </div>
                             </div>
                         </div>
+                    </div>
+                </a>
+            {% endfor %}
+            
+            <!-- ループ終了後に最後のセクションを閉じる -->
+            {% if problems %}
+                </div> <!-- problems-grid -->
+            </div> <!-- type-section -->
+            {% endif %}
+        {% else %}
+            <div class="no-problems">
+                <div class="no-problems-content">
+                    <i class="fas fa-info-circle"></i>
+                    <h3>この章の問題はまだ登録されていません</h3>
+                    <p>管理者によって問題が登録されるまでお待ちください。</p>
+                    <a href="{{ url_for('essay_index') }}" class="btn btn-primary">
+                        <i class="fas fa-arrow-left"></i> 論述問題集に戻る
                     </a>
-                    
-                    {% if loop.last %}
-                        </div> <!-- problems-grid -->
-                    </div> <!-- type-section -->
-                    {% endif %}
-                {% endfor %}
-            {% else %}
-                <div class="no-problems">
-                    <div class="no-problems-content">
-                        <i class="fas fa-info-circle"></i>
-                        <h3>この章の問題はまだ登録されていません</h3>
-                        <p>管理者によって問題が登録されるまでお待ちください。</p>
-                        <a href="{{ url_for('essay_index') }}" class="btn btn-primary">
-                            <i class="fas fa-arrow-left"></i> 論述問題集に戻る
-                        </a>
                     </div>
                 </div>
-            {% endif %}
             </div>
-        </div>
-        {% endfor %}
-        
-        {% if not problems %}
-        <div class="no-problems">
-            <div class="no-problems-content">
-                <i class="fas fa-info-circle"></i>
-                <h3>この章の問題はまだ登録されていません</h3>
-                <p>管理者によって問題が登録されるまでお待ちください。</p>
-                <a href="{{ url_for('essay_index') }}" class="btn btn-primary">
-                    <i class="fas fa-arrow-left"></i> 論述問題集に戻る
-                </a>
-            </div>
-        </div>
         {% endif %}
     </div>
 </div>
