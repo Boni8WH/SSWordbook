@@ -584,57 +584,86 @@ var problemId = problemData.id || 0;
 var viewedAnswer = problemData.progress.viewed_answer || false;
 
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOMContentLoaded実行開始');
     console.log('初期化完了 - 問題ID:', problemId, '評価:', currentRating, '解答閲覧済み:', viewedAnswer);
     
     // 解答が既に閲覧済みの場合は表示
     if (viewedAnswer) {
+        console.log('解答を自動表示');
         showAnswer();
     }
     
     // 星評価の初期化
     if (currentRating > 0) {
+        console.log('星評価初期化:', currentRating);
         setRating(currentRating);
     }
     
     // イベントリスナーの設定
     var showAnswerBtn = document.getElementById('showAnswerBtn');
+    console.log('解答表示ボタン:', showAnswerBtn);
     if (showAnswerBtn) {
-        showAnswerBtn.addEventListener('click', showAnswer);
+        showAnswerBtn.addEventListener('click', function() {
+            console.log('解答表示ボタンがクリックされました');
+            showAnswer();
+        });
+    } else {
+        console.error('解答表示ボタンが見つかりません');
     }
     
     var saveProgressBtn = document.getElementById('saveProgressBtn');
+    console.log('進捗保存ボタン:', saveProgressBtn);
     if (saveProgressBtn) {
-        saveProgressBtn.addEventListener('click', saveProgress);
+        saveProgressBtn.addEventListener('click', function() {
+            console.log('進捗保存ボタンがクリックされました');
+            saveProgress();
+        });
+    } else {
+        console.error('進捗保存ボタンが見つかりません');
     }
     
     // 星評価のクリックイベント
     var stars = document.querySelectorAll('.star-rating');
+    console.log('星の数:', stars.length);
     for (var i = 0; i < stars.length; i++) {
         stars[i].addEventListener('click', function() {
             var rating = this.getAttribute('data-rating');
+            console.log('星がクリックされました。評価:', rating);
             setRating(rating);
         });
     }
+    
+    console.log('DOMContentLoaded実行完了');
 });
 
 function showAnswer() {
+    console.log('showAnswer関数が呼び出されました');
     var answerSection = document.getElementById('answerSection');
     var showBtn = document.getElementById('showAnswerBtn');
     
+    console.log('answerSection:', answerSection);
+    console.log('showBtn:', showBtn);
+    
     if (answerSection && showBtn) {
+        console.log('解答セクションを表示します');
         answerSection.classList.add('show');
         showBtn.style.display = 'none';
         
         // 解答閲覧を記録
         updateProgress({ viewed_answer: true });
+    } else {
+        console.error('必要な要素が見つかりません');
     }
 }
 
 function setRating(rating) {
+    console.log('setRating関数が呼び出されました。評価:', rating);
     var ratingNum = parseInt(rating);
     if (ratingNum >= 1 && ratingNum <= 5) {
         currentRating = ratingNum;
+        console.log('新しい評価を設定:', currentRating);
         var stars = document.querySelectorAll('.star-rating');
+        console.log('星の要素数:', stars.length);
         for (var i = 0; i < stars.length; i++) {
             if (i < ratingNum) {
                 stars[i].classList.add('active');
@@ -642,15 +671,23 @@ function setRating(rating) {
                 stars[i].classList.remove('active');
             }
         }
+    } else {
+        console.error('無効な評価値:', rating);
     }
 }
 
 function saveProgress() {
+    console.log('saveProgress関数が呼び出されました');
     var understoodEl = document.getElementById('understood');
     var reviewFlagEl = document.getElementById('reviewFlag');
     var memoEl = document.getElementById('memo');
     
+    console.log('understood要素:', understoodEl);
+    console.log('reviewFlag要素:', reviewFlagEl);
+    console.log('memo要素:', memoEl);
+    
     if (!understoodEl || !reviewFlagEl || !memoEl) {
+        console.error('フォーム要素が見つかりません');
         alert('フォーム要素が見つかりません');
         return;
     }
@@ -665,6 +702,7 @@ function saveProgress() {
         updates.difficulty_rating = currentRating;
     }
     
+    console.log('進捗更新データ:', updates);
     updateProgress(updates);
 }
 
