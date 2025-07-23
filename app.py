@@ -7270,15 +7270,24 @@ def essay_index():
         
         print(f"📋 表示される章: {len(chapter_stats)}章")
 
-        context = get_template_context(current_user.id, current_user.username, current_user.room_number)
+        # テンプレートコンテキストを取得（引数なし）
+        context = get_template_context()
+        
+        # セッション情報を手動で追加
         context.update({
-            'chapter_stats': chapter_stats
+            'chapter_stats': chapter_stats,
+            'current_user_id': current_user.id,
+            'current_username': current_user.username,
+            'current_room_number': current_user.room_number,
+            'is_logged_in': True
         })
 
         return render_template('essay_index.html', **context)
 
     except Exception as e:
         print(f"Error in essay_index: {e}")
+        import traceback
+        traceback.print_exc()
         flash('論述問題集の表示中にエラーが発生しました。', 'danger')
         return redirect(url_for('index'))
     
@@ -7326,7 +7335,10 @@ def essay_chapter(chapter):
         # 章名の決定
         chapter_name = '総合問題' if chapter == 'com' else f'第{chapter}章'
 
-        context = get_template_context(current_user.id, current_user.username, current_user.room_number)
+        # テンプレートコンテキストを取得（引数なし）
+        context = get_template_context()
+        
+        # 必要な情報を追加
         context.update({
             'chapter': chapter,
             'chapter_name': chapter_name,
@@ -7338,13 +7350,19 @@ def essay_chapter(chapter):
                 'year_from': year_from,
                 'year_to': year_to,
                 'keyword': keyword
-            }
+            },
+            'current_user_id': current_user.id,
+            'current_username': current_user.username,
+            'current_room_number': current_user.room_number,
+            'is_logged_in': True
         })
 
         return render_template('essay_chapter.html', **context)
 
     except Exception as e:
         print(f"Error in essay_chapter: {e}")
+        import traceback
+        traceback.print_exc()
         flash('論述問題の取得中にエラーが発生しました。', 'danger')
         return redirect(url_for('essay_index'))
 
@@ -7381,21 +7399,30 @@ def essay_problem(problem_id):
         if has_essay_problem_image(problem_id):
             image_path = get_essay_problem_image_path(problem_id)
         
-        context = get_template_context(current_user.id, current_user.username, current_user.room_number)
+        # テンプレートコンテキストを取得（引数なし）
+        context = get_template_context()
+        
+        # 必要な情報を追加
         context.update({
             'problem': problem,
             'prev_problem': prev_problem,
             'next_problem': next_problem,
-            'image_path': image_path
+            'image_path': image_path,
+            'current_user_id': current_user.id,
+            'current_username': current_user.username,
+            'current_room_number': current_user.room_number,
+            'is_logged_in': True
         })
         
         return render_template('essay_problem.html', **context)
 
     except Exception as e:
         print(f"Error in essay_problem: {e}")
+        import traceback
+        traceback.print_exc()
         flash('論述問題の表示中にエラーが発生しました。', 'danger')
         return redirect(url_for('essay_index'))
-
+    
 def get_adjacent_problems_with_visibility(problem, room_number):
     """公開設定を考慮した前後の問題を取得"""
     try:
