@@ -4535,8 +4535,6 @@ def admin_clean_invalid_history():
     
     return redirect(url_for('admin_page'))
 
-# app.py に以下のデバッグ機能を追加してください
-
 def debug_specific_user_data(username):
     """特定ユーザーのデータを詳細デバッグ"""
     
@@ -6750,6 +6748,43 @@ def api_check_special_status(chapter_num):
 # ====================================================================
 # デバッグ・管理機能
 # ====================================================================
+def debug_essay_image_info(problem_id):
+    """論述問題の画像情報をデバッグ出力"""
+    import glob
+    import os
+    
+    upload_dir = os.path.join('static', 'uploads', 'essay_images')
+    
+    print(f"=== 画像デバッグ情報 - 問題ID: {problem_id} ===")
+    print(f"アップロードディレクトリ: {upload_dir}")
+    print(f"ディレクトリ存在確認: {os.path.exists(upload_dir)}")
+    
+    # ディレクトリ内の全ファイルをリスト
+    if os.path.exists(upload_dir):
+        all_files = os.listdir(upload_dir)
+        print(f"ディレクトリ内の全ファイル: {all_files}")
+        
+        # 該当問題IDのファイルを検索
+        pattern = f"essay_problem_{problem_id}.*"
+        matching_files = [f for f in all_files if f.startswith(f"essay_problem_{problem_id}.")]
+        print(f"該当ファイル（パターン: {pattern}）: {matching_files}")
+        
+        # glob検索結果
+        glob_pattern = os.path.join(upload_dir, pattern)
+        glob_matches = glob.glob(glob_pattern)
+        print(f"glob検索結果: {glob_matches}")
+        
+        # 各ファイルの詳細情報
+        for file_path in glob_matches:
+            file_size = os.path.getsize(file_path) if os.path.exists(file_path) else 0
+            print(f"  ファイル: {file_path}")
+            print(f"  サイズ: {file_size} bytes")
+            print(f"  存在確認: {os.path.exists(file_path)}")
+    else:
+        print("アップロードディレクトリが存在しません")
+    
+    print("=" * 50)
+
 @app.route('/admin/debug_essay_visibility/<room_number>')
 def debug_essay_visibility(room_number):
     """論述問題公開設定のデバッグ情報を取得"""
@@ -7368,7 +7403,7 @@ def essay_chapter(chapter):
 
 @app.route('/essay/problem/<int:problem_id>')
 def essay_problem(problem_id):
-    """個別論述問題表示（公開設定チェック付き）"""
+    """個別論述問題表示（画像表示デバッグ機能付き）"""
     try:
         if 'user_id' not in session:
             flash('論述問題を閲覧するにはログインしてください。', 'info')
@@ -7421,10 +7456,31 @@ def essay_problem(problem_id):
         # 前後の問題を取得（公開されているもののみ）
         prev_problem, next_problem = get_adjacent_problems_with_visibility(problem, current_user.room_number)
         
+        # 画像関連の詳細デバッグ情報を出力
+        print(f"🖼️ 画像デバッグ開始 - 問題ID: {problem_id}")
+        debug_essay_image_info(problem_id)
+        
         # 画像パスを取得
         image_path = None
-        if has_essay_problem_image(problem_id):
+        has_image = has_essay_problem_image(problem_id)
+        
+        print(f"📸 画像存在確認: {has_image}")
+        
+        if has_image:
             image_path = get_essay_problem_image_path(problem_id)
+            print(f"📸 生成された画像パス: {image_path}")
+            
+            # 画像ファイルの物理的存在確認
+            if image_path:
+                full_image_path = os.path.join('static', image_path)
+                image_exists = os.path.exists(full_image_path)
+                print(f"📸 画像ファイル物理的存在確認: {image_exists} (パス: {full_image_path})")
+                
+                if not image_exists:
+                    print(f"⚠️ 画像パスは生成されましたが、ファイルが存在しません: {full_image_path}")
+                    image_path = None
+        else:
+            print(f"📸 問題ID {problem_id} には画像が関連付けられていません")
         
         # テンプレートコンテキストを取得（引数なし）
         context = get_template_context()
@@ -7437,12 +7493,11 @@ def essay_problem(problem_id):
             'problem': problem,
             'prev_problem': prev_problem,
             'next_problem': next_problem,
-            'image_path': image_path,
+            'image_path': image_path,  # ここで正しく渡されているかを確認
             'current_user_id': current_user.id,
             'current_username': current_user.username,
             'current_room_number': current_user.room_number,
             'is_logged_in': True,
-            # ★ テンプレートエラー回避のため追加
             'current_filters': {
                 'type': '',
                 'university': '',
@@ -7453,8 +7508,11 @@ def essay_problem(problem_id):
             'filter_data': filter_data,
             'chapter': problem.chapter,
             'chapter_name': '総合問題' if problem.chapter == 'com' else f'第{problem.chapter}章',
-            'problems': [problem]  # ★ 個別問題を配列で渡す（テンプレートが{% if problems %}をチェックするため）
+            'problems': [problem]
         })
+        
+        # テンプレートに渡される image_path の最終確認
+        print(f"📸 テンプレートに渡される image_path: {context.get('image_path')}")
         
         return render_template('essay_problem.html', **context)
 
@@ -7719,6 +7777,100 @@ def get_essay_chapter_stats_with_visibility(user_id, room_number):
 # ========================================
 # 論述問題公開設定 API エンドポイント
 # ========================================
+@app.route('/debug/essay_images')
+def debug_essay_images():
+    """論述問題の画像状況をデバッグ"""
+    if not session.get('admin_logged_in'):
+        return "管理者権限が必要です", 403
+    
+    import glob
+    import os
+    
+    debug_info = []
+    
+    try:
+        # アップロードディレクトリの確認
+        upload_dir = os.path.join('static', 'uploads', 'essay_images')
+        debug_info.append(f"アップロードディレクトリ: {upload_dir}")
+        debug_info.append(f"ディレクトリ存在: {os.path.exists(upload_dir)}")
+        
+        if os.path.exists(upload_dir):
+            # ディレクトリ内の全ファイル
+            all_files = os.listdir(upload_dir)
+            debug_info.append(f"ディレクトリ内のファイル数: {len(all_files)}")
+            debug_info.append("ファイル一覧:")
+            
+            for file in all_files:
+                file_path = os.path.join(upload_dir, file)
+                file_size = os.path.getsize(file_path)
+                debug_info.append(f"  - {file} ({file_size} bytes)")
+        
+        # データベースから画像付き問題を確認
+        problems_with_images = []
+        all_problems = EssayProblem.query.all()
+        
+        for problem in all_problems:
+            has_image = has_essay_problem_image(problem.id)
+            image_path = get_essay_problem_image_path(problem.id) if has_image else None
+            
+            if has_image:
+                problems_with_images.append({
+                    'id': problem.id,
+                    'chapter': problem.chapter,
+                    'university': problem.university,
+                    'year': problem.year,
+                    'has_image': has_image,
+                    'image_path': image_path,
+                    'file_exists': os.path.exists(os.path.join('static', image_path)) if image_path else False
+                })
+        
+        debug_info.append(f"\n画像付き問題数: {len(problems_with_images)}")
+        debug_info.append("画像付き問題一覧:")
+        
+        for problem_info in problems_with_images:
+            debug_info.append(f"  問題ID {problem_info['id']} ({problem_info['university']} {problem_info['year']}年):")
+            debug_info.append(f"    画像パス: {problem_info['image_path']}")
+            debug_info.append(f"    ファイル存在: {problem_info['file_exists']}")
+        
+        return "<pre>" + "\n".join(debug_info) + "</pre>"
+        
+    except Exception as e:
+        return f"<pre>デバッグエラー: {str(e)}</pre>"
+
+@app.route('/debug/essay_image/<int:problem_id>')
+def debug_essay_image_specific(problem_id):
+    """特定の問題の画像をデバッグ"""
+    if not session.get('admin_logged_in'):
+        return "管理者権限が必要です", 403
+    
+    debug_essay_image_info(problem_id)
+    
+    problem = EssayProblem.query.get_or_404(problem_id)
+    has_image = has_essay_problem_image(problem_id)
+    image_path = get_essay_problem_image_path(problem_id) if has_image else None
+    
+    info = []
+    info.append(f"問題ID: {problem_id}")
+    info.append(f"大学: {problem.university}")
+    info.append(f"年度: {problem.year}")
+    info.append(f"章: {problem.chapter}")
+    info.append(f"画像あり: {has_image}")
+    info.append(f"画像パス: {image_path}")
+    
+    if image_path:
+        full_path = os.path.join('static', image_path)
+        info.append(f"フルパス: {full_path}")
+        info.append(f"ファイル存在: {os.path.exists(full_path)}")
+        
+        if os.path.exists(full_path):
+            file_size = os.path.getsize(full_path)
+            info.append(f"ファイルサイズ: {file_size} bytes")
+            
+            # 画像を実際に表示してみる
+            info.append(f"\n実際の画像表示テスト:")
+            info.append(f'<img src="/static/{image_path}" style="max-width: 300px; border: 1px solid red;" alt="テスト画像">')
+    
+    return "<pre>" + "\n".join(info) + "</pre>"
 
 @app.route('/admin/get_room_list')
 def admin_get_room_list():
@@ -9139,14 +9291,37 @@ def has_essay_problem_image(problem_id):
     return len(glob.glob(pattern)) > 0
 
 def get_essay_problem_image_path(problem_id):
-    """論述問題の画像パスを取得"""
+    """論述問題の画像パスを取得（修正版）"""
+    import glob
+    import os
+    
     upload_dir = os.path.join('static', 'uploads', 'essay_images')
     pattern = os.path.join(upload_dir, f"essay_problem_{problem_id}.*")
     matches = glob.glob(pattern)
+    
     if matches:
-        # staticからの相対パスを返す
-        relative_path = os.path.relpath(matches[0], 'static')
-        return relative_path.replace('\\', '/')  # Windows対応
+        # staticディレクトリからの相対パスを正しく生成
+        abs_path = os.path.abspath(matches[0])
+        static_abs = os.path.abspath('static')
+        
+        # static以下の相対パスを取得
+        try:
+            relative_path = os.path.relpath(abs_path, static_abs)
+            # Windowsのバックスラッシュをスラッシュに変換
+            relative_path = relative_path.replace('\\', '/')
+            
+            # デバッグ用ログ出力
+            print(f"画像パス生成 - 問題ID: {problem_id}")
+            print(f"  絶対パス: {abs_path}")
+            print(f"  相対パス: {relative_path}")
+            print(f"  ファイル存在確認: {os.path.exists(abs_path)}")
+            
+            return relative_path
+        except ValueError as e:
+            print(f"パス変換エラー - 問題ID {problem_id}: {e}")
+            return None
+    
+    print(f"画像ファイルが見つかりません - 問題ID: {problem_id}, パターン: {pattern}")
     return None
 
 # テンプレート関数として登録
