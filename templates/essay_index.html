@@ -500,46 +500,12 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('📋 管理者ページ初期化開始');
+    console.log('📋 論述問題集ページ初期化開始');
     
-    // ユーザーテーブルの機能を初期化
-    initializeUserTable();
+    // 論述問題集固有の初期化処理のみ実行
+    // 管理者機能（initializeUserTable, initializeUserFiltering）は呼び出さない
     
-    // フィルタリング機能を初期化
-    initializeUserFiltering();
-    
-    console.log('✅ 管理者ページ初期化完了');
+    console.log('✅ 論述問題集ページ初期化完了');
 });
-
-function initializeUserTable() {
-    console.log('🔧 ユーザーテーブル機能を初期化中...');
-    
-    // ソートアイコンにクリックイベントを追加
-    const sortIcons = document.querySelectorAll('.sort-icon[data-column]');
-    
-    sortIcons.forEach(icon => {
-        icon.addEventListener('click', function() {
-            const column = this.getAttribute('data-column');
-            console.log(`📊 ソート実行: ${column}列`);
-            
-            // 現在のソート状態を確認
-            const isCurrentlyAscending = this.classList.contains('fa-sort-up');
-            
-            // 全てのソートアイコンをリセット
-            document.querySelectorAll('.sort-icon[data-column]').forEach(otherIcon => {
-                otherIcon.className = 'fas fa-sort sort-icon';
-            });
-            
-            // クリックされたアイコンの状態を更新
-            const newAscending = !isCurrentlyAscending;
-            this.className = `fas fa-sort-${newAscending ? 'up' : 'down'} sort-icon`;
-            
-            // ソートを実行
-            sortUserTable(column, newAscending);
-        });
-        
-        console.log(`✅ ソートアイコン設定完了: ${icon.getAttribute('data-column')}`);
-    });
-}
 </script>
 {% endblock %}
