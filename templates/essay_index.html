@@ -384,6 +384,26 @@
         text-align: center;
     }
 }
+
+/* 進捗バーを非表示にする */
+.progress-bar-container {
+    display: none !important;
+}
+
+/* 進捗テキストも非表示にする */
+.progress-text {
+    display: none !important;
+}
+
+/* 章カードのレイアウト調整（進捗バーがない場合） */
+.chapter-card {
+    height: auto;
+    min-height: 120px; /* 進捗バー分の高さを調整 */
+}
+
+.progress-section {
+    padding-bottom: 0; /* 下部の余白を削除 */
+}
 </style>
 {% endblock %}
 
@@ -428,13 +448,6 @@
                         <span class="stat-label">理解済み</span>
                         <span class="stat-value understood">{{ chapter_stat.understood_problems }}</span>
                     </div>
-                </div>
-                
-                <div class="progress-bar-container">
-                    <div class="progress-bar">
-                        <div class="progress-fill" data-progress="{{ chapter_stat.progress_rate }}"></div>
-                    </div>
-                    <span class="progress-text">{{ chapter_stat.progress_rate }}%</span>
                 </div>
             </div>
             
@@ -487,23 +500,46 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // 章カードのクリックイベント
-    document.querySelectorAll('.chapter-card').forEach(card => {
-        card.addEventListener('click', function() {
-            const url = this.dataset.chapterUrl;
-            if (url) {
-                location.href = url;
-            }
-        });
-    });
+    console.log('📋 管理者ページ初期化開始');
     
-    // プログレスバーの幅を設定
-    document.querySelectorAll('.progress-fill').forEach(progressBar => {
-        const progress = progressBar.dataset.progress;
-        if (progress) {
-            progressBar.style.width = progress + '%';
-        }
-    });
+    // ユーザーテーブルの機能を初期化
+    initializeUserTable();
+    
+    // フィルタリング機能を初期化
+    initializeUserFiltering();
+    
+    console.log('✅ 管理者ページ初期化完了');
 });
+
+function initializeUserTable() {
+    console.log('🔧 ユーザーテーブル機能を初期化中...');
+    
+    // ソートアイコンにクリックイベントを追加
+    const sortIcons = document.querySelectorAll('.sort-icon[data-column]');
+    
+    sortIcons.forEach(icon => {
+        icon.addEventListener('click', function() {
+            const column = this.getAttribute('data-column');
+            console.log(`📊 ソート実行: ${column}列`);
+            
+            // 現在のソート状態を確認
+            const isCurrentlyAscending = this.classList.contains('fa-sort-up');
+            
+            // 全てのソートアイコンをリセット
+            document.querySelectorAll('.sort-icon[data-column]').forEach(otherIcon => {
+                otherIcon.className = 'fas fa-sort sort-icon';
+            });
+            
+            // クリックされたアイコンの状態を更新
+            const newAscending = !isCurrentlyAscending;
+            this.className = `fas fa-sort-${newAscending ? 'up' : 'down'} sort-icon`;
+            
+            // ソートを実行
+            sortUserTable(column, newAscending);
+        });
+        
+        console.log(`✅ ソートアイコン設定完了: ${icon.getAttribute('data-column')}`);
+    });
+}
 </script>
 {% endblock %}

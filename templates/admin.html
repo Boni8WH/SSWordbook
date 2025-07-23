@@ -128,11 +128,11 @@
                 </form>
                 
                 <h4>登録済みユーザー一覧</h4>
-                <!-- ソート機能付きユーザーリスト -->
+                <!-- ソート・検索コントロール -->
                 <div class="table-controls mb-3">
                     <div class="row">
                         <div class="col-md-6">
-                            <label for="roomSortSelect">部屋でソート:</label>
+                            <label for="roomSortSelect">部屋でフィルター:</label>
                             <select id="roomSortSelect" class="form-control form-control-sm">
                                 <option value="">全ての部屋</option>
                                 {% set room_numbers = [] %}
@@ -148,7 +148,8 @@
                         </div>
                         <div class="col-md-6">
                             <label for="userSearchInput">ユーザー検索:</label>
-                            <input type="text" id="userSearchInput" class="form-control form-control-sm" placeholder="名前、出席番号で検索...">
+                            <input type="text" id="userSearchInput" class="form-control form-control-sm" 
+                                placeholder="名前、出席番号で検索...">
                         </div>
                     </div>
                 </div>
@@ -160,19 +161,30 @@
                             <thead class="table-dark sticky-header">
                                 <tr>
                                     <th>ID</th>
-                                    <th>部屋 <i class="fas fa-sort sort-icon" data-column="room" style="cursor: pointer;"></i></th>
+                                    <th style="cursor: pointer;" title="クリックでソート">
+                                        部屋 
+                                        <i class="fas fa-sort sort-icon" data-column="room"></i>
+                                    </th>
                                     <th>出席番号</th>
-                                    <th>現在のアカウント名 <i class="fas fa-sort sort-icon" data-column="name" style="cursor: pointer;"></i></th>
+                                    <th style="cursor: pointer;" title="クリックでソート">
+                                        現在のアカウント名 
+                                        <i class="fas fa-sort sort-icon" data-column="name"></i>
+                                    </th>
                                     <th>最初のアカウント名</th>
                                     <th>変更日時</th>
-                                    <th>最終ログイン <i class="fas fa-sort sort-icon" data-column="login" style="cursor: pointer;"></i></th>
+                                    <th style="cursor: pointer;" title="クリックでソート">
+                                        最終ログイン 
+                                        <i class="fas fa-sort sort-icon" data-column="login"></i>
+                                    </th>
                                     <th>操作</th>
                                 </tr>
                             </thead>
                             <tbody id="userTableBody">
                                 {% for user in users %}
                                 {% if user.username != 'admin' %}
-                                <tr data-room="{{ user.room_number }}" data-name="{{ user.username|lower }}" data-student="{{ user.student_id|lower }}">
+                                <tr data-room="{{ user.room_number }}" 
+                                    data-name="{{ user.username|lower }}" 
+                                    data-student="{{ user.student_id|lower }}">
                                     <td>{{ user.id }}</td>
                                     <td><span class="badge bg-secondary">{{ user.room_number }}</span></td>
                                     <td>{{ user.student_id }}</td>
@@ -191,13 +203,25 @@
                                         <span class="text-muted">-</span>
                                         {% endif %}
                                     </td>
-                                    <td>{{ user.username_changed_at | to_jst if user.username_changed_at else '-' }}</td>
-                                    <td>{{ user.last_login | to_jst if user.last_login else '未ログイン' }}</td>
                                     <td>
-                                        <button class="btn btn-danger btn-sm delete-user-btn"
-                                                data-user-id="{{ user.id }}"
-                                                data-username="{{ user.username }}"
-                                                data-room="{{ user.room_number }}">削除</button>
+                                        {% if user.username_changed_at %}
+                                        <small class="text-muted">{{ user.username_changed_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                                        {% else %}
+                                        <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if user.last_login_at %}
+                                        {{ user.last_login_at.strftime('%Y-%m-%d %H:%M') }}
+                                        {% else %}
+                                        <span class="text-muted">未ログイン</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <button type="button" class="btn btn-danger btn-sm delete-user-btn" 
+                                                onclick="deleteUser({{ user.id }}, '{{ user.username }}')">
+                                            <i class="fas fa-trash"></i> 削除
+                                        </button>
                                     </td>
                                 </tr>
                                 {% endif %}
@@ -1091,33 +1115,110 @@ function initializeUserTableSort() {
     });
 }
 
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('📋 管理者ページ初期化開始');
+    
+    // 他の既存初期化関数があれば維持
+    // 例: initializeOtherFeatures();
+    
+    // ユーザーテーブルの機能を初期化
+    initializeUserTable();
+    
+    // フィルタリング機能を初期化
+    initializeUserFiltering();
+    
+    console.log('✅ 管理者ページ初期化完了');
+});
+
+function initializeUserTable() {
+    console.log('🔧 ユーザーテーブル機能を初期化中...');
+    
+    // ソートアイコンにクリックイベントを追加
+    const sortIcons = document.querySelectorAll('.sort-icon[data-column]');
+    
+    if (sortIcons.length === 0) {
+        console.warn('⚠️ ソートアイコンが見つかりません');
+        return;
+    }
+    
+    sortIcons.forEach(icon => {
+        icon.addEventListener('click', function() {
+            const column = this.getAttribute('data-column');
+            console.log(`📊 ソート実行: ${column}列`);
+            
+            // 現在のソート状態を確認
+            const isCurrentlyAscending = this.classList.contains('fa-sort-up');
+            
+            // 全てのソートアイコンをリセット
+            document.querySelectorAll('.sort-icon[data-column]').forEach(otherIcon => {
+                otherIcon.className = 'fas fa-sort sort-icon';
+            });
+            
+            // クリックされたアイコンの状態を更新
+            const newAscending = !isCurrentlyAscending;
+            this.className = `fas fa-sort-${newAscending ? 'up' : 'down'} sort-icon`;
+            
+            // ソートを実行
+            sortUserTable(column, newAscending);
+        });
+        
+        console.log(`✅ ソートアイコン設定完了: ${icon.getAttribute('data-column')}`);
+    });
+}
+
+// ✅ 新版: 改良されたソート関数
 function sortUserTable(column, ascending) {
+    console.log(`🔄 テーブルソート実行: ${column}, 昇順=${ascending}`);
+    
     const tbody = document.getElementById('userTableBody');
+    if (!tbody) {
+        console.error('❌ userTableBodyが見つかりません');
+        return;
+    }
+    
     const rows = Array.from(tbody.querySelectorAll('tr'));
+    console.log(`📋 ソート対象行数: ${rows.length}`);
+    
+    if (rows.length === 0) {
+        console.warn('⚠️ ソート対象の行がありません');
+        return;
+    }
     
     rows.sort((a, b) => {
         let aVal, bVal;
         
         switch(column) {
             case 'room':
-                aVal = a.cells[1].textContent.trim();
-                bVal = b.cells[1].textContent.trim();
+                aVal = a.cells[1] ? a.cells[1].textContent.trim() : '';
+                bVal = b.cells[1] ? b.cells[1].textContent.trim() : '';
+                // 数値として比較（部屋番号）
+                aVal = parseInt(aVal.replace(/[^0-9]/g, '')) || 0;
+                bVal = parseInt(bVal.replace(/[^0-9]/g, '')) || 0;
                 break;
+                
             case 'name':
-                aVal = a.cells[3].textContent.trim();
-                bVal = b.cells[3].textContent.trim();
+                aVal = a.cells[3] ? a.cells[3].textContent.trim().toLowerCase() : '';
+                bVal = b.cells[3] ? b.cells[3].textContent.trim().toLowerCase() : '';
                 break;
+                
             case 'login':
-                aVal = a.cells[6].textContent.trim();
-                bVal = b.cells[6].textContent.trim();
-                // 日付の場合は Date オブジェクトに変換
-                if (aVal !== '未ログイン') aVal = new Date(aVal);
-                if (bVal !== '未ログイン') bVal = new Date(bVal);
+                aVal = a.cells[6] ? a.cells[6].textContent.trim() : '';
+                bVal = b.cells[6] ? b.cells[6].textContent.trim() : '';
+                
+                // 日付の処理
+                if (aVal === '未ログイン' || aVal === '') aVal = new Date(0); // 最古の日付
+                else aVal = new Date(aVal);
+                
+                if (bVal === '未ログイン' || bVal === '') bVal = new Date(0);
+                else bVal = new Date(bVal);
                 break;
+                
             default:
+                console.warn(`⚠️ 未対応のソート列: ${column}`);
                 return 0;
         }
         
+        // 比較処理
         if (aVal < bVal) return ascending ? -1 : 1;
         if (aVal > bVal) return ascending ? 1 : -1;
         return 0;
@@ -1126,42 +1227,106 @@ function sortUserTable(column, ascending) {
     // テーブルを再構築
     tbody.innerHTML = '';
     rows.forEach(row => tbody.appendChild(row));
+    
+    console.log(`✅ ソート完了: ${column} (昇順=${ascending})`);
 }
 
-// ユーザー検索・フィルタリング機能
+// ✅ 新版: 改良されたフィルタリング初期化
 function initializeUserFiltering() {
+    console.log('🔍 フィルタリング機能を初期化中...');
+    
     const roomSelect = document.getElementById('roomSortSelect');
     const searchInput = document.getElementById('userSearchInput');
     
     if (roomSelect) {
-        roomSelect.addEventListener('change', filterUsers);
+        roomSelect.addEventListener('change', function() {
+            console.log(`🏠 部屋フィルター変更: ${this.value}`);
+            filterUsers();
+        });
+        console.log('✅ 部屋セレクトボックス設定完了');
+    } else {
+        console.warn('⚠️ roomSortSelectが見つかりません');
     }
     
     if (searchInput) {
-        searchInput.addEventListener('input', filterUsers);
+        searchInput.addEventListener('input', function() {
+            console.log(`🔍 検索フィルター変更: "${this.value}"`);
+            filterUsers();
+        });
+        console.log('✅ 検索入力フィールド設定完了');
+    } else {
+        console.warn('⚠️ userSearchInputが見つかりません');
     }
 }
 
+// ✅ 新版: 改良されたフィルター関数
 function filterUsers() {
     const roomSelect = document.getElementById('roomSortSelect');
     const searchInput = document.getElementById('userSearchInput');
     const tbody = document.getElementById('userTableBody');
     
-    if (!tbody) return;
+    if (!tbody) {
+        console.error('❌ userTableBodyが見つかりません');
+        return;
+    }
     
     const selectedRoom = roomSelect ? roomSelect.value : '';
     const searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
     
+    console.log(`🔍 フィルター適用: 部屋="${selectedRoom}", 検索="${searchTerm}"`);
+    
     const rows = tbody.querySelectorAll('tr');
+    let visibleCount = 0;
     
     rows.forEach(row => {
-        const roomMatch = !selectedRoom || row.dataset.room === selectedRoom;
-        const searchMatch = !searchTerm || 
-            row.dataset.name.includes(searchTerm) || 
-            row.dataset.student.includes(searchTerm);
+        // データ属性から値を取得（null チェック追加）
+        const roomValue = row.dataset ? row.dataset.room : '';
+        const roomMatch = !selectedRoom || roomValue === selectedRoom;
         
-        row.style.display = (roomMatch && searchMatch) ? '' : 'none';
+        // 検索対象のテキストを取得（名前と出席番号）
+        const nameText = row.dataset ? (row.dataset.name || '') : '';
+        const studentText = row.dataset ? (row.dataset.student || '') : '';
+        
+        const searchMatch = !searchTerm || 
+            nameText.includes(searchTerm) || 
+            studentText.includes(searchTerm);
+        
+        const shouldShow = roomMatch && searchMatch;
+        row.style.display = shouldShow ? '' : 'none';
+        
+        if (shouldShow) visibleCount++;
     });
+    
+    console.log(`✅ フィルター完了: ${visibleCount}行表示`);
+}
+
+// ✅ 新版: デバッグ関数（オプション）
+function debugUserTable() {
+    console.log('🐛 ユーザーテーブルデバッグ情報:');
+    
+    const tbody = document.getElementById('userTableBody');
+    const roomSelect = document.getElementById('roomSortSelect');
+    const searchInput = document.getElementById('userSearchInput');
+    const sortIcons = document.querySelectorAll('.sort-icon[data-column]');
+    
+    console.log('DOM要素の存在確認:');
+    console.log(`- userTableBody: ${tbody ? '✅' : '❌'}`);
+    console.log(`- roomSortSelect: ${roomSelect ? '✅' : '❌'}`);
+    console.log(`- userSearchInput: ${searchInput ? '✅' : '❌'}`);
+    console.log(`- sortIcons: ${sortIcons.length}個`);
+    
+    if (tbody) {
+        const rows = tbody.querySelectorAll('tr');
+        console.log(`テーブル行数: ${rows.length}`);
+        
+        if (rows.length > 0) {
+            const firstRow = rows[0];
+            console.log('最初の行のデータ属性:');
+            console.log(`- data-room: "${firstRow.dataset ? firstRow.dataset.room : 'なし'}"`);
+            console.log(`- data-name: "${firstRow.dataset ? firstRow.dataset.name : 'なし'}"`);
+            console.log(`- data-student: "${firstRow.dataset ? firstRow.dataset.student : 'なし'}"`);
+        }
+    }
 }
 
 // ========================================
@@ -4596,6 +4761,53 @@ document.addEventListener('DOMContentLoaded', function() {
     max-width: 300px;
     z-index: 9999;
     display: none; /* 本番では非表示 */
+}
+
+/* ソート可能なヘッダーのスタイル */
+th[style*="cursor: pointer"] {
+    user-select: none;
+    background-color: #495057 !important;
+}
+
+th[style*="cursor: pointer"]:hover {
+    background-color: #6c757d !important;
+}
+
+.sort-icon {
+    margin-left: 5px;
+    opacity: 0.7;
+    transition: opacity 0.2s, color 0.2s;
+}
+
+.sort-icon:hover {
+    opacity: 1;
+    color: #ffc107;
+}
+
+/* ソート状態のアイコン */
+.fa-sort-up {
+    color: #28a745;
+}
+
+.fa-sort-down {
+    color: #dc3545;
+}
+
+/* テーブル行のホバー効果 */
+#userTableBody tr:hover {
+    background-color: #f8f9fa !important;
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 768px) {
+    .table-controls .col-md-6 {
+        margin-bottom: 10px;
+    }
+    
+    .scrollable-table-container {
+        max-height: 400px;
+        overflow-y: auto;
+    }
 }
 </style>
 {% endblock %}
