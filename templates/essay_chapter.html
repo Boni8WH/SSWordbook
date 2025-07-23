@@ -2,7 +2,7 @@
 
 {% block title %}{{ chapter_name }} - 論述問題集{% endblock %}
 
-{% block extra_head %}
+{% block head_extra %}
 <style>
 /* 基本スタイル */
 .essay-chapter-container {
@@ -355,19 +355,19 @@
         <div class="chapter-stats">
             <div class="stat-item">
                 <i class="fas fa-list"></i>
-                総問題数: {{ total_problems }}問
+                総問題数: {{ total_problems or problems|length }}問
             </div>
             <div class="stat-item">
                 <i class="fas fa-eye"></i>
-                閲覧済み: {{ viewed_problems }}問
+                閲覧済み: {{ viewed_problems or 0 }}問
             </div>
             <div class="stat-item">
                 <i class="fas fa-check-circle"></i>
-                理解済み: {{ understood_problems }}問
+                理解済み: {{ understood_problems or 0 }}問
             </div>
             <div class="stat-item">
                 <i class="fas fa-percentage"></i>
-                進捗率: {{ progress_rate }}%
+                進捗率: {{ progress_rate or 0 }}%
             </div>
         </div>
     </div>
@@ -389,18 +389,22 @@
                 <label class="filter-label">大学で絞り込み</label>
                 <select class="filter-select" id="universityFilter">
                     <option value="">すべての大学</option>
-                    {% for university in filter_data.universities %}
-                    <option value="{{ university }}" {{ 'selected' if current_filters.university == university }}>{{ university }}</option>
-                    {% endfor %}
+                    {% if filter_data and filter_data.universities %}
+                        {% for university in filter_data.universities %}
+                        <option value="{{ university }}" {{ 'selected' if current_filters.university == university }}>{{ university }}</option>
+                        {% endfor %}
+                    {% endif %}
                 </select>
             </div>
             <div class="filter-item">
                 <label class="filter-label">年度で絞り込み</label>
                 <select class="filter-select" id="yearFilter">
                     <option value="">すべての年度</option>
-                    {% for year in range(filter_data.year_range.max, filter_data.year_range.min - 1, -1) %}
-                    <option value="{{ year }}" {{ 'selected' if current_filters.year_from == year }}>{{ year }}年</option>
-                    {% endfor %}
+                    {% if filter_data and filter_data.year_range %}
+                        {% for year in range(filter_data.year_range.max, filter_data.year_range.min - 1, -1) %}
+                        <option value="{{ year }}" {{ 'selected' if current_filters.year_from == year }}>{{ year }}年</option>
+                        {% endfor %}
+                    {% endif %}
                 </select>
             </div>
             <div class="filter-item">
@@ -510,7 +514,6 @@ document.addEventListener('DOMContentLoaded', function() {
         if (typeFilter.value) params.set('type', typeFilter.value);
         if (universityFilter.value) params.set('university', universityFilter.value);
         if (yearFilter.value) params.set('year_from', yearFilter.value);
-        if (progressFilter.value) params.set('progress', progressFilter.value);
         
         const url = new URL(window.location);
         url.search = params.toString();
