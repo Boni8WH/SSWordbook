@@ -21,6 +21,7 @@
     border-radius: 15px;
     margin-bottom: 25px;
     box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+    position: relative;
 }
 
 .breadcrumb {
@@ -54,7 +55,7 @@
     flex-wrap: wrap;
     gap: 15px;
     align-items: center;
-    margin-bottom: 10px;
+    margin-bottom: 15px;
 }
 
 .meta-item {
@@ -65,6 +66,40 @@
     padding: 6px 12px;
     border-radius: 20px;
     font-size: 0.9rem;
+}
+
+/* 現在の進捗表示をヘッダーに追加 */
+.header-progress {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.header-progress .progress-indicator {
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.header-progress .progress-indicator.viewed {
+    background: rgba(33, 150, 243, 0.8);
+}
+
+.header-progress .progress-indicator.understood {
+    background: rgba(76, 175, 80, 0.8);
+}
+
+.header-progress .progress-indicator.review {
+    background: rgba(255, 193, 7, 0.8);
+}
+
+.header-progress .progress-indicator.difficulty {
+    background: rgba(156, 39, 176, 0.8);
 }
 
 /* ナビゲーション */
@@ -88,6 +123,7 @@
     transition: all 0.3s ease;
     border: 1px solid #dee2e6;
     font-size: 0.9rem;
+    font-weight: 500;
 }
 
 .nav-button:hover {
@@ -95,6 +131,7 @@
     color: #495057;
     text-decoration: none;
     transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .nav-button:disabled,
@@ -103,6 +140,7 @@
     color: #6c757d;
     cursor: not-allowed;
     transform: none;
+    box-shadow: none;
 }
 
 .back-to-chapter {
@@ -143,10 +181,14 @@
     margin: 0;
 }
 
-/* 問題画像 */
+/* 問題画像 - 改善された表示 */
 .question-image {
     margin: 20px 0;
     text-align: center;
+    background: white;
+    padding: 15px;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
 }
 
 .question-image img {
@@ -154,6 +196,13 @@
     height: auto;
     border-radius: 8px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.image-caption {
+    margin-top: 10px;
+    font-size: 0.9rem;
+    color: #6c757d;
+    font-style: italic;
 }
 
 /* 解答セクション */
@@ -164,10 +213,16 @@
     margin-bottom: 25px;
     border-left: 4px solid #ff9800;
     display: none;
+    animation: fadeIn 0.3s ease;
 }
 
 .answer-section.show {
     display: block;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 .answer-text {
@@ -208,19 +263,21 @@
     box-shadow: none;
 }
 
-/* 進捗管理セクション */
+/* 進捗管理セクション - 改善されたデザイン */
 .progress-section {
     background: white;
     border: 1px solid #dee2e6;
     border-radius: 12px;
     padding: 25px;
     margin-bottom: 25px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
 .progress-controls {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
     gap: 20px;
+    margin-bottom: 20px;
 }
 
 .control-group {
@@ -233,62 +290,100 @@
     font-weight: 600;
     color: #495057;
     font-size: 0.95rem;
+    display: flex;
+    align-items: center;
+    gap: 6px;
 }
 
 .checkbox-group {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
+    padding: 8px 12px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+    transition: all 0.3s ease;
+}
+
+.checkbox-group:hover {
+    background: #e9ecef;
 }
 
 .checkbox-group input[type="checkbox"] {
     width: 18px;
     height: 18px;
     cursor: pointer;
+    accent-color: #667eea;
+}
+
+.checkbox-label {
+    font-weight: 500;
+    cursor: pointer;
+    flex: 1;
 }
 
 .rating-group {
     display: flex;
     gap: 5px;
+    padding: 8px 12px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+    justify-content: center;
 }
 
 .star-rating {
     color: #ddd;
     font-size: 1.5rem;
     cursor: pointer;
-    transition: color 0.2s ease;
+    transition: color 0.2s ease, transform 0.2s ease;
 }
 
 .star-rating.active,
 .star-rating:hover {
     color: #ffc107;
+    transform: scale(1.1);
 }
 
 .memo-input {
     width: 100%;
     min-height: 80px;
-    padding: 10px;
+    padding: 12px;
     border: 1px solid #ced4da;
-    border-radius: 6px;
+    border-radius: 8px;
     font-family: inherit;
     font-size: 0.95rem;
     resize: vertical;
+    transition: border-color 0.3s ease;
+}
+
+.memo-input:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
 }
 
 .save-progress-btn {
-    background: #28a745;
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
     color: white;
     border: none;
-    padding: 10px 20px;
-    border-radius: 6px;
+    padding: 12px 25px;
+    border-radius: 8px;
     cursor: pointer;
     font-size: 0.95rem;
     font-weight: 600;
-    transition: background 0.3s ease;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    justify-self: center;
+    box-shadow: 0 2px 8px rgba(40, 167, 69, 0.3);
 }
 
 .save-progress-btn:hover {
-    background: #218838;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(40, 167, 69, 0.4);
 }
 
 /* 現在の進捗表示 */
@@ -296,7 +391,9 @@
     display: flex;
     flex-wrap: wrap;
     gap: 10px;
-    margin-top: 15px;
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid #dee2e6;
 }
 
 .progress-indicator {
@@ -304,26 +401,50 @@
     border-radius: 15px;
     font-size: 0.85rem;
     font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 6px;
 }
 
 .progress-indicator.viewed {
     background: #e3f2fd;
     color: #1976d2;
+    border: 1px solid #bbdefb;
 }
 
 .progress-indicator.understood {
     background: #e8f5e8;
     color: #2e7d32;
+    border: 1px solid #c8e6c9;
 }
 
 .progress-indicator.review {
     background: #fff3e0;
     color: #f57c00;
+    border: 1px solid #ffcc02;
 }
 
 .progress-indicator.difficulty {
     background: #f3e5f5;
     color: #7b1fa2;
+    border: 1px solid #ce93d8;
+}
+
+/* 成功メッセージ */
+.save-success {
+    background: #d4edda;
+    color: #155724;
+    padding: 10px 15px;
+    border-radius: 8px;
+    margin-top: 10px;
+    border: 1px solid #c3e6cb;
+    display: none;
+    animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 /* レスポンシブ対応 */
@@ -358,6 +479,10 @@
     .progress-controls {
         grid-template-columns: 1fr;
     }
+    
+    .rating-group {
+        justify-content: flex-start;
+    }
 }
 
 @media (max-width: 480px) {
@@ -373,6 +498,27 @@
     .answer-section,
     .progress-section {
         padding: 15px;
+    }
+    
+    .star-rating {
+        font-size: 1.3rem;
+    }
+    
+    .header-progress {
+        justify-content: center;
+    }
+}
+
+/* 印刷対応 */
+@media print {
+    .problem-navigation,
+    .progress-section,
+    .show-answer-btn {
+        display: none;
+    }
+    
+    .answer-section {
+        display: block !important;
     }
 }
 </style>
@@ -421,6 +567,30 @@
                 タイプ{{ problem.type }}
             </div>
         </div>
+
+        <!-- ヘッダーに現在の進捗表示 -->
+        <div class="header-progress">
+            {% if problem.progress and problem.progress.viewed_answer %}
+            <span class="progress-indicator viewed">
+                <i class="fas fa-eye"></i> 解答閲覧済み
+            </span>
+            {% endif %}
+            {% if problem.progress and problem.progress.understood %}
+            <span class="progress-indicator understood">
+                <i class="fas fa-check-circle"></i> 理解済み
+            </span>
+            {% endif %}
+            {% if problem.progress and problem.progress.review_flag %}
+            <span class="progress-indicator review">
+                <i class="fas fa-flag"></i> 復習予定
+            </span>
+            {% endif %}
+            {% if problem.progress and problem.progress.difficulty_rating %}
+            <span class="progress-indicator difficulty">
+                <i class="fas fa-star"></i> 難易度{{ problem.progress.difficulty_rating }}/5
+            </span>
+            {% endif %}
+        </div>
     </div>
 
     <!-- ナビゲーション -->
@@ -463,11 +633,20 @@
         </h2>
         <p class="question-text">{{ problem.question }}</p>
         
+        <!-- 改善された画像表示 -->
         {% if image_path %}
         <div class="question-image">
             <img src="{{ url_for('static', filename=image_path) }}" 
                  alt="問題図" 
                  loading="lazy">
+            <div class="image-caption">問題図</div>
+        </div>
+        {% elif has_essay_image(problem.id) %}
+        <div class="question-image">
+            <img src="{{ url_for('static', filename=essay_image_path(problem.id)) }}" 
+                 alt="問題図" 
+                 loading="lazy">
+            <div class="image-caption">問題図</div>
         </div>
         {% endif %}
     </div>
@@ -491,52 +670,64 @@
     <div class="progress-section">
         <h2 class="section-title">
             <i class="fas fa-chart-line"></i>
-            学習進捗
+            学習の記録
         </h2>
         
         <div class="progress-controls">
             <div class="control-group">
-                <label>理解度</label>
+                <label>
+                    <i class="fas fa-check-circle"></i>
+                    理解度
+                </label>
                 <div class="checkbox-group">
-                    <input type="checkbox" 
-                           id="understood" 
-                           {% if problem.progress and problem.progress.understood %}checked{% endif %}>
-                    <label for="understood">理解した</label>
+                    <input type="checkbox" id="understoodCheck">
+                    <label for="understoodCheck" class="checkbox-label">この問題を理解した</label>
                 </div>
             </div>
             
             <div class="control-group">
-                <label>復習フラグ</label>
+                <label>
+                    <i class="fas fa-flag"></i>
+                    復習設定
+                </label>
                 <div class="checkbox-group">
-                    <input type="checkbox" 
-                           id="reviewFlag" 
-                           {% if problem.progress and problem.progress.review_flag %}checked{% endif %}>
-                    <label for="reviewFlag">後で復習する</label>
+                    <input type="checkbox" id="reviewCheck">
+                    <label for="reviewCheck" class="checkbox-label">後で復習する</label>
                 </div>
             </div>
             
             <div class="control-group">
-                <label>難易度評価</label>
-                <div class="rating-group">
-                    {% for i in range(1, 6) %}
-                    <span class="star-rating {% if problem.progress and problem.progress.difficulty_rating and i <= problem.progress.difficulty_rating %}active{% endif %}" 
-                          data-rating="{{ i }}">★</span>
-                    {% endfor %}
+                <label>
+                    <i class="fas fa-star"></i>
+                    難易度評価
+                </label>
+                <div class="rating-group" id="difficultyRating">
+                    <span class="star-rating" data-rating="1">★</span>
+                    <span class="star-rating" data-rating="2">★</span>
+                    <span class="star-rating" data-rating="3">★</span>
+                    <span class="star-rating" data-rating="4">★</span>
+                    <span class="star-rating" data-rating="5">★</span>
                 </div>
             </div>
             
             <div class="control-group">
-                <label for="memo">メモ</label>
-                <textarea id="memo" 
-                          class="memo-input" 
-                          placeholder="この問題についてのメモを記入...">{% if problem.progress and problem.progress.memo %}{{ problem.progress.memo }}{% endif %}</textarea>
+                <label for="memoInput">
+                    <i class="fas fa-sticky-note"></i>
+                    メモ・学習ポイント
+                </label>
+                <textarea class="memo-input" id="memoInput" placeholder="重要なポイントや気づきを記録しましょう..."></textarea>
             </div>
         </div>
         
         <button class="save-progress-btn" id="saveProgressBtn">
             <i class="fas fa-save"></i>
-            進捗を保存
+            学習記録を保存
         </button>
+
+        <div class="save-success" id="saveSuccess">
+            <i class="fas fa-check-circle"></i>
+            学習記録を保存しました！
+        </div>
         
         <!-- 現在の進捗表示 -->
         <div class="current-progress">
@@ -571,212 +762,283 @@
      data-problem-id="{{ problem.id }}"
      data-current-rating="{% if problem.progress and problem.progress.difficulty_rating %}{{ problem.progress.difficulty_rating }}{% else %}0{% endif %}"
      data-viewed-answer="{% if problem.progress and problem.progress.viewed_answer %}true{% else %}false{% endif %}"
+     data-understood="{% if problem.progress and problem.progress.understood %}true{% else %}false{% endif %}"
+     data-review-flag="{% if problem.progress and problem.progress.review_flag %}true{% else %}false{% endif %}"
+     data-memo="{% if problem.progress and problem.progress.memo %}{{ problem.progress.memo }}{% else %}{% endif %}"
      style="display: none;"></div>
 
 <script>
-// デバッグ用のログを追加
-console.log('スクリプト読み込み開始');
+console.log('論述問題個別ページ初期化開始');
 
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('DOMContentLoaded実行開始');
-    
-    // HTMLのdata属性からJavaScript変数を取得
-    var problemData = document.getElementById('problem-data');
-    console.log('problemData要素:', problemData);
-    
+    // データ取得
+    const problemData = document.getElementById('problem-data');
     if (!problemData) {
         console.error('problem-data要素が見つかりません');
         return;
     }
     
-    var problemId = parseInt(problemData.getAttribute('data-problem-id'));
-    var currentRating = parseInt(problemData.getAttribute('data-current-rating'));
-    var viewedAnswer = problemData.getAttribute('data-viewed-answer') === 'true';
+    const problemId = parseInt(problemData.getAttribute('data-problem-id'));
+    const currentRating = parseInt(problemData.getAttribute('data-current-rating')) || 0;
+    const viewedAnswer = problemData.getAttribute('data-viewed-answer') === 'true';
+    const understood = problemData.getAttribute('data-understood') === 'true';
+    const reviewFlag = problemData.getAttribute('data-review-flag') === 'true';
+    const memo = problemData.getAttribute('data-memo') || '';
     
-    console.log('初期化完了 - 問題ID:', problemId, '評価:', currentRating, '解答閲覧済み:', viewedAnswer);
+    console.log('初期化データ:', { problemId, currentRating, viewedAnswer, understood, reviewFlag, memo });
     
-    // 各ボタン要素の存在確認
-    var showAnswerBtn = document.getElementById('showAnswerBtn');
-    var saveProgressBtn = document.getElementById('saveProgressBtn');
-    var answerSection = document.getElementById('answerSection');
+    // DOM要素取得
+    const showAnswerBtn = document.getElementById('showAnswerBtn');
+    const answerSection = document.getElementById('answerSection');
+    const saveProgressBtn = document.getElementById('saveProgressBtn');
+    const saveSuccess = document.getElementById('saveSuccess');
+    const understoodCheck = document.getElementById('understoodCheck');
+    const reviewCheck = document.getElementById('reviewCheck');
+    const memoInput = document.getElementById('memoInput');
+    const difficultyStars = document.querySelectorAll('.star-rating');
     
-    console.log('showAnswerBtn:', showAnswerBtn);
-    console.log('saveProgressBtn:', saveProgressBtn);
-    console.log('answerSection:', answerSection);
+    // 初期値設定
+    if (understood) understoodCheck.checked = true;
+    if (reviewFlag) reviewCheck.checked = true;
+    if (memo) memoInput.value = memo;
+    
+    // 難易度評価の初期設定
+    updateStarRating(currentRating);
     
     // 解答が既に閲覧済みの場合は表示
     if (viewedAnswer && answerSection && showAnswerBtn) {
-        console.log('解答を自動表示');
         answerSection.classList.add('show');
         showAnswerBtn.style.display = 'none';
     }
     
-    // 星評価の初期化
-    if (currentRating > 0) {
-        console.log('星評価初期化:', currentRating);
-        setRating(currentRating);
-    }
-    
-    // 解答表示ボタンのイベントリスナー
-    if (showAnswerBtn) {
-        showAnswerBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            console.log('解答表示ボタンがクリックされました');
-            showAnswer(problemId);
-        });
-        console.log('解答表示ボタンのイベントリスナーを設定しました');
-    } else {
-        console.error('解答表示ボタンが見つかりません');
-    }
-    
-    // 進捗保存ボタンのイベントリスナー
-    if (saveProgressBtn) {
-        saveProgressBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            console.log('進捗保存ボタンがクリックされました');
-            saveProgress(problemId, currentRating);
-        });
-        console.log('進捗保存ボタンのイベントリスナーを設定しました');
-    } else {
-        console.error('進捗保存ボタンが見つかりません');
-    }
-    
-    // 星評価のクリックイベント
-    var stars = document.querySelectorAll('.star-rating');
-    console.log('星の数:', stars.length);
-    
-    for (var i = 0; i < stars.length; i++) {
-        stars[i].addEventListener('click', function(e) {
-            e.preventDefault();
-            var rating = this.getAttribute('data-rating');
-            console.log('星がクリックされました。評価:', rating);
-            currentRating = parseInt(rating);
-            setRating(currentRating);
+    // 解答表示ボタンのイベント
+    if (showAnswerBtn && answerSection) {
+        showAnswerBtn.addEventListener('click', function() {
+            answerSection.classList.add('show');
+            showAnswerBtn.style.display = 'none';
+            
+            // 解答閲覧フラグを即座に保存
+            saveViewedAnswer();
         });
     }
     
-    if (stars.length > 0) {
-        console.log('星評価のイベントリスナーを設定しました');
-    } else {
-        console.error('星評価要素が見つかりません');
-    }
-    
-    console.log('DOMContentLoaded実行完了');
-});
-
-function showAnswer(problemId) {
-    console.log('showAnswer関数が呼び出されました');
-    var answerSection = document.getElementById('answerSection');
-    var showBtn = document.getElementById('showAnswerBtn');
-    
-    console.log('answerSection:', answerSection);
-    console.log('showBtn:', showBtn);
-    
-    if (answerSection && showBtn) {
-        console.log('解答セクションを表示します');
-        answerSection.classList.add('show');
-        showBtn.style.display = 'none';
+    // 星評価のイベント
+    difficultyStars.forEach(star => {
+        star.addEventListener('click', function() {
+            const rating = parseInt(this.getAttribute('data-rating'));
+            updateStarRating(rating === currentRating ? 0 : rating);
+        });
         
-        // 解答閲覧を記録
-        updateProgress(problemId, { viewed_answer: true });
-    } else {
-        console.error('必要な要素が見つかりません');
-    }
-}
-
-function setRating(rating) {
-    console.log('setRating関数が呼び出されました。評価:', rating);
-    var ratingNum = parseInt(rating);
-    if (ratingNum >= 1 && ratingNum <= 5) {
-        console.log('新しい評価を設定:', ratingNum);
-        var stars = document.querySelectorAll('.star-rating');
-        console.log('星の要素数:', stars.length);
-        for (var i = 0; i < stars.length; i++) {
-            if (i < ratingNum) {
-                stars[i].classList.add('active');
-            } else {
-                stars[i].classList.remove('active');
-            }
-        }
-    } else {
-        console.error('無効な評価値:', rating);
-    }
-}
-
-function saveProgress(problemId, currentRating) {
-    console.log('saveProgress関数が呼び出されました');
-    var understoodEl = document.getElementById('understood');
-    var reviewFlagEl = document.getElementById('reviewFlag');
-    var memoEl = document.getElementById('memo');
-    
-    console.log('understood要素:', understoodEl);
-    console.log('reviewFlag要素:', reviewFlagEl);
-    console.log('memo要素:', memoEl);
-    
-    if (!understoodEl || !reviewFlagEl || !memoEl) {
-        console.error('フォーム要素が見つかりません');
-        alert('フォーム要素が見つかりません');
-        return;
-    }
-    
-    var updates = {
-        understood: understoodEl.checked,
-        review_flag: reviewFlagEl.checked,
-        memo: memoEl.value
-    };
-    
-    if (currentRating > 0) {
-        updates.difficulty_rating = currentRating;
-    }
-    
-    console.log('進捗更新データ:', updates);
-    updateProgress(problemId, updates);
-}
-
-function updateProgress(problemId, updates) {
-    console.log('updateProgress関数が呼び出されました');
-    console.log('problemId:', problemId, 'updates:', updates);
-    
-    if (!problemId || problemId === 0) {
-        console.error('問題IDが無効です:', problemId);
-        alert('問題IDが取得できませんでした');
-        return;
-    }
-    
-    console.log('APIリクエスト送信中...');
-    
-    fetch('/api/essay/progress/update', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            problem_id: problemId,
-            updates: updates
-        })
-    })
-    .then(function(response) {
-        console.log('APIレスポンス受信:', response.status);
-        return response.json();
-    })
-    .then(function(data) {
-        console.log('APIレスポンスデータ:', data);
-        if (data.status === 'success') {
-            if (updates.understood !== undefined || updates.review_flag !== undefined || updates.memo !== undefined) {
-                alert('進捗を保存しました');
-                location.reload();
-            }
-        } else {
-            console.error('APIエラー:', data.message);
-            alert('エラー: ' + (data.message || '不明なエラー'));
-        }
-    })
-    .catch(function(error) {
-        console.error('更新エラー:', error);
-        alert('進捗の保存中にエラーが発生しました');
+        star.addEventListener('mouseenter', function() {
+            const rating = parseInt(this.getAttribute('data-rating'));
+            highlightStars(rating);
+        });
     });
-}
-
-console.log('スクリプト読み込み完了');
+    
+    // 星評価エリアのマウスリーブ
+    document.getElementById('difficultyRating').addEventListener('mouseleave', function() {
+        updateStarRating(currentRating);
+    });
+    
+    // 進捗保存ボタンのイベント
+    if (saveProgressBtn) {
+        saveProgressBtn.addEventListener('click', saveProgress);
+    }
+    
+    // 関数定義
+    function updateStarRating(rating) {
+        currentRating = rating;
+        difficultyStars.forEach((star, index) => {
+            star.classList.toggle('active', index < rating);
+        });
+    }
+    
+    function highlightStars(rating) {
+        difficultyStars.forEach((star, index) => {
+            star.style.color = index < rating ? '#ffc107' : '#ddd';
+        });
+    }
+    
+    function saveViewedAnswer() {
+        fetch(`/essay/progress/${problemId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                viewed_answer: true
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                console.log('解答閲覧フラグ保存成功');
+                // ヘッダーの進捗表示を更新
+                updateHeaderProgress();
+            }
+        })
+        .catch(error => {
+            console.error('解答閲覧フラグ保存エラー:', error);
+        });
+    }
+    
+    function saveProgress() {
+        const progressData = {
+            understood: understoodCheck.checked,
+            review_flag: reviewCheck.checked,
+            difficulty_rating: currentRating || null,
+            memo: memoInput.value.trim() || null
+        };
+        
+        console.log('保存データ:', progressData);
+        
+        // ボタンを無効化
+        saveProgressBtn.disabled = true;
+        saveProgressBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 保存中...';
+        
+        fetch(`/essay/progress/${problemId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(progressData)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                console.log('進捗保存成功');
+                showSaveSuccess();
+                updateHeaderProgress();
+                updateCurrentProgress();
+            } else {
+                console.error('進捗保存失敗:', data.message);
+                alert('保存に失敗しました: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('進捗保存エラー:', error);
+            alert('保存中にエラーが発生しました');
+        })
+        .finally(() => {
+            // ボタンを有効化
+            saveProgressBtn.disabled = false;
+            saveProgressBtn.innerHTML = '<i class="fas fa-save"></i> 学習記録を保存';
+        });
+    }
+    
+    function showSaveSuccess() {
+        saveSuccess.style.display = 'block';
+        setTimeout(() => {
+            saveSuccess.style.display = 'none';
+        }, 3000);
+    }
+    
+    function updateHeaderProgress() {
+        // ヘッダーの進捗表示を動的に更新
+        const headerProgress = document.querySelector('.header-progress');
+        if (!headerProgress) return;
+        
+        // 既存の進捗インジケーターをクリア
+        headerProgress.innerHTML = '';
+        
+        // 解答閲覧済み
+        if (viewedAnswer || answerSection.classList.contains('show')) {
+            const viewedIndicator = document.createElement('span');
+            viewedIndicator.className = 'progress-indicator viewed';
+            viewedIndicator.innerHTML = '<i class="fas fa-eye"></i> 解答閲覧済み';
+            headerProgress.appendChild(viewedIndicator);
+        }
+        
+        // 理解済み
+        if (understoodCheck.checked) {
+            const understoodIndicator = document.createElement('span');
+            understoodIndicator.className = 'progress-indicator understood';
+            understoodIndicator.innerHTML = '<i class="fas fa-check-circle"></i> 理解済み';
+            headerProgress.appendChild(understoodIndicator);
+        }
+        
+        // 復習フラグ
+        if (reviewCheck.checked) {
+            const reviewIndicator = document.createElement('span');
+            reviewIndicator.className = 'progress-indicator review';
+            reviewIndicator.innerHTML = '<i class="fas fa-flag"></i> 復習予定';
+            headerProgress.appendChild(reviewIndicator);
+        }
+        
+        // 難易度
+        if (currentRating > 0) {
+            const difficultyIndicator = document.createElement('span');
+            difficultyIndicator.className = 'progress-indicator difficulty';
+            difficultyIndicator.innerHTML = `<i class="fas fa-star"></i> 難易度${currentRating}/5`;
+            headerProgress.appendChild(difficultyIndicator);
+        }
+    }
+    
+    function updateCurrentProgress() {
+        // フッターの現在の進捗表示を更新
+        const currentProgress = document.querySelector('.current-progress');
+        if (!currentProgress) return;
+        
+        // 既存の進捗インジケーターをクリア
+        currentProgress.innerHTML = '';
+        
+        // 解答閲覧済み
+        if (viewedAnswer || answerSection.classList.contains('show')) {
+            const viewedIndicator = document.createElement('span');
+            viewedIndicator.className = 'progress-indicator viewed';
+            viewedIndicator.innerHTML = '<i class="fas fa-eye"></i> 解答閲覧済み';
+            currentProgress.appendChild(viewedIndicator);
+        }
+        
+        // 理解済み
+        if (understoodCheck.checked) {
+            const understoodIndicator = document.createElement('span');
+            understoodIndicator.className = 'progress-indicator understood';
+            understoodIndicator.innerHTML = '<i class="fas fa-check-circle"></i> 理解済み';
+            currentProgress.appendChild(understoodIndicator);
+        }
+        
+        // 復習フラグ
+        if (reviewCheck.checked) {
+            const reviewIndicator = document.createElement('span');
+            reviewIndicator.className = 'progress-indicator review';
+            reviewIndicator.innerHTML = '<i class="fas fa-flag"></i> 復習予定';
+            currentProgress.appendChild(reviewIndicator);
+        }
+        
+        // 難易度
+        if (currentRating > 0) {
+            const difficultyIndicator = document.createElement('span');
+            difficultyIndicator.className = 'progress-indicator difficulty';
+            difficultyIndicator.innerHTML = `<i class="fas fa-star"></i> 難易度${currentRating}/5`;
+            currentProgress.appendChild(difficultyIndicator);
+        }
+    }
+    
+    // キーボードショートカット
+    document.addEventListener('keydown', function(e) {
+        // Ctrl+S で保存
+        if (e.ctrlKey && e.key === 's') {
+            e.preventDefault();
+            saveProgress();
+        }
+        
+        // スペースキーで解答表示/非表示
+        if (e.key === ' ' && e.target.tagName !== 'TEXTAREA') {
+            e.preventDefault();
+            if (showAnswerBtn && showAnswerBtn.style.display !== 'none') {
+                showAnswerBtn.click();
+            }
+        }
+        
+        // 数字キー1-5で難易度設定
+        if (e.key >= '1' && e.key <= '5') {
+            const rating = parseInt(e.key);
+            updateStarRating(rating === currentRating ? 0 : rating);
+        }
+    });
+    
+    console.log('論述問題個別ページ初期化完了');
+});
 </script>
 {% endblock %}
