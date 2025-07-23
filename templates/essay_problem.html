@@ -564,13 +564,15 @@
     </div>
 </div>
 
+{% endblock %}
+
+{% block scripts %}
 <!-- データ属性でJavaScriptに値を渡す -->
 <div id="problem-data" 
      data-problem-id="{{ problem.id }}"
      data-current-rating="{% if problem.progress and problem.progress.difficulty_rating %}{{ problem.progress.difficulty_rating }}{% else %}0{% endif %}"
      data-viewed-answer="{% if problem.progress and problem.progress.viewed_answer %}true{% else %}false{% endif %}"
      style="display: none;"></div>
-{% endblock %}
 
 <script>
 // デバッグ用のログを追加
