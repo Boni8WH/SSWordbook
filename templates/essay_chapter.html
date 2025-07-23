@@ -17,7 +17,7 @@
 .chapter-header {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
-    padding: 30px;
+    padding: 20px; /* 30px → 20px に削減 */
     border-radius: 15px;
     margin-bottom: 30px;
     box-shadow: 0 5px 20px rgba(102, 126, 234, 0.3);
@@ -43,21 +43,21 @@
 }
 
 .chapter-title {
-    margin: 0 0 20px 0;
-    font-size: 2.2rem;
+    margin: 0 0 15px 0; /* 20px → 15px に削減 */
+    font-size: 2rem; /* 2.2rem → 2rem に少し削減 */
     font-weight: 700;
 }
 
 .chapter-stats {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 15px;
-    margin-top: 20px;
+    gap: 12px; /* 15px → 12px に削減 */
+    margin-top: 15px; /* 20px → 15px に削減 */
 }
 
 .stat-item {
     background: rgba(255, 255, 255, 0.1);
-    padding: 15px;
+    padding: 12px; /* 15px → 12px に削減 */
     border-radius: 10px;
     backdrop-filter: blur(10px);
 }
@@ -331,12 +331,18 @@
     }
     
     .chapter-header {
-        padding: 20px;
+        padding: 15px; /* スマホではさらに削減 */
+        margin-bottom: 20px;
+    }
+
+    .chapter-title {
+        font-size: 1.6rem; /* スマホではさらに小さく */
+        margin-bottom: 10px;
     }
     
     .chapter-stats {
-        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
         gap: 10px;
+        margin-top: 10px;
     }
     
     .filter-grid {
@@ -363,6 +369,32 @@
     .problem-preview {
         -webkit-line-clamp: 3;
         line-clamp: 3;
+    }
+
+    .stat-item {
+        padding: 10px;
+    }
+}
+
+@media (max-width: 480px) {
+    .chapter-header {
+        padding: 12px; /* さらに小さく */
+        margin-bottom: 15px;
+    }
+    
+    .chapter-title {
+        font-size: 1.4rem;
+        margin-bottom: 8px;
+    }
+    
+    .chapter-stats {
+        gap: 8px;
+        margin-top: 8px;
+    }
+    
+    .stat-item {
+        padding: 8px;
+        font-size: 0.9rem;
     }
 }
 
