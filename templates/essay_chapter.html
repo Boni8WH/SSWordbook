@@ -113,7 +113,8 @@
     gap: 15px;
     margin-bottom: 20px;
     padding: 15px 0;
-    border-bottom: 2px solid #e9ecef;
+    /* border-bottomを削除 - これが横線問題の原因 */
+    /* border-bottom: 2px solid #e9ecef; */
 }
 
 .type-badge {
@@ -125,6 +126,8 @@
     font-size: 0.9rem;
     min-width: 80px;
     text-align: center;
+    /* 右側にボーダーを追加してセパレーターとして機能 */
+    margin-right: 15px;
 }
 
 .type-title {
@@ -132,18 +135,25 @@
     color: #2c3e50;
     font-size: 1.4rem;
     font-weight: 600;
+    /* 下部にのみボーダーを追加 */
+    border-bottom: 2px solid #e9ecef;
+    padding-bottom: 10px;
+    flex: 1;
 }
 
-/* 問題グリッド - 大幅改善 */
+/* 問題グリッド - さらなる改善 */
 .problems-grid {
     display: grid;
-    /* より柔軟なグリッド設定 */
+    /* グリッド列の設定を修正 */
     grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
     gap: 20px;
-    /* 重要: カードを上部に揃える */
+    /* カードを上部に揃える */
     align-items: start;
-    /* グリッドの行の高さを自動調整 */
+    /* 行の高さを内容に合わせて自動調整 */
     grid-auto-rows: min-content;
+    /* グリッドコンテナの幅を明示的に設定 */
+    width: 100%;
+    max-width: 1200px;
 }
 
 /* 大画面での最適化 */
@@ -151,6 +161,8 @@
     .problems-grid {
         /* 大画面では最大3列に制限 */
         grid-template-columns: repeat(3, 1fr);
+        max-width: 1200px;
+        margin: 0 auto;
     }
 }
 
@@ -158,6 +170,8 @@
     .problems-grid {
         /* 中画面では2列 */
         grid-template-columns: repeat(2, 1fr);
+        max-width: 800px;
+        margin: 0 auto;
     }
 }
 
@@ -466,72 +480,65 @@
     <!-- 問題一覧 -->
     <div class="problems-section">
         {% if problems %}
-            {% set current_type = '' %}
-            {% for problem in problems %}
-                {% if current_type != problem.type %}
-                    {% if current_type != '' %}
-                        </div> <!-- problems-grid -->
-                    </div> <!-- type-section -->
-                    {% endif %}
-                    {% set current_type = problem.type %}
-                    <div class="type-section">
-                        <div class="type-header">
-                            <div class="type-badge">
-                                タイプ{{ problem.type }}
-                            </div>
-                            <h2 class="type-title">
-                                {% if problem.type == 'A' %}200字以上
-                                {% elif problem.type == 'B' %}100-150字程度
-                                {% elif problem.type == 'C' %}50-75字程度
-                                {% elif problem.type == 'D' %}30字程度
-                                {% endif %}
-                            </h2>
+            <!-- まずタイプ別にグループ化 -->
+            {% set problem_groups = problems | groupby('type') %}
+            {% for type_name, type_problems in problem_groups %}
+                <div class="type-section">
+                    <div class="type-header">
+                        <div class="type-badge">
+                            タイプ{{ type_name }}
                         </div>
-                        <div class="problems-grid">
-                {% endif %}
-                
-                <!-- 個別問題カード -->
-                <a href="{{ url_for('essay_problem', problem_id=problem.id) }}" class="problem-card-link">
-                    <div class="problem-card">
-                        <div class="problem-header">
-                            <div class="university-year">
-                                <span class="university">{{ problem.university }}</span>
-                                <span class="year">{{ problem.year }}年</span>
-                            </div>
-                            <div class="progress-indicators">
-                                {% if problem.progress and problem.progress.viewed_answer %}
-                                    <span class="indicator viewed" title="解答閲覧済み">
-                                        <i class="fas fa-eye"></i>
-                                    </span>
-                                {% endif %}
-                                {% if problem.progress and problem.progress.understood %}
-                                    <span class="indicator understood" title="理解済み">
-                                        <i class="fas fa-check-circle"></i>
-                                    </span>
-                                {% endif %}
-                                {% if problem.progress and problem.progress.review_flag %}
-                                    <span class="indicator review" title="復習フラグ">
-                                        <i class="fas fa-flag"></i>
-                                    </span>
-                                {% endif %}
-                                {% if problem.progress and problem.progress.difficulty_rating %}
-                                    <span class="indicator difficulty" title="難易度: {{ problem.progress.difficulty_rating }}/5">
-                                        <i class="fas fa-star"></i>{{ problem.progress.difficulty_rating }}
-                                    </span>
-                                {% endif %}
-                            </div>
-                        </div>
-                        
-                        <div class="problem-content">
-                            <p class="problem-preview">{{ (problem.question[:150] + '...' if problem.question|length > 150 else problem.question) }}</p>
-                        </div>
+                        <h2 class="type-title">
+                            {% if type_name == 'A' %}200字以上
+                            {% elif type_name == 'B' %}100-150字程度
+                            {% elif type_name == 'C' %}50-75字程度
+                            {% elif type_name == 'D' %}30字程度
+                            {% endif %}
+                        </h2>
                     </div>
-                </a>
-                
-                {% if loop.last %}
-                    </div> <!-- problems-grid -->
-                </div> <!-- type-section -->
-                {% endif %}
+                    
+                    <div class="problems-grid">
+                        {% for problem in type_problems %}
+                            <!-- 個別問題カード -->
+                            <a href="{{ url_for('essay_problem', problem_id=problem.id) }}" class="problem-card-link">
+                                <div class="problem-card">
+                                    <div class="problem-header">
+                                        <div class="university-year">
+                                            <span class="university">{{ problem.university }}</span>
+                                            <span class="year">{{ problem.year }}年</span>
+                                        </div>
+                                        <div class="progress-indicators">
+                                            {% if problem.progress and problem.progress.viewed_answer %}
+                                                <span class="indicator viewed" title="解答閲覧済み">
+                                                    <i class="fas fa-eye"></i>
+                                                </span>
+                                            {% endif %}
+                                            {% if problem.progress and problem.progress.understood %}
+                                                <span class="indicator understood" title="理解済み">
+                                                    <i class="fas fa-check-circle"></i>
+                                                </span>
+                                            {% endif %}
+                                            {% if problem.progress and problem.progress.review_flag %}
+                                                <span class="indicator review" title="復習フラグ">
+                                                    <i class="fas fa-flag"></i>
+                                                </span>
+                                            {% endif %}
+                                            {% if problem.progress and problem.progress.difficulty_rating %}
+                                                <span class="indicator difficulty" title="難易度: {{ problem.progress.difficulty_rating }}/5">
+                                                    <i class="fas fa-star"></i>{{ problem.progress.difficulty_rating }}
+                                                </span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="problem-content">
+                                        <p class="problem-preview">{{ (problem.question[:150] + '...' if problem.question|length > 150 else problem.question) }}</p>
+                                    </div>
+                                </div>
+                            </a>
+                        {% endfor %}
+                    </div>
+                </div>
             {% endfor %}
         {% else %}
             <div class="no-problems">
