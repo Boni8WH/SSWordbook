@@ -6748,6 +6748,125 @@ def api_check_special_status(chapter_num):
 # ====================================================================
 # デバッグ・管理機能
 # ====================================================================
+# app.py に追加するデバッグ用関数
+
+@app.route('/debug/essay_progress/<int:user_id>')
+def debug_essay_progress(user_id):
+    """論述問題の進捗データをデバッグ"""
+    if 'admin' not in session:
+        return "管理者権限が必要です", 403
+    
+    try:
+        user = User.query.get(user_id)
+        if not user:
+            return f"ユーザーID {user_id} が見つかりません", 404
+        
+        # 1. 進捗データの存在確認
+        progress_data = EssayProgress.query.filter_by(user_id=user_id).all()
+        
+        # 2. 章別統計の再計算
+        chapter_stats = get_essay_chapter_stats_with_visibility(user_id, user.room_number)
+        
+        debug_info = {
+            'user_info': {
+                'id': user.id,
+                'username': user.username,
+                'room_number': user.room_number
+            },
+            'progress_count': len(progress_data),
+            'progress_details': [
+                {
+                    'problem_id': p.problem_id,
+                    'viewed_answer': p.viewed_answer,
+                    'understood': p.understood,
+                    'viewed_at': p.viewed_at.isoformat() if p.viewed_at else None,
+                    'understood_at': p.understood_at.isoformat() if p.understood_at else None
+                }
+                for p in progress_data
+            ],
+            'chapter_stats': chapter_stats,
+            'total_problems': sum(stat.get('total_problems', 0) for stat in chapter_stats),
+            'total_viewed': sum(stat.get('viewed_problems', 0) for stat in chapter_stats),
+            'total_understood': sum(stat.get('understood_problems', 0) for stat in chapter_stats)
+        }
+        
+        return f"<pre>{json.dumps(debug_info, indent=2, ensure_ascii=False)}</pre>"
+        
+    except Exception as e:
+        return f"エラー: {str(e)}", 500
+
+def fix_essay_progress_stats():
+    """進捗統計の修正関数"""
+    try:
+        # EssayProgressテーブルの存在確認
+        inspector = inspect(db.engine)
+        if not inspector.has_table('essay_progress'):
+            print("EssayProgressテーブルが存在しません")
+            return False
+        
+        # 統計再計算のためのSQL修正
+        # get_essay_chapter_stats_with_visibility 関数内のクエリを確認
+        
+        # 1. 基本的な進捗データの確認
+        total_progress = db.session.query(EssayProgress).count()
+        viewed_count = db.session.query(EssayProgress).filter(EssayProgress.viewed_answer == True).count()
+        understood_count = db.session.query(EssayProgress).filter(EssayProgress.understood == True).count()
+        
+        print(f"進捗データ総数: {total_progress}")
+        print(f"閲覧済み: {viewed_count}")
+        print(f"理解済み: {understood_count}")
+        
+        # 2. 章別統計の詳細確認
+        stats_query = db.session.query(
+            EssayProblem.chapter,
+            func.count(EssayProblem.id).label('total_problems'),
+            func.count(EssayProgress.id).label('progress_entries'),
+            func.sum(
+                db.case(
+                    (EssayProgress.viewed_answer == True, 1),
+                    else_=0
+                )
+            ).label('viewed_problems'),
+            func.sum(
+                db.case(
+                    (EssayProgress.understood == True, 1),
+                    else_=0
+                )
+            ).label('understood_problems')
+        ).outerjoin(
+            EssayProgress,
+            EssayProblem.id == EssayProgress.problem_id
+        ).filter(
+            EssayProblem.enabled == True
+        ).group_by(
+            EssayProblem.chapter
+        ).all()
+        
+        for stat in stats_query:
+            print(f"章 {stat.chapter}: 総問題数={stat.total_problems}, "
+                  f"進捗エントリ={stat.progress_entries}, "
+                  f"閲覧済み={stat.viewed_problems}, "
+                  f"理解済み={stat.understood_problems}")
+        
+        return True
+        
+    except Exception as e:
+        print(f"エラー: {e}")
+        return False
+
+# 管理者用の修正エンドポイント
+@app.route('/admin/fix_essay_stats')
+def admin_fix_essay_stats():
+    """管理者用: 論述問題統計の修正"""
+    if 'admin' not in session:
+        return "管理者権限が必要です", 403
+    
+    result = fix_essay_progress_stats()
+    if result:
+        return "統計修正処理を実行しました。ログを確認してください。"
+    else:
+        return "統計修正処理でエラーが発生しました。", 500
+    
 def debug_essay_image_info(problem_id):
     """論述問題の画像情報をデバッグ出力"""
     import glob
