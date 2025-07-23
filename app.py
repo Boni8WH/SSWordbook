@@ -7411,7 +7411,15 @@ def essay_problem(problem_id):
             'current_user_id': current_user.id,
             'current_username': current_user.username,
             'current_room_number': current_user.room_number,
-            'is_logged_in': True
+            'is_logged_in': True,
+            # ★ current_filters を追加（空の辞書でも可）
+            'current_filters': {
+                'type': '',
+                'university': '',
+                'year_from': None,
+                'year_to': None,
+                'keyword': ''
+            }
         })
         
         return render_template('essay_problem.html', **context)
