@@ -203,9 +203,9 @@
                                         <span class="text-muted">-</span>
                                         {% endif %}
                                     </td>
-                                    <td>
+                                   <td>
                                         {% if user.username_changed_at %}
-                                        <small class="text-muted">{{ user.username_changed_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                                        <small class="text-muted">{{ user.username_changed_at }}</small>
                                         {% else %}
                                         <span class="text-muted">-</span>
                                         {% endif %}
