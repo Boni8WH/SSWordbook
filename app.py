@@ -7350,7 +7350,7 @@ def essay_chapter(chapter):
 
         print(f"🔍 フィルター - タイプ: {type_filter}, 大学: {university_filter}, 年度: {year_from}-{year_to}, キーワード: {keyword}")
 
-        # 公開設定を考慮した問題取得
+        # 公開設定を考慮した問題取得（ユーザーIDを渡して進捗情報も取得）
         problems = get_filtered_essay_problems_with_visibility(
             chapter=chapter,
             room_number=current_user.room_number,
@@ -7359,7 +7359,7 @@ def essay_chapter(chapter):
             year_from=year_from,
             year_to=year_to,
             keyword=keyword or None,
-            user_id=current_user.id
+            user_id=current_user.id  # ここでuser_idを渡す
         )
 
         print(f"📋 公開設定適用後の問題数: {len(problems)}件")
@@ -7369,6 +7369,12 @@ def essay_chapter(chapter):
 
         # 章名の決定
         chapter_name = '総合問題' if chapter == 'com' else f'第{chapter}章'
+
+        # 統計情報を計算
+        total_problems = len(problems)
+        viewed_problems = sum(1 for p in problems if p.progress['viewed_answer'])
+        understood_problems = sum(1 for p in problems if p.progress['understood'])
+        progress_rate = round((understood_problems / total_problems * 100) if total_problems > 0 else 0, 1)
 
         # テンプレートコンテキストを取得（引数なし）
         context = get_template_context()
@@ -7389,7 +7395,12 @@ def essay_chapter(chapter):
             'current_user_id': current_user.id,
             'current_username': current_user.username,
             'current_room_number': current_user.room_number,
-            'is_logged_in': True
+            'is_logged_in': True,
+            # 統計情報を追加
+            'total_problems': total_problems,
+            'viewed_problems': viewed_problems,
+            'understood_problems': understood_problems,
+            'progress_rate': progress_rate
         })
 
         return render_template('essay_chapter.html', **context)
@@ -7652,7 +7663,7 @@ def set_essay_visibility_setting(room_number, chapter, problem_type, is_visible)
         return False
 
 def get_filtered_essay_problems_with_visibility(chapter, room_number, type_filter=None, university_filter=None, year_from=None, year_to=None, keyword=None, user_id=None):
-    """部屋の公開設定を考慮した論述問題の取得"""
+    """部屋の公開設定を考慮した論述問題の取得（progress情報付き）"""
     try:
         # ベースクエリ
         query = EssayProblem.query.filter(
@@ -7698,16 +7709,36 @@ def get_filtered_essay_problems_with_visibility(chapter, room_number, type_filte
             if not is_essay_problem_visible(room_number, problem.chapter, problem.type):
                 continue  # 非公開の問題はスキップ
             
-            problem_data = problem.to_dict()
-            problem_data['preview'] = problem.question[:100] + '...' if len(problem.question) > 100 else problem.question
-            problem_data['progress'] = {
+            # 進捗情報を取得（user_idが提供されている場合のみ）
+            progress_data = {
                 'viewed_answer': False,
                 'understood': False,
                 'difficulty_rating': None,
                 'review_flag': False
             }
-            problems.append(problem_data)
+            
+            if user_id:
+                try:
+                    progress = EssayProgress.query.filter_by(
+                        user_id=user_id,
+                        problem_id=problem.id
+                    ).first()
+                    
+                    if progress:
+                        progress_data = {
+                            'viewed_answer': progress.viewed_answer,
+                            'understood': progress.understood,
+                            'difficulty_rating': progress.difficulty_rating,
+                            'review_flag': progress.review_flag
+                        }
+                except Exception as progress_error:
+                    print(f"Error getting progress for problem {problem.id}: {progress_error}")
+            
+            # 問題オブジェクトに進捗情報を追加
+            problem.progress = progress_data
+            problems.append(problem)
         
+        print(f"📋 公開設定適用後の問題数: {len(problems)}件, 進捗情報付与完了")
         return problems
         
     except Exception as e:
