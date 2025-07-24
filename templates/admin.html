@@ -1336,6 +1336,37 @@ function debugUserTable() {
     }
 }
 
+// ユーザー削除機能（安全版）
+function deleteUserSafe(button) {
+    const userId = button.getAttribute('data-user-id');
+    const username = button.getAttribute('data-username');
+    
+    if (!userId || !username) {
+        alert('❌ ユーザー情報の取得に失敗しました。');
+        return;
+    }
+    
+    // 確認ダイアログ
+    const confirmMessage = `ユーザー「${username}」を削除しますか？\n\n⚠️ この操作は元に戻せません\n⚠️ 学習履歴も全て削除されます\n\n削除を実行しますか？`;
+    
+    if (!confirm(confirmMessage)) {
+        return;
+    }
+    
+    // ボタンを無効化して処理中表示
+    const originalText = button.textContent;
+    button.disabled = true;
+    button.textContent = '削除中...';
+    
+    // 削除リクエストを送信（フォーム形式で安全に）
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = `/admin/delete_user/${userId}`;
+    form.style.display = 'none';
+    
+    document.body.appendChild(form);
+    form.submit();
+}
 // ========================================
 // 3. DOMContentLoaded イベントリスナー
 // ========================================
