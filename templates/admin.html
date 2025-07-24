@@ -157,7 +157,7 @@
                 <!-- スクロール可能なテーブルコンテナ -->
                 <div class="scrollable-table-container">
                     <div class="table-responsive" style="overflow-x: auto;">
-                        <table class="table table-striped user-list-table" id="userTable" style="min-width: 800px;">
+                        <table class="table table-striped user-list-table" id="userTable" style="min-width: 700px;">
                             <thead class="table-dark sticky-header">
                                 <tr>
                                     <th>ID</th>
@@ -172,10 +172,6 @@
                                     </th>
                                     <th>最初のアカウント名</th>
                                     <th>変更日時</th>
-                                    <th style="cursor: pointer;" title="クリックでソート">
-                                        最終ログイン 
-                                        <i class="fas fa-sort sort-icon" data-column="login"></i>
-                                    </th>
                                     <th>操作</th>
                                 </tr>
                             </thead>
@@ -203,18 +199,11 @@
                                         <span class="text-muted">-</span>
                                         {% endif %}
                                     </td>
-                                   <td>
+                                    <td>
                                         {% if user.username_changed_at %}
                                         <small class="text-muted">{{ user.username_changed_at }}</small>
                                         {% else %}
                                         <span class="text-muted">-</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        {% if user.last_login_at %}
-                                        {{ user.last_login_at.strftime('%Y-%m-%d %H:%M') }}
-                                        {% else %}
-                                        <span class="text-muted">未ログイン</span>
                                         {% endif %}
                                     </td>
                                     <td>
@@ -1208,18 +1197,6 @@ function sortUserTable(column, ascending) {
                 bVal = b.cells[3] ? b.cells[3].textContent.trim().toLowerCase() : '';
                 break;
                 
-            case 'login':
-                aVal = a.cells[6] ? a.cells[6].textContent.trim() : '';
-                bVal = b.cells[6] ? b.cells[6].textContent.trim() : '';
-                
-                // 日付の処理
-                if (aVal === '未ログイン' || aVal === '') aVal = new Date(0); // 最古の日付
-                else aVal = new Date(aVal);
-                
-                if (bVal === '未ログイン' || bVal === '') bVal = new Date(0);
-                else bVal = new Date(bVal);
-                break;
-                
             default:
                 console.warn(`⚠️ 未対応のソート列: ${column}`);
                 return 0;
@@ -1266,7 +1243,7 @@ function initializeUserFiltering() {
     }
 }
 
-// ✅ 新版: 改良されたフィルター関数
+// ★修正：改良されたフィルター関数
 function filterUsers() {
     const roomSelect = document.getElementById('roomSortSelect');
     const searchInput = document.getElementById('userSearchInput');
@@ -1286,17 +1263,18 @@ function filterUsers() {
     let visibleCount = 0;
     
     rows.forEach(row => {
-        // データ属性から値を取得（null チェック追加）
-        const roomValue = row.dataset ? row.dataset.room : '';
+        // ★修正：データ属性から正確に値を取得
+        const roomValue = row.getAttribute('data-room') || '';
+        const nameValue = row.getAttribute('data-name') || '';
+        const studentValue = row.getAttribute('data-student') || '';
+        
+        // ★修正：部屋フィルターの判定を修正
         const roomMatch = !selectedRoom || roomValue === selectedRoom;
         
-        // 検索対象のテキストを取得（名前と出席番号）
-        const nameText = row.dataset ? (row.dataset.name || '') : '';
-        const studentText = row.dataset ? (row.dataset.student || '') : '';
-        
+        // ★修正：検索フィルターの判定を修正
         const searchMatch = !searchTerm || 
-            nameText.includes(searchTerm) || 
-            studentText.includes(searchTerm);
+            nameValue.includes(searchTerm) || 
+            studentValue.includes(searchTerm);
         
         const shouldShow = roomMatch && searchMatch;
         row.style.display = shouldShow ? '' : 'none';
