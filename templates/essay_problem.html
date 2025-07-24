@@ -436,46 +436,29 @@
     <!-- ナビゲーション -->
     <div class="problem-navigation">
         {% if prev_problem %}
-            <a href="{{ url_for('essay_problem', problem_id=prev_problem.id) }}" class="nav-button" style="pointer-events: auto !important;">
+            <a href="{{ url_for('essay_problem', problem_id=prev_problem.id) }}" class="nav-button">
                 <i class="fas fa-chevron-left"></i>
                 前の問題
             </a>
         {% else %}
-            <span class="nav-button disabled" style="pointer-events: none !important;">
+            <span class="nav-button disabled">
                 <i class="fas fa-chevron-left"></i>
                 前の問題
             </span>
         {% endif %}
 
-        <!-- 修正: JavaScriptフォールバック付きの章一覧ボタン -->
-        {% set chapter_url = url_for('essay_chapter', chapter=problem.chapter) if problem.chapter else url_for('essay_index') %}
-        <a href="{{ chapter_url }}" 
-        class="nav-button back-to-chapter" 
-        style="pointer-events: auto !important; cursor: pointer !important; border: 2px solid red !important;"
-        onclick="console.log('クリックされました:', this.href); return true;"
-        onmouseover="console.log('マウスオーバー:', this.href);"
-        data-chapter="{{ problem.chapter }}"
-        data-url="{{ chapter_url }}">
+        <a href="{{ url_for('essay_chapter', chapter=problem.chapter) if problem.chapter else url_for('essay_index') }}" class="nav-button back-to-chapter">
             <i class="fas fa-list"></i>
             {% if problem.chapter == 'com' %}総合問題一覧に戻る{% else %}第{{ problem.chapter }}章一覧に戻る{% endif %}
         </a>
 
-        <!-- さらにフォールバック用のボタンも追加 -->
-        <button type="button" 
-                class="nav-button back-to-chapter-fallback" 
-                style="margin-left: 10px; background: orange; color: white; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer;"
-                onclick="window.location.href='{{ chapter_url }}'; console.log('フォールバックボタン実行:', '{{ chapter_url }}');">
-            <i class="fas fa-list"></i>
-            テスト用戻るボタン
-        </button>
-
         {% if next_problem %}
-            <a href="{{ url_for('essay_problem', problem_id=next_problem.id) }}" class="nav-button" style="pointer-events: auto !important;">
+            <a href="{{ url_for('essay_problem', problem_id=next_problem.id) }}" class="nav-button">
                 次の問題
                 <i class="fas fa-chevron-right"></i>
             </a>
         {% else %}
-            <span class="nav-button disabled" style="pointer-events: none !important;">
+            <span class="nav-button disabled">
                 次の問題
                 <i class="fas fa-chevron-right"></i>
             </span>
@@ -497,8 +480,7 @@
                 alt="問題図" 
                 loading="lazy"
                 style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);"
-                onerror="console.error('画像読み込みエラー:', this.src); this.style.display='none';"
-                onload="console.log('画像読み込み成功:', this.src);">
+                onerror="this.style.display='none';">
         </div>
         {% endif %}
     </div>
@@ -610,16 +592,10 @@
      style="display: none;"></div>
 
 <script>
-// デバッグ用のログを追加
-console.log('スクリプト読み込み開始');
 
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('DOMContentLoaded実行開始');
-    
+document.addEventListener('DOMContentLoaded', function() {    
     // HTMLのdata属性からJavaScript変数を取得
-    var problemData = document.getElementById('problem-data');
-    console.log('problemData要素:', problemData);
-    
+    var problemData = document.getElementById('problem-data');    
     if (!problemData) {
         console.error('problem-data要素が見つかりません');
         return;
@@ -628,22 +604,14 @@ document.addEventListener('DOMContentLoaded', function() {
     var problemId = parseInt(problemData.getAttribute('data-problem-id'));
     var currentRating = parseInt(problemData.getAttribute('data-current-rating'));
     var viewedAnswer = problemData.getAttribute('data-viewed-answer') === 'true';
-    
-    console.log('初期化完了 - 問題ID:', problemId, '評価:', currentRating, '解答閲覧済み:', viewedAnswer);
-    
+        
     // 各ボタン要素の存在確認
     var showAnswerBtn = document.getElementById('showAnswerBtn');
     var hideAnswerBtn = document.getElementById('hideAnswerBtn');
     var saveProgressBtn = document.getElementById('saveProgressBtn');
     var answerSection = document.getElementById('answerSection');
     
-    console.log('showAnswerBtn:', showAnswerBtn);
-    console.log('hideAnswerBtn:', hideAnswerBtn);
-    console.log('saveProgressBtn:', saveProgressBtn);
-    console.log('answerSection:', answerSection);
-    
     // ★修正：初期状態は常に解答を非表示にする
-    console.log('初期状態：解答を非表示にしています');
     if (answerSection) {
         answerSection.classList.remove('show');
     }
@@ -656,7 +624,6 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 星評価の初期化
     if (currentRating > 0) {
-        console.log('星評価初期化:', currentRating);
         setRating(currentRating);
     }
     
@@ -664,10 +631,8 @@ document.addEventListener('DOMContentLoaded', function() {
     if (showAnswerBtn) {
         showAnswerBtn.addEventListener('click', function(e) {
             e.preventDefault();
-            console.log('解答表示ボタンがクリックされました');
             showAnswer(problemId);
         });
-        console.log('解答表示ボタンのイベントリスナーを設定しました');
     } else {
         console.error('解答表示ボタンが見つかりません');
     }
@@ -676,10 +641,8 @@ document.addEventListener('DOMContentLoaded', function() {
     if (hideAnswerBtn) {
         hideAnswerBtn.addEventListener('click', function(e) {
             e.preventDefault();
-            console.log('解答非表示ボタンがクリックされました');
             hideAnswer();
         });
-        console.log('解答非表示ボタンのイベントリスナーを設定しました');
     } else {
         console.error('解答非表示ボタンが見つかりません');
     }
@@ -691,46 +654,34 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log('進捗保存ボタンがクリックされました');
             saveProgress(problemId, currentRating);
         });
-        console.log('進捗保存ボタンのイベントリスナーを設定しました');
     } else {
         console.error('進捗保存ボタンが見つかりません');
     }
     
     // 星評価のクリックイベント
     var stars = document.querySelectorAll('.star-rating');
-    console.log('星の数:', stars.length);
     
     for (var i = 0; i < stars.length; i++) {
         stars[i].addEventListener('click', function(e) {
             e.preventDefault();
             var rating = this.getAttribute('data-rating');
-            console.log('星がクリックされました。評価:', rating);
             currentRating = parseInt(rating);
             setRating(currentRating);
         });
     }
     
     if (stars.length > 0) {
-        console.log('星評価のイベントリスナーを設定しました');
     } else {
         console.error('星評価要素が見つかりません');
-    }
-    
-    console.log('DOMContentLoaded実行完了');
+    }    
 });
 
 function showAnswer(problemId) {
-    console.log('showAnswer関数が呼び出されました');
     var answerSection = document.getElementById('answerSection');
     var showBtn = document.getElementById('showAnswerBtn');
     var hideBtn = document.getElementById('hideAnswerBtn');
     
-    console.log('answerSection:', answerSection);
-    console.log('showBtn:', showBtn);
-    console.log('hideBtn:', hideBtn);
-    
     if (answerSection && showBtn && hideBtn) {
-        console.log('解答セクションを表示します');
         answerSection.classList.add('show');
         showBtn.style.display = 'none';
         hideBtn.style.display = 'flex';
@@ -743,17 +694,11 @@ function showAnswer(problemId) {
 }
 
 function hideAnswer() {
-    console.log('hideAnswer関数が呼び出されました');
     var answerSection = document.getElementById('answerSection');
     var showBtn = document.getElementById('showAnswerBtn');
     var hideBtn = document.getElementById('hideAnswerBtn');
     
-    console.log('answerSection:', answerSection);
-    console.log('showBtn:', showBtn);
-    console.log('hideBtn:', hideBtn);
-    
     if (answerSection && showBtn && hideBtn) {
-        console.log('解答セクションを非表示にします');
         answerSection.classList.remove('show');
         showBtn.style.display = 'flex';
         hideBtn.style.display = 'none';
@@ -763,12 +708,10 @@ function hideAnswer() {
 }
 
 function setRating(rating) {
-    console.log('setRating関数が呼び出されました。評価:', rating);
     var ratingNum = parseInt(rating);
     if (ratingNum >= 1 && ratingNum <= 5) {
         console.log('新しい評価を設定:', ratingNum);
         var stars = document.querySelectorAll('.star-rating');
-        console.log('星の要素数:', stars.length);
         for (var i = 0; i < stars.length; i++) {
             if (i < ratingNum) {
                 stars[i].classList.add('active');
@@ -782,14 +725,9 @@ function setRating(rating) {
 }
 
 function saveProgress(problemId, currentRating) {
-    console.log('saveProgress関数が呼び出されました');
     var understoodEl = document.getElementById('understood');
     var reviewFlagEl = document.getElementById('reviewFlag');
     var memoEl = document.getElementById('memo');
-    
-    console.log('understood要素:', understoodEl);
-    console.log('reviewFlag要素:', reviewFlagEl);
-    console.log('memo要素:', memoEl);
     
     if (!understoodEl || !reviewFlagEl || !memoEl) {
         console.error('フォーム要素が見つかりません');
@@ -807,21 +745,16 @@ function saveProgress(problemId, currentRating) {
         updates.difficulty_rating = currentRating;
     }
     
-    console.log('進捗更新データ:', updates);
     updateProgress(problemId, updates);
 }
 
 function updateProgress(problemId, updates) {
-    console.log('updateProgress関数が呼び出されました');
-    console.log('problemId:', problemId, 'updates:', updates);
     
     if (!problemId || problemId === 0) {
         console.error('問題IDが無効です:', problemId);
         alert('問題IDが取得できませんでした');
         return;
     }
-    
-    console.log('APIリクエスト送信中...');
     
     fetch('/api/essay/progress/update', {
         method: 'POST',
@@ -834,11 +767,9 @@ function updateProgress(problemId, updates) {
         })
     })
     .then(function(response) {
-        console.log('APIレスポンス受信:', response.status);
         return response.json();
     })
     .then(function(data) {
-        console.log('APIレスポンスデータ:', data);
         if (data.status === 'success') {
             if (updates.understood !== undefined || updates.review_flag !== undefined || updates.memo !== undefined) {
                 alert('進捗を保存しました');
