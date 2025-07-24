@@ -1126,10 +1126,10 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
+// ユーザーテーブル初期化
 function initializeUserTable() {
     console.log('🔧 ユーザーテーブル機能を初期化中...');
     
-    // ソートアイコンにクリックイベントを追加
     const sortIcons = document.querySelectorAll('.sort-icon[data-column]');
     
     if (sortIcons.length === 0) {
@@ -1160,9 +1160,11 @@ function initializeUserTable() {
         
         console.log(`✅ ソートアイコン設定完了: ${icon.getAttribute('data-column')}`);
     });
+    
+    console.log(`✅ ユーザーテーブル初期化完了: ${sortIcons.length}個のソートアイコン`);
 }
 
-// ✅ 新版: 改良されたソート関数
+// ★修正：ソート関数（最終ログイン列削除に対応）
 function sortUserTable(column, ascending) {
     console.log(`🔄 テーブルソート実行: ${column}, 昇順=${ascending}`);
     
@@ -1185,14 +1187,15 @@ function sortUserTable(column, ascending) {
         
         switch(column) {
             case 'room':
+                // 部屋番号のソート（数値として比較）
                 aVal = a.cells[1] ? a.cells[1].textContent.trim() : '';
                 bVal = b.cells[1] ? b.cells[1].textContent.trim() : '';
-                // 数値として比較（部屋番号）
                 aVal = parseInt(aVal.replace(/[^0-9]/g, '')) || 0;
                 bVal = parseInt(bVal.replace(/[^0-9]/g, '')) || 0;
                 break;
                 
             case 'name':
+                // アカウント名のソート（文字列として比較）
                 aVal = a.cells[3] ? a.cells[3].textContent.trim().toLowerCase() : '';
                 bVal = b.cells[3] ? b.cells[3].textContent.trim().toLowerCase() : '';
                 break;
@@ -1215,36 +1218,41 @@ function sortUserTable(column, ascending) {
     console.log(`✅ ソート完了: ${column} (昇順=${ascending})`);
 }
 
-// ✅ 新版: 改良されたフィルタリング初期化
 function initializeUserFiltering() {
     console.log('🔍 フィルタリング機能を初期化中...');
     
     const roomSelect = document.getElementById('roomSortSelect');
     const searchInput = document.getElementById('userSearchInput');
     
-    if (roomSelect) {
-        roomSelect.addEventListener('change', function() {
-            console.log(`🏠 部屋フィルター変更: ${this.value}`);
-            filterUsers();
-        });
-        console.log('✅ 部屋セレクトボックス設定完了');
-    } else {
-        console.warn('⚠️ roomSortSelectが見つかりません');
+    if (!roomSelect) {
+        console.error('❌ roomSortSelectが見つかりません');
+        return;
     }
     
-    if (searchInput) {
-        searchInput.addEventListener('input', function() {
-            console.log(`🔍 検索フィルター変更: "${this.value}"`);
-            filterUsers();
-        });
-        console.log('✅ 検索入力フィールド設定完了');
-    } else {
-        console.warn('⚠️ userSearchInputが見つかりません');
+    if (!searchInput) {
+        console.error('❌ userSearchInputが見つかりません');
+        return;
     }
+    
+    // 部屋選択のイベントリスナー
+    roomSelect.addEventListener('change', function() {
+        console.log(`🏠 部屋フィルター変更: "${this.value}"`);
+        filterUsers();
+    });
+    
+    // 検索入力のイベントリスナー
+    searchInput.addEventListener('input', function() {
+        console.log(`🔍 検索フィルター変更: "${this.value}"`);
+        filterUsers();
+    });
+    
+    console.log('✅ フィルタリング機能初期化完了');
 }
 
-// ★修正：改良されたフィルター関数
+// ★修正：フィルター関数（デバッグ情報を追加）
 function filterUsers() {
+    console.log('🔄 フィルター関数実行開始');
+    
     const roomSelect = document.getElementById('roomSortSelect');
     const searchInput = document.getElementById('userSearchInput');
     const tbody = document.getElementById('userTableBody');
@@ -1257,21 +1265,32 @@ function filterUsers() {
     const selectedRoom = roomSelect ? roomSelect.value : '';
     const searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
     
-    console.log(`🔍 フィルター適用: 部屋="${selectedRoom}", 検索="${searchTerm}"`);
+    console.log(`🔍 フィルター条件:`);
+    console.log(`  - 選択された部屋: "${selectedRoom}"`);
+    console.log(`  - 検索語: "${searchTerm}"`);
     
     const rows = tbody.querySelectorAll('tr');
     let visibleCount = 0;
     
-    rows.forEach(row => {
-        // ★修正：データ属性から正確に値を取得
+    console.log(`📋 処理対象行数: ${rows.length}`);
+    
+    rows.forEach((row, index) => {
+        // データ属性から値を取得
         const roomValue = row.getAttribute('data-room') || '';
         const nameValue = row.getAttribute('data-name') || '';
         const studentValue = row.getAttribute('data-student') || '';
         
-        // ★修正：部屋フィルターの判定を修正
-        const roomMatch = !selectedRoom || roomValue === selectedRoom;
+        // デバッグ：最初の数行の情報を出力
+        if (index < 3) {
+            console.log(`🔍 行${index + 1}:`, {
+                roomValue,
+                nameValue,
+                studentValue
+            });
+        }
         
-        // ★修正：検索フィルターの判定を修正
+        // フィルター条件の判定
+        const roomMatch = !selectedRoom || roomValue === selectedRoom;
         const searchMatch = !searchTerm || 
             nameValue.includes(searchTerm) || 
             studentValue.includes(searchTerm);
@@ -1285,7 +1304,7 @@ function filterUsers() {
     console.log(`✅ フィルター完了: ${visibleCount}行表示`);
 }
 
-// ✅ 新版: デバッグ関数（オプション）
+// ★修正：デバッグ関数（問題診断用）
 function debugUserTable() {
     console.log('🐛 ユーザーテーブルデバッグ情報:');
     
@@ -1307,10 +1326,17 @@ function debugUserTable() {
         if (rows.length > 0) {
             const firstRow = rows[0];
             console.log('最初の行のデータ属性:');
-            console.log(`- data-room: "${firstRow.dataset ? firstRow.dataset.room : 'なし'}"`);
-            console.log(`- data-name: "${firstRow.dataset ? firstRow.dataset.name : 'なし'}"`);
-            console.log(`- data-student: "${firstRow.dataset ? firstRow.dataset.student : 'なし'}"`);
+            console.log(`- data-room: "${firstRow.getAttribute('data-room')}"`);
+            console.log(`- data-name: "${firstRow.getAttribute('data-name')}"`);
+            console.log(`- data-student: "${firstRow.getAttribute('data-student')}"`);
         }
+    }
+    
+    if (roomSelect) {
+        console.log('部屋選択オプション:');
+        Array.from(roomSelect.options).forEach((option, index) => {
+            console.log(`  ${index}: "${option.value}" - "${option.textContent}"`);
+        });
     }
 }
 
@@ -1324,19 +1350,16 @@ function deleteUserSafe(button) {
         return;
     }
     
-    // 確認ダイアログ
     const confirmMessage = `ユーザー「${username}」を削除しますか？\n\n⚠️ この操作は元に戻せません\n⚠️ 学習履歴も全て削除されます\n\n削除を実行しますか？`;
     
     if (!confirm(confirmMessage)) {
         return;
     }
     
-    // ボタンを無効化して処理中表示
     const originalText = button.textContent;
     button.disabled = true;
     button.textContent = '削除中...';
     
-    // 削除リクエストを送信（フォーム形式で安全に）
     const form = document.createElement('form');
     form.method = 'POST';
     form.action = `/admin/delete_user/${userId}`;
@@ -1345,6 +1368,30 @@ function deleteUserSafe(button) {
     document.body.appendChild(form);
     form.submit();
 }
+
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🎉 DOMContentLoaded - ユーザー管理初期化開始');
+    
+    // 少し遅延させて確実に要素が存在するようにする
+    setTimeout(function() {
+        console.log('⏰ 遅延初期化実行');
+        
+        // デバッグ情報を出力
+        debugUserTable();
+        
+        // ユーザーテーブル機能の初期化
+        initializeUserTable();
+        
+        // フィルタリング機能の初期化
+        initializeUserFiltering();
+        
+        console.log('✅ ユーザー管理初期化完了');
+    }, 500);
+});
+
+window.debugUserTable = debugUserTable;
+window.filterUsers = filterUsers;
+
 // ========================================
 // 3. DOMContentLoaded イベントリスナー
 // ========================================
