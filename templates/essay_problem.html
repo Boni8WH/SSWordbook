@@ -398,7 +398,7 @@
             </a>
             <i class="fas fa-chevron-right"></i>
             <a href="{{ url_for('essay_chapter', chapter=problem.chapter) }}">
-                第{{ problem.chapter }}章
+                {% if problem.chapter == 'com' %}総合問題{% else %}第{{ problem.chapter }}章{% endif %}
             </a>
             <i class="fas fa-chevron-right"></i>
             <span>問題{{ problem.id }}</span>
