@@ -449,6 +449,35 @@
     /* 最後のセクションに下部マージンを追加 */
     margin-bottom: 40px;
 }
+
+.filter-year-range .year-range-inputs {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.filter-year-range .year-from,
+.filter-year-range .year-to {
+    flex: 1;
+    min-width: 0;
+}
+
+.year-separator {
+    color: #666;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+    .filter-year-range .year-range-inputs {
+        flex-direction: column;
+        gap: 4px;
+    }
+    
+    .year-separator {
+        display: none;
+    }
+}
 </style>
 {% endblock %}
 
@@ -513,16 +542,27 @@
                     {% endif %}
                 </select>
             </div>
-            <div class="filter-item">
+            <div class="filter-item filter-year-range">
                 <label class="filter-label">年度で絞り込み</label>
-                <select class="filter-select" id="yearFilter">
-                    <option value="">すべての年度</option>
-                    {% if filter_data and filter_data.year_range %}
-                        {% for year in range(filter_data.year_range.max, filter_data.year_range.min - 1, -1) %}
-                        <option value="{{ year }}" {{ 'selected' if current_filters.year_from == year }}>{{ year }}年</option>
-                        {% endfor %}
-                    {% endif %}
-                </select>
+                <div class="year-range-inputs">
+                    <select class="filter-select year-from" id="yearFromFilter">
+                        <option value="">開始年度</option>
+                        {% if filter_data and filter_data.year_range %}
+                            {% for year in range(filter_data.year_range.min, filter_data.year_range.max + 1) %}
+                            <option value="{{ year }}" {{ 'selected' if current_filters.year_from == year }}>{{ year }}年</option>
+                            {% endfor %}
+                        {% endif %}
+                    </select>
+                    <span class="year-separator">〜</span>
+                    <select class="filter-select year-to" id="yearToFilter">
+                        <option value="">終了年度</option>
+                        {% if filter_data and filter_data.year_range %}
+                            {% for year in range(filter_data.year_range.min, filter_data.year_range.max + 1) %}
+                            <option value="{{ year }}" {{ 'selected' if current_filters.year_to == year }}>{{ year }}年</option>
+                            {% endfor %}
+                        {% endif %}
+                    </select>
+                </div>
             </div>
             <div class="filter-item">
                 <label class="filter-label">進捗状況</label>
@@ -614,7 +654,8 @@
 document.addEventListener('DOMContentLoaded', function() {
     const typeFilter = document.getElementById('typeFilter');
     const universityFilter = document.getElementById('universityFilter');
-    const yearFilter = document.getElementById('yearFilter');
+    const yearFromFilter = document.getElementById('yearFromFilter');
+    const yearToFilter = document.getElementById('yearToFilter');
     const progressFilter = document.getElementById('progressFilter');
     
     // フィルター変更時のイベント
@@ -623,7 +664,8 @@ document.addEventListener('DOMContentLoaded', function() {
         
         if (typeFilter.value) params.set('type', typeFilter.value);
         if (universityFilter.value) params.set('university', universityFilter.value);
-        if (yearFilter.value) params.set('year_from', yearFilter.value);
+        if (yearFromFilter.value) params.set('year_from', yearFromFilter.value);
+        if (yearToFilter.value) params.set('year_to', yearToFilter.value);
         
         const url = new URL(window.location);
         url.search = params.toString();
@@ -632,7 +674,8 @@ document.addEventListener('DOMContentLoaded', function() {
     
     typeFilter.addEventListener('change', applyFilters);
     universityFilter.addEventListener('change', applyFilters);
-    yearFilter.addEventListener('change', applyFilters);
+    yearFromFilter.addEventListener('change', applyFilters);
+    yearToFilter.addEventListener('change', applyFilters);
     
     // 進捗フィルターは別途処理（JavaScriptで動的にフィルタリング）
     progressFilter.addEventListener('change', function() {

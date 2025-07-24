@@ -416,7 +416,7 @@
         <div class="problem-meta">
             <div class="meta-item">
                 <i class="fas fa-book"></i>
-                第{{ problem.chapter }}章
+                {% if problem.chapter == 'com' %}総合問題{% else %}第{{ problem.chapter }}章{% endif %}
             </div>
             <div class="meta-item">
                 <i class="fas fa-graduation-cap"></i>
