@@ -13,6 +13,8 @@ from datetime import datetime, timedelta
 from sqlalchemy import inspect, text, func, case, cast, Integer
 import glob
 
+from models import db, User, AdminUser, RoomSetting, EssayVisibilitySetting
+
 # 外部ライブラリ
 import pytz
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, Response
@@ -91,14 +93,8 @@ app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_DEFAULT_SENDER', app.co
 
 mail = Mail(app)
 
-# ===== SQLAlchemy初期化（1回のみ） =====
-db = SQLAlchemy(app)
-
-# models.pyと統一
-import models
-models.db = db
-
-from models import User, AdminUser, RoomSetting, EssayVisibilitySetting
+# ===== SQLAlchemy初期化 =====
+db.init_app(app)
 
 UPLOAD_FOLDER = 'uploads'
 if not os.path.exists(UPLOAD_FOLDER):
