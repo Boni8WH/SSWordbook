@@ -12,11 +12,516 @@ from io import StringIO
 from datetime import datetime, timedelta
 from sqlalchemy import inspect, text, func, case, cast, Integer
 import glob
-
-from models import db, User, AdminUser, RoomSetting, EssayVisibilitySetting
-
-# 外部ライブラリ
 import pytz
+JST = pytz.timezone('Asia/Tokyo')
+
+# ====================================================================
+# データベースモデル定義（models.pyから統合）
+# ====================================================================
+
+from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.types import TypeDecorator, Text
+from werkzeug.security import generate_password_hash, check_password_hash
+
+# SQLAlchemyインスタンスを作成
+db = SQLAlchemy()
+
+# JSONデータを扱うカスタム型
+class JSONEncodedDict(TypeDecorator):
+    impl = Text
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return None
+        return json.dumps(value)
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return None
+        return json.loads(value)
+
+class User(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    room_number = db.Column(db.String(50), nullable=False)
+    student_id = db.Column(db.String(50), unique=True, nullable=False)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    # パスワードはハッシュ化して保存
+    _room_password_hash = db.Column(db.String(128), nullable=False)
+    _individual_password_hash = db.Column(db.String(128), nullable=False)
+    
+    # アカウント名変更・初回ログイン・制限状態管理用フィールド
+    original_username = db.Column(db.String(80), nullable=False)
+    is_first_login = db.Column(db.Boolean, default=True, nullable=False)
+    password_changed_at = db.Column(db.DateTime)
+    username_changed_at = db.Column(db.DateTime)
+    restriction_triggered = db.Column(db.Boolean, default=False, nullable=False)
+    restriction_released = db.Column(db.Boolean, default=False, nullable=False)
+    
+    # 問題履歴をJSON形式で保存 (問題ID: {total: N, correct: M, consecutive_correct: K})
+    problem_history = db.Column(JSONEncodedDict, default={})
+    # 苦手問題をJSON形式で保存 (問題オブジェクトのリスト)
+    incorrect_words = db.Column(JSONEncodedDict, default=[])
+    # 最終ログイン日時
+    last_login = db.Column(db.DateTime, default=lambda: datetime.now(JST))
+
+    def set_room_password(self, password):
+        self._room_password_hash = generate_password_hash(password)
+
+    def check_room_password(self, password):
+        return check_password_hash(self._room_password_hash, password)
+
+    def set_individual_password(self, password):
+        self._individual_password_hash = generate_password_hash(password)
+
+    def check_individual_password(self, password):
+        return check_password_hash(self._individual_password_hash, password)
+
+    def __repr__(self):
+        return f'<User {self.username} (Room: {self.room_number}, ID: {self.student_id})>'
+    
+    def get_problem_history(self):
+        """問題履歴を取得"""
+        if self.problem_history:
+            return self.problem_history
+        return {}
+
+    def set_problem_history(self, history):
+        """問題履歴を設定"""
+        self.problem_history = history
+
+    def get_incorrect_words(self):
+        """苦手問題を取得"""
+        if self.incorrect_words:
+            return self.incorrect_words
+        return []
+
+    def set_incorrect_words(self, words):
+        """苦手問題を設定"""
+        self.incorrect_words = words
+
+    def change_username(self, new_username):
+        """アカウント名を変更する"""
+        if not self.original_username:
+            self.original_username = self.username
+        
+        self.username = new_username
+        self.username_changed_at = datetime.now(JST)
+    
+    def mark_first_login_completed(self):
+        """初回ログインを完了としてマークする"""
+        self.is_first_login = False
+    
+    def change_password_first_time(self, new_password):
+        """初回パスワード変更（個別パスワードのみ）"""
+        self.set_individual_password(new_password)
+        self.password_changed_at = datetime.now(JST)
+        self.mark_first_login_completed()
+    
+    def set_restriction_state(self, triggered, released):
+        """制限状態を設定"""
+        self.restriction_triggered = triggered
+        self.restriction_released = released
+    
+    def get_restriction_state(self):
+        """制限状態を取得"""
+        return {
+            'hasBeenRestricted': self.restriction_triggered,
+            'restrictionReleased': self.restriction_released
+        }
+
+class AdminUser(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    _password_hash = db.Column(db.String(128), nullable=False)
+
+    def set_password(self, password):
+        self._password_hash = generate_password_hash(password)
+
+    def check_password(self, password):
+        return check_password_hash(self._password_hash, password)
+
+    def __repr__(self):
+        return f'<AdminUser {self.username}>'
+
+class RoomSetting(db.Model):
+    __table_args__ = {'extend_existing': True}  # ← 重複エラー回避
+    
+    id = db.Column(db.Integer, primary_key=True)
+    room_number = db.Column(db.String(50), unique=True, nullable=False)
+    max_enabled_unit_number = db.Column(db.String(50), default="9999", nullable=False)
+    csv_filename = db.Column(db.String(100), default="words.csv", nullable=False)
+    ranking_display_count = db.Column(db.Integer, default=10, nullable=False)
+    enabled_units = db.Column(db.Text, default="[]", nullable=False)  # JSON形式で単元リストを保存
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(JST), onupdate=lambda: datetime.now(JST))
+
+    def get_enabled_units(self):
+        """有効な単元のリストを取得"""
+        try:
+            return json.loads(self.enabled_units)
+        except:
+            return []
+    
+    def set_enabled_units(self, units_list):
+        """有効な単元のリストを設定"""
+        self.enabled_units = json.dumps(units_list)
+
+    def __repr__(self):
+        return f'<RoomSetting {self.room_number}, Max Unit: {self.max_enabled_unit_number}, CSV: {self.csv_filename}>'
+
+class RoomCsvFile(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    filename = db.Column(db.String(100), unique=True, nullable=False)
+    original_filename = db.Column(db.String(100), nullable=False)
+    file_size = db.Column(db.Integer, nullable=False)
+    word_count = db.Column(db.Integer, default=0)
+    upload_date = db.Column(db.DateTime, default=lambda: datetime.now(JST))
+    description = db.Column(db.Text)
+    
+    def __repr__(self):
+        return f'<RoomCsvFile {self.filename} ({self.word_count} words)>'
+
+class AppInfo(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    app_name = db.Column(db.String(100), default="世界史単語帳", nullable=False)
+    version = db.Column(db.String(20), default="1.0.0", nullable=False)
+    last_updated_date = db.Column(db.String(50), default="2025年6月15日", nullable=False)
+    update_content = db.Column(db.Text, default="アプリケーションが開始されました。", nullable=False)
+    footer_text = db.Column(db.String(200), default="", nullable=True)
+    contact_email = db.Column(db.String(100), default="", nullable=True)
+    school_name = db.Column(db.String(100), default="朋優学院", nullable=False)
+    app_settings = db.Column(JSONEncodedDict, default={})
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(JST), onupdate=lambda: datetime.now(JST))
+    updated_by = db.Column(db.String(80), default="system")
+
+    @classmethod
+    def get_current_info(cls):
+        """現在のアプリ情報を取得。存在しない場合はデフォルトを作成"""
+        app_info = cls.query.first()
+        if not app_info:
+            app_info = cls()
+            db.session.add(app_info)
+            try:
+                db.session.commit()
+            except Exception as e:
+                print(f"Error creating app_info: {e}")
+                db.session.rollback()
+        return app_info
+
+    def to_dict(self):
+        """フロントエンド用の辞書形式で返す"""
+        return {
+            'appName': self.app_name,
+            'version': self.version,
+            'lastUpdatedDate': self.last_updated_date,
+            'updateContent': self.update_content,
+            'footerText': self.footer_text,
+            'contactEmail': self.contact_email,
+            'schoolName': getattr(self, 'school_name', '朋優学院')
+        }
+
+    def __repr__(self):
+        return f'<AppInfo {self.app_name} v{self.version}>'
+
+class PasswordResetToken(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False)
+    token = db.Column(db.String(100), unique=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    used = db.Column(db.Boolean, default=False)
+    used_at = db.Column(db.DateTime)
+    
+    user = db.relationship('User', backref=db.backref('reset_tokens', lazy=True, passive_deletes=True))
+    
+    def is_expired(self):
+        """UTCベースで期限チェック"""
+        return datetime.utcnow() > self.expires_at
+    
+    def is_valid(self):
+        """UTCベースで有効性チェック"""
+        return not self.used and not self.is_expired()
+
+class CsvFileContent(db.Model):
+    """CSVファイルの内容をデータベースに保存"""
+    id = db.Column(db.Integer, primary_key=True)
+    filename = db.Column(db.String(100), unique=True, nullable=False)
+    original_filename = db.Column(db.String(100), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    file_size = db.Column(db.Integer, nullable=False)
+    word_count = db.Column(db.Integer, default=0)
+    upload_date = db.Column(db.DateTime, default=lambda: datetime.now(JST))
+    
+    def get_csv_data(self):
+        """CSV内容を辞書リストとして返す"""
+        try:
+            reader = csv.DictReader(StringIO(self.content))
+            return list(reader)
+        except Exception as e:
+            print(f"CSV parsing error: {e}")
+            return []
+
+class UserStats(db.Model):
+    """ユーザーの学習統計を事前計算して保存するテーブル"""
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False, unique=True)
+    room_number = db.Column(db.String(50), nullable=False, index=True)
+    
+    # 基本統計
+    total_attempts = db.Column(db.Integer, default=0, nullable=False)
+    total_correct = db.Column(db.Integer, default=0, nullable=False)
+    mastered_count = db.Column(db.Integer, default=0, nullable=False)
+    incorrect_count = db.Column(db.Integer, default=0, nullable=False)
+    
+    # 計算済みスコア
+    accuracy_rate = db.Column(db.Float, default=0.0, nullable=False)
+    coverage_rate = db.Column(db.Float, default=0.0, nullable=False)
+    balance_score = db.Column(db.Float, default=0.0, nullable=False)
+    mastery_score = db.Column(db.Float, default=0.0, nullable=False)
+    reliability_score = db.Column(db.Float, default=0.0, nullable=False)
+    activity_score = db.Column(db.Float, default=0.0, nullable=False)
+    
+    # メタデータ
+    last_updated = db.Column(db.DateTime, default=lambda: datetime.now(JST), nullable=False)
+    total_questions_in_room = db.Column(db.Integer, default=0, nullable=False)
+    
+    # リレーション
+    user = db.relationship('User', backref=db.backref('stats', uselist=False, passive_deletes=True))
+    
+    def __repr__(self):
+        return f'<UserStats {self.user.username}: {self.balance_score:.1f}>'
+
+    @classmethod
+    def get_or_create(cls, user_id):
+        """ユーザー統計を取得または作成"""
+        stats = cls.query.filter_by(user_id=user_id).first()
+        if not stats:
+            user = User.query.get(user_id)
+            if user:
+                stats = cls(
+                    user_id=user_id,
+                    room_number=user.room_number
+                )
+                db.session.add(stats)
+                db.session.flush()
+        return stats
+
+    def update_stats(self, word_data=None):
+        """統計を再計算して更新"""
+        try:
+            user = self.user
+            if not user:
+                return False
+            
+            print(f"📊 統計更新開始: {user.username}")
+            
+            # 部屋の単語データを取得
+            if word_data is None:
+                word_data = load_word_data_for_room(user.room_number)
+            
+            # 部屋設定を取得
+            room_setting = RoomSetting.query.filter_by(room_number=user.room_number).first()
+            max_enabled_unit_num_str = room_setting.max_enabled_unit_number if room_setting else "9999"
+            parsed_max_enabled_unit_num = parse_unit_number(max_enabled_unit_num_str)
+            
+            # 有効な問題数を計算
+            total_questions_for_room = 0
+            for word in word_data:
+                is_word_enabled_in_csv = word['enabled']
+                is_unit_enabled_by_room_setting = parse_unit_number(word['number']) <= parsed_max_enabled_unit_num
+                if is_word_enabled_in_csv and is_unit_enabled_by_room_setting:
+                    total_questions_for_room += 1
+            
+            # 学習履歴を分析
+            user_history = user.get_problem_history()
+            user_incorrect = user.get_incorrect_words()
+            total_attempts = 0
+            total_correct = 0
+            mastered_problem_ids = set()
+            
+            for problem_id, history in user_history.items():
+                # 対応する単語を検索
+                matched_word = None
+                for word in word_data:
+                    if get_problem_id(word) == problem_id:
+                        matched_word = word
+                        break
+                
+                if matched_word:
+                    is_word_enabled_in_csv = matched_word['enabled']
+                    is_unit_enabled_by_room_setting = parse_unit_number(matched_word['number']) <= parsed_max_enabled_unit_num
+                    
+                    if is_word_enabled_in_csv and is_unit_enabled_by_room_setting:
+                        correct_attempts = history.get('correct_attempts', 0)
+                        incorrect_attempts = history.get('incorrect_attempts', 0)
+                        problem_total_attempts = correct_attempts + incorrect_attempts
+                        
+                        total_attempts += problem_total_attempts
+                        total_correct += correct_attempts
+                        
+                        # マスター判定：正答率80%以上
+                        if problem_total_attempts > 0:
+                            accuracy_rate = (correct_attempts / problem_total_attempts) * 100
+                            if accuracy_rate >= 80.0:
+                                mastered_problem_ids.add(problem_id)
+            
+            # 基本統計を更新
+            self.total_attempts = total_attempts
+            self.total_correct = total_correct
+            self.mastered_count = len(mastered_problem_ids)
+            self.total_questions_in_room = total_questions_for_room
+            self.incorrect_count = len(user_incorrect)
+            
+            # 正答率計算
+            self.accuracy_rate = (total_correct / total_attempts * 100) if total_attempts > 0 else 0
+            
+            # 網羅率計算
+            self.coverage_rate = (self.mastered_count / total_questions_for_room * 100) if total_questions_for_room > 0 else 0
+            
+            # 動的スコアシステムによる計算
+            if total_attempts == 0:
+                self.balance_score = 0
+                self.mastery_score = 0
+                self.reliability_score = 0
+                self.activity_score = 0
+            else:
+                # 正答率を計算
+                accuracy_rate = total_correct / total_attempts
+                
+                # 1. マスタースコア（段階的 + 連続的）
+                mastery_base = (self.mastered_count // 100) * 250
+                mastery_progress = ((self.mastered_count % 100) / 100) * 125
+                self.mastery_score = mastery_base + mastery_progress
+                
+                # 2. 正答率スコア（段階的連続計算）
+                if accuracy_rate >= 0.9:
+                    self.reliability_score = 500 + (accuracy_rate - 0.9) * 800
+                elif accuracy_rate >= 0.8:
+                    self.reliability_score = 350 + (accuracy_rate - 0.8) * 1500
+                elif accuracy_rate >= 0.7:
+                    self.reliability_score = 200 + (accuracy_rate - 0.7) * 1500
+                elif accuracy_rate >= 0.6:
+                    self.reliability_score = 100 + (accuracy_rate - 0.6) * 1000
+                else:
+                    self.reliability_score = accuracy_rate * 166.67
+                
+                # 3. 継続性スコア（活動量評価）
+                self.activity_score = math.sqrt(total_attempts) * 3
+                
+                # 4. 精度ボーナス（高正答率への追加評価）
+                precision_bonus = 0
+                if accuracy_rate >= 0.95:
+                    precision_bonus = 150 + (accuracy_rate - 0.95) * 1000
+                elif accuracy_rate >= 0.9:
+                    precision_bonus = 100 + (accuracy_rate - 0.9) * 1000
+                elif accuracy_rate >= 0.85:
+                    precision_bonus = 50 + (accuracy_rate - 0.85) * 1000
+                elif accuracy_rate >= 0.8:
+                    precision_bonus = (accuracy_rate - 0.8) * 1000
+                
+                # 総合スコア
+                self.balance_score = self.mastery_score + self.reliability_score + self.activity_score + precision_bonus
+            
+            # 更新日時
+            self.last_updated = datetime.now(JST)
+            
+            print(f"✅ 統計更新完了: {user.username} (スコア: {self.balance_score:.1f})")
+            return True
+            
+        except Exception as e:
+            print(f"❌ 統計更新エラー ({user.username}): {e}")
+            return False
+
+# 論述問題の部屋別公開設定モデル
+class EssayVisibilitySetting(db.Model):
+    __tablename__ = 'essay_visibility_setting'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    room_number = db.Column(db.String(50), nullable=False)
+    chapter = db.Column(db.String(10), nullable=False)
+    problem_type = db.Column(db.String(1), nullable=False)
+    is_visible = db.Column(db.Boolean, nullable=False, default=True)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(JST), onupdate=lambda: datetime.now(JST))
+    
+    __table_args__ = (
+        db.UniqueConstraint('room_number', 'chapter', 'problem_type', name='uq_room_chapter_type'),
+    )
+    
+    def __repr__(self):
+        return f'<EssayVisibilitySetting Room:{self.room_number} Ch:{self.chapter} Type:{self.problem_type} Visible:{self.is_visible}>'
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'room_number': self.room_number,
+            'chapter': self.chapter,
+            'problem_type': self.problem_type,
+            'is_visible': self.is_visible,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
+
+class EssayProblem(db.Model):
+    __tablename__ = 'essay_problems'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    chapter = db.Column(db.String(10), nullable=False)
+    type = db.Column(db.String(1), nullable=False)
+    university = db.Column(db.String(100), nullable=False)
+    year = db.Column(db.Integer, nullable=False)
+    question = db.Column(db.Text, nullable=False)
+    answer = db.Column(db.Text, nullable=False)
+    answer_length = db.Column(db.Integer, nullable=False)
+    enabled = db.Column(db.Boolean, default=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'chapter': self.chapter,
+            'type': self.type,
+            'university': self.university,
+            'year': self.year,
+            'question': self.question,
+            'answer': self.answer,
+            'answer_length': self.answer_length,
+            'enabled': self.enabled
+        }
+
+class EssayProgress(db.Model):
+    __tablename__ = 'essay_progress'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False)
+    problem_id = db.Column(db.Integer, db.ForeignKey('essay_problems.id', ondelete='CASCADE'), nullable=False)
+    viewed_answer = db.Column(db.Boolean, default=False, nullable=False)
+    understood = db.Column(db.Boolean, default=False, nullable=False)
+    difficulty_rating = db.Column(db.Integer)
+    memo = db.Column(db.Text)
+    review_flag = db.Column(db.Boolean, default=False, nullable=False)
+    viewed_at = db.Column(db.DateTime)
+    understood_at = db.Column(db.DateTime)
+    last_updated = db.Column(db.DateTime, default=lambda: datetime.now(JST))
+    
+    __table_args__ = (
+        db.UniqueConstraint('user_id', 'problem_id', name='unique_user_problem'),
+    )
+
+class EssayCsvFile(db.Model):
+    __tablename__ = 'essay_csv_files'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    filename = db.Column(db.String(100), unique=True, nullable=False)
+    original_filename = db.Column(db.String(100), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    file_size = db.Column(db.Integer, nullable=False)
+    problem_count = db.Column(db.Integer, default=0, nullable=False)
+    upload_date = db.Column(db.DateTime, default=lambda: datetime.now(JST))
+
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, Response
 from flask_sqlalchemy import SQLAlchemy
 from flask_mail import Mail, Message
@@ -47,9 +552,6 @@ if os.environ.get('RENDER') == 'true':
 
 logger = logging.getLogger(__name__)
 logger.info(f"ログレベル設定: {logging.getLevelName(log_level)} ({'本番' if os.environ.get('RENDER') == 'true' else 'ローカル'}環境)")
-
-# 日本時間のタイムゾーンオブジェクトを作成
-JST = pytz.timezone('Asia/Tokyo')
 
 # ===== Flaskアプリの作成 =====
 app = Flask(__name__)
@@ -184,295 +686,6 @@ def to_jst_filter(dt):
     except Exception as e:
         print(f"🔍 エラー: {e}")
         return str(dt)
-
-# ====================================================================
-# データベースモデル定義
-# ====================================================================
-class RoomSetting(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    room_number = db.Column(db.String(50), unique=True, nullable=False)
-    enabled_units = db.Column(db.Text, default="[]", nullable=False)  # ← JSON形式で単元リストを保存
-    csv_filename = db.Column(db.String(100), default="words.csv", nullable=False)
-    max_enabled_unit_number = db.Column(db.String(50), default="9999", nullable=False)
-    ranking_display_count = db.Column(db.Integer, default=5, nullable=False)
-
-    def get_enabled_units(self):
-        """有効な単元のリストを取得"""
-        try:
-            return json.loads(self.enabled_units)
-        except:
-            return []
-    
-    def set_enabled_units(self, units_list):
-        """有効な単元のリストを設定"""
-        self.enabled_units = json.dumps(units_list)
-
-class RoomCsvFile(db.Model):
-    """部屋ごとのカスタムCSVファイル情報を管理するモデル"""
-    id = db.Column(db.Integer, primary_key=True)
-    filename = db.Column(db.String(100), unique=True, nullable=False)
-    original_filename = db.Column(db.String(100), nullable=False)  # アップロード時の元のファイル名
-    file_size = db.Column(db.Integer, nullable=False)  # バイト単位
-    word_count = db.Column(db.Integer, default=0)  # 単語数
-    upload_date = db.Column(db.DateTime, default=lambda: datetime.now(JST))
-    description = db.Column(db.Text)  # ファイルの説明（オプション）
-    
-    def __repr__(self):
-        return f'<RoomCsvFile {self.filename} ({self.word_count} words)>'
-
-class AppInfo(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    app_name = db.Column(db.String(100), default="世界史単語帳", nullable=False)
-    version = db.Column(db.String(20), default="1.0.0", nullable=False)
-    last_updated_date = db.Column(db.String(50), default="2025年6月15日", nullable=False)
-    update_content = db.Column(db.Text, default="アプリケーションが開始されました。", nullable=False)
-    footer_text = db.Column(db.String(200), default="", nullable=True)
-    contact_email = db.Column(db.String(100), default="", nullable=True)
-    school_name = db.Column(db.String(100), default="朋優学院", nullable=False)
-    app_settings = db.Column(db.Text, default='{}')
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))
-    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))
-    updated_by = db.Column(db.String(80), default="system")
-
-    @classmethod
-    def get_current_info(cls):
-        app_info = cls.query.first()
-        if not app_info:
-            app_info = cls()
-            db.session.add(app_info)
-            try:
-                db.session.commit()
-            except Exception as e:
-                print(f"Error creating app_info: {e}")
-                db.session.rollback()
-        return app_info
-
-    def to_dict(self):
-        return {
-            'appName': self.app_name,
-            'version': self.version,
-            'lastUpdatedDate': self.last_updated_date,
-            'updateContent': self.update_content,
-            'footerText': self.footer_text,
-            'contactEmail': self.contact_email,
-            'schoolName': getattr(self, 'school_name', '朋優学院')  # ★ 追加
-        }
-
-class PasswordResetToken(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False)  # ★CASCADE追加
-    token = db.Column(db.String(100), unique=True, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    expires_at = db.Column(db.DateTime, nullable=False)
-    used = db.Column(db.Boolean, default=False)
-    used_at = db.Column(db.DateTime)
-    
-    # ★relationshipにpassiveキーワード追加
-    user = db.relationship('User', backref=db.backref('reset_tokens', lazy=True, passive_deletes=True))
-    
-    def is_expired(self):
-        """UTCベースで期限チェック"""
-        return datetime.utcnow() > self.expires_at
-    
-    def is_valid(self):
-        """UTCベースで有効性チェック"""
-        return not self.used and not self.is_expired()
-
-class CsvFileContent(db.Model):
-    """CSVファイルの内容をデータベースに保存"""
-    id = db.Column(db.Integer, primary_key=True)
-    filename = db.Column(db.String(100), unique=True, nullable=False)
-    original_filename = db.Column(db.String(100), nullable=False)
-    content = db.Column(db.Text, nullable=False)  # CSV内容をテキストとして保存
-    file_size = db.Column(db.Integer, nullable=False)
-    word_count = db.Column(db.Integer, default=0)
-    upload_date = db.Column(db.DateTime, default=lambda: datetime.now(JST))
-    
-    def get_csv_data(self):
-        """CSV内容を辞書リストとして返す"""
-        try:
-            reader = csv.DictReader(StringIO(self.content))
-            return list(reader)
-        except Exception as e:
-            print(f"CSV parsing error: {e}")
-            return []
-
-class UserStats(db.Model):
-    """ユーザーの学習統計を事前計算して保存するテーブル"""
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False, unique=True)
-    room_number = db.Column(db.String(50), nullable=False, index=True)  # 高速検索用インデックス
-    
-    # 基本統計
-    total_attempts = db.Column(db.Integer, default=0, nullable=False)
-    total_correct = db.Column(db.Integer, default=0, nullable=False)
-    mastered_count = db.Column(db.Integer, default=0, nullable=False)
-    incorrect_count = db.Column(db.Integer, default=0, nullable=False)
-    
-    # 計算済みスコア
-    accuracy_rate = db.Column(db.Float, default=0.0, nullable=False)
-    coverage_rate = db.Column(db.Float, default=0.0, nullable=False)
-    balance_score = db.Column(db.Float, default=0.0, nullable=False)
-    mastery_score = db.Column(db.Float, default=0.0, nullable=False)
-    reliability_score = db.Column(db.Float, default=0.0, nullable=False)
-    activity_score = db.Column(db.Float, default=0.0, nullable=False)
-    
-    # メタデータ
-    last_updated = db.Column(db.DateTime, default=lambda: datetime.now(JST), nullable=False)
-    total_questions_in_room = db.Column(db.Integer, default=0, nullable=False)
-    
-    # リレーション
-    user = db.relationship('User', backref=db.backref('stats', uselist=False, passive_deletes=True))
-    
-    def __repr__(self):
-        return f'<UserStats {self.user.username}: {self.balance_score:.1f}>'
-
-    @classmethod
-    def get_or_create(cls, user_id):
-        """ユーザー統計を取得または作成"""
-        stats = cls.query.filter_by(user_id=user_id).first()
-        if not stats:
-            user = User.query.get(user_id)
-            if user:
-                stats = cls(
-                    user_id=user_id,
-                    room_number=user.room_number
-                )
-                db.session.add(stats)
-                db.session.flush()  # IDを取得するため
-        return stats
-
-    def update_stats(self, word_data=None):
-        """統計を再計算して更新"""
-        try:
-            user = self.user
-            if not user:
-                return False
-            
-            print(f"📊 統計更新開始: {user.username}")
-            
-            # 部屋の単語データを取得
-            if word_data is None:
-                word_data = load_word_data_for_room(user.room_number)
-            
-            # 部屋設定を取得
-            room_setting = RoomSetting.query.filter_by(room_number=user.room_number).first()
-            max_enabled_unit_num_str = room_setting.max_enabled_unit_number if room_setting else "9999"
-            parsed_max_enabled_unit_num = parse_unit_number(max_enabled_unit_num_str)
-            
-            # 有効な問題数を計算
-            total_questions_for_room = 0
-            for word in word_data:
-                is_word_enabled_in_csv = word['enabled']
-                is_unit_enabled_by_room_setting = parse_unit_number(word['number']) <= parsed_max_enabled_unit_num
-                if is_word_enabled_in_csv and is_unit_enabled_by_room_setting:
-                    total_questions_for_room += 1
-            
-            # 学習履歴を分析
-            user_history = user.get_problem_history()
-            user_incorrect = user.get_incorrect_words()
-            total_attempts = 0
-            total_correct = 0
-            mastered_problem_ids = set()
-            
-            for problem_id, history in user_history.items():
-                # 対応する単語を検索
-                matched_word = None
-                for word in word_data:
-                    if get_problem_id(word) == problem_id:
-                        matched_word = word
-                        break
-                
-                if matched_word:
-                    is_word_enabled_in_csv = matched_word['enabled']
-                    is_unit_enabled_by_room_setting = parse_unit_number(matched_word['number']) <= parsed_max_enabled_unit_num
-                    
-                    if is_word_enabled_in_csv and is_unit_enabled_by_room_setting:
-                        correct_attempts = history.get('correct_attempts', 0)
-                        incorrect_attempts = history.get('incorrect_attempts', 0)
-                        problem_total_attempts = correct_attempts + incorrect_attempts
-                        
-                        total_attempts += problem_total_attempts
-                        total_correct += correct_attempts
-                        
-                        # マスター判定：正答率80%以上
-                        if problem_total_attempts > 0:
-                            accuracy_rate = (correct_attempts / problem_total_attempts) * 100
-                            if accuracy_rate >= 80.0:
-                                mastered_problem_ids.add(problem_id)
-            
-            # 基本統計を更新
-            self.total_attempts = total_attempts
-            self.total_correct = total_correct
-            self.mastered_count = len(mastered_problem_ids)
-            self.total_questions_in_room = total_questions_for_room
-            self.incorrect_count = len(user_incorrect)
-            
-            # 正答率計算
-            self.accuracy_rate = (total_correct / total_attempts * 100) if total_attempts > 0 else 0
-            
-            # 網羅率計算
-            self.coverage_rate = (self.mastered_count / total_questions_for_room * 100) if total_questions_for_room > 0 else 0
-            
-            # ベイズ統計による正答率補正
-            EXPECTED_AVG_ACCURACY = 0.7
-            CONFIDENCE_ATTEMPTS = 10
-            PRIOR_CORRECT = EXPECTED_AVG_ACCURACY * CONFIDENCE_ATTEMPTS
-            PRIOR_ATTEMPTS = CONFIDENCE_ATTEMPTS
-            
-            # 動的スコアシステムによる計算
-            if total_attempts == 0:
-                self.balance_score = 0
-                self.mastery_score = 0
-                self.reliability_score = 0
-                self.activity_score = 0
-            else:
-                # 正答率を計算
-                accuracy_rate = total_correct / total_attempts
-                
-                # 1. マスタースコア（段階的 + 連続的）
-                mastery_base = (self.mastered_count // 100) * 250
-                mastery_progress = ((self.mastered_count % 100) / 100) * 125
-                self.mastery_score = mastery_base + mastery_progress
-                
-                # 2. 正答率スコア（段階的連続計算）
-                if accuracy_rate >= 0.9:
-                    self.reliability_score = 500 + (accuracy_rate - 0.9) * 800
-                elif accuracy_rate >= 0.8:
-                    self.reliability_score = 350 + (accuracy_rate - 0.8) * 1500
-                elif accuracy_rate >= 0.7:
-                    self.reliability_score = 200 + (accuracy_rate - 0.7) * 1500
-                elif accuracy_rate >= 0.6:
-                    self.reliability_score = 100 + (accuracy_rate - 0.6) * 1000
-                else:
-                    self.reliability_score = accuracy_rate * 166.67
-                
-                # 3. 継続性スコア（活動量評価）
-                self.activity_score = math.sqrt(total_attempts) * 3
-                
-                # 4. 精度ボーナス（高正答率への追加評価）
-                precision_bonus = 0
-                if accuracy_rate >= 0.95:
-                    precision_bonus = 150 + (accuracy_rate - 0.95) * 1000
-                elif accuracy_rate >= 0.9:
-                    precision_bonus = 100 + (accuracy_rate - 0.9) * 1000
-                elif accuracy_rate >= 0.85:
-                    precision_bonus = 50 + (accuracy_rate - 0.85) * 1000
-                elif accuracy_rate >= 0.8:
-                    precision_bonus = (accuracy_rate - 0.8) * 1000
-                
-                # 総合スコア = マスタースコア + 正答率スコア + 継続性スコア + 精度ボーナス
-                self.balance_score = self.mastery_score + self.reliability_score + self.activity_score + precision_bonus
-            
-            # 更新日時
-            self.last_updated = datetime.now(JST)
-            
-            print(f"✅ 統計更新完了: {user.username} (スコア: {self.balance_score:.1f})")
-            return True
-            
-        except Exception as e:
-            print(f"❌ 統計更新エラー ({user.username}): {e}")
-            return False
 
 # ====================================================================
 # ヘルパー関数
@@ -7299,35 +7512,6 @@ def debug_room_setting_model():
 # ========================================
 # 論述問題集用データベースモデル
 # ========================================
-
-class EssayProblem(db.Model):
-    __tablename__ = 'essay_problems'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    chapter = db.Column(db.String(10), nullable=False)
-    type = db.Column(db.String(1), nullable=False)  # A, B, C, D
-    university = db.Column(db.String(100), nullable=False)
-    year = db.Column(db.Integer, nullable=False)
-    question = db.Column(db.Text, nullable=False)
-    answer = db.Column(db.Text, nullable=False)
-    answer_length = db.Column(db.Integer, nullable=False)
-    enabled = db.Column(db.Boolean, default=True, nullable=False)
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))
-    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))
-    
-    def to_dict(self):
-        return {
-            'id': self.id,
-            'chapter': self.chapter,
-            'type': self.type,
-            'university': self.university,
-            'year': self.year,
-            'question': self.question,
-            'answer': self.answer,
-            'answer_length': self.answer_length,
-            'enabled': self.enabled
-        }
-
 class EssayProgress(db.Model):
     __tablename__ = 'essay_progress'
     
