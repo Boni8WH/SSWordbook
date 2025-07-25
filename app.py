@@ -466,6 +466,7 @@ class EssayVisibilitySetting(db.Model):
 
 class EssayProblem(db.Model):
     __tablename__ = 'essay_problems'
+    __table_args__ = {'extend_existing': True}
     
     id = db.Column(db.Integer, primary_key=True)
     chapter = db.Column(db.String(10), nullable=False)
@@ -509,10 +510,12 @@ class EssayProgress(db.Model):
     
     __table_args__ = (
         db.UniqueConstraint('user_id', 'problem_id', name='unique_user_problem'),
+        {'extend_existing': True}  # ← 追加
     )
 
 class EssayCsvFile(db.Model):
     __tablename__ = 'essay_csv_files'
+    __table_args__ = {'extend_existing': True}  # ← 追加
     
     id = db.Column(db.Integer, primary_key=True)
     filename = db.Column(db.String(100), unique=True, nullable=False)
@@ -7508,39 +7511,6 @@ def debug_room_setting_model():
         
     except Exception as e:
         return f"<h1>診断エラー: {str(e)}</h1>"
-
-# ========================================
-# 論述問題集用データベースモデル
-# ========================================
-class EssayProgress(db.Model):
-    __tablename__ = 'essay_progress'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False)
-    problem_id = db.Column(db.Integer, db.ForeignKey('essay_problems.id', ondelete='CASCADE'), nullable=False)
-    viewed_answer = db.Column(db.Boolean, default=False, nullable=False)
-    understood = db.Column(db.Boolean, default=False, nullable=False)
-    difficulty_rating = db.Column(db.Integer)
-    memo = db.Column(db.Text)
-    review_flag = db.Column(db.Boolean, default=False, nullable=False)
-    viewed_at = db.Column(db.DateTime)
-    understood_at = db.Column(db.DateTime)
-    last_updated = db.Column(db.DateTime, default=lambda: datetime.now(JST))
-    
-    __table_args__ = (
-        db.UniqueConstraint('user_id', 'problem_id', name='unique_user_problem'),
-    )
-
-class EssayCsvFile(db.Model):
-    __tablename__ = 'essay_csv_files'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    filename = db.Column(db.String(100), unique=True, nullable=False)
-    original_filename = db.Column(db.String(100), nullable=False)
-    content = db.Column(db.Text, nullable=False)
-    file_size = db.Column(db.Integer, nullable=False)
-    problem_count = db.Column(db.Integer, default=0, nullable=False)
-    upload_date = db.Column(db.DateTime, default=lambda: datetime.now(JST))
 
 # ========================================
 # 論述問題集用ルート
