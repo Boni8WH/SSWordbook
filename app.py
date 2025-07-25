@@ -2433,74 +2433,55 @@ def index():
         traceback.print_exc()
         return f"Internal Server Error: {e}", 500
 
-# app.py の login_page ルートを修正
-
 @app.route('/login', methods=['GET', 'POST'])
 def login_page():
-    try:
-        if request.method == 'POST':
-            login_type = request.form.get('login_type', 'user')
+    if request.method == 'POST':
+        login_type = request.form.get('login_type')
+        
+        if login_type == 'admin':
+            admin_username = request.form.get('admin_username')
+            admin_password = request.form.get('admin_password')
             
-            if login_type == 'admin':
-                # 管理者ログイン処理（変更なし）
-                admin_username = request.form.get('admin_username')
-                admin_password = request.form.get('admin_password')
-                
-                admin_user = User.query.filter_by(username=admin_username, room_number='ADMIN', student_id='000').first()
-                
-                if admin_user and admin_user.check_individual_password(admin_password):
-                    session['user_id'] = admin_user.id
-                    session['username'] = admin_user.username
-                    session['room_number'] = admin_user.room_number
-                    session['admin_logged_in'] = True
-                    session.permanent = True
-                    
-                    admin_user.last_login = datetime.now(JST)
-                    db.session.commit()
-                    
-                    flash('管理者としてログインしました。', 'success')
-                    return redirect(url_for('admin_page'))
-                else:
-                    flash('管理者のユーザー名またはパスワードが間違っています。', 'danger')
+            # 🔥 修正: データベースの管理者ユーザーで認証
+            # room_number='ADMIN' のユーザーを管理者として扱う
+            admin_user = User.query.filter_by(room_number='ADMIN', username=admin_username).first()
             
+            if admin_user and admin_user.check_individual_password(admin_password):
+                session['admin_logged_in'] = True
+                session['username'] = 'admin'
+                session['user_id'] = admin_user.id  # 管理者ユーザーのIDも保存
+                flash('管理者としてログインしました。', 'success')
+                return redirect(url_for('admin_page'))
             else:
-                # 一般ユーザーログイン処理
-                room_number = request.form.get('room_number')
-                room_password = request.form.get('room_password')
-                student_id = request.form.get('student_id')
-                individual_password = request.form.get('individual_password')
-
-                user = User.query.filter_by(room_number=room_number, student_id=student_id).first()
-
-                if user and user.check_individual_password(individual_password) and user.check_room_password(room_password):
-                    session['user_id'] = user.id
-                    session['username'] = user.username
-                    session['room_number'] = user.room_number
-                    session['admin_logged_in'] = False
-                    session.permanent = True
-                    
-                    user.last_login = datetime.now(JST)
-                    db.session.commit()
-
-                    # 🆕 初回ログインチェック
-                    if hasattr(user, 'is_first_login') and user.is_first_login:
-                        flash('初回ログインです。セキュリティのためパスワードを変更してください。', 'info')
-                        return redirect(url_for('first_time_password_change'))
-                    
-                    flash('ログインしました。', 'success')
-                    return redirect(url_for('index'))
+                flash('管理者のユーザー名またはパスワードが間違っています。', 'danger')
+        
+        elif login_type == 'user':
+            room_number = request.form.get('room_number')
+            room_password = request.form.get('room_password')
+            student_id = request.form.get('student_id')
+            individual_password = request.form.get('individual_password')
+            
+            # 複数アカウント対応の認証を使用
+            user = authenticate_user(room_number, room_password, student_id, individual_password)
+            
+            if user:
+                session['user_id'] = user.id
+                session['username'] = user.username
+                session['room_number'] = user.room_number
+                user.last_login = datetime.now(JST)
+                db.session.commit()
+                
+                if hasattr(user, 'is_first_login') and user.is_first_login:
+                    flash('初回ログインです。パスワードを変更してください。', 'info')
+                    return redirect(url_for('first_time_password_change'))
                 else:
-                    flash('部屋番号、出席番号、またはパスワードが間違っています。', 'danger')
-        
-        # GET リクエスト時
-        context = get_template_context()
-        return render_template('login.html', **context)
-        
-    except Exception as e:
-        print(f"Error in login route: {e}")
-        import traceback
-        traceback.print_exc()
-        return f"Login Error: {e}", 500
+                    flash(f'ようこそ、{user.username}さん！', 'success')
+                    return redirect(url_for('index'))
+            else:
+                flash('ログイン情報が間違っています。', 'danger')
+    
+    context = get_template_context()
+    return render_template('login.html', **context)
 
 @app.route('/first_time_password_change', methods=['GET', 'POST'])
 def first_time_password_change():
@@ -5916,8 +5897,6 @@ def admin_app_info_reset():
         flash(f'アプリ情報のリセット中にエラーが発生しました: {str(e)}', 'danger')
         return redirect(url_for('admin_app_info'))
 
-# app.py の admin_add_user ルートを修正
-
 @app.route('/admin/add_user', methods=['POST'])
 def admin_add_user():
     try:
@@ -5935,25 +5914,29 @@ def admin_add_user():
             flash('すべての項目を入力してください。', 'danger')
             return redirect(url_for('admin_page'))
 
-        # 重複チェック（個別パスワードハッシュも考慮）
+        # 🔥 修正: 完全に同一のアカウント（全ての情報が同じ）のみ重複とみなす
         individual_password_hash = generate_password_hash(individual_password)
+        room_password_hash = generate_password_hash(room_password)
+        
         existing_user = User.query.filter_by(
             room_number=room_number,
             student_id=student_id,
+            username=username,
+            _room_password_hash=room_password_hash,
             _individual_password_hash=individual_password_hash
         ).first()
                     
         if existing_user:
-            flash(f'部屋{room_number}にユーザー名{username}は既に存在します。', 'danger')
+            flash(f'完全に同一のアカウント（部屋{room_number}、出席番号{student_id}、ユーザー名{username}、同じパスワード）は既に存在します。', 'danger')
             return redirect(url_for('admin_page'))
 
-        # 🆕 新規ユーザー作成（初回ログインフラグ付き）
+        # ✅ 新規ユーザー作成（同じ部屋・出席番号でも個別パスワードが異なれば作成可能）
         new_user = User(
             room_number=room_number,
             student_id=student_id,
             username=username,
             original_username=username,
-            is_first_login=True  # 🆕 初回ログインフラグを設定
+            is_first_login=True
         )
         new_user.set_room_password(room_password)
         new_user.set_individual_password(individual_password)
@@ -5973,11 +5956,29 @@ def admin_add_user():
 
         flash(f'ユーザー {username} (部屋: {room_number}, 出席番号: {student_id}) を登録しました。初回ログイン時にパスワード変更が必要です。', 'success')
         return redirect(url_for('admin_page'))
-        
+
     except Exception as e:
         print(f"Error in admin_add_user: {e}")
-        flash(f'ユーザー追加中にエラーが発生しました: {e}', 'danger')
+        db.session.rollback()
+        flash(f'ユーザー追加中にエラーが発生しました: {str(e)}', 'danger')
         return redirect(url_for('admin_page'))
+
+def authenticate_user(room_number, room_password, student_id, individual_password):
+    """
+    複数の同じ出席番号アカウントから正しいものを見つける
+    """
+    # 同じ部屋番号・出席番号の全てのユーザーを取得
+    potential_users = User.query.filter_by(
+        room_number=room_number,
+        student_id=student_id
+    ).all()
+    
+    for user in potential_users:
+        # 入室パスワードと個別パスワードの両方をチェック
+        if user.check_room_password(room_password) and user.check_individual_password(individual_password):
+            return user
+    
+    return None
 
 @app.route('/admin/delete_user/<int:user_id>', methods=['POST'])
 def admin_delete_user(user_id):
