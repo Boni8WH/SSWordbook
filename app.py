@@ -49,6 +49,10 @@ class User(db.Model):
     # パスワードはハッシュ化して保存
     _room_password_hash = db.Column(db.String(128), nullable=False)
     _individual_password_hash = db.Column(db.String(128), nullable=False)
+    __table_args__ = (
+        db.UniqueConstraint('room_number', 'student_id', '_individual_password_hash', 
+                          name='unique_room_student_individual_password'),
+    )
     
     # アカウント名変更・初回ログイン・制限状態管理用フィールド
     original_username = db.Column(db.String(80), nullable=False)
@@ -1083,10 +1087,12 @@ def change_username_page():
                 context['current_user'] = current_user
                 return render_template('change_username.html', **context)
             
-            # 同じ部屋内での重複チェック
+            # 重複チェック（個別パスワードハッシュも考慮）
             existing_user = User.query.filter_by(
-                room_number=current_user.room_number,
-                username=new_username
+                room_number=current_user.room_number,  # 修正: current_user.room_numberを使用
+                username=new_username  # 修正: usernameで重複チェック（student_idは不要）
+            ).filter(
+                User.id != current_user.id  # 自分自身は除外
             ).first()
             
             if existing_user and existing_user.id != current_user.id:
@@ -5929,10 +5935,12 @@ def admin_add_user():
             flash('すべての項目を入力してください。', 'danger')
             return redirect(url_for('admin_page'))
 
-        # 重複チェック
+        # 重複チェック（個別パスワードハッシュも考慮）
+        individual_password_hash = generate_password_hash(individual_password)
         existing_user = User.query.filter_by(
-            room_number=room_number, 
-            username=username
+            room_number=room_number,
+            student_id=student_id,
+            _individual_password_hash=individual_password_hash
         ).first()
                     
         if existing_user:
@@ -6630,7 +6638,17 @@ def admin_upload_users():
                     continue
 
                 # 重複チェック
-                existing_user = User.query.filter_by(room_number=room_number, username=username).first()
+                individual_password_hash = generate_password_hash(individual_password, method='pbkdf2:sha256', salt_length=8)
+                existing_user = User.query.filter_by(
+                    room_number=room_number,
+                    student_id=student_id,
+                    _individual_password_hash=individual_password_hash
+                ).first()
+                
+                if existing_user:
+                    errors.append(f"行{line_num}: 部屋{room_number}・出席番号{student_id}で同じ個別パスワードのアカウントが既に存在します")
+                    skipped_count += 1
+                    continue
                 if existing_user:
                     errors.append(f"行{line_num}: ユーザー {username} は既に存在します")
                     skipped_count += 1
