@@ -13,9 +13,6 @@ from datetime import datetime, timedelta
 from sqlalchemy import inspect, text, func, case, cast, Integer
 import glob
 
-# 既存のmodelsからのインポート文を見つけて、EssayVisibilitySettingを追加
-from models import User, AdminUser, RoomSetting, EssayVisibilitySetting
-
 # 外部ライブラリ
 import pytz
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, Response
@@ -96,6 +93,12 @@ mail = Mail(app)
 
 # ===== SQLAlchemy初期化（1回のみ） =====
 db = SQLAlchemy(app)
+
+# models.pyと統一
+import models
+models.db = db
+
+from models import User, AdminUser, RoomSetting, EssayVisibilitySetting
 
 UPLOAD_FOLDER = 'uploads'
 if not os.path.exists(UPLOAD_FOLDER):

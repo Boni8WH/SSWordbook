@@ -11,7 +11,7 @@ import pytz
 # 日本時間のタイムゾーンオブジェクトを作成
 JST = pytz.timezone('Asia/Tokyo')
 
-db = SQLAlchemy()
+db = None
 
 # JSONデータを扱うカスタム型
 class JSONEncodedDict(TypeDecorator):
