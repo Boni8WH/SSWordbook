@@ -35,6 +35,15 @@ class User(db.Model):
     # パスワードはハッシュ化して保存
     _room_password_hash = db.Column(db.String(128), nullable=False)
     _individual_password_hash = db.Column(db.String(128), nullable=False)
+    
+    # ★★★ 以下のフィールドを追加 ★★★
+    original_username = db.Column(db.String(80), nullable=False)
+    is_first_login = db.Column(db.Boolean, default=True, nullable=False)
+    password_changed_at = db.Column(db.DateTime)
+    username_changed_at = db.Column(db.DateTime)
+    restriction_triggered = db.Column(db.Boolean, default=False, nullable=False)
+    restriction_released = db.Column(db.Boolean, default=False, nullable=False)
+    
     # 問題履歴をJSON形式で保存 (問題ID: {total: N, correct: M, consecutive_correct: K})
     problem_history = db.Column(JSONEncodedDict, default={})
     # 苦手問題をJSON形式で保存 (問題オブジェクトのリスト)
@@ -56,6 +65,56 @@ class User(db.Model):
 
     def __repr__(self):
         return f'<User {self.username} (Room: {self.room_number}, ID: {self.student_id})>'
+    
+    def get_problem_history(self):
+        """問題履歴を取得"""
+        if self.problem_history:
+            return self.problem_history
+        return {}
+
+    def set_problem_history(self, history):
+        """問題履歴を設定"""
+        self.problem_history = history
+
+    def get_incorrect_words(self):
+        """苦手問題を取得"""
+        if self.incorrect_words:
+            return self.incorrect_words
+        return []
+
+    def set_incorrect_words(self, words):
+        """苦手問題を設定"""
+        self.incorrect_words = words
+
+    def change_username(self, new_username):
+        """アカウント名を変更する"""
+        if not self.original_username:
+            self.original_username = self.username
+        
+        self.username = new_username
+        self.username_changed_at = datetime.now(JST)
+    
+    def mark_first_login_completed(self):
+        """初回ログインを完了としてマークする"""
+        self.is_first_login = False
+    
+    def change_password_first_time(self, new_password):
+        """初回パスワード変更（個別パスワードのみ）"""
+        self.set_individual_password(new_password)
+        self.password_changed_at = datetime.now(JST)
+        self.mark_first_login_completed()
+    
+    def set_restriction_state(self, triggered, released):
+        """制限状態を設定"""
+        self.restriction_triggered = triggered
+        self.restriction_released = released
+    
+    def get_restriction_state(self):
+        """制限状態を取得"""
+        return {
+            'hasBeenRestricted': self.restriction_triggered,
+            'restrictionReleased': self.restriction_released
+        }
 
 class AdminUser(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -147,6 +206,19 @@ class EssayVisibilitySetting(db.Model):
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
+    
+class EssayProblemImage(db.Model):
+    __tablename__ = 'essay_problem_images'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    problem_id = db.Column(db.Integer, nullable=False, unique=True)  # essay_problemsのidと対応
+    image_data = db.Column(db.LargeBinary, nullable=False)  # 画像のバイナリデータ
+    image_filename = db.Column(db.String(255), nullable=False)  # 元のファイル名
+    image_content_type = db.Column(db.String(100), nullable=False)  # MIME type (image/jpeg など)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))
+    
+    def __repr__(self):
+        return f'<EssayProblemImage problem_id={self.problem_id} filename={self.image_filename}>'
 
     @classmethod
     def get_current_info(cls):
