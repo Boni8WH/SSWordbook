@@ -154,7 +154,118 @@
                     </div>
                 </div>
 
-                <!-- スクロール可能なテーブルコンテナ -->
+                <!-- ユーザー一覧テーブル -->
+                <div class="scrollable-table-container">
+                    <div class="table-responsive">
+                        <table class="table table-striped" id="userTable">
+                            <thead class="table-dark sticky-header">
+                                <tr>
+                                    <th>ID</th>
+                                    <th style="cursor: pointer;" data-column="room">
+                                        部屋番号 <i class="fas fa-sort sort-icon" data-column="room"></i>
+                                    </th>
+                                    <th>出席番号</th>
+                                    <th style="cursor: pointer;" data-column="name">
+                                        アカウント名 <i class="fas fa-sort sort-icon" data-column="name"></i>
+                                    </th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="userTableBody">
+                                {% for user in users %}
+                                {% if user.room_number != 'ADMIN' %}
+                                <tr data-room="{{ user.room_number }}" 
+                                    data-name="{{ user.username.lower() }}" 
+                                    data-student="{{ user.student_id }}">
+                                    <td>{{ user.id }}</td>
+                                    <td>
+                                        <span class="badge bg-primary">{{ user.room_number }}</span>
+                                        {% if room_data.get(user.room_number, {}).get('is_suspended', False) %}
+                                            <span class="badge bg-warning text-dark ms-1">
+                                                <i class="fas fa-pause"></i> 一時停止
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                    <td><code>{{ user.student_id }}</code></td>
+                                    <td><strong>{{ user.username }}</strong></td>
+                                    <td>
+                                        <button class="btn btn-danger btn-sm delete-user-btn" 
+                                                data-user-id="{{ user.id }}" 
+                                                data-username="{{ user.username }}">
+                                            <i class="fas fa-trash"></i> 削除
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endif %}
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    </div>
+
+    <!-- 部屋ごとCSVファイル管理セクション -->
+    <div class="admin-section">
+        <div class="section-header" data-bs-toggle="collapse" data-bs-target="#section-csv-management" aria-expanded="false">
+            <h3><i class="fas fa-folder-open"></i> 部屋ごとCSVファイル管理 <i class="fas fa-chevron-down toggle-icon"></i></h3>
+        </div>
+        <div class="collapse" id="section-csv-management">
+            <div class="section-content">
+                <p>各部屋で使用する単語帳CSVファイルを個別に設定できます。アップロードしない場合はデフォルトのwords.csvが使用されます。</p>
+                <div class="csv-template-section" style="margin-bottom: 25px; padding: 15px; background-color: #f0f8ff; border: 1px solid #87ceeb; border-radius: 6px; border-left: 4px solid #17a2b8;">
+                    <h4 style="margin-top: 0; color: #17a2b8; display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-download"></i> CSVテンプレートダウンロード
+                    </h4>
+                    <p style="color: #666; font-size: 0.9em; margin-bottom: 15px;">
+                        正しい形式の単語帳CSVファイルを作成するためのテンプレートです。サンプルデータ付きですぐに編集を開始できます。
+                    </p>
+                    <a href="{{ url_for('download_csv_template') }}" class="btn btn-outline-info btn-sm">
+                        <i class="fas fa-file-csv"></i> 単語帳CSVテンプレートをダウンロード
+                    </a>
+                    <small class="text-muted d-block mt-2">
+                        ※ ファイル形式：chapter, number, category, question, answer, enabled
+                    </small>
+                </div>        
+                <form action="{{ url_for('admin_upload_room_csv') }}" method="POST" enctype="multipart/form-data" class="upload-form">
+                    <div class="input-group">
+                        <label for="room_csv_file">CSVファイルを選択:</label>
+                        <input type="file" id="room_csv_file" name="file" accept=".csv" required>
+                        <small class="form-text text-muted">＊ファイル名は半角英数字＊</small>
+                    </div>
+                    <button type="submit" class="btn btn-success">CSVファイルアップロード</button>
+                </form>
+
+                <h4>アップロード済みCSVファイル一覧</h4>
+                <div id="csv-files-list">
+                    <div class="d-flex gap-2 mb-3">
+                        <button class="btn btn-info btn-sm" onclick="loadCsvFilesList()">
+                            <i class="fas fa-sync-alt"></i> ファイル一覧を更新
+                        </button>
+                    </div>
+                    <!-- スクロール可能なCSVファイルリスト -->
+                    <div class="scrollable-table-container">
+                        <div id="csv-files-container" style="margin-top: 15px; overflow-x: auto;">
+                            <p class="text-info">📋 ファイル一覧を読み込み中...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 部屋ごとの設定管理セクション -->
+    <div class="admin-section">
+        <div class="section-header" data-bs-toggle="collapse" data-bs-target="#section-room-settings" aria-expanded="false">
+            <h3><i class="fas fa-home"></i> 部屋ごとの設定管理 <i class="fas fa-chevron-down toggle-icon"></i></h3>
+        </div>
+        <div class="collapse" id="section-room-settings">
+            <div class="section-content">
+                <p>各部屋の学習範囲、CSVファイル、一時停止状態を管理します。</p>
+
+                <!-- スクロール可能な部屋設定テーブル -->
                 <div class="scrollable-table-container">
                     <div class="table-responsive" style="overflow-x: auto;">
                         <table class="table table-striped room-setting-table" style="min-width: 700px;">
@@ -253,155 +364,6 @@
         </div>
     </div>
 
-    <!-- 部屋ごとCSVファイル管理セクション -->
-    <div class="admin-section">
-        <div class="section-header" data-bs-toggle="collapse" data-bs-target="#section-csv-management" aria-expanded="false">
-            <h3><i class="fas fa-folder-open"></i> 部屋ごとCSVファイル管理 <i class="fas fa-chevron-down toggle-icon"></i></h3>
-        </div>
-        <div class="collapse" id="section-csv-management">
-            <div class="section-content">
-                <p>各部屋で使用する単語帳CSVファイルを個別に設定できます。アップロードしない場合はデフォルトのwords.csvが使用されます。</p>
-                <div class="csv-template-section" style="margin-bottom: 25px; padding: 15px; background-color: #f0f8ff; border: 1px solid #87ceeb; border-radius: 6px; border-left: 4px solid #17a2b8;">
-                    <h4 style="margin-top: 0; color: #17a2b8; display: flex; align-items: center; gap: 8px;">
-                        <i class="fas fa-download"></i> CSVテンプレートダウンロード
-                    </h4>
-                    <p style="color: #666; font-size: 0.9em; margin-bottom: 15px;">
-                        正しい形式の単語帳CSVファイルを作成するためのテンプレートです。サンプルデータ付きですぐに編集を開始できます。
-                    </p>
-                    <a href="{{ url_for('download_csv_template') }}" class="btn btn-outline-info btn-sm">
-                        <i class="fas fa-file-csv"></i> 単語帳CSVテンプレートをダウンロード
-                    </a>
-                    <small class="text-muted d-block mt-2">
-                        ※ ファイル形式：chapter, number, category, question, answer, enabled
-                    </small>
-                </div>        
-                <form action="{{ url_for('admin_upload_room_csv') }}" method="POST" enctype="multipart/form-data" class="upload-form">
-                    <div class="input-group">
-                        <label for="room_csv_file">CSVファイルを選択:</label>
-                        <input type="file" id="room_csv_file" name="file" accept=".csv" required>
-                        <small class="form-text text-muted">＊ファイル名は半角英数字＊</small>
-                    </div>
-                    <button type="submit" class="btn btn-success">CSVファイルアップロード</button>
-                </form>
-
-                <h4>アップロード済みCSVファイル一覧</h4>
-                <div id="csv-files-list">
-                    <div class="d-flex gap-2 mb-3">
-                        <button class="btn btn-info btn-sm" onclick="loadCsvFilesList()">
-                            <i class="fas fa-sync-alt"></i> ファイル一覧を更新
-                        </button>
-                    </div>
-                    <!-- スクロール可能なCSVファイルリスト -->
-                    <div class="scrollable-table-container">
-                        <div id="csv-files-container" style="margin-top: 15px; overflow-x: auto;">
-                            <p class="text-info">📋 ファイル一覧を読み込み中...</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- 部屋ごとの設定管理セクション -->
-    <div class="admin-section">
-        <div class="section-header" data-bs-toggle="collapse" data-bs-target="#section-room-settings" aria-expanded="false">
-            <h3><i class="fas fa-home"></i> 部屋ごとの設定管理 <i class="fas fa-chevron-down toggle-icon"></i></h3>
-        </div>
-        <div class="collapse" id="section-room-settings">
-            <div class="section-content">
-                <p>各部屋の学習範囲とCSVファイルを設定します。</p>
-
-                <!-- スクロール可能な部屋設定テーブル -->
-                <div class="scrollable-table-container">
-                    <div class="table-responsive" style="overflow-x: auto;">
-                        <table class="table table-striped room-setting-table" style="min-width: 700px;">
-                            <thead class="table-dark sticky-header">
-                                <tr>
-                                    <th>部屋番号</th>
-                                    <th>有効単元設定</th>
-                                    <th>使用CSVファイル</th>
-                                    <th>操作</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% set unique_room_numbers = [] %}
-                                {% for user in users %}
-                                    {% if user.room_number not in unique_room_numbers and user.room_number != 'ADMIN' %}
-                                        {% set _ = unique_room_numbers.append(user.room_number) %}
-                                    {% endif %}
-                                {% endfor %}
-                                
-                                {% for setting in room_max_unit_settings.keys() %}
-                                    {% if setting not in unique_room_numbers and setting != 'ADMIN' %}
-                                        {% set _ = unique_room_numbers.append(setting) %}
-                                    {% endif %}
-                                {% endfor %}
-
-                                {% for room_num in unique_room_numbers|sort %}
-                                <tr>
-                                    <td><strong>{{ room_num }}</strong></td>
-                                    <td>
-                                        <div class="unit-setting-container" id="unitContainer_{{ room_num }}">
-                                            <div class="unit-controls mb-2">
-                                                <button type="button" class="btn btn-outline-primary btn-sm" onclick="loadAvailableUnits('{{ room_num }}')">
-                                                    <i class="fas fa-sync"></i> 単元一覧読み込み
-                                                </button>
-                                                <button type="button" class="btn btn-outline-success btn-sm" onclick="selectAllUnits('{{ room_num }}')">
-                                                    <i class="fas fa-check-double"></i> 全て選択
-                                                </button>
-                                                <button type="button" class="btn btn-outline-warning btn-sm" onclick="clearAllUnits('{{ room_num }}')">
-                                                    <i class="fas fa-times"></i> 全て解除
-                                                </button>
-                                            </div>
-                                            <div class="unit-checkboxes" id="unitCheckboxes_{{ room_num }}">
-                                                <p class="text-muted">「単元一覧読み込み」をクリックして利用可能な単元を表示してください</p>
-                                            </div>
-                                            <div class="selected-units-display mt-2">
-                                                <small class="text-info">
-                                                    選択中: <span id="selectedCount_{{ room_num }}">0</span>個の単元
-                                                </small>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <select id="csvFile_{{ room_num }}" 
-                                                class="form-control csv-setting-select" 
-                                                data-room-number="{{ room_num }}">
-                                            <option value="words.csv" {% if room_csv_settings.get(room_num, 'words.csv') == 'words.csv' %}selected{% endif %}>
-                                                words.csv (デフォルト)
-                                            </option>
-                                            <!-- 動的にオプションを追加 -->
-                                        </select>
-                                        <small class="form-text text-muted">
-                                            現在の設定: <code id="current_csv_{{ room_num }}">{{ room_csv_settings.get(room_num, 'words.csv') }}</code>
-                                        </small>
-                                    </td>
-                                    <td>
-                                        <div class="btn-group-vertical btn-group-sm">
-                                            <button class="btn btn-primary btn-sm save-room-setting-btn" 
-                                                    data-room-number="{{ room_num }}">保存</button>
-                                            <button class="btn btn-warning btn-sm me-1" 
-                                                    data-room-number="{{ room_num }}"
-                                                    data-is-suspended="{{ room_data.get(room_num, {}).get('is_suspended', False)|lower }}"
-                                                    onclick="toggleRoomSuspension(this)">
-                                                {% if room_data.get(room_num, {}).get('is_suspended', False) %}
-                                                    <i class="fas fa-play"></i> 再開
-                                                {% else %}
-                                                    <i class="fas fa-pause"></i> 一時停止
-                                                {% endif %}
-                                            </button>
-                                            <button class="btn btn-danger btn-sm" onclick="deleteRoom('{{ room_num }}')">削除</button>
-                                        </div>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
     <div class="admin-section">
         <div class="section-header" data-bs-toggle="collapse" data-bs-target="#section-essay-visibility" aria-expanded="false">
             <h3><i class="fas fa-eye"></i> 論述問題公開設定 <i class="fas fa-chevron-down toggle-icon"></i></h3>
@@ -1102,25 +1064,6 @@ function initializeUserTableSort() {
     });
 }
 
-document.addEventListener('DOMContentLoaded', function() {
-    // 削除ボタンのイベント委譲
-    document.addEventListener('click', function(event) {
-        if (event.target.closest('.delete-user-btn')) {
-            event.preventDefault();
-            
-            const button = event.target.closest('.delete-user-btn');
-            const userId = button.getAttribute('data-user-id');
-            const username = button.getAttribute('data-username');
-            
-            if (userId && username) {
-                deleteUserSafe(button);
-            } else {
-                alert('❌ ユーザー情報の取得に失敗しました。');
-            }
-        }
-    });
-});
-
 // ユーザーテーブル初期化
 function initializeUserTable() {
     console.log('🔧 ユーザーテーブル機能を初期化中...');
@@ -1364,149 +1307,412 @@ function deleteUserSafe(button) {
     form.submit();
 }
 
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('🎉 DOMContentLoaded - ユーザー管理初期化開始');
-    
-    // 少し遅延させて確実に要素が存在するようにする
-    setTimeout(function() {
-        console.log('⏰ 遅延初期化実行');
-        
-        // デバッグ情報を出力
-        debugUserTable();
-        
-        // ユーザーテーブル機能の初期化
-        initializeUserTable();
-        
-        // フィルタリング機能の初期化
-        initializeUserFiltering();
-        
-        console.log('✅ ユーザー管理初期化完了');
-    }, 500);
-});
-
 window.debugUserTable = debugUserTable;
 window.filterUsers = filterUsers;
 
 // ========================================
 // 3. DOMContentLoaded イベントリスナー
 // ========================================
-// 個別論述問題追加
 document.addEventListener('DOMContentLoaded', function() {
-    const essayForm = document.getElementById('newEssayProblemForm');
+    console.log('🎉 DOMContentLoaded - 管理画面統合初期化開始');
     
-    // フォームが存在する場合のみイベントリスナーを追加
-    if (essayForm) {
-        essayForm.addEventListener('submit', function(e) {
-            e.preventDefault();
+    // ========================================
+    // 1. 基本機能の初期化（最優先）
+    // ========================================
+    
+    // 折りたたみ機能の初期化
+    console.log('📁 折りたたみ機能初期化中...');
+    initializeCollapseSections();
+    
+    // ========================================
+    // 2. ユーザー削除機能（イベント委譲）
+    // ========================================
+    
+    console.log('👤 ユーザー削除機能初期化中...');
+    document.addEventListener('click', function(event) {
+        if (event.target.closest('.delete-user-btn')) {
+            event.preventDefault();
             
-            const form = this;
-            const formData = new FormData(form);
+            const button = event.target.closest('.delete-user-btn');
+            const userId = button.getAttribute('data-user-id');
+            const username = button.getAttribute('data-username');
             
-            // 必須項目の確認
-            const chapter = formData.get('chapter');
-            const question = formData.get('question');
-            const type = formData.get('type');
-            
-            if (!chapter || !question || !type) {
-                alert('❌ 章、タイプ、問題文は必須項目です。');
-                return;
-            }
-            
-            // 有効フラグの処理
-            const enabledCheckbox = document.getElementById('new_essay_enabled');
-            if (enabledCheckbox && enabledCheckbox.checked) {
-                formData.set('enabled', 'on');
+            if (userId && username) {
+                deleteUserSafe(button);
             } else {
-                formData.delete('enabled');
+                alert('❌ ユーザー情報の取得に失敗しました。');
             }
-            
-            const submitBtn = form.querySelector('button[type="submit"]');
-            const originalText = submitBtn.innerHTML;
-            submitBtn.disabled = true;
-            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 追加中...';
-            
-            // FormDataで送信（画像ファイル対応）
-            fetch('/admin/essay/add_problem', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    let message = '✅ ' + data.message;
-                    if (data.has_image) {
-                        message += ' （画像付き）';
-                    }
-                    alert(message);
-                    
-                    // フォームをリセット
-                    form.reset();
-                    if (typeof clearImagePreview === 'function') {
-                        clearImagePreview();
-                    }
-                    document.getElementById('new_essay_enabled').checked = true;
-                    
-                    // 統計情報を更新
-                    if (typeof loadEssayStats === 'function') {
-                        loadEssayStats();
-                    }
-                    if (typeof loadEssayProblems === 'function') {
-                        loadEssayProblems();
-                    }
-                } else {
-                    alert('❌ エラー: ' + data.message);
+        }
+    });
+    
+    // ========================================
+    // 3. 論述問題フォーム初期化
+    // ========================================
+    
+    setTimeout(() => {
+        console.log('📝 論述問題フォーム初期化中...');
+        
+        const essayForm = document.getElementById('newEssayProblemForm');
+        
+        if (essayForm) {
+            essayForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const form = this;
+                const formData = new FormData(form);
+                
+                // 必須項目の確認
+                const chapter = formData.get('chapter');
+                const question = formData.get('question');
+                const type = formData.get('type');
+                
+                if (!chapter || !question || !type) {
+                    alert('❌ 章、タイプ、問題文は必須項目です。');
+                    return;
                 }
-            })
-            .catch(error => {
-                console.error('追加エラー:', error);
-                alert('❌ 追加中にエラーが発生しました。');
-            })
-            .finally(() => {
-                submitBtn.disabled = false;
-                submitBtn.innerHTML = originalText;
+                
+                // 有効フラグの処理
+                const enabledCheckbox = document.getElementById('new_essay_enabled');
+                if (enabledCheckbox && enabledCheckbox.checked) {
+                    formData.set('enabled', 'on');
+                } else {
+                    formData.delete('enabled');
+                }
+                
+                const submitBtn = form.querySelector('button[type="submit"]');
+                const originalText = submitBtn.innerHTML;
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 追加中...';
+                
+                // FormDataで送信（画像ファイル対応）
+                fetch('/admin/essay/add_problem', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        let message = '✅ ' + data.message;
+                        if (data.has_image) {
+                            message += ' （画像付き）';
+                        }
+                        alert(message);
+                        
+                        // フォームをリセット
+                        form.reset();
+                        if (typeof clearImagePreview === 'function') {
+                            clearImagePreview();
+                        }
+                        document.getElementById('new_essay_enabled').checked = true;
+                        
+                        // 統計情報を更新
+                        if (typeof loadEssayStats === 'function') {
+                            loadEssayStats();
+                        }
+                        if (typeof loadEssayProblems === 'function') {
+                            loadEssayProblems();
+                        }
+                    } else {
+                        alert('❌ エラー: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('追加エラー:', error);
+                    alert('❌ 追加中にエラーが発生しました。');
+                })
+                .finally(() => {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = originalText;
+                });
+            });
+        }
+        
+        // 画像プレビュー機能
+        window.previewImage = function(input) {
+            const previewDiv = document.getElementById('imagePreview');
+            if (!previewDiv) return;
+            
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                
+                reader.onload = function(e) {
+                    previewDiv.innerHTML = `
+                        <div class="image-preview-container">
+                            <img src="${e.target.result}" alt="プレビュー" 
+                                 style="max-width: 200px; max-height: 200px; border-radius: 8px; border: 1px solid #ddd;">
+                            <button type="button" class="btn btn-sm btn-outline-danger mt-2" 
+                                    onclick="clearImagePreview()">
+                                <i class="fas fa-times"></i> 削除
+                            </button>
+                        </div>
+                    `;
+                };
+                
+                reader.readAsDataURL(input.files[0]);
+            } else {
+                clearImagePreview();
+            }
+        };
+        
+        // 画像プレビューをクリア
+        window.clearImagePreview = function() {
+            const previewDiv = document.getElementById('imagePreview');
+            const imageInput = document.getElementById('new_essay_image');
+            
+            if (previewDiv) {
+                previewDiv.innerHTML = '';
+            }
+            if (imageInput) {
+                imageInput.value = '';
+            }
+        };
+    }, 500);
+    
+    // ========================================
+    // 4. CSVファイル一覧を自動読み込み（重要！）
+    // ========================================
+    
+    setTimeout(() => {
+        console.log('📋 CSVファイル一覧を自動読み込み中...');
+        if (typeof loadCsvFilesList === 'function') {
+            loadCsvFilesList();
+        } else {
+            console.warn('loadCsvFilesList関数が見つかりません');
+        }
+    }, 1000);
+    
+    // ========================================
+    // 5. 部屋設定を自動読み込み & 保存ボタン初期化
+    // ========================================
+    
+    setTimeout(() => {
+        console.log('🏠 部屋設定を自動読み込み中...');
+        if (typeof loadRoomSettings === 'function') {
+            loadRoomSettings();
+        }
+        
+        // 部屋設定保存ボタンの初期化
+        console.log('💾 部屋設定保存ボタン初期化中...');
+        
+        // 既存のイベントリスナーを削除して新しいものに置き換え
+        document.querySelectorAll('.save-room-setting-btn').forEach(button => {
+            button.replaceWith(button.cloneNode(true));
+        });
+        
+        // 新しいイベントリスナーを追加
+        document.querySelectorAll('.save-room-setting-btn').forEach(button => {
+            button.addEventListener('click', function() {
+                const roomNumber = this.dataset.roomNumber;
+                const csvFileSelect = document.getElementById('csvFile_' + roomNumber);
+                
+                console.log(`🔧 部屋設定保存開始: ${roomNumber}`);
+                
+                if (!csvFileSelect) {
+                    alert('設定要素が見つかりません。');
+                    return;
+                }
+                
+                // 選択された単元を取得
+                const selectedUnits = getSelectedUnits(roomNumber);
+                const csvFilename = csvFileSelect.value;
+                
+                console.log(`📝 保存する設定:`, {
+                    roomNumber: roomNumber,
+                    selectedUnits: selectedUnits,
+                    csvFilename: csvFilename
+                });
+
+                // ボタンを無効化して重複実行を防ぐ
+                this.disabled = true;
+                this.textContent = '保存中...';
+
+                // 単元設定、CSVファイル設定を同時に更新
+                Promise.all([
+                    fetch('/admin/update_room_units_setting', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            room_number: roomNumber,
+                            enabled_units: selectedUnits
+                        })
+                    }),
+                    fetch('/admin/update_room_csv_setting', {
+                        method: 'POST', 
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            room_number: roomNumber,
+                            csv_filename: csvFilename
+                        })
+                    })
+                ])
+                .then(responses => {
+                    console.log('📡 サーバーレスポンス受信:', responses.map(r => r.status));
+                    return Promise.all(responses.map(r => r.json()));
+                })
+                .then(results => {
+                    const unitResult = results[0];
+                    const csvResult = results[1];
+                    
+                    console.log('📊 保存結果:', { unitResult, csvResult });
+                    
+                    if (unitResult.status === 'success' && csvResult.status === 'success') {
+                        alert(`✅ 部屋 ${roomNumber} の設定を更新しました:\n・有効単元: ${selectedUnits.length}個\n・CSVファイル: ${csvFilename}`);
+                        
+                        // 設定を再読み込み
+                        loadRoomSettings();
+                    } else {
+                        const errorMsg = (unitResult.message || csvResult.message || '不明なエラー');
+                        alert('❌ 設定の保存中にエラーが発生しました: ' + errorMsg);
+                        console.error('❌ 保存エラー:', { unitResult, csvResult });
+                    }
+                })
+                .catch(error => {
+                    console.error('❌ 保存処理中にエラー:', error);
+                    alert('❌ 設定の保存中にエラーが発生しました: ' + error.message);
+                })
+                .finally(() => {
+                    // ボタンを元に戻す
+                    this.disabled = false;
+                    this.textContent = '保存';
+                });
             });
         });
-    }
+    }, 1500);
     
-    // 画像プレビュー機能も安全にチェック
-    window.previewImage = function(input) {
-        const previewDiv = document.getElementById('imagePreview');
-        if (!previewDiv) return;
-        
-        if (input.files && input.files[0]) {
-            const reader = new FileReader();
-            
-            reader.onload = function(e) {
-                previewDiv.innerHTML = `
-                    <div class="image-preview-container">
-                        <img src="${e.target.result}" alt="プレビュー" 
-                             style="max-width: 200px; max-height: 200px; border-radius: 8px; border: 1px solid #ddd;">
-                        <button type="button" class="btn btn-sm btn-outline-danger mt-2" 
-                                onclick="clearImagePreview()">
-                            <i class="fas fa-times"></i> 削除
-                        </button>
-                    </div>
-                `;
-            };
-            
-            reader.readAsDataURL(input.files[0]);
-        } else {
-            clearImagePreview();
-        }
-    };
+    // ========================================
+    // 6. ユーザー管理初期化
+    // ========================================
     
-    // 画像プレビューをクリア
-    window.clearImagePreview = function() {
-        const previewDiv = document.getElementById('imagePreview');
-        const imageInput = document.getElementById('new_essay_image');
+    setTimeout(function() {
+        console.log('👥 ユーザー管理初期化中...');
         
-        if (previewDiv) {
-            previewDiv.innerHTML = '';
+        // デバッグ情報を出力
+        if (typeof debugUserTable === 'function') {
+            debugUserTable();
         }
-        if (imageInput) {
-            imageInput.value = '';
+        
+        // ユーザーテーブル機能の初期化
+        if (typeof initializeUserTable === 'function') {
+            initializeUserTable();
         }
-    };
+        
+        // フィルタリング機能の初期化
+        if (typeof initializeUserFiltering === 'function') {
+            initializeUserFiltering();
+        }
+        
+        console.log('✅ ユーザー管理初期化完了');
+    }, 2000);
+    
+    // ========================================
+    // 7. 論述問題関連の初期化
+    // ========================================
+    
+    setTimeout(() => {
+        console.log('📚 論述問題関連初期化中...');
+        
+        // 論述問題統計とリストを読み込み
+        if (document.getElementById('essay-stats-container')) {
+            if (typeof loadEssayStats === 'function') {
+                loadEssayStats();
+            }
+        }
+        if (document.getElementById('essay-problems-container')) {
+            if (typeof loadEssayProblems === 'function') {
+                loadEssayProblems();
+            }
+        }
+        
+        // 論述問題フィルター機能の初期化
+        const essayChapterFilter = document.getElementById('essayChapterFilter');
+        const essayTypeFilter = document.getElementById('essayTypeFilter');
+        const essaySearch = document.getElementById('essaySearch');
+        
+        if (essayChapterFilter) {
+            essayChapterFilter.addEventListener('change', function() {
+                if (typeof loadEssayProblems === 'function') {
+                    loadEssayProblems();
+                } else if (typeof filterEssayProblems === 'function') {
+                    filterEssayProblems();
+                }
+            });
+        }
+        if (essayTypeFilter) {
+            essayTypeFilter.addEventListener('change', function() {
+                if (typeof loadEssayProblems === 'function') {
+                    loadEssayProblems();
+                } else if (typeof filterEssayProblems === 'function') {
+                    filterEssayProblems();
+                }
+            });
+        }
+        if (essaySearch) {
+            let searchTimeout;
+            essaySearch.addEventListener('input', function() {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => {
+                    if (typeof loadEssayProblems === 'function') {
+                        loadEssayProblems();
+                    } else if (typeof filterEssayProblems === 'function') {
+                        filterEssayProblems();
+                    }
+                }, 500);
+            });
+        }
+        
+        console.log('✅ 論述問題関連初期化完了');
+    }, 2500);
+    
+    // ========================================
+    // 8. 論述問題公開設定初期化
+    // ========================================
+    
+    setTimeout(() => {
+        console.log('👁️ 論述問題公開設定初期化中...');
+        if (typeof initializeVisibilitySettings === 'function') {
+            initializeVisibilitySettings();
+        }
+        console.log('✅ 論述問題公開設定初期化完了');
+    }, 3000);
+    
+    // ========================================
+    // 9. デバッグモード設定
+    // ========================================
+    
+    setTimeout(() => {
+        // デバッグモードの場合のみ（本番では削除推奨）
+        if (window.location.hostname === 'localhost' || window.location.hostname.includes('127.0.0.1')) {
+            console.log('🔧 デバッグモードが有効です');
+            console.log('📝 使用可能なデバッグコマンド:');
+            console.log('   debugVisibilitySettings() - 設定状況を表示');
+            console.log('   testIndividualClick(章, タイプ) - 個別クリックをテスト');
+            console.log('   showCurrentSettings() - 現在の設定を表示');
+        }
+    }, 3500);
+    
+    // ========================================
+    // 10. 最終チェック
+    // ========================================
+    
+    setTimeout(() => {
+        console.log('🔍 最終チェック中...');
+        
+        // 各種要素の存在確認
+        const essayForm = document.getElementById('newEssayProblemForm');
+        const userTable = document.getElementById('userTable');
+        const csvUpload = document.getElementById('csvUploadForm');
+        const visibilityMatrix = document.getElementById('visibilityMatrix');
+        
+        console.log('📊 要素存在確認:');
+        console.log('  - 論述問題フォーム:', essayForm ? '✅' : '❌');
+        console.log('  - ユーザーテーブル:', userTable ? '✅' : '❌');
+        console.log('  - CSVアップロード:', csvUpload ? '✅' : '❌');
+        console.log('  - 公開設定マトリックス:', visibilityMatrix ? '✅' : '❌');
+        
+        console.log('🎯 すべての統合初期化完了');
+    }, 4000);
+    
+    console.log('✅ 管理画面統合初期化スケジュール設定完了');
 });
 
 // ========================================
@@ -1962,94 +2168,6 @@ function getSelectedUnits(roomNumber) {
     const checkboxes = document.querySelectorAll(`#unitCheckboxes_${roomNumber} input[type="checkbox"]:checked`);
     return Array.from(checkboxes).map(cb => cb.value);
 }
-
-// 部屋設定保存ボタンのイベントリスナーを修正
-document.addEventListener('DOMContentLoaded', function() {
-    // 既存のイベントリスナーを削除して新しいものに置き換え
-    document.querySelectorAll('.save-room-setting-btn').forEach(button => {
-        // 既存のイベントリスナーを削除
-        button.replaceWith(button.cloneNode(true));
-    });
-    
-    // 新しいイベントリスナーを追加
-    document.querySelectorAll('.save-room-setting-btn').forEach(button => {
-        button.addEventListener('click', function() {
-            const roomNumber = this.dataset.roomNumber;
-            const csvFileSelect = document.getElementById('csvFile_' + roomNumber);
-            
-            console.log(`🔧 部屋設定保存開始: ${roomNumber}`);
-            
-            if (!csvFileSelect) {
-                alert('設定要素が見つかりません。');
-                return;
-            }
-            
-            // 選択された単元を取得
-            const selectedUnits = getSelectedUnits(roomNumber);
-            const csvFilename = csvFileSelect.value;
-            
-            console.log(`📝 保存する設定:`, {
-                roomNumber: roomNumber,
-                selectedUnits: selectedUnits,
-                csvFilename: csvFilename
-            });
-
-            // ボタンを無効化して重複実行を防ぐ
-            this.disabled = true;
-            this.textContent = '保存中...';
-
-            // 単元設定、CSVファイル設定を同時に更新
-            Promise.all([
-                fetch('/admin/update_room_units_setting', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        room_number: roomNumber,
-                        enabled_units: selectedUnits
-                    })
-                }),
-                fetch('/admin/update_room_csv_setting', {
-                    method: 'POST', 
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        room_number: roomNumber,
-                        csv_filename: csvFilename
-                    })
-                })
-            ])
-            .then(responses => {
-                console.log('📡 サーバーレスポンス受信:', responses.map(r => r.status));
-                return Promise.all(responses.map(r => r.json()));
-            })
-            .then(results => {
-                const unitResult = results[0];
-                const csvResult = results[1];
-                
-                console.log('📊 保存結果:', { unitResult, csvResult });
-                
-                if (unitResult.status === 'success' && csvResult.status === 'success') {
-                    alert(`✅ 部屋 ${roomNumber} の設定を更新しました:\n・有効単元: ${selectedUnits.length}個\n・CSVファイル: ${csvFilename}`);
-                    
-                    // 設定を再読み込み
-                    loadRoomSettings();
-                } else {
-                    const errorMsg = (unitResult.message || csvResult.message || '不明なエラー');
-                    alert('❌ 設定の保存中にエラーが発生しました: ' + errorMsg);
-                    console.error('❌ 保存エラー:', { unitResult, csvResult });
-                }
-            })
-            .catch(error => {
-                console.error('❌ 保存処理中にエラー:', error);
-                alert('❌ 設定の保存中にエラーが発生しました: ' + error.message);
-            })
-            .finally(() => {
-                // ボタンを元に戻す
-                this.disabled = false;
-                this.textContent = '保存';
-            });
-        });
-    });
-});
 
 // 論述問題CSVテンプレートダウンロード
 function downloadEssayTemplate() {
@@ -2842,42 +2960,6 @@ function exportEssayProblems() {
     window.open('/admin/essay/export_csv?' + params.toString(), '_blank');
 }
 
-// フィルター変更時の自動更新
-document.addEventListener('DOMContentLoaded', function() {
-    document.getElementById('essayChapterFilter').addEventListener('change', loadEssayProblems);
-    document.getElementById('essayTypeFilter').addEventListener('change', loadEssayProblems);
-    
-    let searchTimeout;
-    document.getElementById('essaySearch').addEventListener('input', function() {
-        clearTimeout(searchTimeout);
-        searchTimeout = setTimeout(loadEssayProblems, 500);
-    });
-    setTimeout(() => {
-        // 論述問題統計とリストを読み込み
-        if (document.getElementById('essay-stats-container')) {
-            loadEssayStats();
-        }
-        if (document.getElementById('essay-problems-container')) {
-            loadEssayProblems();
-        }
-    }, 1000);
-    
-    // 論述問題フィルター機能の初期化
-    const essayChapterFilter = document.getElementById('essayChapterFilter');
-    const essayTypeFilter = document.getElementById('essayTypeFilter');
-    const essaySearch = document.getElementById('essaySearch');
-    
-    if (essayChapterFilter) {
-        essayChapterFilter.addEventListener('change', filterEssayProblems);
-    }
-    if (essayTypeFilter) {
-        essayTypeFilter.addEventListener('change', filterEssayProblems);
-    }
-    if (essaySearch) {
-        essaySearch.addEventListener('input', debounce(filterEssayProblems, 500));
-    }
-});
-
 function debounce(func, wait) {
     let timeout;
     return function executedFunction(...args) {
@@ -2985,11 +3067,6 @@ function addEssayProblem() {
 let currentVisibilitySettings = {};
 let availableChapters = [];
 let availableTypes = ['A', 'B', 'C', 'D'];
-
-// 初期化
-document.addEventListener('DOMContentLoaded', function() {
-    initializeVisibilitySettings();
-});
 
 function initializeVisibilitySettings() {
     // 部屋一覧を読み込み
@@ -3486,18 +3563,6 @@ function showCurrentSettings() {
 window.debugVisibilitySettings = debugVisibilitySettings;
 window.testIndividualClick = testIndividualClick;
 window.showCurrentSettings = showCurrentSettings;
-
-// ページ読み込み後に自動デバッグ情報出力（開発時のみ）
-document.addEventListener('DOMContentLoaded', function() {
-    // デバッグモードの場合のみ（本番では削除推奨）
-    if (window.location.hostname === 'localhost' || window.location.hostname.includes('127.0.0.1')) {
-        console.log('🔧 デバッグモードが有効です');
-        console.log('📝 使用可能なデバッグコマンド:');
-        console.log('   debugVisibilitySettings() - 設定状況を表示');
-        console.log('   testIndividualClick(章, タイプ) - 個別クリックをテスト');
-        console.log('   showCurrentSettings() - 現在の設定を表示');
-    }
-});
 
 // 部屋削除機能
 function deleteRoom(roomNumber) {
