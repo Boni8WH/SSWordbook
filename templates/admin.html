@@ -3156,27 +3156,30 @@ function createVisibilityMatrix() {
 function updateCellAppearance(cell, isVisible) {
     console.log(`🎨 セル更新: 第${cell.getAttribute('data-chapter')}章${cell.getAttribute('data-type')}問題 → ${isVisible ? '公開' : '非公開'}`);
     
+    // ★重要：セル内容を完全にクリアしてから再構築
+    cell.innerHTML = '';
+    
     // クラス更新
     cell.classList.remove('visible', 'hidden');
     cell.classList.add(isVisible ? 'visible' : 'hidden');
     
-    // アイコンとテキスト更新
-    const iconElement = cell.querySelector('.setting-icon');
-    const textElement = cell.querySelector('.setting-text');
+    // 新しいアイコン要素を作成
+    const iconElement = document.createElement('i');
+    iconElement.className = `${isVisible ? 'fas fa-eye' : 'fas fa-eye-slash'} setting-icon`;
     
-    if (iconElement && textElement) {
-        iconElement.className = `${isVisible ? 'fas fa-eye' : 'fas fa-eye-slash'} setting-icon`;
-        textElement.textContent = isVisible ? '公開' : '非公開';
-        
-        // レイアウト安定化のため、要素のサイズを保持
-        iconElement.style.display = 'block';
-        textElement.style.display = 'block';
-    }
+    // 新しいテキスト要素を作成
+    const textElement = document.createElement('div');
+    textElement.className = 'setting-text';
+    textElement.textContent = isVisible ? '公開' : '非公開';
+    
+    // セルに追加
+    cell.appendChild(iconElement);
+    cell.appendChild(textElement);
     
     // データ属性更新
     cell.setAttribute('data-visible', isVisible);
     
-    console.log('✅ セル更新完了');
+    console.log(`✅ セル完全再構築完了: "${textElement.textContent}"`);
 }
 
 // 章全体の一括設定機能
@@ -3239,77 +3242,12 @@ style.textContent = `
 `;
 document.head.appendChild(style);
 
-
-function updateCellAppearance(cell, isVisible) {
-    console.log(`🎨 Grid セル更新: 第${cell.getAttribute('data-chapter')}章${cell.getAttribute('data-type')}問題 → ${isVisible ? '公開' : '非公開'}`);
-    
-    // クラス更新
-    cell.classList.remove('visible', 'hidden');
-    cell.classList.add(isVisible ? 'visible' : 'hidden');
-    
-    // アイコンとテキスト更新
-    const iconElement = cell.querySelector('.setting-icon');
-    const textElement = cell.querySelector('.setting-text');
-    
-    if (iconElement && textElement) {
-        iconElement.className = `${isVisible ? 'fas fa-eye' : 'fas fa-eye-slash'} setting-icon`;
-        textElement.textContent = isVisible ? '公開' : '非公開';
-    }
-    
-    // データ属性更新
-    cell.setAttribute('data-visible', isVisible);
-    
-    console.log('✅ Grid セル更新完了');
-}
-
 function getVisibilitySetting(chapter, type) {
     // 設定が存在する場合はその値、存在しない場合はデフォルトでtrue（公開）
     if (currentVisibilitySettings[chapter] && currentVisibilitySettings[chapter][type] !== undefined) {
         return currentVisibilitySettings[chapter][type];
     }
     return true;
-}
-
-function updateCellAppearance(cell, isVisible) {
-    console.log(`🎨 セル更新: 第${cell.getAttribute('data-chapter')}章${cell.getAttribute('data-type')}問題 → ${isVisible ? '公開' : '非公開'}`);
-    
-    // 既存のクラスをクリア
-    cell.classList.remove('visible', 'hidden');
-    cell.classList.add(isVisible ? 'visible' : 'hidden');
-    
-    // ★重要：新しいCSS構造に対応したコンテンツコンテナを取得
-    let contentContainer = cell.querySelector('.visibility-cell-content');
-    if (!contentContainer) {
-        // コンテナが存在しない場合は新規作成
-        contentContainer = document.createElement('div');
-        contentContainer.className = 'visibility-cell-content';
-        cell.appendChild(contentContainer);
-    }
-    
-    // アイコンとテキストを取得または作成
-    let iconElement = contentContainer.querySelector('.status-icon');
-    let textElement = contentContainer.querySelector('.status-text');
-    
-    if (!iconElement) {
-        iconElement = document.createElement('i');
-        iconElement.className = 'status-icon';
-        contentContainer.appendChild(iconElement);
-    }
-    
-    if (!textElement) {
-        textElement = document.createElement('div');
-        textElement.className = 'status-text';
-        contentContainer.appendChild(textElement);
-    }
-    
-    // アイコンとテキストを更新
-    iconElement.className = `${isVisible ? 'fas fa-eye' : 'fas fa-eye-slash'} status-icon`;
-    textElement.textContent = isVisible ? '公開' : '非公開';
-    
-    // データ属性を更新
-    cell.setAttribute('data-visible', isVisible);
-    
-    console.log(`✅ 新CSS構造でセル更新完了: ${iconElement.className}, "${textElement.textContent}"`);
 }
 
 // デバッグ用：マトリックスの状態確認
