@@ -2583,15 +2583,15 @@ function showEditDialog(problem) {
                                     <!-- 画像アップロードフォーム（初期状態では非表示） -->
                                     <div class="image-upload-section" id="imageUploadSection_${problem.id}" style="display: none;">
                                         <form id="imageUploadForm_${problem.id}" enctype="multipart/form-data">
-                                            <div class="form-group">
+                                            <div class="form-group mb-2">
                                                 <input type="file" id="imageInput_${problem.id}" name="image" 
-                                                    accept="image/*" class="form-control mb-2" required>
+                                                    accept="image/*" class="form-control" required>
                                                 <small class="form-text text-muted">
                                                     対応形式: PNG, JPG, JPEG, GIF (最大5MB)
                                                 </small>
                                             </div>
                                             <div class="form-group">
-                                                <button type="button" class="btn btn-success btn-sm" onclick="uploadEssayImageFromEdit(${problem.id})">
+                                                <button type="button" id="uploadBtn_${problem.id}" class="btn btn-success btn-sm" onclick="uploadEssayImageFromEdit(${problem.id})">
                                                     <i class="fas fa-upload"></i> アップロード
                                                 </button>
                                                 <button type="button" class="btn btn-secondary btn-sm" onclick="hideImageUploadInEdit(${problem.id})">
@@ -3529,12 +3529,13 @@ function hideImageUploadInEdit(problemId) {
     document.getElementById('imageUploadForm_' + problemId).reset();
 }
 
-// 編集モーダルから画像アップロード
+// 編集モーダルから画像アップロード（改良版）
 function uploadEssayImageFromEdit(problemId) {
-    const form = document.getElementById('imageUploadForm_' + problemId);
+    console.log('画像アップロード開始:', problemId);
+    
     const fileInput = document.getElementById('imageInput_' + problemId);
     
-    if (!fileInput.files[0]) {
+    if (!fileInput || !fileInput.files[0]) {
         alert('画像ファイルを選択してください');
         return;
     }
@@ -3542,8 +3543,14 @@ function uploadEssayImageFromEdit(problemId) {
     const formData = new FormData();
     formData.append('image', fileInput.files[0]);
     
-    // アップロードボタンを無効化
-    const uploadBtn = form.querySelector('.btn-success');
+    // IDで直接ボタンを取得
+    const uploadBtn = document.getElementById('uploadBtn_' + problemId);
+    if (!uploadBtn) {
+        console.error('アップロードボタンが見つかりません:', 'uploadBtn_' + problemId);
+        alert('ボタンが見つかりません。ページを再読み込みしてください。');
+        return;
+    }
+    
     const originalText = uploadBtn.innerHTML;
     uploadBtn.disabled = true;
     uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> アップロード中...';
@@ -3554,20 +3561,25 @@ function uploadEssayImageFromEdit(problemId) {
     })
     .then(response => response.json())
     .then(data => {
+        console.log('アップロード結果:', data);
+        
         if (data.status === 'success') {
             alert(data.message);
             
-            // 現在の画像セクションを表示し、なしセクションを非表示
-            document.getElementById('currentImageSection_' + problemId).style.display = 'block';
-            document.getElementById('noImageSection_' + problemId).style.display = 'none';
+            // 表示を更新
+            const currentSection = document.getElementById('currentImageSection_' + problemId);
+            const noImageSection = document.getElementById('noImageSection_' + problemId);
             
-            // 画像を更新
+            if (currentSection) currentSection.style.display = 'block';
+            if (noImageSection) noImageSection.style.display = 'none';
+            
+            // 画像を更新（キャッシュ回避）
             const img = document.querySelector(`#currentImageSection_${problemId} img`);
             if (img) {
-                img.src = `/essay_image/${problemId}?t=${Date.now()}`; // キャッシュ回避
+                img.src = `/essay_image/${problemId}?t=${Date.now()}`;
             }
             
-            // アップロードフォームを非表示
+            // フォームを非表示
             hideImageUploadInEdit(problemId);
         } else {
             alert(`エラー: ${data.message}`);
