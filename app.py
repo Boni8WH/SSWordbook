@@ -7710,43 +7710,128 @@ def debug_room_setting_model():
 # ========================================
 @app.route('/essay')
 def essay_index():
-    """論述問題集トップページ（公開設定対応版）"""
+    """論述問題の章一覧ページ"""
+    if not session.get('logged_in'):
+        return redirect(url_for('login_page'))
+    
     try:
-        if 'user_id' not in session:
-            flash('論述問題を閲覧するにはログインしてください。', 'info')
-            return redirect(url_for('login_page'))
-
-        current_user = User.query.get(session['user_id'])
-        if not current_user:
-            flash('ユーザーが見つかりません。', 'danger')
-            return redirect(url_for('logout'))
-
-        print(f"📊 論述問題集トップページ - ユーザー: {current_user.username}, 部屋: {current_user.room_number}")
-
-        # 公開設定を考慮した章別統計を取得
-        chapter_stats = get_essay_chapter_stats_with_visibility(current_user.id, current_user.room_number)
+        current_user = session.get('username', 'unknown')
+        current_room = get_user_room_number(current_user)
         
-        print(f"📋 表示される章: {len(chapter_stats)}章")
-
-        # テンプレートコンテキストを取得（引数なし）
-        context = get_template_context()
+        if not current_room:
+            flash('部屋番号が設定されていません。', 'error')
+            return redirect(url_for('index'))
         
-        # セッション情報を手動で追加
-        context.update({
-            'chapter_stats': chapter_stats,
-            'current_user_id': current_user.id,
-            'current_username': current_user.username,
-            'current_room_number': current_user.room_number,
-            'is_logged_in': True
-        })
-
-        return render_template('essay_index.html', **context)
-
+        # 公開設定を取得
+        visibility_settings = get_room_visibility_settings(current_room)
+        
+        # 章ごとの統計を取得（順序制御付き）
+        chapter_stats = []
+        
+        # 通常の章（1章、2章、3章...）と総合問題を分離
+        regular_chapters = []
+        combined_chapters = []
+        
+        for chapter in visibility_settings.keys():
+            if chapter == 'com' or chapter.lower() == 'com':  # 総合問題
+                combined_chapters.append(chapter)
+            else:
+                try:
+                    # 数値として変換可能な章を通常章として扱う
+                    int(chapter)
+                    regular_chapters.append(chapter)
+                except ValueError:
+                    # 数値でない章も総合問題扱い
+                    combined_chapters.append(chapter)
+        
+        # 通常章を数値でソート
+        regular_chapters.sort(key=lambda x: int(x))
+        
+        # 総合問題をソート（アルファベット順）
+        combined_chapters.sort()
+        
+        # 並び順：通常章 → 総合問題
+        sorted_chapters = regular_chapters + combined_chapters
+        
+        app.logger.info(f"📊 章並び順: {sorted_chapters}")
+        
+        for chapter in sorted_chapters:
+            types = visibility_settings[chapter]
+            
+            # この章で公開されている問題があるかチェック
+            has_visible_problems = any(is_visible for is_visible in types.values())
+            
+            if not has_visible_problems:
+                app.logger.info(f"⏭️ 第{chapter}章: 公開問題なし（スキップ）")
+                continue
+            
+            # 章の統計を計算
+            if chapter == 'com' or chapter.lower() == 'com':
+                chapter_name = "総合問題"
+            else:
+                chapter_name = f"第{chapter}章"
+            
+            # この章の問題を取得（公開設定に従って）
+            visible_problems = []
+            for problem_type, is_visible in types.items():
+                if is_visible:
+                    problems = EssayProblem.query.filter_by(
+                        chapter=chapter,
+                        type=problem_type,
+                        enabled=True
+                    ).all()
+                    visible_problems.extend(problems)
+            
+            if not visible_problems:
+                app.logger.info(f"⏭️ {chapter_name}: 実際の問題なし（スキップ）")
+                continue
+            
+            # ユーザーの進捗を取得
+            total_problems = len(visible_problems)
+            viewed_problems = 0
+            understood_problems = 0
+            
+            for problem in visible_problems:
+                # 閲覧履歴をチェック（EssayProgressテーブルがある場合）
+                try:
+                    progress = EssayProgress.query.filter_by(
+                        user_id=session.get('user_id'),
+                        problem_id=problem.id
+                    ).first()
+                    
+                    if progress:
+                        viewed_problems += 1
+                        if progress.understood:
+                            understood_problems += 1
+                except Exception:
+                    # EssayProgressテーブルがない場合はスキップ
+                    pass
+            
+            # 進捗率を計算
+            progress_rate = int((understood_problems / total_problems * 100)) if total_problems > 0 else 0
+            
+            chapter_stat = {
+                'chapter': chapter,
+                'chapter_name': chapter_name,
+                'total_problems': total_problems,
+                'viewed_problems': viewed_problems,
+                'understood_problems': understood_problems,
+                'progress_rate': progress_rate
+            }
+            
+            chapter_stats.append(chapter_stat)
+            app.logger.info(f"📈 {chapter_name}: {total_problems}問（閲覧:{viewed_problems}, 理解:{understood_problems}）")
+        
+        app.logger.info(f"✅ 論述問題章一覧を生成しました（{len(chapter_stats)}章）")
+        
+        return render_template('essay_index.html', 
+                             chapter_stats=chapter_stats,
+                             current_username=current_user,
+                             current_room_number=current_room)
+        
     except Exception as e:
-        print(f"Error in essay_index: {e}")
-        import traceback
-        traceback.print_exc()
-        flash('論述問題集の表示中にエラーが発生しました。', 'danger')
+        app.logger.error(f"論述問題章一覧エラー: {str(e)}")
+        flash('章一覧の取得に失敗しました。', 'error')
         return redirect(url_for('index'))
     
 @app.route('/essay/chapter/<chapter>')
