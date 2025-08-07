@@ -2555,7 +2555,7 @@ function showEditDialog(problem) {
                                 <label class="form-label"><strong><i class="fas fa-image"></i> 問題画像</strong></label>
                                 <div class="image-management-section" id="imageManagement_${problem.id}">
                                     <!-- 現在の画像があるかチェック -->
-                                    <div class="current-image-section" id="currentImageSection_${problem.id}" style="display: ${problem.has_image ? 'block' : 'none'};">
+                                    <div class="current-image-section" id="currentImageSection_${problem.id}" style="display: none;">
                                         <div class="image-preview">
                                             <img src="/essay_image/${problem.id}" 
                                                 alt="問題画像" 
@@ -2643,6 +2643,12 @@ function showEditDialog(problem) {
     document.getElementById('editEssayModal').addEventListener('hidden.bs.modal', function() {
         this.remove();
     });
+
+    // モーダル表示後に画像の存在チェック
+    setTimeout(() => {
+        checkAndShowImage(problem.id);
+    }, 100);
+
 }
 
 function saveEssayProblem() {
@@ -3517,16 +3523,33 @@ function showImageUploadInEdit(problemId) {
 
 // 画像アップロードフォームを非表示
 function hideImageUploadInEdit(problemId) {
-    document.getElementById('imageUploadSection_' + problemId).style.display = 'none';
+    const uploadSection = document.getElementById('imageUploadSection_' + problemId);
+    const form = document.getElementById('imageUploadForm_' + problemId);
     
-    // ボタンを元に戻す
+    // セクションを非表示
+    if (uploadSection) {
+        uploadSection.style.display = 'none';
+    }
+    
+    // 現在の画像表示ボタンのテキストを変更
     const changeBtn = document.querySelector(`#currentImageSection_${problemId} .btn-secondary`);
     if (changeBtn) {
         changeBtn.style.display = 'inline-block';
     }
     
-    // フォームをリセット
-    document.getElementById('imageUploadForm_' + problemId).reset();
+    // フォームが存在する場合のみリセット
+    if (form) {
+        try {
+            form.reset();
+        } catch (error) {
+            console.warn('フォームのリセットに失敗しました:', error);
+            // フォームリセットに失敗してもファイル入力をクリア
+            const fileInput = document.getElementById('imageInput_' + problemId);
+            if (fileInput) {
+                fileInput.value = '';
+            }
+        }
+    }
 }
 
 // 編集モーダルから画像アップロード（改良版）
@@ -3566,21 +3589,13 @@ function uploadEssayImageFromEdit(problemId) {
         if (data.status === 'success') {
             alert(data.message);
             
-            // 表示を更新
-            const currentSection = document.getElementById('currentImageSection_' + problemId);
-            const noImageSection = document.getElementById('noImageSection_' + problemId);
-            
-            if (currentSection) currentSection.style.display = 'block';
-            if (noImageSection) noImageSection.style.display = 'none';
-            
-            // 画像を更新（キャッシュ回避）
-            const img = document.querySelector(`#currentImageSection_${problemId} img`);
-            if (img) {
-                img.src = `/essay_image/${problemId}?t=${Date.now()}`;
-            }
-            
-            // フォームを非表示
+            // アップロードフォームを先に非表示
             hideImageUploadInEdit(problemId);
+            
+            // 少し遅延を入れてから画像をチェック・表示
+            setTimeout(() => {
+                checkAndShowImage(problemId);
+            }, 500);
         } else {
             alert(`エラー: ${data.message}`);
         }
@@ -3629,6 +3644,21 @@ function deleteEssayImageFromEdit(problemId) {
     });
 }
 
+// 画像の存在チェックと表示切り替え
+function checkAndShowImage(problemId) {
+    const img = new Image();
+    img.onload = function() {
+        // 画像が正常に読み込まれた場合
+        document.getElementById('currentImageSection_' + problemId).style.display = 'block';
+        document.getElementById('noImageSection_' + problemId).style.display = 'none';
+    };
+    img.onerror = function() {
+        // 画像が読み込めない場合
+        document.getElementById('currentImageSection_' + problemId).style.display = 'none';
+        document.getElementById('noImageSection_' + problemId).style.display = 'block';
+    };
+    img.src = `/essay_image/${problemId}?t=${Date.now()}`;
+}
 </script>
 
 <style>
