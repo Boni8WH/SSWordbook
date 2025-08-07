@@ -10989,3 +10989,38 @@ def admin_upload_essay_image_form(problem_id):
     except Exception as e:
         flash(f'エラー: {str(e)}', 'danger')
         return redirect(url_for('admin_essay_problems'))
+
+@app.route('/admin/delete_essay_image/<int:problem_id>', methods=['POST'])
+def delete_essay_image(problem_id):
+    """論述問題の画像を削除"""
+    if not session.get('admin_logged_in'):
+        return jsonify({'status': 'error', 'message': '管理者権限が必要です'})
+    
+    try:
+        # 問題の存在確認
+        essay_problem = EssayProblem.query.get(problem_id)
+        if not essay_problem:
+            return jsonify({'status': 'error', 'message': '指定された問題が見つかりません'})
+        
+        # 画像の存在確認と削除
+        existing_image = EssayImage.query.filter_by(problem_id=problem_id).first()
+        if existing_image:
+            db.session.delete(existing_image)
+            db.session.commit()
+            
+            app.logger.info(f"問題{problem_id}の画像を削除しました")
+            return jsonify({
+                'status': 'success', 
+                'message': f'問題{problem_id}の画像を削除しました'
+            })
+        else:
+            return jsonify({
+                'status': 'error', 
+                'message': '削除する画像が見つかりません'
+            })
+            
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"画像削除エラー: {str(e)}")
+        return jsonify({'status': 'error', 'message': f'削除中にエラーが発生しました: {str(e)}'})
+
