@@ -10926,6 +10926,18 @@ def admin_upload_essay_image_form(problem_id):
         # 現在の画像の有無を確認
         has_current_image = has_essay_image(problem_id)
         
+        # 画像表示部分を事前に準備
+        if has_current_image:
+            image_section = f'''
+                <div class="current-image">
+                    <h3>現在の画像</h3>
+                    <img src="{url_for('essay_image', problem_id=problem_id)}" alt="現在の画像">
+                    <p><small>現在の画像が表示されています</small></p>
+                </div>
+            '''
+        else:
+            image_section = '<p><em>現在画像は設定されていません</em></p>'
+        
         return f'''
         <html>
         <head>
@@ -10953,13 +10965,7 @@ def admin_upload_essay_image_form(problem_id):
                     <strong>問題文：</strong> {essay_problem.question[:100]}...
                 </div>
                 
-                {f'''
-                <div class="current-image">
-                    <h3>現在の画像</h3>
-                    <img src="{url_for('essay_image', problem_id=problem_id)}" alt="現在の画像">
-                    <p><small>現在の画像が表示されています</small></p>
-                </div>
-                ''' if has_current_image else '<p><em>現在画像は設定されていません</em></p>'}
+                {image_section}
                 
                 <form method="POST" action="{url_for('upload_essay_image', problem_id=problem_id)}" enctype="multipart/form-data">
                     <div class="form-group">
