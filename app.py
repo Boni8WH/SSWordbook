@@ -1443,6 +1443,28 @@ def migrate_database():
                     print("✅ suspended_atカラムは既に存在します")
             
             print("✅ RoomSetting一時停止機能のマイグレーション完了")
+
+            # 7. EssayProblemテーブルのimage_urlカラム追加
+            if inspector.has_table('essay_problems'):
+                columns = [col['name'] for col in inspector.get_columns('essay_problems')]
+                print(f"📋 既存のEssayProblemsテーブルカラム: {columns}")
+                
+                # image_urlカラムの追加
+                if 'image_url' not in columns:
+                    print("🔧 image_urlカラムを追加します...")
+                    try:
+                        with db.engine.connect() as conn:
+                            conn.execute(text('ALTER TABLE essay_problems ADD COLUMN image_url VARCHAR(500)'))
+                            conn.commit()
+                        print("✅ image_urlカラムを追加しました")
+                    except Exception as e:
+                        print(f"⚠️ image_urlカラム追加エラー: {e}")
+                else:
+                    print("✅ image_urlカラムは既に存在します")
+            else:
+                print("📋 essay_problemsテーブルが存在しません（論述機能未使用）")
+
+            print("✅ EssayProblems関連のマイグレーション完了")
                 
         except Exception as e:
             print(f"⚠️ マイグレーション中にエラーが発生しました: {e}")
