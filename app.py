@@ -218,6 +218,9 @@ class RoomSetting(db.Model):
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(JST), onupdate=lambda: datetime.now(JST))
 
+    is_suspended = db.Column(db.Boolean, nullable=False, default=False)
+    suspended_at = db.Column(db.DateTime, nullable=True)
+
     def get_enabled_units(self):
         """有効な単元のリストを取得"""
         try:
@@ -2502,9 +2505,7 @@ def login_page():
         if login_type == 'admin':
             admin_username = request.form.get('admin_username')
             admin_password = request.form.get('admin_password')
-            
-            # 🔥 修正: データベースの管理者ユーザーで認証
-            # room_number='ADMIN' のユーザーを管理者として扱う
+
             admin_user = User.query.filter_by(room_number='ADMIN', username=admin_username).first()
             
             if admin_user and admin_user.check_individual_password(admin_password):
@@ -2521,6 +2522,12 @@ def login_page():
             room_password = request.form.get('room_password')
             student_id = request.form.get('student_id')
             individual_password = request.form.get('individual_password')
+            
+            room_setting = RoomSetting.query.filter_by(room_number=room_number).first()
+            if room_setting and room_setting.is_suspended:
+                flash(f'部屋{room_number}は現在一時停止中です。管理者にお問い合わせください。', 'warning')
+                app.logger.info(f"一時停止中の部屋{room_number}へのログイン試行")
+                return redirect(url_for('login_page'))
             
             # 複数アカウント対応の認証を使用
             user = authenticate_user(room_number, room_password, student_id, individual_password)
@@ -5764,6 +5771,17 @@ def admin_page():
         room_csv_settings = {rs.room_number: rs.csv_filename for rs in room_settings}
         room_ranking_settings = {rs.room_number: getattr(rs, 'ranking_display_count', 5) for rs in room_settings}
         
+        room_data = {}
+        for rs in room_settings:
+            users_in_room = User.query.filter_by(room_number=rs.room_number).count()
+            room_data[rs.room_number] = {
+                'csv_filename': rs.csv_filename or '未設定',
+                'max_unit': rs.max_enabled_unit_number if hasattr(rs, 'max_enabled_unit_number') else "9999",
+                'user_count': users_in_room,
+                'is_suspended': getattr(rs, 'is_suspended', False),  # 一時停止状態
+                'suspended_at': getattr(rs, 'suspended_at', None)     # 一時停止日時
+            }
+
         # ユーザー情報を拡張（元のアカウント名と変更履歴を含む）
         user_list_with_details = []
         for user in users:
@@ -5835,6 +5853,7 @@ def admin_page():
             'room_max_unit_settings': room_max_unit_settings,
             'room_csv_settings': room_csv_settings,
             'room_ranking_settings': room_ranking_settings,  # ★ランキング設定を追加
+            'room_data': room_data,
             'admin_stats': {  # ★管理者ダッシュボード用統計
                 'total_users': total_users,
                 'total_rooms': total_rooms,
@@ -10673,3 +10692,49 @@ def admin_delete_room():
         db.session.rollback()
         app.logger.error(f"部屋削除エラー: {str(e)}")
         return jsonify({'status': 'error', 'message': f'削除中にエラーが発生しました: {str(e)}'})
+
+@app.route('/admin/toggle_room_suspension', methods=['POST'])
+def admin_toggle_room_suspension():
+    """管理者用：部屋の一時停止/再開機能"""
+    if not session.get('admin_logged_in'):
+        return jsonify({'status': 'error', 'message': '管理者権限が必要です'})
+    
+    try:
+        data = request.get_json()
+        room_number = data.get('room_number')
+        
+        if not room_number:
+            return jsonify({'status': 'error', 'message': '部屋番号が指定されていません'})
+        
+        # 部屋設定を取得
+        room_setting = RoomSetting.query.filter_by(room_number=room_number).first()
+        if not room_setting:
+            return jsonify({'status': 'error', 'message': f'部屋{room_number}が見つかりません'})
+        
+        # 一時停止状態を切り替え
+        if room_setting.is_suspended:
+            # 再開
+            room_setting.is_suspended = False
+            room_setting.suspended_at = None
+            action_message = f'部屋{room_number}の一時停止を解除しました'
+            app.logger.info(f"部屋{room_number}の一時停止を解除")
+        else:
+            # 一時停止
+            room_setting.is_suspended = True
+            room_setting.suspended_at = datetime.utcnow()
+            action_message = f'部屋{room_number}を一時停止にしました'
+            app.logger.info(f"部屋{room_number}を一時停止に設定")
+        
+        room_setting.updated_at = datetime.utcnow()
+        db.session.commit()
+        
+        return jsonify({
+            'status': 'success', 
+            'message': action_message,
+            'is_suspended': room_setting.is_suspended
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"部屋一時停止切り替えエラー: {str(e)}")
+        return jsonify({'status': 'error', 'message': f'処理中にエラーが発生しました: {str(e)}'})
