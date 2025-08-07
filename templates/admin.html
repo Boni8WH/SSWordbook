@@ -353,8 +353,7 @@
                                         <div class="btn-group-vertical btn-group-sm">
                                             <button class="btn btn-primary btn-sm save-room-setting-btn" 
                                                     data-room-number="{{ room_num }}">保存</button>
-                                            <button class="btn btn-danger btn-sm delete-room-setting-btn" 
-                                                    data-room-number="{{ room_num }}">削除</button>
+                                            <button class="btn btn-danger btn-sm" onclick="deleteRoom('{{ room.room_number }}')">削除</button>
                                         </div>
                                     </td>
                                 </tr>
@@ -3323,6 +3322,41 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('   showCurrentSettings() - 現在の設定を表示');
     }
 });
+
+// 部屋削除機能
+function deleteRoom(roomNumber) {
+    if (!confirm(`部屋${roomNumber}を本当に削除しますか？\n\n⚠️ この操作は元に戻せません。\n※ 部屋にユーザーが存在する場合は削除できません。`)) {
+        return;
+    }
+    
+    console.log(`🗑️ 部屋${roomNumber}の削除を開始`);
+    
+    fetch('/admin/delete_room', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            room_number: roomNumber
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log('削除結果:', data);
+        
+        if (data.status === 'success') {
+            alert(data.message);
+            // ページをリロードして表示を更新
+            window.location.reload();
+        } else {
+            alert(`エラー: ${data.message}`);
+        }
+    })
+    .catch(error => {
+        console.error('削除エラー:', error);
+        alert('削除中にエラーが発生しました');
+    });
+}
 </script>
 
 <style>
