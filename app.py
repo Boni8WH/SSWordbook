@@ -10871,26 +10871,36 @@ def upload_essay_image(problem_id):
         if file_size > 5 * 1024 * 1024:  # 5MB
             return jsonify({'status': 'error', 'message': 'ファイルサイズが大きすぎます（5MBまで）'})
         
-        # 既存画像の削除
+        # 既存画像の削除（分離したトランザクション）
         existing_image = EssayImage.query.filter_by(problem_id=problem_id).first()
         if existing_image:
-            db.session.delete(existing_image)
+            try:
+                db.session.delete(existing_image)
+                db.session.commit()
+                app.logger.info(f"既存の画像（問題{problem_id}）を削除しました")
+            except Exception as delete_error:
+                db.session.rollback()
+                app.logger.error(f"既存画像削除エラー: {delete_error}")
+                return jsonify({'status': 'error', 'message': '既存画像の削除に失敗しました'})
         
         # 画像データを読み込み
         image_data = file.read()
         
-        # データベースに保存
+        # 新しい画像をデータベースに保存
         new_image = EssayImage(
             problem_id=problem_id,
             image_data=image_data,
             image_format=file_ext.upper()
         )
         
-        db.session.add(new_image)
-        db.session.commit()
-        
-        # 既存の upload_essay_image 関数の最後の return 部分を以下に変更
-        app.logger.info(f"問題{problem_id}の画像をデータベースに保存しました（サイズ: {len(image_data):,}bytes）")
+        try:
+            db.session.add(new_image)
+            db.session.commit()
+            app.logger.info(f"問題{problem_id}の画像をデータベースに保存しました（サイズ: {len(image_data):,}bytes）")
+        except Exception as insert_error:
+            db.session.rollback()
+            app.logger.error(f"新しい画像保存エラー: {insert_error}")
+            return jsonify({'status': 'error', 'message': '新しい画像の保存に失敗しました'})
         
         # フォームからの直接アップロードの場合はページにリダイレクト
         if request.referrer and 'upload_essay_image_form' in request.referrer:
