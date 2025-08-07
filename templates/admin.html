@@ -3139,7 +3139,7 @@ function createVisibilityMatrix() {
         chapterCell.textContent = `第${chapter}章`;
         row.appendChild(chapterCell);
         
-        // 各タイプのセル - 位置を完全に固定
+        // 各タイプのセル - 新しいCSS構造に完全対応
         availableTypes.forEach((type, index) => {
             const cell = document.createElement('td');
             cell.className = 'visibility-cell';
@@ -3147,14 +3147,13 @@ function createVisibilityMatrix() {
             // 設定状態を取得
             const isVisible = getVisibilitySetting(chapter, type);
             
-            // コンテンツコンテナ
+            // ★重要：新しいCSS構造に対応したコンテンツコンテナ
             const contentContainer = document.createElement('div');
             contentContainer.className = 'visibility-cell-content';
             
             // アイコン要素
             const iconElement = document.createElement('i');
-            iconElement.className = isVisible ? 'fas fa-eye' : 'fas fa-eye-slash';
-            iconElement.classList.add('status-icon');
+            iconElement.className = `${isVisible ? 'fas fa-eye' : 'fas fa-eye-slash'} status-icon`;
             
             // テキスト要素
             const textElement = document.createElement('div');
@@ -3172,7 +3171,7 @@ function createVisibilityMatrix() {
             // クリックイベント
             cell.addEventListener('click', function(event) {
                 event.stopPropagation();
-                console.log(`🖱️ クリック: 第${chapter}章 タイプ${type} (列位置: ${index + 2})`);
+                console.log(`🖱️ クリック: 第${chapter}章 タイプ${type} (列${index + 2})`);
                 toggleIndividualVisibility(chapter, type, cell);
             });
             
@@ -3180,7 +3179,6 @@ function createVisibilityMatrix() {
             cell.setAttribute('data-chapter', chapter);
             cell.setAttribute('data-type', type);
             cell.setAttribute('data-visible', isVisible);
-            cell.setAttribute('data-column-index', index + 2); // デバッグ用
             
             row.appendChild(cell);
         });
@@ -3191,7 +3189,7 @@ function createVisibilityMatrix() {
     document.getElementById('visibilityMatrix').style.display = 'block';
     updateSettingsSummary();
     
-    console.log('✅ 完全固定レイアウトマトリックス生成完了');
+    console.log('✅ 新CSS構造対応マトリックス生成完了');
 }
 
 function getVisibilitySetting(chapter, type) {
@@ -3203,42 +3201,63 @@ function getVisibilitySetting(chapter, type) {
 }
 
 function updateCellAppearance(cell, isVisible) {
-    console.log(`🎨 セル更新: 第${cell.getAttribute('data-chapter')}章${cell.getAttribute('data-type')}問題 → ${isVisible ? '公開' : '非公開'} (列位置: ${cell.getAttribute('data-column-index')})`);
+    console.log(`🎨 セル更新: 第${cell.getAttribute('data-chapter')}章${cell.getAttribute('data-type')}問題 → ${isVisible ? '公開' : '非公開'}`);
     
     // 既存のクラスをクリア
     cell.classList.remove('visible', 'hidden');
     cell.classList.add(isVisible ? 'visible' : 'hidden');
     
-    // コンテンツコンテナを取得
-    const contentContainer = cell.querySelector('.visibility-cell-content');
+    // ★重要：新しいCSS構造に対応したコンテンツコンテナを取得
+    let contentContainer = cell.querySelector('.visibility-cell-content');
     if (!contentContainer) {
-        console.error('コンテンツコンテナが見つかりません');
-        return;
+        // コンテナが存在しない場合は新規作成
+        contentContainer = document.createElement('div');
+        contentContainer.className = 'visibility-cell-content';
+        cell.appendChild(contentContainer);
+    }
+    
+    // アイコンとテキストを取得または作成
+    let iconElement = contentContainer.querySelector('.status-icon');
+    let textElement = contentContainer.querySelector('.status-text');
+    
+    if (!iconElement) {
+        iconElement = document.createElement('i');
+        iconElement.className = 'status-icon';
+        contentContainer.appendChild(iconElement);
+    }
+    
+    if (!textElement) {
+        textElement = document.createElement('div');
+        textElement.className = 'status-text';
+        contentContainer.appendChild(textElement);
     }
     
     // アイコンとテキストを更新
-    const iconElement = contentContainer.querySelector('.status-icon');
-    const textElement = contentContainer.querySelector('.status-text');
-    
-    if (iconElement && textElement) {
-        iconElement.className = isVisible ? 'fas fa-eye status-icon' : 'fas fa-eye-slash status-icon';
-        textElement.textContent = isVisible ? '公開' : '非公開';
-        
-        console.log(`✅ セル内容更新完了: アイコン=${iconElement.className}, テキスト=${textElement.textContent}`);
-    } else {
-        console.error('アイコンまたはテキスト要素が見つかりません');
-    }
+    iconElement.className = `${isVisible ? 'fas fa-eye' : 'fas fa-eye-slash'} status-icon`;
+    textElement.textContent = isVisible ? '公開' : '非公開';
     
     // データ属性を更新
     cell.setAttribute('data-visible', isVisible);
     
-    // 変更アニメーション
-    cell.style.animation = 'settingChanged 0.5s ease';
-    setTimeout(() => {
-        cell.style.animation = '';
-    }, 500);
+    console.log(`✅ 新CSS構造でセル更新完了: ${iconElement.className}, "${textElement.textContent}"`);
 }
 
+// デバッグ用：マトリックスの状態確認
+function debugMatrixState() {
+    console.log('=== マトリックス状態デバッグ ===');
+    
+    const cells = document.querySelectorAll('.visibility-cell');
+    cells.forEach((cell, index) => {
+        const chapter = cell.getAttribute('data-chapter');
+        const type = cell.getAttribute('data-type');
+        const isVisible = cell.getAttribute('data-visible') === 'true';
+        const hasContent = cell.querySelector('.visibility-cell-content');
+        
+        console.log(`セル${index + 1}: 第${chapter}章${type}問題, ${isVisible ? '公開' : '非公開'}, コンテナ: ${hasContent ? 'あり' : 'なし'}`);
+    });
+    
+    console.log('=== デバッグ終了 ===');
+}
 
 function toggleIndividualVisibility(chapter, type, cell) {
     // 現在の状態を取得
