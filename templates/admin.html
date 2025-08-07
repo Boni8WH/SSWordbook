@@ -2963,34 +2963,61 @@ function clearImagePreview() {
     document.getElementById('new_essay_image').value = '';
 }
 
+// 論述問題追加の関数を修正
 function addEssayProblem() {
-    const form = document.getElementById('newEssayProblemForm');
-    const formData = new FormData(form);
+    const formData = {
+        chapter: document.getElementById('add_chapter').value,
+        type: document.getElementById('add_type').value,
+        university: document.getElementById('add_university').value,
+        year: document.getElementById('add_year').value,
+        question: document.getElementById('add_question').value,
+        answer: document.getElementById('add_answer').value,
+        answer_length: document.getElementById('add_answer_length').value,
+        enabled: document.getElementById('add_enabled').checked
+    };
     
-    // 有効フラグの処理
-    const enabledCheckbox = document.getElementById('new_essay_enabled');
-    if (enabledCheckbox.checked) {
-        formData.set('enabled', 'on');
-    }
+    console.log('追加データ:', formData);
     
-    fetch('/admin/essay/add_problem', {
+    fetch('/admin/essay/add', {
         method: 'POST',
-        body: formData  // JSONではなくFormDataを送信
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData)
     })
-    .then(response => response.json())
+    .then(response => {
+        console.log('レスポンステータス:', response.status);
+        
+        // レスポンスの内容タイプをチェック
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            throw new Error(`JSONではないレスポンス: ${contentType}`);
+        }
+        
+        return response.json();
+    })
     .then(data => {
+        console.log('追加結果:', data);
+        
         if (data.status === 'success') {
-            alert(`✅ ${data.message}`);
-            form.reset();
-            clearImagePreview();  // 画像プレビューもクリア
-            loadEssayProblems();  // 問題一覧を再読み込み
+            alert(data.message);
+            document.getElementById('addEssayModal').style.display = 'none';
+            loadEssayProblems(); // 一覧を再読み込み
         } else {
-            alert(`❌ エラー: ${data.message}`);
+            alert(`エラー: ${data.message}`);
         }
     })
     .catch(error => {
-        console.error('問題追加エラー:', error);
-        alert('❌ 問題の追加中にエラーが発生しました');
+        console.error('追加エラー:', error);
+        
+        // より詳細なエラーメッセージ
+        if (error.message.includes('JSONではないレスポンス')) {
+            alert('サーバーでエラーが発生しました。管理者に連絡してください。');
+        } else if (error.message.includes('NetworkError') || error.message.includes('Failed to fetch')) {
+            alert('ネットワークエラーが発生しました。接続を確認してください。');
+        } else {
+            alert(`追加中にエラーが発生しました: ${error.message}`);
+        }
     });
 }
 
@@ -3087,7 +3114,12 @@ function loadVisibilitySettings() {
 
 function createVisibilityMatrix() {
     const tbody = document.getElementById('visibilityTableBody');
+    
+    // 既存のイベントリスナーをクリア
     tbody.innerHTML = '';
+    tbody.replaceWith(tbody.cloneNode(false));
+
+    document.documentElement.style.setProperty('--type-count', availableTypes.length);
     
     availableChapters.forEach(chapter => {
         const row = document.createElement('tr');
@@ -3138,6 +3170,9 @@ function updateCellAppearance(cell, isVisible) {
     
     // 新しい状態のクラスを追加
     cell.classList.add(isVisible ? 'visible' : 'hidden');
+    
+    // データ属性にも状態を保存
+    cell.setAttribute('data-visible', isVisible);
     
     const iconClass = isVisible ? 'fas fa-eye' : 'fas fa-eye-slash';
     const statusText = isVisible ? '公開' : '非公開';
@@ -5003,7 +5038,7 @@ function checkAndShowImage(problemId) {
 }
 
 .visibility-table th:not(:first-child) {
-    width: calc((100% - 120px) / 4); /* 残りを4等分 */
+    width: calc((100% - 120px) / var(--type-count, 4));
 }
 
 .visibility-cell {
@@ -5099,6 +5134,7 @@ function checkAndShowImage(problemId) {
 @media (max-width: 768px) {
     .visibility-table {
         font-size: 0.8em;
+        min-width: 600px;
     }
     
     .visibility-cell {
@@ -5127,6 +5163,11 @@ function checkAndShowImage(problemId) {
     
     .bulk-operations .btn-group .btn {
         margin-bottom: 5px;
+    }
+
+    .visibility-table-container {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
     }
 }
 
