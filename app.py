@@ -7711,19 +7711,42 @@ def debug_room_setting_model():
 @app.route('/essay')
 def essay_index():
     """論述問題の章一覧ページ"""
-    if not session.get('logged_in'):
+    if not session.get('user_id'):
         return redirect(url_for('login_page'))
     
     try:
         current_user = session.get('username', 'unknown')
-        current_room = get_user_room_number(current_user)
+        
+        # ユーザーの部屋番号を取得
+        user = User.query.get(session['user_id'])
+        if not user:
+            flash('ユーザー情報が見つかりません。', 'error')
+            return redirect(url_for('index'))
+        
+        current_room = user.room_number
         
         if not current_room:
             flash('部屋番号が設定されていません。', 'error')
             return redirect(url_for('index'))
         
         # 公開設定を取得
-        visibility_settings = get_room_visibility_settings(current_room)
+        visibility_settings = {}
+        try:
+            settings = EssayVisibilitySetting.query.filter_by(room_number=current_room).all()
+            
+            for setting in settings:
+                if setting.chapter not in visibility_settings:
+                    visibility_settings[setting.chapter] = {}
+                visibility_settings[setting.chapter][setting.problem_type] = setting.is_visible
+                
+        except Exception as e:
+            app.logger.error(f"公開設定取得エラー: {e}")
+            # デフォルト：全ての論述問題を取得して公開設定
+            problems = EssayProblem.query.filter_by(enabled=True).all()
+            for problem in problems:
+                if problem.chapter not in visibility_settings:
+                    visibility_settings[problem.chapter] = {}
+                visibility_settings[problem.chapter][problem.type] = True
         
         # 章ごとの統計を取得（順序制御付き）
         chapter_stats = []
@@ -7791,9 +7814,9 @@ def essay_index():
             viewed_problems = 0
             understood_problems = 0
             
-            for problem in visible_problems:
-                # 閲覧履歴をチェック（EssayProgressテーブルがある場合）
-                try:
+            # 進捗計算（EssayProgressテーブルがある場合）
+            try:
+                for problem in visible_problems:
                     progress = EssayProgress.query.filter_by(
                         user_id=session.get('user_id'),
                         problem_id=problem.id
@@ -7803,9 +7826,9 @@ def essay_index():
                         viewed_problems += 1
                         if progress.understood:
                             understood_problems += 1
-                except Exception:
-                    # EssayProgressテーブルがない場合はスキップ
-                    pass
+            except Exception:
+                # EssayProgressテーブルがない場合はスキップ
+                pass
             
             # 進捗率を計算
             progress_rate = int((understood_problems / total_problems * 100)) if total_problems > 0 else 0
@@ -7824,10 +7847,14 @@ def essay_index():
         
         app.logger.info(f"✅ 論述問題章一覧を生成しました（{len(chapter_stats)}章）")
         
+        # テンプレートコンテキストを取得
+        context = get_template_context()
+        
         return render_template('essay_index.html', 
                              chapter_stats=chapter_stats,
                              current_username=current_user,
-                             current_room_number=current_room)
+                             current_room_number=current_room,
+                             **context)
         
     except Exception as e:
         app.logger.error(f"論述問題章一覧エラー: {str(e)}")
