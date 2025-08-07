@@ -656,6 +656,21 @@ else:
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'quiz_data.db')
     is_postgres = False
 
+class EssayImage(db.Model):
+    __tablename__ = 'essay_images'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    problem_id = db.Column(db.Integer, db.ForeignKey('essay_problems.id'), nullable=False, unique=True)
+    image_data = db.Column(db.LargeBinary, nullable=False)  # 画像のバイナリデータ
+    image_format = db.Column(db.String(10), nullable=False, default='PNG')  # PNG, JPEG など
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    
+    # リレーション
+    essay_problem = db.relationship('EssayProblem', backref=db.backref('image', uselist=False))
+    
+    def __repr__(self):
+        return f'<EssayImage {self.problem_id}>'
+
 # ===== メール設定 =====
 app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
 app.config['MAIL_PORT'] = int(os.environ.get('MAIL_PORT', '587'))
@@ -1465,6 +1480,20 @@ def migrate_database():
                 print("📋 essay_problemsテーブルが存在しません（論述機能未使用）")
 
             print("✅ EssayProblems関連のマイグレーション完了")
+
+            # 8. EssayImageテーブルの作成
+            if not inspector.has_table('essay_images'):
+                print("🔧 essay_imagesテーブルを作成します...")
+                try:
+                    db.create_all()  # 新しいテーブルを作成
+                    print("✅ essay_imagesテーブルを作成しました")
+                except Exception as e:
+                    print(f"⚠️ essay_imagesテーブル作成エラー: {e}")
+            else:
+                print("✅ essay_imagesテーブルは既に存在します")
+
+            print("✅ EssayImage関連のマイグレーション完了")
+
                 
         except Exception as e:
             print(f"⚠️ マイグレーション中にエラーが発生しました: {e}")
@@ -10806,3 +10835,151 @@ def admin_toggle_room_suspension():
         db.session.rollback()
         app.logger.error(f"部屋一時停止切り替えエラー: {str(e)}")
         return jsonify({'status': 'error', 'message': f'処理中にエラーが発生しました: {str(e)}'})
+    
+@app.route('/admin/upload_essay_image/<int:problem_id>', methods=['POST'])
+def upload_essay_image(problem_id):
+    """論述問題の画像をアップロード（データベース保存）"""
+    if not session.get('admin_logged_in'):
+        return jsonify({'status': 'error', 'message': '管理者権限が必要です'})
+    
+    try:
+        # 問題の存在確認
+        essay_problem = EssayProblem.query.get(problem_id)
+        if not essay_problem:
+            return jsonify({'status': 'error', 'message': '指定された問題が見つかりません'})
+        
+        # ファイルの確認
+        if 'image' not in request.files:
+            return jsonify({'status': 'error', 'message': '画像ファイルが選択されていません'})
+        
+        file = request.files['image']
+        if file.filename == '':
+            return jsonify({'status': 'error', 'message': '画像ファイルが選択されていません'})
+        
+        # ファイル形式の確認
+        allowed_extensions = {'png', 'jpg', 'jpeg', 'gif'}
+        file_ext = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
+        
+        if file_ext not in allowed_extensions:
+            return jsonify({'status': 'error', 'message': '対応していないファイル形式です（PNG, JPG, JPEG, GIFのみ）'})
+        
+        # ファイルサイズチェック（5MBまで）
+        file.seek(0, 2)  # ファイル末尾に移動
+        file_size = file.tell()
+        file.seek(0)  # ファイル先頭に戻す
+        
+        if file_size > 5 * 1024 * 1024:  # 5MB
+            return jsonify({'status': 'error', 'message': 'ファイルサイズが大きすぎます（5MBまで）'})
+        
+        # 既存画像の削除
+        existing_image = EssayImage.query.filter_by(problem_id=problem_id).first()
+        if existing_image:
+            db.session.delete(existing_image)
+        
+        # 画像データを読み込み
+        image_data = file.read()
+        
+        # データベースに保存
+        new_image = EssayImage(
+            problem_id=problem_id,
+            image_data=image_data,
+            image_format=file_ext.upper()
+        )
+        
+        db.session.add(new_image)
+        db.session.commit()
+        
+        # 既存の upload_essay_image 関数の最後の return 部分を以下に変更
+        app.logger.info(f"問題{problem_id}の画像をデータベースに保存しました（サイズ: {len(image_data):,}bytes）")
+        
+        # フォームからの直接アップロードの場合はページにリダイレクト
+        if request.referrer and 'upload_essay_image_form' in request.referrer:
+            flash(f'問題{problem_id}の画像をアップロードしました', 'success')
+            return redirect(url_for('admin_upload_essay_image_form', problem_id=problem_id))
+        
+        # APIからの場合はJSONレスポンス
+        return jsonify({
+            'status': 'success', 
+            'message': f'問題{problem_id}の画像をアップロードしました',
+            'file_size': f'{len(image_data):,}bytes',
+            'format': file_ext.upper()
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"画像アップロードエラー: {str(e)}")
+        return jsonify({'status': 'error', 'message': f'アップロード中にエラーが発生しました: {str(e)}'})
+
+@app.route('/admin/upload_essay_image_form/<int:problem_id>')
+def admin_upload_essay_image_form(problem_id):
+    """管理者用：論述問題画像アップロードフォーム表示"""
+    if not session.get('admin_logged_in'):
+        flash('管理者権限が必要です', 'danger')
+        return redirect(url_for('login_page'))
+    
+    try:
+        essay_problem = EssayProblem.query.get(problem_id)
+        if not essay_problem:
+            flash('指定された問題が見つかりません', 'danger')
+            return redirect(url_for('admin_essay_problems'))
+        
+        # 現在の画像の有無を確認
+        has_current_image = has_essay_image(problem_id)
+        
+        return f'''
+        <html>
+        <head>
+            <title>問題{problem_id}の画像アップロード</title>
+            <style>
+                body {{ font-family: Arial, sans-serif; margin: 40px; }}
+                .container {{ max-width: 600px; margin: 0 auto; }}
+                .form-group {{ margin-bottom: 20px; }}
+                .btn {{ padding: 10px 20px; margin: 5px; border: none; border-radius: 5px; cursor: pointer; }}
+                .btn-primary {{ background: #007bff; color: white; }}
+                .btn-secondary {{ background: #6c757d; color: white; }}
+                .current-image {{ text-align: center; margin: 20px 0; }}
+                .current-image img {{ max-width: 100%; border: 1px solid #ddd; border-radius: 5px; }}
+                .alert {{ padding: 15px; margin: 20px 0; border-radius: 5px; }}
+                .alert-info {{ background: #d1ecf1; border: 1px solid #bee5eb; color: #0c5460; }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>問題{problem_id}の画像アップロード</h1>
+                
+                <div class="alert alert-info">
+                    <strong>問題：</strong> {essay_problem.university} {essay_problem.year}年<br>
+                    <strong>タイプ：</strong> {essay_problem.type} ({essay_problem.answer_length}字)<br>
+                    <strong>問題文：</strong> {essay_problem.question[:100]}...
+                </div>
+                
+                {f'''
+                <div class="current-image">
+                    <h3>現在の画像</h3>
+                    <img src="{url_for('essay_image', problem_id=problem_id)}" alt="現在の画像">
+                    <p><small>現在の画像が表示されています</small></p>
+                </div>
+                ''' if has_current_image else '<p><em>現在画像は設定されていません</em></p>'}
+                
+                <form method="POST" action="{url_for('upload_essay_image', problem_id=problem_id)}" enctype="multipart/form-data">
+                    <div class="form-group">
+                        <label for="image"><strong>新しい画像を選択:</strong></label><br>
+                        <input type="file" id="image" name="image" accept="image/*" required>
+                        <small style="display: block; color: #666; margin-top: 5px;">
+                            対応形式: PNG, JPG, JPEG, GIF (最大5MB)
+                        </small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <button type="submit" class="btn btn-primary">アップロード</button>
+                        <a href="/admin/essay/problems" class="btn btn-secondary">戻る</a>
+                    </div>
+                </form>
+            </div>
+        </body>
+        </html>
+        '''
+        
+    except Exception as e:
+        flash(f'エラー: {str(e)}', 'danger')
+        return redirect(url_for('admin_essay_problems'))
