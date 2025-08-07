@@ -3828,9 +3828,8 @@ function checkAndShowImage(problemId) {
 }
 
 /* ========================================
-   2. 折りたたみセクションのスタイル
+   2. 折りたたみセクションのスタイル（修正版）
    ======================================== */
-/* 全ての折りたたみセクションの統一 */
 .admin-section {
     margin-bottom: 20px;
     border: 1px solid #dee2e6;
@@ -3842,21 +3841,51 @@ function checkAndShowImage(problemId) {
 
 .section-header {
     background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-    padding: 15px 20px;
+    padding: 15px 20px !important;
     cursor: pointer;
     border-bottom: 1px solid #dee2e6;
     transition: all 0.3s ease;
     user-select: none;
 }
 
-/* ★重要：すべてのsection-contentのpadding統一 */
-.section-content {
-    padding: 25px !important; /* 統一されたpadding */
-    background-color: #fff;
-    transition: all 0.3s ease;
+.section-header:hover {
+    background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%);
 }
 
-/* 特定セクションで異なるpaddingが設定されている場合の上書き */
+.section-header h3 {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 1.3rem;
+    color: #495057;
+    font-weight: 600;
+}
+
+.section-header h3 i:first-child {
+    margin-right: 10px;
+    color: #6c757d;
+}
+
+.toggle-icon {
+    transition: transform 0.3s ease;
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+
+.section-header[aria-expanded="true"] .toggle-icon {
+    transform: rotate(180deg);
+}
+
+/* ★重要：すべてのsection-contentを統一 */
+.section-content {
+    padding: 25px !important;
+    background-color: #fff !important;
+    transition: all 0.3s ease;
+    box-sizing: border-box !important;
+}
+
+/* 特定のセクションのpadding上書きを防ぐ */
 .admin-section .section-content {
     padding: 25px !important;
 }
@@ -3870,13 +3899,42 @@ function checkAndShowImage(problemId) {
     margin-bottom: 0;
 }
 
-/* フォームコンテナのpadding調整 */
-.upload-form, 
-.add-user-form,
-.essay-form-container,
-.csv-upload-form {
-    padding: 20px;
-    margin: 15px 0;
+/* フォームコンテナのmargin統一 */
+.section-content .upload-form, 
+.section-content .add-user-form,
+.section-content .essay-form-container,
+.section-content .csv-upload-form,
+.section-content .admin-panel {
+    margin: 15px 0 !important;
+    padding: 20px !important;
+}
+
+/* テーブルコンテナのmargin統一 */
+.section-content .scrollable-table-container,
+.section-content .table-controls {
+    margin-bottom: 15px !important;
+}
+
+/* CSV関連セクションのpadding統一 */
+.section-content .csv-template-section,
+.section-content .csv-import-section,
+.section-content .essay-stats-section,
+.section-content .essay-management-section,
+.section-content .essay-form-section {
+    margin: 15px 0 !important;
+    padding: 20px !important;
+}
+
+/* 特定セクションの個別修正 */
+#section-user-management .section-content,
+#section-csv-management .section-content,
+#section-room-settings .section-content,
+#section-essay-visibility .section-content,
+#section-essay-management .section-content,
+#section-user-stats .section-content,
+#section-database-management .section-content {
+    padding: 25px !important;
+    box-sizing: border-box !important;
 }
 
 /* ========================================
@@ -4047,7 +4105,7 @@ function checkAndShowImage(problemId) {
     }
     
     .section-header {
-        padding: 12px 15px;
+        padding: 12px 15px !important;
     }
     
     .section-header h3 {
@@ -4055,11 +4113,23 @@ function checkAndShowImage(problemId) {
     }
     
     .section-content {
-        padding: 20px 15px;
+        padding: 20px 15px !important;
     }
     
-    .upload-form, .add-user-form {
-        padding: 15px;
+    .section-content .upload-form, 
+    .section-content .add-user-form,
+    .section-content .admin-panel {
+        padding: 15px !important;
+        margin: 10px 0 !important;
+    }
+    
+    .section-content .csv-template-section,
+    .section-content .csv-import-section,
+    .section-content .essay-stats-section,
+    .section-content .essay-management-section,
+    .section-content .essay-form-section {
+        padding: 15px !important;
+        margin: 10px 0 !important;
     }
     
     .btn-group-vertical {
@@ -4102,6 +4172,17 @@ function checkAndShowImage(problemId) {
 @media (max-width: 480px) {
     .section-header h3 {
         font-size: 1rem;
+    }
+    
+    .section-content {
+        padding: 15px 10px !important;
+    }
+    
+    .section-content .upload-form, 
+    .section-content .add-user-form,
+    .section-content .admin-panel {
+        padding: 12px !important;
+        margin: 8px 0 !important;
     }
     
     .admin-panel {
@@ -4220,6 +4301,17 @@ function checkAndShowImage(problemId) {
 
 .selected-units-display {
     font-weight: 500;
+}
+
+@media (max-width: 768px) {
+    .units-grid {
+        grid-template-columns: repeat(auto-fill, minmax(50px, 1fr));
+        gap: 6px;
+    }
+    
+    .unit-setting-container {
+        max-width: 100%;
+    }
 }
 
 /* ========================================
@@ -4821,28 +4913,23 @@ function checkAndShowImage(problemId) {
     color: white;
 }
 
-/* ==================
-   15. 論述問題公開設定
-   ================== */
+/* ========================================
+   15. 論述問題公開設定マトリックス - CSS Grid レイアウト
+   ======================================== */
 .visibility-matrix {
     background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
     border-radius: 10px;
     padding: 20px;
-    margin-top: 20px;
+    margin: 20px 0 !important;
 }
 
 .matrix-header h4 {
     color: #495057;
     font-weight: 600;
-    margin-bottom: 10px;
-}
-
-.matrix-header p {
-    font-size: 0.9rem;
     margin-bottom: 20px;
 }
 
-/* ★重要：CSS Grid による安定したレイアウト */
+/* ★重要：CSS Grid による固定レイアウト */
 .visibility-grid {
     display: grid !important;
     grid-template-columns: 120px repeat(var(--type-count, 4), 1fr) !important;
@@ -4968,34 +5055,6 @@ function checkAndShowImage(problemId) {
     border: 1px solid #dee2e6;
 }
 
-/* レスポンシブ対応 */
-@media (max-width: 768px) {
-    .visibility-grid {
-        grid-template-columns: 100px repeat(var(--type-count, 4), 1fr) !important;
-        gap: 2px !important;
-    }
-    
-    .grid-cell-setting {
-        min-height: 50px !important;
-        max-height: 50px !important;
-        gap: 2px !important;
-    }
-    
-    .grid-cell-setting .setting-icon {
-        font-size: 1.1em !important;
-    }
-    
-    .grid-cell-setting .setting-text {
-        font-size: 0.7em !important;
-    }
-    
-    .grid-cell-chapter {
-        padding: 10px 4px !important;
-        font-size: 0.8rem !important;
-        min-height: 50px !important;
-    }
-}
-
 /* ========================================
    16. 論述問題編集モーダル内の画像管理スタイル
    ======================================== */
@@ -5098,59 +5157,9 @@ th[style*="cursor: pointer"]:hover {
    18. レスポンシブ対応（論述問題・公開設定）
    ======================================== */
 @media (max-width: 768px) {
-    .unit-setting-container {
-        max-width: 100%;
-    }
-    
-    .units-grid {
-        grid-template-columns: repeat(auto-fill, minmax(50px, 1fr));
-        gap: 6px;
-    }
-    
-    .stat-card {
-        margin-bottom: 15px;
-        padding: 15px;
-    }
-    
-    .stat-number {
-        font-size: 2rem;
-    }
-    
-    .essay-management-controls .col-md-4 {
-        margin-bottom: 15px;
-    }
-    
     .essay-form-grid {
         grid-template-columns: 1fr;
         gap: 15px;
-    }
-    
-    .essay-form-container,
-    .csv-upload-form,
-    .csv-template-section,
-    .essay-filter-section {
-        padding: 15px;
-    }
-    
-    .essay-form-section,
-    .csv-import-section,
-    .essay-management-section,
-    .essay-stats-section {
-        padding: 15px;
-        margin: 15px 0;
-    }
-    
-    .template-format {
-        font-size: 0.75rem;
-        padding: 10px;
-    }
-    
-    .upload-area {
-        padding: 20px;
-    }
-    
-    .file-input-label {
-        padding: 15px;
     }
     
     .image-preview img {
@@ -5170,54 +5179,34 @@ th[style*="cursor: pointer"]:hover {
     }
     
     /* ★重要：公開設定マトリックスのレスポンシブ */
-    .visibility-table {
+    .visibility-grid {
+        grid-template-columns: 100px repeat(var(--type-count, 4), 1fr) !important;
+        gap: 2px !important;
         font-size: 0.8em;
-        min-width: 600px;
     }
     
-    .visibility-cell {
-        padding: 10px 4px !important;
+    .grid-cell-setting {
         min-height: 50px !important;
+        max-height: 50px !important;
+        gap: 2px !important;
     }
     
-    .visibility-cell i {
-        font-size: 1.2em !important;
+    .grid-cell-setting .setting-icon {
+        font-size: 1.1em !important;
     }
     
-    .visibility-cell > div > div {
-        font-size: 0.8em !important;
+    .grid-cell-setting .setting-text {
+        font-size: 0.7em !important;
     }
     
-    .chapter-name-cell {
+    .grid-cell-chapter {
         padding: 10px 4px !important;
-        font-size: 0.9em;
-    }
-    
-    .bulk-operations .btn-group {
-        display: flex;
-        flex-direction: column;
-        width: 100%;
-    }
-    
-    .bulk-operations .btn-group .btn {
-        margin-bottom: 5px;
-    }
-
-    .visibility-table-container {
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
+        font-size: 0.8rem !important;
+        min-height: 50px !important;
     }
 }
 
 @media (max-width: 480px) {
-    .essay-form-section,
-    .csv-import-section,
-    .essay-management-section,
-    .essay-stats-section {
-        padding: 10px;
-        margin: 10px 0;
-    }
-    
     .essay-form-container,
     .csv-upload-form {
         padding: 12px;
@@ -5254,7 +5243,7 @@ th[style*="cursor: pointer"]:hover {
         white-space: nowrap;
     }
 }
-    
+
 /* ========================================
    19. デバッグ用スタイル（開発時のみ）
    ======================================== */
