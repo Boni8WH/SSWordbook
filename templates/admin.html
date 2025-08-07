@@ -207,10 +207,10 @@
     </div>
     </div>
 
-    <!-- 部屋ごとCSVファイル管理セクション -->
+    <!-- 問題CSVファイル管理セクション -->
     <div class="admin-section">
         <div class="section-header" data-bs-toggle="collapse" data-bs-target="#section-csv-management" aria-expanded="false">
-            <h3><i class="fas fa-folder-open"></i> 部屋ごとCSVファイル管理 <i class="fas fa-chevron-down toggle-icon"></i></h3>
+            <h3><i class="fas fa-folder-open"></i> 問題CSVファイル管理 <i class="fas fa-chevron-down toggle-icon"></i></h3>
         </div>
         <div class="collapse" id="section-csv-management">
             <div class="section-content">
@@ -3830,6 +3830,7 @@ function checkAndShowImage(problemId) {
 /* ========================================
    2. 折りたたみセクションのスタイル
    ======================================== */
+/* 全ての折りたたみセクションの統一 */
 .admin-section {
     margin-bottom: 20px;
     border: 1px solid #dee2e6;
@@ -3848,38 +3849,34 @@ function checkAndShowImage(problemId) {
     user-select: none;
 }
 
-.section-header:hover {
-    background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%);
-}
-
-.section-header h3 {
-    margin: 0;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    font-size: 1.3rem;
-    color: #495057;
-    font-weight: 600;
-}
-
-.section-header h3 i:first-child {
-    margin-right: 10px;
-    color: #6c757d;
-}
-
-.toggle-icon {
-    transition: transform 0.3s ease;
-    color: #6c757d;
-    font-size: 0.9rem;
-}
-
-.section-header[aria-expanded="true"] .toggle-icon {
-    transform: rotate(180deg);
-}
-
+/* ★重要：すべてのsection-contentのpadding統一 */
 .section-content {
-    padding: 25px;
+    padding: 25px !important; /* 統一されたpadding */
     background-color: #fff;
+    transition: all 0.3s ease;
+}
+
+/* 特定セクションで異なるpaddingが設定されている場合の上書き */
+.admin-section .section-content {
+    padding: 25px !important;
+}
+
+/* ネストされたコンテンツの調整 */
+.section-content > * {
+    margin-bottom: 15px;
+}
+
+.section-content > *:last-child {
+    margin-bottom: 0;
+}
+
+/* フォームコンテナのpadding調整 */
+.upload-form, 
+.add-user-form,
+.essay-form-container,
+.csv-upload-form {
+    padding: 20px;
+    margin: 15px 0;
 }
 
 /* ========================================
