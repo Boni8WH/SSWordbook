@@ -3395,7 +3395,6 @@ function deleteRoom(roomNumber) {
     });
 }
 
-// 部屋一時停止/再開機能
 function toggleRoomSuspension(buttonElement) {
     const roomNumber = buttonElement.getAttribute('data-room-number');
     const currentSuspendedState = buttonElement.getAttribute('data-is-suspended') === 'true';
@@ -3411,10 +3410,10 @@ function toggleRoomSuspension(buttonElement) {
     
     console.log(`🔄 部屋${roomNumber}の${action}処理を開始`);
     
-    // ボタンを無効化
-    const originalHTML = button.innerHTML;
-    button.disabled = true;
-    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 処理中...';
+    // ✅ buttonElement を使用（button ではない）
+    const originalHTML = buttonElement.innerHTML;
+    buttonElement.disabled = true;
+    buttonElement.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 処理中...';
     
     fetch('/admin/toggle_room_suspension', {
         method: 'POST',
@@ -3431,21 +3430,20 @@ function toggleRoomSuspension(buttonElement) {
         
         if (data.status === 'success') {
             alert(data.message);
-            // ページをリロードして表示を更新
             window.location.reload();
         } else {
             alert(`エラー: ${data.message}`);
-            // ボタンを元に戻す
-            button.disabled = false;
-            button.innerHTML = originalHTML;
+            // ✅ buttonElement を使用（button ではない）
+            buttonElement.disabled = false;
+            buttonElement.innerHTML = originalHTML;
         }
     })
     .catch(error => {
         console.error('一時停止切り替えエラー:', error);
         alert('処理中にエラーが発生しました');
-        // ボタンを元に戻す
-        button.disabled = false;
-        button.innerHTML = originalHTML;
+        // ✅ buttonElement を使用（button ではない）
+        buttonElement.disabled = false;
+        buttonElement.innerHTML = originalHTML;
     });
 }
 
