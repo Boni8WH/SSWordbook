@@ -3091,23 +3091,32 @@ function loadVisibilitySettings() {
     const roomNumber = document.getElementById('visibilityRoomSelect').value;
     if (!roomNumber) return;
     
+    console.log(`🔄 設定読み込み開始: 部屋${roomNumber}`);
     showVisibilityStatus('info', '設定を読み込み中...');
     
     fetch(`/admin/essay_visibility_settings/${roomNumber}`)
         .then(response => response.json())
         .then(data => {
+            console.log('📨 サーバーレスポンス:', data);
+            
             if (data.status === 'success') {
                 currentVisibilitySettings = data.settings;
                 availableChapters = data.chapters;
+                
+                console.log('📊 読み込んだ設定:', currentVisibilitySettings);
+                console.log('📚 利用可能な章:', availableChapters);
+                console.log('🏷️ 利用可能なタイプ:', availableTypes);
+                
                 createVisibilityMatrix();
                 updateSettingsSummary();
                 showVisibilityStatus('success', `部屋 ${roomNumber} の設定を読み込みました`);
             } else {
+                console.error('❌ 設定読み込みエラー:', data.message);
                 showVisibilityStatus('error', data.message);
             }
         })
         .catch(error => {
-            console.error('設定読み込みエラー:', error);
+            console.error('❌ 設定読み込み例外:', error);
             showVisibilityStatus('error', '設定の読み込みに失敗しました');
         });
 }
@@ -3118,6 +3127,7 @@ function createVisibilityMatrix() {
     
     // CSS変数を動的に設定
     document.documentElement.style.setProperty('--type-count', availableTypes.length);
+    console.log(`📊 マトリックス生成開始: ${availableChapters.length}章 × ${availableTypes.length}タイプ`);
     
     availableChapters.forEach(chapter => {
         const row = document.createElement('tr');
@@ -3126,6 +3136,9 @@ function createVisibilityMatrix() {
         const chapterCell = document.createElement('td');
         chapterCell.className = 'chapter-name-cell';
         chapterCell.textContent = `第${chapter}章`;
+        chapterCell.style.fontWeight = 'bold';
+        chapterCell.style.textAlign = 'center';
+        chapterCell.style.backgroundColor = '#f8f9fa';
         row.appendChild(chapterCell);
         
         // 各タイプのセル
@@ -3135,33 +3148,73 @@ function createVisibilityMatrix() {
             
             // 既存の関数を使用して設定状態を取得
             const isVisible = getVisibilitySetting(chapter, type);
+            console.log(`🔍 第${chapter}章 タイプ${type}: ${isVisible ? '公開' : '非公開'}`);
+            
+            // セルの基本スタイル設定
+            cell.style.textAlign = 'center';
+            cell.style.cursor = 'pointer';
+            cell.style.padding = '15px 8px';
+            cell.style.minHeight = '60px';
+            cell.style.border = '2px solid transparent';
+            cell.style.transition = 'all 0.3s ease';
             
             // アイコンとテキストを作成
+            const container = document.createElement('div');
+            container.style.display = 'flex';
+            container.style.flexDirection = 'column';
+            container.style.alignItems = 'center';
+            container.style.justifyContent = 'center';
+            container.style.height = '100%';
+            
             const iconElement = document.createElement('i');
             const textElement = document.createElement('div');
+            textElement.style.fontSize = '0.9em';
+            textElement.style.fontWeight = '600';
+            textElement.style.marginTop = '5px';
             
             if (isVisible) {
                 iconElement.className = 'fas fa-eye';
                 iconElement.style.color = '#28a745';
+                iconElement.style.fontSize = '1.5em';
                 textElement.textContent = '公開';
                 textElement.style.color = '#28a745';
+                cell.style.backgroundColor = '#d4edda';
+                cell.style.borderColor = '#28a745';
                 cell.classList.add('visible');
             } else {
                 iconElement.className = 'fas fa-eye-slash';
                 iconElement.style.color = '#dc3545';
+                iconElement.style.fontSize = '1.5em';
                 textElement.textContent = '非公開';
                 textElement.style.color = '#dc3545';
+                cell.style.backgroundColor = '#f8d7da';
+                cell.style.borderColor = '#dc3545';
                 cell.classList.add('hidden');
             }
             
-            // セルにアイコンとテキストを追加
-            cell.appendChild(iconElement);
-            cell.appendChild(textElement);
+            // コンテナにアイコンとテキストを追加
+            container.appendChild(iconElement);
+            container.appendChild(textElement);
+            cell.appendChild(container);
             
             // クリックイベント
             cell.addEventListener('click', function(event) {
                 event.stopPropagation();
+                console.log(`🖱️ クリック: 第${chapter}章 タイプ${type}`);
                 toggleIndividualVisibility(chapter, type, cell);
+            });
+            
+            // ホバー効果
+            cell.addEventListener('mouseenter', function() {
+                this.style.transform = 'scale(1.02)';
+                this.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.2)';
+                this.style.zIndex = '1';
+            });
+            
+            cell.addEventListener('mouseleave', function() {
+                this.style.transform = 'scale(1)';
+                this.style.boxShadow = 'none';
+                this.style.zIndex = 'auto';
             });
             
             // データ属性を設定
@@ -3174,6 +3227,14 @@ function createVisibilityMatrix() {
         
         tbody.appendChild(row);
     });
+    
+    // マトリックスを表示
+    document.getElementById('visibilityMatrix').style.display = 'block';
+    
+    // 統計を更新
+    updateSettingsSummary();
+    
+    console.log(`✅ マトリックス生成完了: ${availableChapters.length}行 × ${availableTypes.length + 1}列`);
 }
 
 function getVisibilitySetting(chapter, type) {
@@ -3185,28 +3246,66 @@ function getVisibilitySetting(chapter, type) {
 }
 
 function updateCellAppearance(cell, isVisible) {
-    // 既存のクラスを削除
+    console.log(`🎨 セル更新: ${cell.getAttribute('data-chapter')}章${cell.getAttribute('data-type')}問題 → ${isVisible ? '公開' : '非公開'}`);
+    
+    // 既存のクラスとコンテンツをクリア
     cell.classList.remove('visible', 'hidden');
+    cell.innerHTML = '';
     
-    // 新しい状態のクラスを追加
-    cell.classList.add(isVisible ? 'visible' : 'hidden');
+    // セルの基本スタイル再設定
+    cell.style.textAlign = 'center';
+    cell.style.cursor = 'pointer';
+    cell.style.padding = '15px 8px';
+    cell.style.minHeight = '60px';
+    cell.style.border = '2px solid transparent';
     
-    // データ属性にも状態を保存
+    // コンテナを作成
+    const container = document.createElement('div');
+    container.style.display = 'flex';
+    container.style.flexDirection = 'column';
+    container.style.alignItems = 'center';
+    container.style.justifyContent = 'center';
+    container.style.height = '100%';
+    
+    // アイコンとテキストを再作成
+    const iconElement = document.createElement('i');
+    const textElement = document.createElement('div');
+    textElement.style.fontSize = '0.9em';
+    textElement.style.fontWeight = '600';
+    textElement.style.marginTop = '5px';
+    
+    if (isVisible) {
+        iconElement.className = 'fas fa-eye';
+        iconElement.style.color = '#28a745';
+        iconElement.style.fontSize = '1.5em';
+        textElement.textContent = '公開';
+        textElement.style.color = '#28a745';
+        cell.style.backgroundColor = '#d4edda';
+        cell.style.borderColor = '#28a745';
+        cell.classList.add('visible');
+    } else {
+        iconElement.className = 'fas fa-eye-slash';
+        iconElement.style.color = '#dc3545';
+        iconElement.style.fontSize = '1.5em';
+        textElement.textContent = '非公開';
+        textElement.style.color = '#dc3545';
+        cell.style.backgroundColor = '#f8d7da';
+        cell.style.borderColor = '#dc3545';
+        cell.classList.add('hidden');
+    }
+    
+    container.appendChild(iconElement);
+    container.appendChild(textElement);
+    cell.appendChild(container);
+    
+    // データ属性を更新
     cell.setAttribute('data-visible', isVisible);
     
-    const iconClass = isVisible ? 'fas fa-eye' : 'fas fa-eye-slash';
-    const statusText = isVisible ? '公開' : '非公開';
-    
-    // セルの内容を更新
-    cell.innerHTML = `
-        <div class="status-icon">
-            <i class="${iconClass}"></i>
-        </div>
-        <div class="status-text">${statusText}</div>
-    `;
-    
-    // デバッグ用ログ
-    console.log(`🎨 セル更新: ${cell.dataset.chapter}章${cell.dataset.type}問題 → ${isVisible ? '公開' : '非公開'}`);
+    // アニメーション効果
+    cell.style.animation = 'settingChanged 0.5s ease';
+    setTimeout(() => {
+        cell.style.animation = '';
+    }, 500);
 }
 
 function toggleIndividualVisibility(chapter, type, cell) {
