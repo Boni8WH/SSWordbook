@@ -440,67 +440,88 @@
                 <!-- 設定マトリックス -->
                 <div id="visibilityMatrix" class="visibility-matrix" style="display: none;">
                     <div class="matrix-header">
-                        <h4><i class="fas fa-table"></i> 公開設定マトリックス</h4>
-                        <p class="text-muted">各セルをクリックして公開/非公開を切り替えできます</p>
+                        <h4><i class="fas fa-eye"></i> 論述問題公開設定</h4>
                     </div>
                     
-                    <!-- 一括操作ボタン -->
-                    <div class="bulk-operations mb-3">
-                        <div class="btn-group btn-group-sm" role="group">
-                            <button class="btn btn-outline-success" onclick="setAllVisible(true)">
-                                <i class="fas fa-eye"></i> 全て公開
-                            </button>
-                            <button class="btn btn-outline-danger" onclick="setAllVisible(false)">
-                                <i class="fas fa-eye-slash"></i> 全て非公開
+                    <!-- Grid Container -->
+                    <div id="visibilityGrid" class="visibility-grid">
+                        <!-- ヘッダー行 -->
+                        <div class="grid-header grid-cell-chapter">章</div>
+                        <div class="grid-header grid-cell-type">タイプA</div>
+                        <div class="grid-header grid-cell-type">タイプB</div>
+                        <div class="grid-header grid-cell-type">タイプC</div>
+                        <div class="grid-header grid-cell-type">タイプD</div>
+                        
+                        <!-- データ行はJavaScriptで動的生成 -->
+                    </div>
+                    
+                    <!-- 一括操作セクション -->
+                    <div class="bulk-operations">
+                        <div class="d-flex flex-wrap gap-2 align-items-center">
+                            <div class="btn-group" role="group">
+                                <button type="button" class="btn btn-success btn-sm" onclick="setAllVisibility(true)">
+                                    <i class="fas fa-eye"></i> 全て公開
+                                </button>
+                                <button type="button" class="btn btn-danger btn-sm" onclick="setAllVisibility(false)">
+                                    <i class="fas fa-eye-slash"></i> 全て非公開
+                                </button>
+                            </div>
+                            
+                            <div class="btn-group" role="group">
+                                <button type="button" class="btn btn-outline-primary btn-sm" onclick="setChapterVisibility('all', true)">
+                                    <i class="fas fa-book"></i> 全章公開
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setChapterVisibility('all', false)">
+                                    <i class="fas fa-book-open"></i> 全章非公開
+                                </button>
+                            </div>
+                            
+                            <div class="btn-group" role="group">
+                                <button type="button" class="btn btn-outline-info btn-sm" onclick="setTypeVisibility('all', true)">
+                                    <i class="fas fa-list"></i> 全タイプ公開
+                                </button>
+                                <button type="button" class="btn btn-outline-warning btn-sm" onclick="setTypeVisibility('all', false)">
+                                    <i class="fas fa-list-ul"></i> 全タイプ非公開
+                                </button>
+                            </div>
+                            
+                            <button type="button" class="btn btn-primary btn-sm" onclick="saveVisibilitySettings()">
+                                <i class="fas fa-save"></i> 設定を保存
                             </button>
                         </div>
-                        <div class="btn-group btn-group-sm ms-2" role="group">
-                            <button class="btn btn-outline-info" onclick="setTypeVisible('A', true)">A問題を公開</button>
-                            <button class="btn btn-outline-info" onclick="setTypeVisible('B', true)">B問題を公開</button>
-                            <button class="btn btn-outline-info" onclick="setTypeVisible('C', true)">C問題を公開</button>
-                            <button class="btn btn-outline-info" onclick="setTypeVisible('D', true)">D問題を公開</button>
-                        </div>
                     </div>
                     
-                    <!-- マトリックステーブル -->
-                    <div class="table-responsive">
-                        <table id="visibilityTable" class="table table-bordered visibility-table">
-                            <thead class="table-dark">
-                                <tr>
-                                    <th style="width: 120px;">章</th>
-                                    <th class="text-center">A問題<br><small>(200字以上)</small></th>
-                                    <th class="text-center">B問題<br><small>(100-150字)</small></th>
-                                    <th class="text-center">C問題<br><small>(50-75字)</small></th>
-                                    <th class="text-center">D問題<br><small>(30字程度)</small></th>
-                                </tr>
-                            </thead>
-                            <tbody id="visibilityTableBody">
-                                <!-- JavaScriptで動的生成 -->
-                            </tbody>
-                        </table>
-                    </div>
-                    
-                    <!-- 設定状況サマリー -->
+                    <!-- 設定サマリー -->
                     <div class="settings-summary mt-3">
-                        <div class="card bg-light">
+                        <div class="card">
                             <div class="card-body">
-                                <h6><i class="fas fa-chart-pie"></i> 設定状況</h6>
-                                <div class="row">
+                                <h6 class="card-title mb-2">
+                                    <i class="fas fa-chart-bar"></i> 設定状況
+                                </h6>
+                                <div class="row text-center">
                                     <div class="col-md-3">
-                                        <span class="badge bg-success me-1">公開:</span>
-                                        <span id="visibleCount">0</span>件
+                                        <div class="stat-item">
+                                            <div class="stat-value text-success" id="publicCount">0</div>
+                                            <div class="stat-label">公開</div>
+                                        </div>
                                     </div>
                                     <div class="col-md-3">
-                                        <span class="badge bg-danger me-1">非公開:</span>
-                                        <span id="hiddenCount">0</span>件
+                                        <div class="stat-item">
+                                            <div class="stat-value text-danger" id="hiddenCount">0</div>
+                                            <div class="stat-label">非公開</div>
+                                        </div>
                                     </div>
                                     <div class="col-md-3">
-                                        <span class="badge bg-info me-1">総数:</span>
-                                        <span id="totalCount">0</span>件
+                                        <div class="stat-item">
+                                            <div class="stat-value text-info" id="totalChapters">0</div>
+                                            <div class="stat-label">総章数</div>
+                                        </div>
                                     </div>
                                     <div class="col-md-3">
-                                        <span class="badge bg-primary me-1">公開率:</span>
-                                        <span id="visibilityRate">0%</span>
+                                        <div class="stat-item">
+                                            <div class="stat-value text-warning" id="totalTypes">0</div>
+                                            <div class="stat-label">総タイプ数</div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -3122,74 +3143,91 @@ function loadVisibilitySettings() {
 }
 
 function createVisibilityMatrix() {
-    const tbody = document.getElementById('visibilityTableBody');
-    tbody.innerHTML = '';
+    const gridContainer = document.getElementById('visibilityGrid');
+    
+    // ヘッダー以外のセルをクリア
+    const existingCells = gridContainer.querySelectorAll(':not(.grid-header)');
+    existingCells.forEach(cell => cell.remove());
     
     // CSS変数を動的に設定
     document.documentElement.style.setProperty('--type-count', availableTypes.length);
     
-    console.log(`📊 完全固定レイアウトマトリックス生成: ${availableChapters.length}章 × ${availableTypes.length}タイプ`);
+    console.log(`📊 CSS Grid マトリックス生成: ${availableChapters.length}章 × ${availableTypes.length}タイプ`);
     
+    // 各章ごとにグリッド行を生成
     availableChapters.forEach(chapter => {
-        const row = document.createElement('tr');
-        
         // 章名セル
-        const chapterCell = document.createElement('td');
-        chapterCell.className = 'chapter-name-cell';
+        const chapterCell = document.createElement('div');
+        chapterCell.className = 'grid-cell-chapter';
         chapterCell.textContent = `第${chapter}章`;
-        row.appendChild(chapterCell);
+        gridContainer.appendChild(chapterCell);
         
-        // 各タイプのセル - 新しいCSS構造に完全対応
-        availableTypes.forEach((type, index) => {
-            const cell = document.createElement('td');
-            cell.className = 'visibility-cell';
+        // 各タイプのセル
+        availableTypes.forEach(type => {
+            const cell = document.createElement('div');
+            cell.className = 'grid-cell-setting';
             
             // 設定状態を取得
             const isVisible = getVisibilitySetting(chapter, type);
             
-            // ★重要：新しいCSS構造に対応したコンテンツコンテナ
-            const contentContainer = document.createElement('div');
-            contentContainer.className = 'visibility-cell-content';
-            
             // アイコン要素
             const iconElement = document.createElement('i');
-            iconElement.className = `${isVisible ? 'fas fa-eye' : 'fas fa-eye-slash'} status-icon`;
+            iconElement.className = `${isVisible ? 'fas fa-eye' : 'fas fa-eye-slash'} setting-icon`;
             
             // テキスト要素
             const textElement = document.createElement('div');
-            textElement.className = 'status-text';
+            textElement.className = 'setting-text';
             textElement.textContent = isVisible ? '公開' : '非公開';
             
-            // コンテナに追加
-            contentContainer.appendChild(iconElement);
-            contentContainer.appendChild(textElement);
-            cell.appendChild(contentContainer);
+            // セルに追加
+            cell.appendChild(iconElement);
+            cell.appendChild(textElement);
             
-            // 状態に応じてセルクラスを設定
+            // 状態クラス設定
             cell.classList.add(isVisible ? 'visible' : 'hidden');
             
             // クリックイベント
             cell.addEventListener('click', function(event) {
                 event.stopPropagation();
-                console.log(`🖱️ クリック: 第${chapter}章 タイプ${type} (列${index + 2})`);
+                console.log(`🖱️ Grid クリック: 第${chapter}章 タイプ${type}`);
                 toggleIndividualVisibility(chapter, type, cell);
             });
             
-            // データ属性を設定
+            // データ属性設定
             cell.setAttribute('data-chapter', chapter);
             cell.setAttribute('data-type', type);
             cell.setAttribute('data-visible', isVisible);
             
-            row.appendChild(cell);
+            gridContainer.appendChild(cell);
         });
-        
-        tbody.appendChild(row);
     });
     
     document.getElementById('visibilityMatrix').style.display = 'block';
     updateSettingsSummary();
     
-    console.log('✅ 新CSS構造対応マトリックス生成完了');
+    console.log('✅ CSS Grid マトリックス生成完了');
+}
+
+function updateCellAppearance(cell, isVisible) {
+    console.log(`🎨 Grid セル更新: 第${cell.getAttribute('data-chapter')}章${cell.getAttribute('data-type')}問題 → ${isVisible ? '公開' : '非公開'}`);
+    
+    // クラス更新
+    cell.classList.remove('visible', 'hidden');
+    cell.classList.add(isVisible ? 'visible' : 'hidden');
+    
+    // アイコンとテキスト更新
+    const iconElement = cell.querySelector('.setting-icon');
+    const textElement = cell.querySelector('.setting-text');
+    
+    if (iconElement && textElement) {
+        iconElement.className = `${isVisible ? 'fas fa-eye' : 'fas fa-eye-slash'} setting-icon`;
+        textElement.textContent = isVisible ? '公開' : '非公開';
+    }
+    
+    // データ属性更新
+    cell.setAttribute('data-visible', isVisible);
+    
+    console.log('✅ Grid セル更新完了');
 }
 
 function getVisibilitySetting(chapter, type) {
@@ -4761,181 +4799,124 @@ function checkAndShowImage(problemId) {
     margin-top: 20px;
 }
 
-/* ★重要：テーブル全体を完全固定レイアウトに */
-.visibility-table {
-    table-layout: fixed !important;
-    width: 100% !important;
-    border-collapse: separate !important;
-    border-spacing: 0 !important;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    border-radius: 8px;
-    overflow: hidden;
+.matrix-header h4 {
+    color: #495057;
+    font-weight: 600;
+    margin-bottom: 20px;
 }
 
-/* ヘッダー行の固定 */
-.visibility-table thead th {
-    background: linear-gradient(135deg, #343a40 0%, #495057 100%);
+/* ★重要：CSS Grid による固定レイアウト */
+.visibility-grid {
+    display: grid !important;
+    grid-template-columns: 100px repeat(var(--type-count, 4), 1fr) !important;
+    gap: 2px !important;
+    background: #fff !important;
+    border-radius: 8px !important;
+    overflow: hidden !important;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* グリッドヘッダー */
+.grid-header {
+    background: linear-gradient(135deg, #343a40 0%, #495057 100%) !important;
     color: white !important;
     font-weight: 600 !important;
-    text-align: center !important;
-    vertical-align: middle !important;
     padding: 12px 8px !important;
-    border: 1px solid #495057 !important;
-}
-
-/* ★超重要：各列の幅を絶対固定 */
-.visibility-table th:nth-child(1),
-.visibility-table td:nth-child(1) {
-    width: 100px !important;
-    min-width: 100px !important;
-    max-width: 100px !important;
-}
-
-.visibility-table th:nth-child(2),
-.visibility-table td:nth-child(2) {
-    width: calc((100% - 100px) / var(--type-count, 4)) !important;
-    min-width: calc((100% - 100px) / var(--type-count, 4)) !important;
-    max-width: calc((100% - 100px) / var(--type-count, 4)) !important;
-}
-
-.visibility-table th:nth-child(3),
-.visibility-table td:nth-child(3) {
-    width: calc((100% - 100px) / var(--type-count, 4)) !important;
-    min-width: calc((100% - 100px) / var(--type-count, 4)) !important;
-    max-width: calc((100% - 100px) / var(--type-count, 4)) !important;
-}
-
-.visibility-table th:nth-child(4),
-.visibility-table td:nth-child(4) {
-    width: calc((100% - 100px) / var(--type-count, 4)) !important;
-    min-width: calc((100% - 100px) / var(--type-count, 4)) !important;
-    max-width: calc((100% - 100px) / var(--type-count, 4)) !important;
-}
-
-.visibility-table th:nth-child(5),
-.visibility-table td:nth-child(5) {
-    width: calc((100% - 100px) / var(--type-count, 4)) !important;
-    min-width: calc((100% - 100px) / var(--type-count, 4)) !important;
-    max-width: calc((100% - 100px) / var(--type-count, 4)) !important;
-}
-
-/* 章名セルの完全固定 */
-.chapter-name-cell {
-    position: relative !important;
     text-align: center !important;
-    vertical-align: middle !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+/* 章名セル */
+.grid-cell-chapter {
+    background: #f8f9fa !important;
+    color: #495057 !important;
     font-weight: bold !important;
-    background-color: #f8f9fa !important;
     border: 1px solid #dee2e6 !important;
     padding: 15px 5px !important;
-    white-space: nowrap !important;
-    overflow: hidden !important;
+    text-align: center !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
 }
 
-/* ★超重要：公開設定セルの完全位置固定 */
-.visibility-cell {
-    position: relative !important;
-    text-align: center !important;
-    vertical-align: middle !important;
-    padding: 0 !important;
+/* ★重要：公開設定セル - Grid固定配置 */
+.grid-cell-setting {
+    background: #fff !important;
     border: 1px solid #dee2e6 !important;
     height: 70px !important;
     cursor: pointer !important;
     transition: all 0.3s ease !important;
-    overflow: hidden !important;
-    box-sizing: border-box !important;
-}
-
-/* ★超重要：セル内コンテンツの絶対中央固定配置 */
-.visibility-cell-content {
-    position: absolute !important;
-    top: 0 !important;
-    left: 0 !important;
-    width: 100% !important;
-    height: 100% !important;
     display: flex !important;
     flex-direction: column !important;
     align-items: center !important;
     justify-content: center !important;
-    pointer-events: none !important;
-    box-sizing: border-box !important;
+    gap: 5px !important;
+    position: relative !important;
 }
 
-/* アイコンの固定配置 */
-.visibility-cell-content .status-icon {
+/* アイコンとテキストのスタイル */
+.grid-cell-setting .setting-icon {
     font-size: 1.5em !important;
-    margin: 0 !important;
-    padding: 0 !important;
     line-height: 1 !important;
-    display: block !important;
-    text-align: center !important;
 }
 
-/* テキストの固定配置 */
-.visibility-cell-content .status-text {
+.grid-cell-setting .setting-text {
     font-size: 0.85em !important;
     font-weight: 600 !important;
-    margin: 5px 0 0 0 !important;
-    padding: 0 !important;
     line-height: 1 !important;
     white-space: nowrap !important;
-    text-align: center !important;
 }
 
-/* 公開状態のスタイル */
-.visibility-cell.visible {
-    background-color: #d4edda !important;
+/* 公開状態 */
+.grid-cell-setting.visible {
+    background: #d4edda !important;
     border-color: #28a745 !important;
 }
 
-.visibility-cell.visible .status-icon,
-.visibility-cell.visible .status-text {
+.grid-cell-setting.visible .setting-icon,
+.grid-cell-setting.visible .setting-text {
     color: #28a745 !important;
 }
 
-/* 非公開状態のスタイル */
-.visibility-cell.hidden {
-    background-color: #f8d7da !important;
+/* 非公開状態 */
+.grid-cell-setting.hidden {
+    background: #f8d7da !important;
     border-color: #dc3545 !important;
 }
 
-.visibility-cell.hidden .status-icon,
-.visibility-cell.hidden .status-text {
+.grid-cell-setting.hidden .setting-icon,
+.grid-cell-setting.hidden .setting-text {
     color: #dc3545 !important;
 }
 
 /* ホバー効果 */
-.visibility-cell:hover {
+.grid-cell-setting:hover {
     transform: scale(1.02) !important;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2) !important;
     z-index: 10 !important;
 }
 
-/* その他の関連スタイル */
-.visibility-cell.changed {
-    animation: settingChanged 0.5s ease;
-}
-
-.bulk-operations {
-    background: rgba(255, 255, 255, 0.8);
-    padding: 15px;
-    border-radius: 8px;
-    border: 1px solid #dee2e6;
-    margin-bottom: 15px;
-}
-
-.settings-summary .card {
-    border: none;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.visibility-room-selector {
-    background: white;
-    padding: 20px;
-    border-radius: 8px;
-    border: 1px solid #dee2e6;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-    margin-bottom: 20px;
+/* レスポンシブ対応 */
+@media (max-width: 768px) {
+    .visibility-grid {
+        grid-template-columns: 80px repeat(var(--type-count, 4), 1fr) !important;
+        gap: 1px !important;
+    }
+    
+    .grid-cell-setting {
+        height: 50px !important;
+        gap: 3px !important;
+    }
+    
+    .grid-cell-setting .setting-icon {
+        font-size: 1.2em !important;
+    }
+    
+    .grid-cell-setting .setting-text {
+        font-size: 0.75em !important;
+    }
 }
 
 /* ========================================
