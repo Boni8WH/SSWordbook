@@ -593,7 +593,7 @@ class EssayCsvFile(db.Model):
     problem_count = db.Column(db.Integer, default=0, nullable=False)
     upload_date = db.Column(db.DateTime, default=lambda: datetime.now(JST))
 
-from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, Response
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, Response, abort
 from flask_sqlalchemy import SQLAlchemy
 from flask_mail import Mail, Message
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -1485,7 +1485,18 @@ def migrate_database():
             if not inspector.has_table('essay_images'):
                 print("🔧 essay_imagesテーブルを作成します...")
                 try:
-                    db.create_all()  # 新しいテーブルを作成
+                    # EssayImageテーブルを明示的に作成
+                    with db.engine.connect() as conn:
+                        conn.execute(text("""
+                            CREATE TABLE essay_images (
+                                id SERIAL PRIMARY KEY,
+                                problem_id INTEGER NOT NULL UNIQUE REFERENCES essay_problems(id) ON DELETE CASCADE,
+                                image_data BYTEA NOT NULL,
+                                image_format VARCHAR(10) NOT NULL DEFAULT 'PNG',
+                                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                            )
+                        """))
+                        conn.commit()
                     print("✅ essay_imagesテーブルを作成しました")
                 except Exception as e:
                     print(f"⚠️ essay_imagesテーブル作成エラー: {e}")
@@ -1493,7 +1504,6 @@ def migrate_database():
                 print("✅ essay_imagesテーブルは既に存在します")
 
             print("✅ EssayImage関連のマイグレーション完了")
-
                 
         except Exception as e:
             print(f"⚠️ マイグレーション中にエラーが発生しました: {e}")
@@ -9442,6 +9452,194 @@ def admin_essay_toggle_enabled():
             'message': '状態の切り替え中にエラーが発生しました'
         }), 500
 
+@app.route('/admin/essay/add', methods=['POST'])
+def add_essay_problem():
+    """論述問題を追加"""
+    if not session.get('admin_logged_in'):
+        return jsonify({'status': 'error', 'message': '管理者権限が必要です'}), 403
+    
+    try:
+        # リクエストデータの取得
+        if request.is_json:
+            data = request.get_json()
+        else:
+            # フォームデータからの取得
+            data = request.form.to_dict()
+            
+        app.logger.info(f"論述問題追加リクエスト: {data}")
+        
+        # 必須フィールドの確認
+        required_fields = ['chapter', 'type', 'university', 'year', 'question', 'answer', 'answer_length']
+        missing_fields = []
+        
+        for field in required_fields:
+            value = data.get(field)
+            if not value or str(value).strip() == '':
+                missing_fields.append(field)
+        
+        if missing_fields:
+            return jsonify({
+                'status': 'error', 
+                'message': f'以下の項目が入力されていません: {", ".join(missing_fields)}'
+            }), 400
+        
+        # データ型変換と検証
+        try:
+            chapter = int(str(data['chapter']).strip())
+            year = int(str(data['year']).strip())
+            answer_length = int(str(data['answer_length']).strip())
+            
+            if chapter <= 0 or year <= 0 or answer_length <= 0:
+                raise ValueError("章、年、解答字数は正の整数である必要があります")
+                
+        except (ValueError, TypeError) as ve:
+            return jsonify({
+                'status': 'error', 
+                'message': f'数値フィールドの形式が正しくありません: {str(ve)}'
+            }), 400
+        
+        # 新しい論述問題を作成
+        new_problem = EssayProblem(
+            chapter=chapter,
+            type=str(data['type']).strip(),
+            university=str(data['university']).strip(),
+            year=year,
+            question=str(data['question']).strip(),
+            answer=str(data['answer']).strip(),
+            answer_length=answer_length,
+            enabled=bool(data.get('enabled', True))
+        )
+        
+        # データベースに保存
+        db.session.add(new_problem)
+        db.session.commit()
+        
+        app.logger.info(f"論述問題を追加しました: ID={new_problem.id}, 大学={new_problem.university}, 年={new_problem.year}")
+        
+        return jsonify({
+            'status': 'success',
+            'message': f'論述問題を追加しました（ID: {new_problem.id}）',
+            'problem_id': new_problem.id
+        }), 200
+        
+    except ValueError as ve:
+        app.logger.error(f"論述問題追加の値エラー: {str(ve)}")
+        return jsonify({
+            'status': 'error', 
+            'message': f'入力値エラー: {str(ve)}'
+        }), 400
+        
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"論述問題追加エラー: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        
+        return jsonify({
+            'status': 'error', 
+            'message': f'論述問題の追加中にシステムエラーが発生しました: {str(e)}'
+        }), 500
+
+@app.route('/admin/essay/edit/<int:problem_id>', methods=['POST'])
+def edit_essay_problem(problem_id):
+    """論述問題を編集"""
+    if not session.get('admin_logged_in'):
+        return jsonify({'status': 'error', 'message': '管理者権限が必要です'}), 403
+    
+    try:
+        # 問題の存在確認
+        problem = EssayProblem.query.get(problem_id)
+        if not problem:
+            return jsonify({
+                'status': 'error', 
+                'message': '指定された問題が見つかりません'
+            }), 404
+        
+        # リクエストデータの取得
+        if request.is_json:
+            data = request.get_json()
+        else:
+            data = request.form.to_dict()
+            
+        app.logger.info(f"論述問題編集リクエスト: ID={problem_id}, data={data}")
+        
+        # フィールドの更新
+        if 'chapter' in data and data['chapter']:
+            problem.chapter = int(str(data['chapter']).strip())
+        if 'type' in data and data['type']:
+            problem.type = str(data['type']).strip()
+        if 'university' in data and data['university']:
+            problem.university = str(data['university']).strip()
+        if 'year' in data and data['year']:
+            problem.year = int(str(data['year']).strip())
+        if 'question' in data and data['question']:
+            problem.question = str(data['question']).strip()
+        if 'answer' in data and data['answer']:
+            problem.answer = str(data['answer']).strip()
+        if 'answer_length' in data and data['answer_length']:
+            problem.answer_length = int(str(data['answer_length']).strip())
+        if 'enabled' in data:
+            problem.enabled = bool(data['enabled'])
+        
+        # 更新日時を設定
+        problem.updated_at = datetime.utcnow()
+        
+        # データベースに保存
+        db.session.commit()
+        
+        app.logger.info(f"論述問題を更新しました: ID={problem_id}")
+        
+        return jsonify({
+            'status': 'success',
+            'message': f'論述問題（ID: {problem_id}）を更新しました'
+        }), 200
+        
+    except ValueError as ve:
+        app.logger.error(f"論述問題編集の値エラー: {str(ve)}")
+        return jsonify({
+            'status': 'error', 
+            'message': f'入力値エラー: {str(ve)}'
+        }), 400
+        
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"論述問題編集エラー: {str(e)}")
+        
+        return jsonify({
+            'status': 'error', 
+            'message': f'論述問題の編集中にエラーが発生しました: {str(e)}'
+        }), 500
+    
+@app.route('/essay_image/<int:problem_id>')
+def essay_image(problem_id):
+    """データベースから論述問題の画像を取得"""
+    try:
+        from flask import Response, abort  # ← ここでも局所的にインポート可能
+        
+        essay_image = EssayImage.query.filter_by(problem_id=problem_id).first()
+        
+        if not essay_image:
+            app.logger.warning(f"画像が見つかりません: problem_id={problem_id}")
+            abort(404)
+        
+        # バイナリデータからレスポンスを作成
+        mimetype = f'image/{essay_image.image_format.lower()}'
+        
+        app.logger.info(f"画像を配信: problem_id={problem_id}, format={essay_image.image_format}, size={len(essay_image.image_data)}bytes")
+        
+        return Response(
+            essay_image.image_data,
+            mimetype=mimetype,
+            headers={
+                'Content-Disposition': f'inline; filename=essay_{problem_id}.{essay_image.image_format.lower()}',
+                'Cache-Control': 'public, max-age=31536000'
+            }
+        )
+        
+    except Exception as e:
+        app.logger.error(f"画像配信エラー: problem_id={problem_id}, error={str(e)}")
+        abort(500)
+
 # ========================================
 # API エンドポイント
 # ========================================
@@ -9815,9 +10013,9 @@ def essay_image_path(problem_id):
 
 @app.template_global()
 def has_essay_image(problem_id):
-    """テンプレートから画像存在チェック"""
-    problem = EssayProblem.query.get(problem_id)
-    return bool(problem and problem.image_url)
+    """論述問題に画像が存在するかチェック（データベースから）"""
+    essay_image = EssayImage.query.filter_by(problem_id=problem_id).first()
+    return essay_image is not None
 
 # app.pyに一時的に追加するマイグレーション用エンドポイント
 @app.route('/admin/migrate_essay_images')
