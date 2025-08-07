@@ -4919,18 +4919,31 @@ function checkAndShowImage(problemId) {
 .visibility-matrix {
     background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
     border-radius: 10px;
-    padding: 20px;
-    margin: 20px 0 !important;
+    padding: 0 !important; /* ★重要：paddingを0に設定 */
+    margin: 15px 0 !important; /* ★重要：marginを他のセクションと統一 */
+}
+
+.matrix-header {
+    color: #495057;
+    font-weight: 600;
+    margin-bottom: 20px;
+    padding: 20px 20px 0 20px !important; /* ★重要：上と左右にpaddingを追加 */
 }
 
 .matrix-header h4 {
     color: #495057;
     font-weight: 600;
+    margin-bottom: 10px;
+}
+
+.matrix-header p {
+    font-size: 0.9rem;
     margin-bottom: 20px;
 }
 
 /* ★重要：CSS Grid による固定レイアウト */
 .visibility-grid {
+    margin: 0 20px 20px 20px !important; /* ★重要：左右と下にmarginを追加 */
     display: grid !important;
     grid-template-columns: 120px repeat(var(--type-count, 4), 1fr) !important;
     gap: 3px !important;
@@ -5053,6 +5066,60 @@ function checkAndShowImage(problemId) {
     padding: 20px;
     border-radius: 8px;
     border: 1px solid #dee2e6;
+    margin: 0 20px 20px 20px !important; /* ★重要：左右と下にmarginを追加 */
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 768px) {
+    .visibility-grid {
+        grid-template-columns: 100px repeat(var(--type-count, 4), 1fr) !important;
+        gap: 2px !important;
+        font-size: 0.8em;
+        margin: 0 15px 15px 15px !important;
+    }
+    
+    .grid-cell-setting {
+        min-height: 50px !important;
+        max-height: 50px !important;
+        gap: 2px !important;
+    }
+    
+    .grid-cell-setting .setting-icon {
+        font-size: 1.1em !important;
+    }
+    
+    .grid-cell-setting .setting-text {
+        font-size: 0.7em !important;
+    }
+    
+    .grid-cell-chapter {
+        padding: 10px 4px !important;
+        font-size: 0.8rem !important;
+        min-height: 50px !important;
+    }
+    
+    .matrix-header {
+        padding: 15px 15px 0 15px !important;
+    }
+    
+    .save-section {
+        margin: 0 15px 15px 15px !important;
+    }
+}
+
+@media (max-width: 480px) {
+    .visibility-grid {
+        margin: 0 10px 10px 10px !important;
+    }
+    
+    .matrix-header {
+        padding: 10px 10px 0 10px !important;
+    }
+    
+    .save-section {
+        margin: 0 10px 10px 10px !important;
+        padding: 15px;
+    }
 }
 
 /* ========================================
