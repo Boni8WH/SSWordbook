@@ -2549,6 +2549,59 @@ function showEditDialog(problem) {
                                 <textarea class="form-control" id="edit_answer" rows="6">${problem.answer || ''}</textarea>
                                 <small class="form-text text-muted">文字数: <span id="answerLength">${(problem.answer || '').length}</span>字</small>
                             </div>
+
+                            <!-- 画像管理セクションを追加 -->
+                            <div class="mb-3">
+                                <label class="form-label"><strong><i class="fas fa-image"></i> 問題画像</strong></label>
+                                <div class="image-management-section" id="imageManagement_${problem.id}">
+                                    <!-- 現在の画像があるかチェック -->
+                                    <div class="current-image-section" id="currentImageSection_${problem.id}" style="display: ${problem.has_image ? 'block' : 'none'};">
+                                        <div class="image-preview">
+                                            <img src="/essay_image/${problem.id}" 
+                                                alt="問題画像" 
+                                                style="max-width: 100%; max-height: 300px; border: 1px solid #ddd; border-radius: 5px;"
+                                                onerror="this.parentElement.parentElement.style.display='none'; document.getElementById('noImageSection_${problem.id}').style.display='block';">
+                                        </div>
+                                        <div class="image-actions mt-2">
+                                            <button type="button" class="btn btn-danger btn-sm" onclick="deleteEssayImageFromEdit(${problem.id})">
+                                                <i class="fas fa-trash"></i> 画像を削除
+                                            </button>
+                                            <button type="button" class="btn btn-secondary btn-sm" onclick="showImageUploadInEdit(${problem.id})">
+                                                <i class="fas fa-exchange-alt"></i> 画像を変更
+                                            </button>
+                                        </div>
+                                    </div>
+                                        
+                                    <!-- 画像なしの場合 -->
+                                    <div class="no-image-section" id="noImageSection_${problem.id}" style="display: ${problem.has_image ? 'none' : 'block'};">
+                                        <p class="text-muted"><i class="fas fa-image"></i> 画像は設定されていません</p>
+                                        <button type="button" class="btn btn-primary btn-sm" onclick="showImageUploadInEdit(${problem.id})">
+                                            <i class="fas fa-upload"></i> 画像をアップロード
+                                        </button>
+                                    </div>
+                                    
+                                    <!-- 画像アップロードフォーム（初期状態では非表示） -->
+                                    <div class="image-upload-section" id="imageUploadSection_${problem.id}" style="display: none;">
+                                        <form id="imageUploadForm_${problem.id}" enctype="multipart/form-data">
+                                            <div class="form-group">
+                                                <input type="file" id="imageInput_${problem.id}" name="image" 
+                                                    accept="image/*" class="form-control mb-2" required>
+                                                <small class="form-text text-muted">
+                                                    対応形式: PNG, JPG, JPEG, GIF (最大5MB)
+                                                </small>
+                                            </div>
+                                            <div class="form-group">
+                                                <button type="button" class="btn btn-success btn-sm" onclick="uploadEssayImageFromEdit(${problem.id})">
+                                                    <i class="fas fa-upload"></i> アップロード
+                                                </button>
+                                                <button type="button" class="btn btn-secondary btn-sm" onclick="hideImageUploadInEdit(${problem.id})">
+                                                    <i class="fas fa-times"></i> キャンセル
+                                                </button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
                             
                             <div class="form-check">
                                 <input class="form-check-input" type="checkbox" id="edit_enabled" ${problem.enabled ? 'checked' : ''}>
@@ -3444,6 +3497,123 @@ function toggleRoomSuspension(buttonElement) {
         // ✅ buttonElement を使用（button ではない）
         buttonElement.disabled = false;
         buttonElement.innerHTML = originalHTML;
+    });
+}
+
+// ========================================
+// 論述問題編集での画像管理機能
+// ========================================
+
+// 画像アップロードフォームを表示
+function showImageUploadInEdit(problemId) {
+    document.getElementById('imageUploadSection_' + problemId).style.display = 'block';
+    
+    // 現在の画像表示ボタンのテキストを変更
+    const changeBtn = document.querySelector(`#currentImageSection_${problemId} .btn-secondary`);
+    if (changeBtn) {
+        changeBtn.style.display = 'none';
+    }
+}
+
+// 画像アップロードフォームを非表示
+function hideImageUploadInEdit(problemId) {
+    document.getElementById('imageUploadSection_' + problemId).style.display = 'none';
+    
+    // ボタンを元に戻す
+    const changeBtn = document.querySelector(`#currentImageSection_${problemId} .btn-secondary`);
+    if (changeBtn) {
+        changeBtn.style.display = 'inline-block';
+    }
+    
+    // フォームをリセット
+    document.getElementById('imageUploadForm_' + problemId).reset();
+}
+
+// 編集モーダルから画像アップロード
+function uploadEssayImageFromEdit(problemId) {
+    const form = document.getElementById('imageUploadForm_' + problemId);
+    const fileInput = document.getElementById('imageInput_' + problemId);
+    
+    if (!fileInput.files[0]) {
+        alert('画像ファイルを選択してください');
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('image', fileInput.files[0]);
+    
+    // アップロードボタンを無効化
+    const uploadBtn = form.querySelector('.btn-success');
+    const originalText = uploadBtn.innerHTML;
+    uploadBtn.disabled = true;
+    uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> アップロード中...';
+    
+    fetch(`/admin/upload_essay_image/${problemId}`, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            alert(data.message);
+            
+            // 現在の画像セクションを表示し、なしセクションを非表示
+            document.getElementById('currentImageSection_' + problemId).style.display = 'block';
+            document.getElementById('noImageSection_' + problemId).style.display = 'none';
+            
+            // 画像を更新
+            const img = document.querySelector(`#currentImageSection_${problemId} img`);
+            if (img) {
+                img.src = `/essay_image/${problemId}?t=${Date.now()}`; // キャッシュ回避
+            }
+            
+            // アップロードフォームを非表示
+            hideImageUploadInEdit(problemId);
+        } else {
+            alert(`エラー: ${data.message}`);
+        }
+    })
+    .catch(error => {
+        console.error('アップロードエラー:', error);
+        alert('アップロード中にエラーが発生しました');
+    })
+    .finally(() => {
+        // ボタンを元に戻す
+        uploadBtn.disabled = false;
+        uploadBtn.innerHTML = originalText;
+    });
+}
+
+// 編集モーダルから画像削除
+function deleteEssayImageFromEdit(problemId) {
+    if (!confirm('この画像を削除しますか？\n\n⚠️ この操作は元に戻せません。')) {
+        return;
+    }
+    
+    fetch(`/admin/delete_essay_image/${problemId}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            alert(data.message);
+            
+            // 現在の画像セクションを非表示し、なしセクションを表示
+            document.getElementById('currentImageSection_' + problemId).style.display = 'none';
+            document.getElementById('noImageSection_' + problemId).style.display = 'block';
+            
+            // アップロードフォームも非表示
+            hideImageUploadInEdit(problemId);
+        } else {
+            alert(`エラー: ${data.message}`);
+        }
+    })
+    .catch(error => {
+        console.error('削除エラー:', error);
+        alert('削除中にエラーが発生しました');
     });
 }
 
@@ -4994,6 +5164,62 @@ th[style*="cursor: pointer"]:hover {
     .scrollable-table-container {
         max-height: 400px;
         overflow-y: auto;
+    }
+}
+
+/* 論述問題編集モーダル内の画像管理スタイル */
+.image-management-section {
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 15px;
+    background-color: #f9f9f9;
+    margin-top: 10px;
+}
+
+.image-preview {
+    text-align: center;
+    margin-bottom: 10px;
+}
+
+.image-actions {
+    text-align: center;
+}
+
+.image-actions .btn {
+    margin: 0 5px;
+}
+
+.no-image-section {
+    text-align: center;
+    padding: 20px;
+}
+
+.image-upload-section {
+    border-top: 1px solid #ddd;
+    padding-top: 15px;
+    margin-top: 15px;
+}
+
+.image-upload-section .form-group {
+    margin-bottom: 10px;
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 768px) {
+    .image-preview img {
+        max-height: 200px;
+    }
+    
+    .image-actions .btn {
+        display: block;
+        width: 100%;
+        margin-bottom: 5px;
+        margin-left: 0;
+        margin-right: 0;
+    }
+    
+    .image-management-section {
+        padding: 10px;
     }
 }
 </style>
