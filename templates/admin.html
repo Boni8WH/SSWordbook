@@ -3136,9 +3136,6 @@ function createVisibilityMatrix() {
         const chapterCell = document.createElement('td');
         chapterCell.className = 'chapter-name-cell';
         chapterCell.textContent = `第${chapter}章`;
-        chapterCell.style.fontWeight = 'bold';
-        chapterCell.style.textAlign = 'center';
-        chapterCell.style.backgroundColor = '#f8f9fa';
         row.appendChild(chapterCell);
         
         // 各タイプのセル
@@ -3150,45 +3147,24 @@ function createVisibilityMatrix() {
             const isVisible = getVisibilitySetting(chapter, type);
             console.log(`🔍 第${chapter}章 タイプ${type}: ${isVisible ? '公開' : '非公開'}`);
             
-            // セルの基本スタイル設定
-            cell.style.textAlign = 'center';
-            cell.style.cursor = 'pointer';
-            cell.style.padding = '15px 8px';
-            cell.style.minHeight = '60px';
-            cell.style.border = '2px solid transparent';
-            cell.style.transition = 'all 0.3s ease';
+            // コンテナを作成（中央配置用）
+            const container = document.createElement('div');
             
             // アイコンとテキストを作成
-            const container = document.createElement('div');
-            container.style.display = 'flex';
-            container.style.flexDirection = 'column';
-            container.style.alignItems = 'center';
-            container.style.justifyContent = 'center';
-            container.style.height = '100%';
-            
             const iconElement = document.createElement('i');
             const textElement = document.createElement('div');
-            textElement.style.fontSize = '0.9em';
-            textElement.style.fontWeight = '600';
-            textElement.style.marginTop = '5px';
             
             if (isVisible) {
                 iconElement.className = 'fas fa-eye';
                 iconElement.style.color = '#28a745';
-                iconElement.style.fontSize = '1.5em';
                 textElement.textContent = '公開';
                 textElement.style.color = '#28a745';
-                cell.style.backgroundColor = '#d4edda';
-                cell.style.borderColor = '#28a745';
                 cell.classList.add('visible');
             } else {
                 iconElement.className = 'fas fa-eye-slash';
                 iconElement.style.color = '#dc3545';
-                iconElement.style.fontSize = '1.5em';
                 textElement.textContent = '非公開';
                 textElement.style.color = '#dc3545';
-                cell.style.backgroundColor = '#f8d7da';
-                cell.style.borderColor = '#dc3545';
                 cell.classList.add('hidden');
             }
             
@@ -3252,45 +3228,24 @@ function updateCellAppearance(cell, isVisible) {
     cell.classList.remove('visible', 'hidden');
     cell.innerHTML = '';
     
-    // セルの基本スタイル再設定
-    cell.style.textAlign = 'center';
-    cell.style.cursor = 'pointer';
-    cell.style.padding = '15px 8px';
-    cell.style.minHeight = '60px';
-    cell.style.border = '2px solid transparent';
-    
-    // コンテナを作成
+    // コンテナを作成（中央配置用）
     const container = document.createElement('div');
-    container.style.display = 'flex';
-    container.style.flexDirection = 'column';
-    container.style.alignItems = 'center';
-    container.style.justifyContent = 'center';
-    container.style.height = '100%';
     
     // アイコンとテキストを再作成
     const iconElement = document.createElement('i');
     const textElement = document.createElement('div');
-    textElement.style.fontSize = '0.9em';
-    textElement.style.fontWeight = '600';
-    textElement.style.marginTop = '5px';
     
     if (isVisible) {
         iconElement.className = 'fas fa-eye';
         iconElement.style.color = '#28a745';
-        iconElement.style.fontSize = '1.5em';
         textElement.textContent = '公開';
         textElement.style.color = '#28a745';
-        cell.style.backgroundColor = '#d4edda';
-        cell.style.borderColor = '#28a745';
         cell.classList.add('visible');
     } else {
         iconElement.className = 'fas fa-eye-slash';
         iconElement.style.color = '#dc3545';
-        iconElement.style.fontSize = '1.5em';
         textElement.textContent = '非公開';
         textElement.style.color = '#dc3545';
-        cell.style.backgroundColor = '#f8d7da';
-        cell.style.borderColor = '#dc3545';
         cell.classList.add('hidden');
     }
     
@@ -5444,5 +5399,87 @@ th[style*="cursor: pointer"]:hover {
         padding: 10px;
     }
 }
+
+/* 公開設定マトリックステーブルのレイアウト修正 */
+.visibility-table {
+    table-layout: fixed; /* 固定レイアウトで列幅を均等に */
+    width: 100%;
+}
+
+.visibility-table th:not(:first-child),
+.visibility-table td:not(:first-child) {
+    width: calc((100% - 120px) / var(--type-count, 4));
+    text-align: center; /* 中央揃え */
+}
+
+.chapter-name-cell {
+    width: 120px; /* 章名列の固定幅 */
+    text-align: center;
+    font-weight: bold;
+    background-color: #f8f9fa;
+    white-space: nowrap; /* 改行を防止 */
+}
+
+/* 視認性改善のためのセルスタイル */
+.visibility-cell {
+    text-align: center !important;
+    vertical-align: middle !important;
+    padding: 15px 8px !important;
+    min-height: 60px;
+    border: 2px solid transparent;
+    transition: all 0.3s ease;
+    position: relative; /* 位置指定を追加 */
+}
+
+/* セル内のコンテンツを中央配置 */
+.visibility-cell > div {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    height: 100% !important;
+    width: 100% !important;
+}
+
+/* アイコンとテキストのスタイル */
+.visibility-cell i {
+    font-size: 1.5em !important;
+    margin-bottom: 5px !important;
+}
+
+.visibility-cell div div {
+    font-size: 0.9em !important;
+    font-weight: 600 !important;
+    margin-top: 0 !important;
+}
+
+/* 公開状態のスタイル */
+.visibility-cell.visible {
+    background-color: #d4edda !important;
+    border-color: #28a745 !important;
+}
+
+/* 非公開状態のスタイル */
+.visibility-cell.hidden {
+    background-color: #f8d7da !important;
+    border-color: #dc3545 !important;
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 768px) {
+    .visibility-cell {
+        min-height: 50px;
+        padding: 10px 4px !important;
+    }
+    
+    .visibility-cell i {
+        font-size: 1.2em !important;
+    }
+    
+    .visibility-cell div div {
+        font-size: 0.8em !important;
+    }
+}
+
 </style>
 {% endblock %}
