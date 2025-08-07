@@ -13,8 +13,66 @@ from datetime import datetime, timedelta
 from sqlalchemy import inspect, text, func, case, cast, Integer
 import glob
 import pytz
+try:
+    import boto3
+    from botocore.exceptions import NoCredentialsError
+    S3_AVAILABLE = True
+except ImportError:
+    print("⚠️ boto3が利用できません。画像アップロードはローカル保存になります。")
+    S3_AVAILABLE = False
+    boto3 = None
+    NoCredentialsError = Exception
 JST = pytz.timezone('Asia/Tokyo')
 
+# AWS S3設定
+S3_BUCKET = 'your-bucket-name'
+S3_KEY = 'your-access-key'
+S3_SECRET = 'your-secret-key'
+S3_REGION = 'ap-northeast-1'  # 東京リージョン
+
+S3_BUCKET = os.environ.get('S3_BUCKET', 'your-default-bucket')
+S3_KEY = os.environ.get('AWS_ACCESS_KEY_ID')
+S3_SECRET = os.environ.get('AWS_SECRET_ACCESS_KEY')
+S3_REGION = os.environ.get('AWS_REGION', 'ap-northeast-1')
+
+# S3クライアント初期化（boto3利用可能時のみ）
+if S3_AVAILABLE and S3_KEY and S3_SECRET:
+    try:
+        s3_client = boto3.client(
+            's3',
+            aws_access_key_id=S3_KEY,
+            aws_secret_access_key=S3_SECRET,
+            region_name=S3_REGION
+        )
+        print("✅ S3クライアント初期化完了")
+    except Exception as e:
+        print(f"⚠️ S3クライアント初期化失敗: {e}")
+        S3_AVAILABLE = False
+        s3_client = None
+else:
+    print("⚠️ S3設定不完全：ローカル保存を使用")
+    s3_client = None
+
+def upload_image_to_s3(file, filename):
+    """画像をS3にアップロード（boto3利用可能時のみ）"""
+    if not S3_AVAILABLE:
+        print("⚠️ S3アップロード不可：boto3がインストールされていません")
+        return None
+        
+    try:
+        s3_client.upload_fileobj(
+            file,
+            S3_BUCKET,
+            f"essay_images/{filename}",
+            ExtraArgs={'ContentType': 'image/jpeg'}
+        )
+        return f"https://{S3_BUCKET}.s3.{S3_REGION}.amazonaws.com/essay_images/{filename}"
+    except NoCredentialsError:
+        print("AWS認証情報が見つかりません")
+        return None
+    except Exception as e:
+        print(f"S3アップロードエラー: {e}")
+        return None
 # ====================================================================
 # データベースモデル定義（models.pyから統合）
 # ====================================================================
@@ -483,6 +541,7 @@ class EssayProblem(db.Model):
     enabled = db.Column(db.Boolean, default=True, nullable=False)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))
+    image_url = db.Column(db.Text, nullable=True) 
     
     def to_dict(self):
         return {
@@ -494,7 +553,9 @@ class EssayProblem(db.Model):
             'question': self.question,
             'answer': self.answer,
             'answer_length': self.answer_length,
-            'enabled': self.enabled
+            'enabled': self.enabled,
+            'image_url': self.image_url,
+            'has_image': bool(self.image_url)
         }
 
 class EssayProgress(db.Model):
@@ -8881,11 +8942,12 @@ def admin_essay_add_problem():
         db.session.add(new_problem)
         db.session.flush()  # IDを取得するためフラッシュ
         
-        # 画像処理（問題IDをベースにしたファイル名）
+        # 画像処理部分を修正
         image_saved = False
+        image_url = None
+        
         if 'image' in request.files:
             image_file = request.files['image']
-            
             if image_file and image_file.filename:
                 # 拡張子チェック
                 filename = secure_filename(image_file.filename)
@@ -8901,24 +8963,19 @@ def admin_essay_add_problem():
                 # 問題IDベースのファイル名を生成
                 image_filename = f"essay_problem_{new_problem.id}.{file_ext}"
                 
-                # 保存先ディレクトリの確保
-                upload_dir = os.path.join('static', 'uploads', 'essay_images')
-                os.makedirs(upload_dir, exist_ok=True)
-                
-                # ファイル保存
-                save_path = os.path.join(upload_dir, image_filename)
-                
-                try:
-                    image_file.save(save_path)
-                    image_saved = True
-                    logger.info(f"画像保存成功: {save_path}")
-                    
-                except Exception as save_error:
-                    logger.error(f"画像保存エラー: {save_error}")
-                    return jsonify({
-                        'status': 'error',
-                        'message': '画像の保存に失敗しました'
-                    }), 500
+                # S3にアップロード（利用可能な場合）
+                if S3_AVAILABLE:
+                    image_url = upload_image_to_s3(image_file, image_filename)
+                    if image_url:
+                        new_problem.image_url = image_url
+                        image_saved = True
+                        logger.info(f"画像S3アップロード成功: {image_url}")
+                    else:
+                        # S3失敗時はローカル保存にフォールバック
+                        return save_image_locally(image_file, image_filename, new_problem)
+                else:
+                    # boto3が利用できない場合はローカル保存
+                    return save_image_locally(image_file, image_filename, new_problem)
         
         # 全てをコミット
         db.session.commit()
@@ -8940,6 +8997,28 @@ def admin_essay_add_problem():
             'message': '問題の追加中にエラーが発生しました'
         }), 500
 
+def save_image_locally(image_file, image_filename, problem):
+    """ローカルに画像を保存（S3が利用できない場合のフォールバック）"""
+    try:
+        # 保存先ディレクトリの確保
+        upload_dir = os.path.join('static', 'uploads', 'essay_images')
+        os.makedirs(upload_dir, exist_ok=True)
+        
+        # ファイル保存
+        save_path = os.path.join(upload_dir, image_filename)
+        image_file.save(save_path)
+        
+        # 相対パスを生成
+        relative_path = f"uploads/essay_images/{image_filename}"
+        problem.image_url = relative_path
+        
+        logger.info(f"画像ローカル保存成功: {save_path}")
+        return True
+        
+    except Exception as save_error:
+        logger.error(f"画像ローカル保存エラー: {save_error}")
+        return False
+    
 @app.route('/admin/essay/upload_csv', methods=['POST'])
 def admin_essay_upload_csv():
     """論述問題をCSVで一括追加（修正版）"""
@@ -9627,14 +9706,30 @@ def get_essay_problem_image_path(problem_id):
 # テンプレート関数として登録
 @app.template_global()
 def essay_image_path(problem_id):
-    """テンプレートから画像パスを取得"""
-    return get_essay_problem_image_path(problem_id)
+    """テンプレートから画像URLを取得"""
+    problem = EssayProblem.query.get(problem_id)
+    return problem.image_url if problem and problem.image_url else None
 
 @app.template_global()
 def has_essay_image(problem_id):
     """テンプレートから画像存在チェック"""
-    return has_essay_problem_image(problem_id)
+    problem = EssayProblem.query.get(problem_id)
+    return bool(problem and problem.image_url)
 
+# app.pyに一時的に追加するマイグレーション用エンドポイント
+@app.route('/admin/migrate_essay_images')
+def migrate_essay_images():
+    """既存の論述問題に画像URLカラムを追加"""
+    if not session.get('admin_logged_in'):
+        return "管理者権限が必要です"
+    
+    try:
+        # テーブルにカラムを追加（SQLite用）
+        db.engine.execute('ALTER TABLE essay_problem ADD COLUMN image_url TEXT')
+        db.session.commit()
+        return "マイグレーション完了"
+    except Exception as e:
+        return f"エラー: {e}"
 # ====================================================================
 # エラーハンドラー
 # ====================================================================
@@ -10536,3 +10631,45 @@ if __name__ == '__main__':
         logger.error(f"💥 起動失敗: {e}")
         import traceback
         traceback.print_exc()
+
+@app.route('/admin/delete_room', methods=['POST'])
+def admin_delete_room():
+    """管理者用：部屋削除機能"""
+    if not session.get('admin_logged_in'):
+        return jsonify({'status': 'error', 'message': '管理者権限が必要です'})
+    
+    try:
+        data = request.get_json()
+        room_number = data.get('room_number')
+        
+        if not room_number:
+            return jsonify({'status': 'error', 'message': '部屋番号が指定されていません'})
+        
+        # 部屋に属するユーザーの確認
+        users_in_room = User.query.filter_by(room_number=room_number).all()
+        
+        if users_in_room:
+            return jsonify({
+                'status': 'error', 
+                'message': f'部屋{room_number}にはまだ{len(users_in_room)}人のユーザーが存在します。先にユーザーを削除してください。'
+            })
+        
+        # 部屋設定を削除
+        room_setting = RoomSetting.query.filter_by(room_number=room_number).first()
+        if room_setting:
+            db.session.delete(room_setting)
+            db.session.commit()
+            return jsonify({
+                'status': 'success', 
+                'message': f'部屋{room_number}を正常に削除しました'
+            })
+        else:
+            return jsonify({
+                'status': 'error', 
+                'message': f'部屋{room_number}が見つかりません'
+            })
+            
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"部屋削除エラー: {str(e)}")
+        return jsonify({'status': 'error', 'message': f'削除中にエラーが発生しました: {str(e)}'})
