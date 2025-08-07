@@ -1410,6 +1410,39 @@ def migrate_database():
             fix_foreign_key_constraints()
                 
             print("✅ UserStats関連のマイグレーション完了")
+
+            # 6. RoomSettingテーブルの一時停止機能用カラム追加 👈 ここから追加
+            if inspector.has_table('room_setting'):
+                columns = [col['name'] for col in inspector.get_columns('room_setting')]
+                print(f"📋 既存のRoomSettingテーブルカラム: {columns}")
+                
+                # is_suspendedカラムの追加
+                if 'is_suspended' not in columns:
+                    print("🔧 is_suspendedカラムを追加します...")
+                    try:
+                        with db.engine.connect() as conn:
+                            conn.execute(text('ALTER TABLE room_setting ADD COLUMN is_suspended BOOLEAN DEFAULT FALSE NOT NULL'))
+                            conn.commit()
+                        print("✅ is_suspendedカラムを追加しました")
+                    except Exception as e:
+                        print(f"⚠️ is_suspendedカラム追加エラー: {e}")
+                else:
+                    print("✅ is_suspendedカラムは既に存在します")
+                
+                # suspended_atカラムの追加
+                if 'suspended_at' not in columns:
+                    print("🔧 suspended_atカラムを追加します...")
+                    try:
+                        with db.engine.connect() as conn:
+                            conn.execute(text('ALTER TABLE room_setting ADD COLUMN suspended_at TIMESTAMP'))
+                            conn.commit()
+                        print("✅ suspended_atカラムを追加しました")
+                    except Exception as e:
+                        print(f"⚠️ suspended_atカラム追加エラー: {e}")
+                else:
+                    print("✅ suspended_atカラムは既に存在します")
+            
+            print("✅ RoomSetting一時停止機能のマイグレーション完了")
                 
         except Exception as e:
             print(f"⚠️ マイグレーション中にエラーが発生しました: {e}")
@@ -10631,7 +10664,20 @@ def admin_comprehensive_storage_analysis():
         traceback.print_exc()
         flash(f'包括的ストレージ分析エラー: {str(e)}', 'danger')
         return redirect(url_for('admin_page'))
-    
+
+# データベース初期化とマイグレーション
+with app.app_context():
+    try:
+        # 既存テーブルの作成
+        db.create_all()
+        
+        # マイグレーションの実行
+        migrate_database()
+        
+        app.logger.info("✅ データベース初期化・マイグレーション完了")
+    except Exception as e:
+        app.logger.error(f"❌ データベース初期化エラー: {e}")
+
 # ===== メイン起動処理の修正 =====
 if __name__ == '__main__':
     try:
