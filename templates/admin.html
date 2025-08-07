@@ -3127,7 +3127,8 @@ function createVisibilityMatrix() {
     
     // CSS変数を動的に設定
     document.documentElement.style.setProperty('--type-count', availableTypes.length);
-    console.log(`📊 マトリックス生成開始: ${availableChapters.length}章 × ${availableTypes.length}タイプ`);
+    
+    console.log(`📊 強制中央配置マトリックス生成: ${availableChapters.length}章 × ${availableTypes.length}タイプ`);
     
     availableChapters.forEach(chapter => {
         const row = document.createElement('tr');
@@ -3138,62 +3139,75 @@ function createVisibilityMatrix() {
         chapterCell.textContent = `第${chapter}章`;
         row.appendChild(chapterCell);
         
-        // 各タイプのセル
+        // 各タイプのセル - 絶対配置で中央固定
         availableTypes.forEach(type => {
             const cell = document.createElement('td');
             cell.className = 'visibility-cell';
             
-            // 既存の関数を使用して設定状態を取得
+            // 設定状態を取得
             const isVisible = getVisibilitySetting(chapter, type);
-            console.log(`🔍 第${chapter}章 タイプ${type}: ${isVisible ? '公開' : '非公開'}`);
             
-            // コンテナを作成（中央配置用）
+            // 絶対配置用のコンテナ
             const container = document.createElement('div');
+            // インラインスタイルで強制配置
+            container.style.cssText = `
+                position: absolute !important;
+                top: 50% !important;
+                left: 50% !important;
+                transform: translate(-50%, -50%) !important;
+                display: flex !important;
+                flex-direction: column !important;
+                align-items: center !important;
+                justify-content: center !important;
+                width: 100% !important;
+                height: 100% !important;
+                pointer-events: none !important;
+            `;
             
-            // アイコンとテキストを作成
+            // アイコン要素
             const iconElement = document.createElement('i');
-            const textElement = document.createElement('div');
+            iconElement.style.cssText = `
+                font-size: 1.5em !important;
+                margin: 0 !important;
+                display: block !important;
+                pointer-events: none !important;
+            `;
             
+            // テキスト要素
+            const textElement = document.createElement('div');
+            textElement.style.cssText = `
+                font-size: 0.85em !important;
+                font-weight: 600 !important;
+                margin-top: 5px !important;
+                white-space: nowrap !important;
+                pointer-events: none !important;
+            `;
+            
+            // 状態に応じてスタイル設定
             if (isVisible) {
                 iconElement.className = 'fas fa-eye';
-                iconElement.style.color = '#28a745';
+                iconElement.style.color = '#28a745 !important';
                 textElement.textContent = '公開';
-                textElement.style.color = '#28a745';
+                textElement.style.color = '#28a745 !important';
                 cell.classList.add('visible');
             } else {
                 iconElement.className = 'fas fa-eye-slash';
-                iconElement.style.color = '#dc3545';
+                iconElement.style.color = '#dc3545 !important';
                 textElement.textContent = '非公開';
-                textElement.style.color = '#dc3545';
+                textElement.style.color = '#dc3545 !important';
                 cell.classList.add('hidden');
             }
             
-            // コンテナにアイコンとテキストを追加
             container.appendChild(iconElement);
             container.appendChild(textElement);
             cell.appendChild(container);
             
-            // クリックイベント
+            // クリックイベント（セル全体で受ける）
             cell.addEventListener('click', function(event) {
                 event.stopPropagation();
-                console.log(`🖱️ クリック: 第${chapter}章 タイプ${type}`);
                 toggleIndividualVisibility(chapter, type, cell);
             });
             
-            // ホバー効果
-            cell.addEventListener('mouseenter', function() {
-                this.style.transform = 'scale(1.02)';
-                this.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.2)';
-                this.style.zIndex = '1';
-            });
-            
-            cell.addEventListener('mouseleave', function() {
-                this.style.transform = 'scale(1)';
-                this.style.boxShadow = 'none';
-                this.style.zIndex = 'auto';
-            });
-            
-            // データ属性を設定
             cell.setAttribute('data-chapter', chapter);
             cell.setAttribute('data-type', type);
             cell.setAttribute('data-visible', isVisible);
@@ -3204,13 +3218,10 @@ function createVisibilityMatrix() {
         tbody.appendChild(row);
     });
     
-    // マトリックスを表示
     document.getElementById('visibilityMatrix').style.display = 'block';
-    
-    // 統計を更新
     updateSettingsSummary();
     
-    console.log(`✅ マトリックス生成完了: ${availableChapters.length}行 × ${availableTypes.length + 1}列`);
+    console.log('✅ 絶対配置マトリックス生成完了');
 }
 
 function getVisibilitySetting(chapter, type) {
@@ -3222,45 +3233,52 @@ function getVisibilitySetting(chapter, type) {
 }
 
 function updateCellAppearance(cell, isVisible) {
-    console.log(`🎨 セル更新: ${cell.getAttribute('data-chapter')}章${cell.getAttribute('data-type')}問題 → ${isVisible ? '公開' : '非公開'}`);
-    
-    // 既存のクラスとコンテンツをクリア
+    // 既存のクラスをクリア
     cell.classList.remove('visible', 'hidden');
-    cell.innerHTML = '';
     
-    // コンテナを作成（中央配置用）
-    const container = document.createElement('div');
+    // コンテナを取得（既存のものを再利用）
+    let container = cell.querySelector('div');
+    if (!container) {
+        container = document.createElement('div');
+        container.style.cssText = `
+            position: absolute !important;
+            top: 50% !important;
+            left: 50% !important;
+            transform: translate(-50%, -50%) !important;
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: center !important;
+            justify-content: center !important;
+            width: 100% !important;
+            height: 100% !important;
+            pointer-events: none !important;
+        `;
+        cell.appendChild(container);
+    }
     
-    // アイコンとテキストを再作成
-    const iconElement = document.createElement('i');
-    const textElement = document.createElement('div');
+    // アイコンとテキストを更新
+    const iconElement = container.querySelector('i') || document.createElement('i');
+    const textElement = container.querySelector('div') || document.createElement('div');
     
     if (isVisible) {
         iconElement.className = 'fas fa-eye';
-        iconElement.style.color = '#28a745';
+        iconElement.style.color = '#28a745 !important';
         textElement.textContent = '公開';
-        textElement.style.color = '#28a745';
+        textElement.style.color = '#28a745 !important';
         cell.classList.add('visible');
     } else {
         iconElement.className = 'fas fa-eye-slash';
-        iconElement.style.color = '#dc3545';
+        iconElement.style.color = '#dc3545 !important';
         textElement.textContent = '非公開';
-        textElement.style.color = '#dc3545';
+        textElement.style.color = '#dc3545 !important';
         cell.classList.add('hidden');
     }
     
-    container.appendChild(iconElement);
-    container.appendChild(textElement);
-    cell.appendChild(container);
+    // 要素が存在しない場合は追加
+    if (!container.contains(iconElement)) container.appendChild(iconElement);
+    if (!container.contains(textElement)) container.appendChild(textElement);
     
-    // データ属性を更新
     cell.setAttribute('data-visible', isVisible);
-    
-    // アニメーション効果
-    cell.style.animation = 'settingChanged 0.5s ease';
-    setTimeout(() => {
-        cell.style.animation = '';
-    }, 500);
 }
 
 function toggleIndividualVisibility(chapter, type, cell) {
@@ -3280,59 +3298,6 @@ function toggleIndividualVisibility(chapter, type, cell) {
     updateCellAppearance(cell, newStatus);
     
     console.log(`章${chapter} タイプ${type}: ${currentStatus ? '公開' : '非公開'} → ${newStatus ? '公開' : '非公開'}`);
-}
-
-
-function updateCellAppearance(cell, isVisible) {
-    // 既存のクラスとコンテンツをクリア
-    cell.classList.remove('visible', 'hidden');
-    cell.innerHTML = '';
-    
-    // アイコンとテキストを再作成
-    const iconElement = document.createElement('i');
-    const textElement = document.createElement('div');
-    
-    if (isVisible) {
-        iconElement.className = 'fas fa-eye';
-        iconElement.style.color = '#28a745';
-        textElement.textContent = '公開';
-        textElement.style.color = '#28a745';
-        cell.classList.add('visible');
-    } else {
-        iconElement.className = 'fas fa-eye-slash';
-        iconElement.style.color = '#dc3545';
-        textElement.textContent = '非公開';
-        textElement.style.color = '#dc3545';
-        cell.classList.add('hidden');
-    }
-    
-    cell.appendChild(iconElement);
-    cell.appendChild(textElement);
-    
-    // データ属性を更新
-    cell.setAttribute('data-visible', isVisible);
-}
-
-function setAllVisible(isVisible) {
-    availableChapters.forEach(chapter => {
-        availableTypes.forEach(type => {
-            if (!currentVisibilitySettings[chapter]) {
-                currentVisibilitySettings[chapter] = {};
-            }
-            currentVisibilitySettings[chapter][type] = isVisible;
-            
-            // セルを更新
-            const cell = document.querySelector(`[data-chapter="${chapter}"][data-type="${type}"]`);
-            if (cell) {
-                updateCellAppearance(cell, isVisible);
-                cell.classList.add('changed');
-                setTimeout(() => cell.classList.remove('changed'), 500);
-            }
-        });
-    });
-    
-    updateSettingsSummary();
-    showVisibilityStatus('success', `全ての問題を${isVisible ? '公開' : '非公開'}に設定しました`);
 }
 
 function setTypeVisible(targetType, isVisible) {
@@ -3894,6 +3859,7 @@ function checkAndShowImage(problemId) {
 .scrollable-table-container {
     max-height: 400px;
     overflow-y: auto;
+    overflow-x: auto; /* 横スクロール追加 */
     border: 1px solid #dee2e6;
     border-radius: 0.375rem;
     margin-bottom: 1rem;
@@ -3924,18 +3890,31 @@ function checkAndShowImage(problemId) {
     display: block;
 }
 
+.table-responsive {
+    overflow-x: auto !important;
+}
+
 /* ========================================
    5. ソートアイコンとインタラクティブ要素
    ======================================== */
 .sort-icon {
     margin-left: 5px;
     opacity: 0.7;
-    transition: opacity 0.2s;
+    transition: opacity 0.2s, color 0.2s;
     cursor: pointer;
 }
 
 .sort-icon:hover {
     opacity: 1;
+    color: #ffc107;
+}
+
+.fa-sort-up {
+    color: #28a745;
+}
+
+.fa-sort-down {
+    color: #dc3545;
 }
 
 .badge {
@@ -3943,7 +3922,7 @@ function checkAndShowImage(problemId) {
 }
 
 #userTableBody tr:hover {
-    background-color: #f8f9fa;
+    background-color: #f8f9fa !important;
 }
 
 .delete-user-btn {
@@ -3991,6 +3970,12 @@ function checkAndShowImage(problemId) {
 @keyframes fadeIn {
     from { opacity: 0; }
     to { opacity: 1; }
+}
+
+@keyframes settingChanged {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3); }
+    100% { transform: scale(1); }
 }
 
 #invalidHistoryAnalysisResult,
@@ -4042,16 +4027,19 @@ function checkAndShowImage(problemId) {
     
     .scrollable-table-container {
         max-height: 300px;
+        overflow-x: auto;
     }
     
     .table {
         font-size: 0.8rem;
+        min-width: 600px; /* 最小幅を保証 */
     }
     
     .table th,
     .table td {
         padding: 0.3rem;
         white-space: nowrap;
+        min-width: 80px; /* 各セルの最小幅 */
     }
     
     .table-controls .row {
@@ -4149,7 +4137,9 @@ function checkAndShowImage(problemId) {
     color: #0c5460;
 }
 
-/* 単元選択用のスタイル */
+/* ========================================
+   11. 単元選択用のスタイル
+   ======================================== */
 .unit-setting-container {
     max-width: 400px;
 }
@@ -4184,70 +4174,33 @@ function checkAndShowImage(problemId) {
     font-weight: 500;
 }
 
-@media (max-width: 768px) {
-    .units-grid {
-        grid-template-columns: repeat(auto-fill, minmax(50px, 1fr));
-        gap: 6px;
-    }
-    
-    .unit-setting-container {
-        max-width: 100%;
-    }
-}
-
-/* 横スクロール対応の追加 */
-.scrollable-table-container {
-    max-height: 400px;
-    overflow-y: auto;
-    overflow-x: auto; /* 横スクロール追加 */
-    border: 1px solid #dee2e6;
-    border-radius: 0.375rem;
-    margin-bottom: 1rem;
-}
-
-.table-responsive {
-    overflow-x: auto !important;
-}
-
-/* スマホ対応の追加 */
-@media (max-width: 768px) {
-    .scrollable-table-container {
-        max-height: 300px;
-        overflow-x: auto;
-    }
-    
-    .table {
-        font-size: 0.75rem;
-        min-width: 600px; /* 最小幅を保証 */
-    }
-    
-    .table th,
-    .table td {
-        padding: 0.3rem;
-        white-space: nowrap;
-        min-width: 80px; /* 各セルの最小幅 */
-    }
-}
-
-/* 論述問題管理用の追加スタイル */
+/* ========================================
+   12. 論述問題管理用のスタイル
+   ======================================== */
 .stat-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 20px;
+    border-radius: 10px;
     text-align: center;
-    padding: 15px;
-    background: white;
-    border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-bottom: 15px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    transition: transform 0.3s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-5px);
 }
 
 .stat-number {
-    font-size: 2rem;
+    font-size: 2.5rem;
     font-weight: bold;
-    color: #3498db;
+    margin-bottom: 5px;
 }
 
 .stat-label {
     font-size: 0.9rem;
-    color: #666;
-    margin-top: 5px;
+    opacity: 0.9;
 }
 
 .essay-management-controls .form-control {
@@ -4258,91 +4211,6 @@ function checkAndShowImage(problemId) {
     font-weight: 600;
     margin-bottom: 5px;
     display: block;
-}
-
-.template-format {
-    background: white;
-    padding: 10px;
-    border-radius: 4px;
-    font-family: monospace;
-    font-size: 0.8em;
-    margin-bottom: 15px;
-    border: 1px solid #ddd;
-}
-
-#essay-problems-container .table {
-    margin-bottom: 0;
-}
-
-#essay-problems-container .btn-group-vertical .btn {
-    margin-bottom: 2px;
-    font-size: 0.7rem;
-    padding: 2px 6px;
-}
-
-@media (max-width: 768px) {
-    .stat-card {
-        margin-bottom: 15px;
-    }
-    
-    .stat-number {
-        font-size: 1.5rem;
-    }
-    
-    .essay-management-controls .col-md-4 {
-        margin-bottom: 15px;
-    }
-}
-
-/* 統計セクション */
-.essay-stats-section {
-    background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
-    border-radius: 12px;
-    padding: 20px;
-    margin-bottom: 25px;
-    border: 1px solid #90caf9;
-}
-
-.essay-stats-section h4 {
-    color: #1565c0;
-    margin-bottom: 15px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-/* CSVインポートセクション */
-.csv-import-section {
-    background: linear-gradient(135deg, #e8f5e8 0%, #c8e6c9 100%);
-    border-radius: 12px;
-    padding: 20px;
-    margin-bottom: 25px;
-    border: 1px solid #81c784;
-}
-
-.csv-import-section h4 {
-    color: #2e7d32;
-    margin-bottom: 15px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-/* CSVテンプレートセクション */
-.csv-template-section {
-    background: white;
-    border: 1px solid #e0e0e0;
-    border-radius: 8px;
-    padding: 20px;
-    margin-bottom: 20px;
-}
-
-.csv-template-section h5 {
-    color: #37474f;
-    margin-bottom: 10px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
 }
 
 .template-format {
@@ -4364,7 +4232,89 @@ function checkAndShowImage(problemId) {
     font-weight: bold;
 }
 
-/* CSVアップロードフォーム */
+#essay-problems-container .table {
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    margin-bottom: 0;
+}
+
+#essay-problems-container .table th {
+    background: #ef6c00;
+    color: white;
+    border: none;
+    padding: 12px 8px;
+    font-weight: 600;
+}
+
+#essay-problems-container .table td {
+    padding: 10px 8px;
+    border-color: #f0f0f0;
+    vertical-align: middle;
+}
+
+#essay-problems-container .table tr:hover {
+    background-color: #fff3e0;
+}
+
+#essay-problems-container .btn-group-vertical .btn {
+    margin-bottom: 2px;
+    font-size: 0.7rem;
+    padding: 2px 6px;
+}
+
+/* ========================================
+   13. 論述問題セクションのスタイル
+   ======================================== */
+.essay-stats-section {
+    background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 25px;
+    border: 1px solid #90caf9;
+}
+
+.essay-stats-section h4 {
+    color: #1565c0;
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.csv-import-section {
+    background: linear-gradient(135deg, #e8f5e8 0%, #c8e6c9 100%);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 25px;
+    border: 1px solid #81c784;
+}
+
+.csv-import-section h4 {
+    color: #2e7d32;
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.csv-template-section {
+    background: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.csv-template-section h5 {
+    color: #37474f;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
 .csv-upload-form {
     background: white;
     border-radius: 10px;
@@ -4454,7 +4404,6 @@ function checkAndShowImage(problemId) {
     box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4);
 }
 
-/* 個別論述問題登録セクション */
 .essay-form-section {
     background: linear-gradient(135deg, #f3e5f5 0%, #e1bee7 100%);
     border: 1px solid #ce93d8;
@@ -4473,7 +4422,6 @@ function checkAndShowImage(problemId) {
     font-weight: 600;
 }
 
-/* フォームコンテナ */
 .essay-form-container {
     background: white;
     border-radius: 10px;
@@ -4482,7 +4430,6 @@ function checkAndShowImage(problemId) {
     border: 1px solid #e9ecef;
 }
 
-/* フォームグリッドレイアウト */
 .essay-form-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -4494,7 +4441,6 @@ function checkAndShowImage(problemId) {
     grid-column: 1 / -1;
 }
 
-/* 入力グループのスタイル */
 .essay-input-group {
     display: flex;
     flex-direction: column;
@@ -4543,7 +4489,6 @@ function checkAndShowImage(problemId) {
     line-height: 1.6;
 }
 
-/* チェックボックス */
 .essay-checkbox-group {
     display: flex;
     align-items: center;
@@ -4573,7 +4518,6 @@ function checkAndShowImage(problemId) {
     gap: 6px;
 }
 
-/* 送信ボタン */
 .essay-submit-btn {
     background: linear-gradient(135deg, #7b1fa2 0%, #9c27b0 100%);
     color: white;
@@ -4605,7 +4549,6 @@ function checkAndShowImage(problemId) {
     box-shadow: none;
 }
 
-/* ヘルプテキスト */
 .essay-help-text {
     font-size: 0.8rem;
     color: #6c757d;
@@ -4613,7 +4556,6 @@ function checkAndShowImage(problemId) {
     font-style: italic;
 }
 
-/* 論述問題管理セクション */
 .essay-management-section {
     background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
     border: 1px solid #ffb74d;
@@ -4632,7 +4574,6 @@ function checkAndShowImage(problemId) {
     font-weight: 600;
 }
 
-/* フィルターセクション */
 .essay-filter-section {
     background: white;
     border: 1px solid #e0e0e0;
@@ -4660,262 +4601,30 @@ function checkAndShowImage(problemId) {
     box-shadow: 0 0 0 2px rgba(239, 108, 0, 0.1);
 }
 
-/* 統計カード */
-.stat-card {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    padding: 20px;
-    border-radius: 10px;
-    text-align: center;
-    margin-bottom: 15px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-    transition: transform 0.3s ease;
-}
-
-.stat-card:hover {
-    transform: translateY(-5px);
-}
-
-.stat-number {
-    font-size: 2.5rem;
-    font-weight: bold;
-    margin-bottom: 5px;
-}
-
-.stat-label {
-    font-size: 0.9rem;
-    opacity: 0.9;
-}
-
-/* 問題一覧テーブル */
-#essay-problems-container .table {
-    background: white;
+.essay-stats-summary {
+    background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
+    border: 1px solid #ffb74d;
     border-radius: 8px;
-    overflow: hidden;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    padding: 15px;
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
 }
 
-#essay-problems-container .table th {
-    background: #ef6c00;
-    color: white;
-    border: none;
-    padding: 12px 8px;
-    font-weight: 600;
+.stat-item {
+    text-align: center;
 }
 
-#essay-problems-container .table td {
-    padding: 10px 8px;
-    border-color: #f0f0f0;
-    vertical-align: middle;
+.stat-value {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #f57c00;
 }
 
-#essay-problems-container .table tr:hover {
-    background-color: #fff3e0;
-}
-
-/* バッジスタイル */
-.badge {
-    padding: 4px 8px;
-    border-radius: 12px;
-    font-size: 0.75rem;
-    font-weight: 500;
-}
-
-.bg-success {
-    background-color: #28a745 !important;
-}
-
-.bg-secondary {
-    background-color: #6c757d !important;
-}
-
-.bg-primary {
-    background-color: #007bff !important;
-}
-
-/* ボタンスタイル */
-.btn-sm {
-    padding: 4px 8px;
-    font-size: 0.75rem;
-    border-radius: 4px;
-    margin: 0 2px;
-}
-
-.btn-outline-primary {
-    border-color: #007bff;
-    color: #007bff;
-}
-
-.btn-outline-primary:hover {
-    background-color: #007bff;
-    color: white;
-}
-
-.btn-outline-danger {
-    border-color: #dc3545;
-    color: #dc3545;
-}
-
-.btn-outline-danger:hover {
-    background-color: #dc3545;
-    color: white;
-}
-
-/* レスポンシブ対応 */
-@media (max-width: 768px) {
-    .essay-form-grid {
-        grid-template-columns: 1fr;
-        gap: 15px;
-    }
-    
-    .essay-form-container,
-    .csv-upload-form,
-    .csv-template-section,
-    .essay-filter-section {
-        padding: 15px;
-    }
-    
-    .essay-form-section,
-    .csv-import-section,
-    .essay-management-section,
-    .essay-stats-section {
-        padding: 15px;
-        margin: 15px 0;
-    }
-    
-    .stat-number {
-        font-size: 2rem;
-    }
-    
-    .stat-card {
-        padding: 15px;
-    }
-    
-    .template-format {
-        font-size: 0.75rem;
-        padding: 10px;
-    }
-    
-    .upload-area {
-        padding: 20px;
-    }
-    
-    .file-input-label {
-        padding: 15px;
-    }
-}
-
-@media (max-width: 480px) {
-    .essay-form-section,
-    .csv-import-section,
-    .essay-management-section,
-    .essay-stats-section {
-        padding: 10px;
-        margin: 10px 0;
-    }
-    
-    .essay-form-container,
-    .csv-upload-form {
-        padding: 12px;
-    }
-    
-    .essay-input-group input,
-    .essay-input-group select,
-    .essay-input-group textarea {
-        padding: 8px 10px;
-        font-size: 0.9rem;
-    }
-    
-    .essay-submit-btn,
-    .btn-upload {
-        padding: 10px 20px;
-        font-size: 0.95rem;
-    }
-    
-    .upload-area {
-        padding: 15px;
-    }
-    
-    .file-input-label i {
-        font-size: 1.2rem;
-    }
-    
-    /* テーブルを横スクロール可能に */
-    .table-responsive {
-        font-size: 0.8rem;
-    }
-    
-    .table th,
-    .table td {
-        padding: 6px 4px;
-        white-space: nowrap;
-    }
-}
-
-/* ダークモード対応 */
-@media (prefers-color-scheme: dark) {
-    .essay-stats-section {
-        background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
-        border-color: #3b82f6;
-    }
-    
-    .csv-import-section {
-        background: linear-gradient(135deg, #166534 0%, #15803d 100%);
-        border-color: #22c55e;
-    }
-    
-    .essay-form-section {
-        background: linear-gradient(135deg, #581c87 0%, #7c2d12 100%);
-        border-color: #a855f7;
-    }
-    
-    .essay-management-section {
-        background: linear-gradient(135deg, #9a3412 0%, #c2410c 100%);
-        border-color: #f97316;
-    }
-    
-    .essay-form-container,
-    .csv-upload-form,
-    .csv-template-section,
-    .essay-filter-section {
-        background: #374151;
-        border-color: #6b7280;
-        color: #f9fafb;
-    }
-    
-    .essay-input-group input,
-    .essay-input-group select,
-    .essay-input-group textarea {
-        background: #4b5563;
-        border-color: #6b7280;
-        color: #f9fafb;
-    }
-    
-    .essay-input-group input:focus,
-    .essay-input-group select:focus,
-    .essay-input-group textarea:focus {
-        border-color: #8b5cf6;
-        background: #4b5563;
-    }
-    
-    .essay-checkbox-group {
-        background: #4b5563;
-        border-color: #6b7280;
-    }
-    
-    .upload-area {
-        background: #374151;
-        border-color: #6b7280;
-    }
-    
-    .template-format {
-        background: #4b5563;
-        border-color: #6b7280;
-        color: #f9fafb;
-    }
-}
-
-/* 論述問題一覧のスタイル改善 - admin.htmlの<style>タグ内の最後に追加 */
+/* ========================================
+   14. 論述問題一覧のスタイル改善
+   ======================================== */
 .essay-problem-item {
     background: white;
     border: 1px solid #dee2e6;
@@ -4954,13 +4663,11 @@ function checkAndShowImage(problemId) {
     font-weight: 500;
 }
 
-/* 章番号のバッジ */
 .badge-chapter {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
 }
 
-/* タイプ別の配色 */
 .badge-type-A {
     background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
     color: white;
@@ -4981,7 +4688,6 @@ function checkAndShowImage(problemId) {
     color: #333;
 }
 
-/* 大学名と年度 */
 .university-info {
     display: inline-flex;
     align-items: center;
@@ -4995,7 +4701,6 @@ function checkAndShowImage(problemId) {
     color: #ff6b6b;
 }
 
-/* 問題文表示エリア */
 .problem-content {
     background: #f8f9fa;
     border-radius: 6px;
@@ -5015,7 +4720,6 @@ function checkAndShowImage(problemId) {
     font-weight: 600;
 }
 
-/* 問題の詳細情報 */
 .problem-meta {
     display: flex;
     gap: 20px;
@@ -5034,7 +4738,6 @@ function checkAndShowImage(problemId) {
     color: #95a5a6;
 }
 
-/* アクションボタン */
 .problem-actions {
     display: flex;
     gap: 5px;
@@ -5070,34 +4773,9 @@ function checkAndShowImage(problemId) {
     color: white;
 }
 
-/* 統計情報の表示 */
-.essay-stats-summary {
-    background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
-    border: 1px solid #ffb74d;
-    border-radius: 8px;
-    padding: 15px;
-    margin-bottom: 20px;
-    display: flex;
-    justify-content: space-around;
-    align-items: center;
-}
-
-.stat-item {
-    text-align: center;
-}
-
-.stat-value {
-    font-size: 1.5rem;
-    font-weight: bold;
-    color: #f57c00;
-}
-
-.stat-label {
-    font-size: 0.85rem;
-    color: #6c757d;
-}
-
-/* 論述問題公開設定用CSS */
+/* ========================================
+   15. 論述問題公開設定マトリックス（★重要な修正）
+   ======================================== */
 .visibility-matrix {
     background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
     border-radius: 10px;
@@ -5110,85 +4788,131 @@ function checkAndShowImage(problemId) {
     font-weight: 600;
 }
 
+/* ★重要：テーブル全体のレイアウト強制修正 */
 .visibility-table {
+    table-layout: fixed !important;
+    width: 100% !important;
+    border-collapse: separate !important;
+    border-spacing: 2px !important;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     border-radius: 8px;
     overflow: hidden;
-    width: 100%;
-    table-layout: fixed; /* ★重要：テーブルレイアウト固定 */
 }
 
 .visibility-table th {
     background: linear-gradient(135deg, #343a40 0%, #495057 100%);
     color: white;
     font-weight: 600;
-    text-align: center;
-    vertical-align: middle;
-    padding: 12px 8px;
+    text-align: center !important;
+    vertical-align: middle !important;
+    padding: 12px 8px !important;
 }
 
-.visibility-table th:first-child {
-    width: 120px; /* 章名セルの幅固定 */
+/* ★重要：章名列の固定幅 */
+.visibility-table th:first-child,
+.visibility-table td:first-child {
+    width: 100px !important;
+    min-width: 100px !important;
+    max-width: 100px !important;
 }
 
-.visibility-table th:not(:first-child) {
-    width: calc((100% - 120px) / var(--type-count, 4));
+/* ★重要：タイプ列の均等幅 */
+.visibility-table th:not(:first-child),
+.visibility-table td:not(:first-child) {
+    width: calc((100% - 100px) / var(--type-count, 4)) !important;
+    min-width: calc((100% - 100px) / var(--type-count, 4)) !important;
+    max-width: calc((100% - 100px) / var(--type-count, 4)) !important;
 }
 
+/* ★重要：章名セルの強制中央配置 */
+.chapter-name-cell {
+    text-align: center !important;
+    vertical-align: middle !important;
+    font-weight: bold !important;
+    background-color: #f8f9fa !important;
+    border: 2px solid #dee2e6 !important;
+    padding: 15px 5px !important;
+    white-space: nowrap !important;
+}
+
+/* ★重要：公開設定セルの完全中央配置 */
 .visibility-cell {
-    position: relative;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    text-align: center;
-    vertical-align: middle;
-    padding: 15px 8px;
-    min-height: 60px;
-    width: auto; /* ★重要：幅を自動調整 */
-    display: table-cell; /* ★重要：テーブルセル表示 */
-    border: 2px solid transparent;
+    text-align: center !important;
+    vertical-align: middle !important;
+    padding: 0 !important;
+    border: 2px solid transparent !important;
+    position: relative !important;
+    height: 70px !important;
+    cursor: pointer !important;
+    transition: all 0.3s ease !important;
 }
 
-.visibility-cell:hover {
-    transform: scale(1.02);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-    z-index: 1;
+/* ★重要：セル内コンテンツの絶対中央配置 */
+.visibility-cell > div {
+    position: absolute !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 100% !important;
+    height: 100% !important;
+    box-sizing: border-box !important;
+    pointer-events: none !important;
 }
 
+/* ★重要：アイコンスタイル */
+.visibility-cell i {
+    font-size: 1.5em !important;
+    margin: 0 !important;
+    display: block !important;
+    line-height: 1 !important;
+    pointer-events: none !important;
+}
+
+/* ★重要：テキストスタイル */
+.visibility-cell > div > div {
+    font-size: 0.85em !important;
+    font-weight: 600 !important;
+    margin-top: 5px !important;
+    white-space: nowrap !important;
+    line-height: 1 !important;
+    pointer-events: none !important;
+}
+
+/* ★重要：公開状態 */
 .visibility-cell.visible {
-    background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
-    border-color: #28a745;
-    color: #155724;
+    background-color: #d4edda !important;
+    border-color: #28a745 !important;
 }
 
+.visibility-cell.visible i,
+.visibility-cell.visible > div > div {
+    color: #28a745 !important;
+}
+
+/* ★重要：非公開状態 */
 .visibility-cell.hidden {
-    background: linear-gradient(135deg, #f8d7da 0%, #f1b0b7 100%);
-    border-color: #dc3545;
-    color: #721c24;
+    background-color: #f8d7da !important;
+    border-color: #dc3545 !important;
 }
 
-.visibility-cell .status-icon {
-    font-size: 1.5em;
-    display: block;
-    margin-bottom: 5px;
-    line-height: 1; /* ★重要：行高さ固定 */
+.visibility-cell.hidden i,
+.visibility-cell.hidden > div > div {
+    color: #dc3545 !important;
 }
 
-.visibility-cell .status-text {
-    font-weight: 600;
-    font-size: 0.9em;
-    line-height: 1; /* ★重要：行高さ固定 */
-    white-space: nowrap; /* ★重要：テキスト改行防止 */
+/* ★重要：ホバー効果 */
+.visibility-cell:hover {
+    transform: scale(1.02) !important;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2) !important;
+    z-index: 10 !important;
 }
 
-.chapter-name {
-    font-weight: 600;
-    color: #495057;
-    background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%);
-    text-align: center;
-    vertical-align: middle;
-    padding: 15px 8px;
-    width: 120px; /* ★重要：幅固定 */
-    white-space: nowrap; /* ★重要：テキスト改行防止 */
+.visibility-cell.changed {
+    animation: settingChanged 0.5s ease;
 }
 
 .bulk-operations {
@@ -5213,138 +4937,9 @@ function checkAndShowImage(problemId) {
     margin-bottom: 20px;
 }
 
-/* アニメーション効果 */
-@keyframes settingChanged {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.1); box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3); }
-    100% { transform: scale(1); }
-}
-
-.visibility-cell.changed {
-    animation: settingChanged 0.5s ease;
-}
-
-/* レスポンシブ対応 */
-@media (max-width: 768px) {
-    .visibility-table {
-        font-size: 0.8em;
-        min-width: 600px;
-    }
-    
-    .visibility-cell {
-        padding: 10px 4px;
-        min-height: 50px;
-    }
-    
-    .visibility-cell .status-icon {
-        font-size: 1.2em;
-    }
-    
-    .visibility-cell .status-text {
-        font-size: 0.8em;
-    }
-    
-    .chapter-name {
-        padding: 10px 4px;
-        font-size: 0.9em;
-    }
-    
-    .bulk-operations .btn-group {
-        display: flex;
-        flex-direction: column;
-        width: 100%;
-    }
-    
-    .bulk-operations .btn-group .btn {
-        margin-bottom: 5px;
-    }
-
-    .visibility-table-container {
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-    }
-}
-
-/* ダークモード対応の維持 */
-@media (prefers-color-scheme: dark) {
-    .visibility-matrix {
-        background: linear-gradient(135deg, #4a5568 0%, #2d3748 100%);
-    }
-    
-    .visibility-cell.visible {
-        background: linear-gradient(135deg, #2d5a34 0%, #1e3a20 100%);
-        color: #c6f6d5;
-    }
-    
-    .visibility-cell.hidden {
-        background: linear-gradient(135deg, #742a2a 0%, #4a1818 100%);
-        color: #fed7d7;
-    }
-}
-
-/* デバッグ用（開発時のみ使用） */
-.debug-info {
-    position: fixed;
-    bottom: 10px;
-    right: 10px;
-    background: rgba(0, 0, 0, 0.8);
-    color: white;
-    padding: 10px;
-    border-radius: 5px;
-    font-size: 12px;
-    max-width: 300px;
-    z-index: 9999;
-    display: none; /* 本番では非表示 */
-}
-
-/* ソート可能なヘッダーのスタイル */
-th[style*="cursor: pointer"] {
-    user-select: none;
-    background-color: #495057 !important;
-}
-
-th[style*="cursor: pointer"]:hover {
-    background-color: #6c757d !important;
-}
-
-.sort-icon {
-    margin-left: 5px;
-    opacity: 0.7;
-    transition: opacity 0.2s, color 0.2s;
-}
-
-.sort-icon:hover {
-    opacity: 1;
-    color: #ffc107;
-}
-
-/* ソート状態のアイコン */
-.fa-sort-up {
-    color: #28a745;
-}
-
-.fa-sort-down {
-    color: #dc3545;
-}
-
-/* テーブル行のホバー効果 */
-#userTableBody tr:hover {
-    background-color: #f8f9fa !important;
-}
-
-/* レスポンシブ対応 */
-@media (max-width: 768px) {
-    .table-controls .col-md-6 {
-        margin-bottom: 10px;
-    }
-    
-    .scrollable-table-container {
-        max-height: 400px;
-        overflow-y: auto;
-    }
-}
-
-/* 論述問題編集モーダル内の画像管理スタイル */
+/* ========================================
+   16. 論述問題編集モーダル内の画像管理スタイル
+   ======================================== */
 .image-management-section {
     border: 1px solid #e0e0e0;
     border-radius: 8px;
@@ -5381,8 +4976,124 @@ th[style*="cursor: pointer"]:hover {
     margin-bottom: 10px;
 }
 
-/* レスポンシブ対応 */
+/* ========================================
+   17. バッジとボタンのスタイル
+   ======================================== */
+.badge {
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.bg-success {
+    background-color: #28a745 !important;
+}
+
+.bg-secondary {
+    background-color: #6c757d !important;
+}
+
+.bg-primary {
+    background-color: #007bff !important;
+}
+
+.btn-sm {
+    padding: 4px 8px;
+    font-size: 0.75rem;
+    border-radius: 4px;
+    margin: 0 2px;
+}
+
+.btn-outline-primary {
+    border-color: #007bff;
+    color: #007bff;
+}
+
+.btn-outline-primary:hover {
+    background-color: #007bff;
+    color: white;
+}
+
+.btn-outline-danger {
+    border-color: #dc3545;
+    color: #dc3545;
+}
+
+.btn-outline-danger:hover {
+    background-color: #dc3545;
+    color: white;
+}
+
+/* ソート可能なヘッダーのスタイル */
+th[style*="cursor: pointer"] {
+    user-select: none;
+    background-color: #495057 !important;
+}
+
+th[style*="cursor: pointer"]:hover {
+    background-color: #6c757d !important;
+}
+
+/* ========================================
+   18. レスポンシブ対応（論述問題・公開設定）
+   ======================================== */
 @media (max-width: 768px) {
+    .unit-setting-container {
+        max-width: 100%;
+    }
+    
+    .units-grid {
+        grid-template-columns: repeat(auto-fill, minmax(50px, 1fr));
+        gap: 6px;
+    }
+    
+    .stat-card {
+        margin-bottom: 15px;
+        padding: 15px;
+    }
+    
+    .stat-number {
+        font-size: 2rem;
+    }
+    
+    .essay-management-controls .col-md-4 {
+        margin-bottom: 15px;
+    }
+    
+    .essay-form-grid {
+        grid-template-columns: 1fr;
+        gap: 15px;
+    }
+    
+    .essay-form-container,
+    .csv-upload-form,
+    .csv-template-section,
+    .essay-filter-section {
+        padding: 15px;
+    }
+    
+    .essay-form-section,
+    .csv-import-section,
+    .essay-management-section,
+    .essay-stats-section {
+        padding: 15px;
+        margin: 15px 0;
+    }
+    
+    .template-format {
+        font-size: 0.75rem;
+        padding: 10px;
+    }
+    
+    .upload-area {
+        padding: 20px;
+    }
+    
+    .file-input-label {
+        padding: 15px;
+    }
+    
     .image-preview img {
         max-height: 200px;
     }
@@ -5398,88 +5109,108 @@ th[style*="cursor: pointer"]:hover {
     .image-management-section {
         padding: 10px;
     }
-}
-
-/* 公開設定マトリックステーブルのレイアウト修正 */
-.visibility-table {
-    table-layout: fixed; /* 固定レイアウトで列幅を均等に */
-    width: 100%;
-}
-
-.visibility-table th:not(:first-child),
-.visibility-table td:not(:first-child) {
-    width: calc((100% - 120px) / var(--type-count, 4));
-    text-align: center; /* 中央揃え */
-}
-
-.chapter-name-cell {
-    width: 120px; /* 章名列の固定幅 */
-    text-align: center;
-    font-weight: bold;
-    background-color: #f8f9fa;
-    white-space: nowrap; /* 改行を防止 */
-}
-
-/* 視認性改善のためのセルスタイル */
-.visibility-cell {
-    text-align: center !important;
-    vertical-align: middle !important;
-    padding: 15px 8px !important;
-    min-height: 60px;
-    border: 2px solid transparent;
-    transition: all 0.3s ease;
-    position: relative; /* 位置指定を追加 */
-}
-
-/* セル内のコンテンツを中央配置 */
-.visibility-cell > div {
-    display: flex !important;
-    flex-direction: column !important;
-    align-items: center !important;
-    justify-content: center !important;
-    height: 100% !important;
-    width: 100% !important;
-}
-
-/* アイコンとテキストのスタイル */
-.visibility-cell i {
-    font-size: 1.5em !important;
-    margin-bottom: 5px !important;
-}
-
-.visibility-cell div div {
-    font-size: 0.9em !important;
-    font-weight: 600 !important;
-    margin-top: 0 !important;
-}
-
-/* 公開状態のスタイル */
-.visibility-cell.visible {
-    background-color: #d4edda !important;
-    border-color: #28a745 !important;
-}
-
-/* 非公開状態のスタイル */
-.visibility-cell.hidden {
-    background-color: #f8d7da !important;
-    border-color: #dc3545 !important;
-}
-
-/* レスポンシブ対応 */
-@media (max-width: 768px) {
+    
+    /* ★重要：公開設定マトリックスのレスポンシブ */
+    .visibility-table {
+        font-size: 0.8em;
+        min-width: 600px;
+    }
+    
     .visibility-cell {
-        min-height: 50px;
         padding: 10px 4px !important;
+        min-height: 50px !important;
     }
     
     .visibility-cell i {
         font-size: 1.2em !important;
     }
     
-    .visibility-cell div div {
+    .visibility-cell > div > div {
         font-size: 0.8em !important;
+    }
+    
+    .chapter-name-cell {
+        padding: 10px 4px !important;
+        font-size: 0.9em;
+    }
+    
+    .bulk-operations .btn-group {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+    }
+    
+    .bulk-operations .btn-group .btn {
+        margin-bottom: 5px;
+    }
+
+    .visibility-table-container {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
     }
 }
 
+@media (max-width: 480px) {
+    .essay-form-section,
+    .csv-import-section,
+    .essay-management-section,
+    .essay-stats-section {
+        padding: 10px;
+        margin: 10px 0;
+    }
+    
+    .essay-form-container,
+    .csv-upload-form {
+        padding: 12px;
+    }
+    
+    .essay-input-group input,
+    .essay-input-group select,
+    .essay-input-group textarea {
+        padding: 8px 10px;
+        font-size: 0.9rem;
+    }
+    
+    .essay-submit-btn,
+    .btn-upload {
+        padding: 10px 20px;
+        font-size: 0.95rem;
+    }
+    
+    .upload-area {
+        padding: 15px;
+    }
+    
+    .file-input-label i {
+        font-size: 1.2rem;
+    }
+    
+    .table-responsive {
+        font-size: 0.8rem;
+    }
+    
+    .table th,
+    .table td {
+        padding: 6px 4px;
+        white-space: nowrap;
+    }
+}
+    
+/* ========================================
+   19. デバッグ用スタイル（開発時のみ）
+   ======================================== */
+.debug-info {
+    position: fixed;
+    bottom: 10px;
+    right: 10px;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 10px;
+    border-radius: 5px;
+    font-size: 12px;
+    max-width: 300px;
+    z-index: 9999;
+    display: none; /* 本番では非表示 */
+}
 </style>
 {% endblock %}
