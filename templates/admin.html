@@ -5357,20 +5357,21 @@ th[style*="cursor: pointer"]:hover {
 }
 
 /* ========================================
-   20. 文字数カウンター用スタイル（完全版）
+   20. 文字数カウンター用スタイル（修正版）
    ======================================== */
 
-/* テキストエリア用のラッパー */
+/* テキストエリア用のラッパー（横幅フル活用） */
 .textarea-wrapper {
     position: relative;
     display: block;
+    width: 100% !important; /* ★重要：横幅を100%に設定 */
 }
 
-/* 文字数カウンター（位置微調整） */
+/* 文字数カウンター（右下角に固定配置） */
 .char-counter {
     position: absolute;
-    bottom: 10px;
-    right: 12px;
+    bottom: 8px !important; /* ★重要：下端から8px */
+    right: 8px !important; /* ★重要：右端から8px */
     background: rgba(255, 255, 255, 0.95);
     color: #6c757d;
     font-size: 0.8rem;
@@ -5384,6 +5385,12 @@ th[style*="cursor: pointer"]:hover {
     font-family: monospace;
     white-space: nowrap;
     transition: all 0.3s ease;
+}
+
+/* テキストエリア自体も横幅フル活用 */
+.textarea-wrapper textarea {
+    width: 100% !important; /* ★重要：横幅を100%に設定 */
+    box-sizing: border-box !important;
 }
 
 /* テキストエリアにフォーカス時のカウンター強調 */
@@ -5413,6 +5420,8 @@ th[style*="cursor: pointer"]:hover {
     padding-bottom: 35px !important;
     resize: vertical;
     min-height: 150px !important;
+    width: 100% !important; /* ★重要：横幅フル活用 */
+    box-sizing: border-box !important;
 }
 
 /* 新規登録フォーム用のテキストエリア（より大きく） */
@@ -5425,17 +5434,58 @@ th[style*="cursor: pointer"]:hover {
     min-height: 160px !important;
 }
 
-/* 既存のスタイルを上書き */
+/* 既存のスタイルを上書き（横幅フル活用） */
 .essay-question-input,
 .essay-answer-input {
     min-height: 120px !important;
     resize: vertical;
     line-height: 1.6;
+    width: 100% !important; /* ★重要：横幅フル活用 */
+    box-sizing: border-box !important;
 }
 
 /* 模範解答入力欄のみ高さを大きく */
 .essay-answer-input {
     min-height: 180px !important;
+}
+
+/* レスポンシブ対応での調整 */
+@media (max-width: 768px) {
+    .char-counter {
+        font-size: 0.75rem;
+        padding: 3px 6px;
+        bottom: 6px !important;
+        right: 6px !important;
+    }
+    
+    .essay-answer-input,
+    #edit_answer {
+        padding-bottom: 30px !important;
+        min-height: 140px !important;
+    }
+    
+    .essay-answer-input {
+        min-height: 160px !important;
+    }
+}
+
+@media (max-width: 480px) {
+    .char-counter {
+        font-size: 0.7rem;
+        padding: 2px 4px;
+        bottom: 4px !important;
+        right: 4px !important;
+    }
+    
+    .essay-answer-input,
+    #edit_answer {
+        padding-bottom: 25px !important;
+        min-height: 120px !important;
+    }
+    
+    .essay-answer-input {
+        min-height: 140px !important;
+    }
 }
 </style>
 
