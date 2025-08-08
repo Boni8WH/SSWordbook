@@ -589,10 +589,14 @@
                                     <label for="new_essay_answer">
                                         <i class="fas fa-lightbulb"></i> 模範解答
                                     </label>
-                                    <textarea id="new_essay_answer" 
-                                            name="answer" 
-                                            class="essay-answer-input"
-                                            placeholder="模範解答を入力してください..."></textarea>
+                                    <div class="textarea-wrapper">
+                                        <textarea id="new_essay_answer" 
+                                                name="answer" 
+                                                class="essay-answer-input"
+                                                placeholder="模範解答を入力してください..."
+                                                oninput="updateAnswerCharCount('new_essay_answer', 'newAnswerCharCount')"></textarea>
+                                        <div class="char-counter" id="newAnswerCharCount">0字</div>
+                                    </div>
                                     <small class="essay-help-text">参考となる解答例（任意）</small>
                                 </div>
                             </div>
@@ -2621,8 +2625,12 @@ function showEditDialog(problem) {
                                 <label for="edit_answer" class="form-label">
                                     <i class="fas fa-lightbulb"></i> 模範解答
                                 </label>
-                                <textarea class="form-control" id="edit_answer" rows="6">${problem.answer || ''}</textarea>
-                                <small class="form-text text-muted">文字数: <span id="answerLength">${(problem.answer || '').length}</span>字</small>
+                                <div class="textarea-wrapper">
+                                    <textarea class="form-control" id="edit_answer" rows="6"
+                                            oninput="updateAnswerCharCount('edit_answer', 'answerLength')">${problem.answer || ''}</textarea>
+                                    <div class="char-counter" id="answerLength">${(problem.answer || '').length}字</div>
+                                </div>
+                                <small class="form-text text-muted">文字数が表示されます</small>
                             </div>
 
                             <!-- 画像管理セクションを追加 -->
@@ -2702,14 +2710,8 @@ function showEditDialog(problem) {
     // DOMに追加
     document.body.insertAdjacentHTML('beforeend', modalHTML);
 
-    // 文字数カウンター設定
-    const answerTextarea = document.getElementById('edit_answer');
-    const answerLengthSpan = document.getElementById('answerLength');
+    initializeCharCount('edit_answer', 'answerLength');
     
-    answerTextarea.addEventListener('input', function() {
-        answerLengthSpan.textContent = this.value.length;
-    });
-
     // モーダル表示
     const modal = new bootstrap.Modal(document.getElementById('editEssayModal'));
     modal.show();
@@ -3801,6 +3803,40 @@ function checkAndShowImage(problemId) {
         document.getElementById('noImageSection_' + problemId).style.display = 'block';
     };
     img.src = `/essay_image/${problemId}?t=${Date.now()}`;
+}
+
+// ========================================
+// 文字数カウンター機能
+// ========================================
+function updateAnswerCharCount(textareaId, counterId) {
+    const textarea = document.getElementById(textareaId);
+    const counter = document.getElementById(counterId);
+    
+    if (!textarea || !counter) {
+        console.warn(`要素が見つかりません: ${textareaId} または ${counterId}`);
+        return;
+    }
+    
+    const currentLength = textarea.value.length;
+    counter.textContent = `${currentLength}字`;
+    
+    // 文字数に応じてスタイル変更
+    counter.classList.remove('warning', 'danger');
+    
+    if (currentLength > 500) {
+        counter.classList.add('danger');
+    } else if (currentLength > 300) {
+        counter.classList.add('warning');
+    }
+    
+    // デバッグ用（本番では削除可能）
+    console.log(`📝 文字数更新: ${textareaId} = ${currentLength}字`);
+}
+
+function initializeCharCount(textareaId, counterId) {
+    setTimeout(() => {
+        updateAnswerCharCount(textareaId, counterId);
+    }, 100);
 }
 </script>
 
@@ -5324,6 +5360,93 @@ th[style*="cursor: pointer"]:hover {
     max-width: 300px;
     z-index: 9999;
     display: none; /* 本番では非表示 */
+}
+
+/* ========================================
+   文字数カウンター用スタイル
+   ======================================== */
+
+/* テキストエリア用のラッパー */
+.textarea-wrapper {
+    position: relative;
+    display: block;
+}
+
+/* 文字数カウンター */
+.char-counter {
+    position: absolute;
+    bottom: 8px;
+    right: 12px;
+    background: rgba(255, 255, 255, 0.9);
+    color: #6c757d;
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 4px 8px;
+    border-radius: 4px;
+    border: 1px solid #dee2e6;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    pointer-events: none;
+    z-index: 5;
+    font-family: monospace;
+    white-space: nowrap;
+    transition: all 0.3s ease;
+}
+
+/* テキストエリアにフォーカス時のカウンター強調 */
+.textarea-wrapper textarea:focus + .char-counter {
+    background: rgba(123, 31, 162, 0.1);
+    color: #7b1fa2;
+    border-color: #7b1fa2;
+    transform: translateY(-2px);
+}
+
+/* 文字数に応じた色変更 */
+.char-counter.warning {
+    background: rgba(255, 193, 7, 0.1);
+    color: #856404;
+    border-color: #ffc107;
+}
+
+.char-counter.danger {
+    background: rgba(220, 53, 69, 0.1);
+    color: #721c24;
+    border-color: #dc3545;
+}
+
+/* テキストエリアの下部余白確保 */
+.essay-answer-input,
+#edit_answer {
+    padding-bottom: 35px !important;
+    resize: vertical;
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 768px) {
+    .char-counter {
+        font-size: 0.75rem;
+        padding: 3px 6px;
+        bottom: 6px;
+        right: 8px;
+    }
+    
+    .essay-answer-input,
+    #edit_answer {
+        padding-bottom: 30px !important;
+    }
+}
+
+@media (max-width: 480px) {
+    .char-counter {
+        font-size: 0.7rem;
+        padding: 2px 4px;
+        bottom: 4px;
+        right: 6px;
+    }
+    
+    .essay-answer-input,
+    #edit_answer {
+        padding-bottom: 25px !important;
+    }
 }
 </style>
 {% endblock %}
