@@ -178,7 +178,20 @@
     margin: 0;
 }
 
-/* 解答表示/非表示ボタン */
+/* ========================================
+   解答コントロール領域の統一（修正版）
+   ======================================== */
+
+/* 解答コントロール領域の統一 */
+.answer-controls {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 25px;
+    flex-wrap: wrap;
+}
+
+/* ★重要：解答ボタンの横幅とサイズを統一 */
 .answer-control-btn {
     background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
     color: white;
@@ -192,8 +205,14 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    margin-bottom: 25px;
     box-shadow: 0 4px 15px rgba(255, 152, 0, 0.3);
+    /* ★重要：固定幅でボタンサイズを統一 */
+    min-width: 150px !important;
+    max-width: 150px !important;
+    width: 150px !important;
+    height: 44px !important;
+    justify-content: center !important;
+    text-align: center !important;
 }
 
 .answer-control-btn:hover {
@@ -208,14 +227,66 @@
     box-shadow: none;
 }
 
-/* 解答非表示ボタン（異なる色） */
+/* 解答非表示ボタン（異なる色だが同じサイズ） */
 .hide-answer-btn {
-    background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
-    box-shadow: 0 4px 15px rgba(220, 53, 69, 0.3);
+    background: linear-gradient(135deg, #dc3545 0%, #c82333 100%) !important;
+    box-shadow: 0 4px 15px rgba(220, 53, 69, 0.3) !important;
+    /* ★重要：同じサイズを強制適用 */
+    min-width: 150px !important;
+    max-width: 150px !important;
+    width: 150px !important;
+    height: 44px !important;
 }
 
 .hide-answer-btn:hover {
-    box-shadow: 0 6px 20px rgba(220, 53, 69, 0.4);
+    box-shadow: 0 6px 20px rgba(220, 53, 69, 0.4) !important;
+}
+
+/* ★重要：アイコンサイズの統一 */
+.answer-control-btn i {
+    font-size: 1rem !important;
+    line-height: 1 !important;
+    width: 16px !important;
+    text-align: center !important;
+    display: inline-block !important;
+}
+
+/* 解答情報表示（位置固定） */
+.answer-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    /* ★重要：位置を固定するため最小幅を設定 */
+    min-width: 140px;
+}
+
+.answer-char-count {
+    background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+    color: #1565c0;
+    padding: 8px 15px;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid #90caf9;
+    box-shadow: 0 2px 8px rgba(21, 101, 192, 0.15);
+    line-height: 1;
+    /* ★重要：文字数表示の幅を固定 */
+    min-width: 120px;
+    justify-content: center;
+}
+
+.answer-char-count i {
+    color: #1976d2;
+    font-size: 0.85rem !important;
+    line-height: 1;
+    vertical-align: baseline;
+    display: inline-flex;
+    align-items: center;
+    width: 14px !important;
+    text-align: center !important;
 }
 
 /* 進捗管理セクション */
@@ -336,7 +407,10 @@
     color: #7b1fa2;
 }
 
-/* レスポンシブ対応 */
+/* ========================================
+   レスポンシブ対応（統一版）
+   ======================================== */
+
 @media (max-width: 768px) {
     .essay-problem-container {
         padding: 15px;
@@ -368,6 +442,42 @@
     .progress-controls {
         grid-template-columns: 1fr;
     }
+    
+    /* 解答コントロールのモバイル対応 */
+    .answer-controls {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+    }
+    
+    .answer-button-container {
+        width: 100% !important;
+        min-width: 100% !important;
+    }
+    
+    .answer-controls .answer-button-container .answer-control-btn {
+        min-width: 100% !important;
+        max-width: 100% !important;
+        width: 100% !important;
+        justify-content: center !important;
+    }
+    
+    .answer-info {
+        justify-content: center;
+        min-width: auto;
+    }
+    
+    .answer-char-count {
+        justify-content: center;
+        font-size: 0.85rem;
+        padding: 6px 12px;
+        min-width: auto;
+        line-height: 1;
+    }
+    
+    .answer-char-count i {
+        font-size: 0.8rem !important;
+    }
 }
 
 @media (max-width: 480px) {
@@ -384,89 +494,55 @@
     .progress-section {
         padding: 15px;
     }
-}
-
-/* 解答コントロール領域 */
-.answer-controls {
-    display: flex;
-    align-items: center;
-    gap: 15px;
-    margin-bottom: 25px;
-    flex-wrap: wrap;
-}
-
-/* 解答情報表示 */
-.answer-info {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-/* ★重要：アイコンとテキストの位置合わせを修正 */
-.answer-char-count {
-    background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
-    color: #1565c0;
-    padding: 8px 15px;
-    border-radius: 20px;
-    font-size: 0.9rem;
-    font-weight: 600;
-    display: flex;
-    align-items: center; /* ★重要：垂直方向の中央揃え */
-    gap: 6px;
-    border: 1px solid #90caf9;
-    box-shadow: 0 2px 8px rgba(21, 101, 192, 0.15);
-    line-height: 1; /* ★重要：行高さを統一 */
-}
-
-.answer-char-count i {
-    color: #1976d2;
-    font-size: 0.85rem;
-    line-height: 1; /* ★重要：アイコンの行高さも統一 */
-    vertical-align: baseline; /* ★重要：ベースライン揃え */
-    display: inline-flex; /* ★重要：インラインフレックス */
-    align-items: center; /* ★重要：アイコン内での中央揃え */
-}
-
-/* レスポンシブ対応 */
-@media (max-width: 768px) {
-    .answer-controls {
-        flex-direction: column;
-        align-items: stretch;
-        gap: 10px;
-    }
     
-    .answer-info {
-        justify-content: center;
-    }
-    
-    .answer-char-count {
-        justify-content: center;
-        font-size: 0.85rem;
-        padding: 6px 12px;
-        line-height: 1; /* ★重要：モバイルでも行高さ統一 */
-    }
-    
-    .answer-char-count i {
-        font-size: 0.8rem;
-    }
-}
-
-@media (max-width: 480px) {
+    /* 小画面での解答コントロール調整 */
     .answer-controls {
         gap: 8px;
+    }
+    
+    .answer-button-container {
+        height: 40px !important;
+    }
+    
+    .answer-controls .answer-button-container .answer-control-btn {
+        font-size: 0.9rem;
+        padding: 10px 20px;
+        height: 40px !important;
     }
     
     .answer-char-count {
         font-size: 0.8rem;
         padding: 5px 10px;
-        line-height: 1; /* ★重要：小画面でも行高さ統一 */
+        line-height: 1;
     }
     
-    .answer-char-count i {
-        font-size: 0.75rem;
+    .answer-char-count i,
+    .answer-control-btn i {
+        font-size: 0.8rem !important;
     }
 }
+
+/* ========================================
+   ボタンコンテナ（同じ位置でボタンを切り替えるため）
+   ======================================== */
+
+/* ボタンコンテナ（同じ位置でボタンを切り替えるため） */
+.answer-button-container {
+    position: relative;
+    display: inline-block;
+    min-width: 150px;
+    height: 44px;
+}
+
+/* ボタンを絶対配置で同じ位置に重ねる */
+.answer-controls .answer-button-container .answer-control-btn {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    margin: 0 !important; /* すべてのmarginを0に設定 */
+}
 </style>
+
 {% endblock %}
 
 {% block content %}
@@ -568,20 +644,24 @@
 
     <!-- 解答表示/非表示ボタン -->
     <div class="answer-controls">
-        <button class="answer-control-btn" id="showAnswerBtn">
-            <i class="fas fa-eye"></i>
-            解答を表示
-        </button>
-        <button class="answer-control-btn hide-answer-btn" id="hideAnswerBtn" style="display: none;">
-            <i class="fas fa-eye-slash"></i>
-            解答を非表示
-        </button>
+        <div class="answer-button-container">
+            <button class="answer-control-btn" id="showAnswerBtn">
+                <i class="fas fa-eye"></i>
+                解答を表示
+            </button>
+            
+            <button class="answer-control-btn hide-answer-btn" id="hideAnswerBtn" style="display: none;">
+                <i class="fas fa-eye-slash"></i>
+                解答を非表示
+            </button>
+        </div>
+        
         <div class="answer-info">
             <span class="answer-char-count">
                 <i class="fas fa-text-width"></i>
                 模範解答：{{ problem.answer_length }}字
             </span>
-        </div> 
+        </div>
     </div>
 
     <!-- 解答セクション -->
