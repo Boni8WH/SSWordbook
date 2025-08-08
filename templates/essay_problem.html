@@ -196,7 +196,7 @@
     background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
     color: white;
     border: none;
-    padding: 12px 25px;
+    padding: 12px 20px; /* 左右のpaddingを調整 */
     border-radius: 25px;
     font-size: 1rem;
     font-weight: 600;
@@ -206,13 +206,14 @@
     align-items: center;
     gap: 8px;
     box-shadow: 0 4px 15px rgba(255, 152, 0, 0.3);
-    /* ★重要：固定幅でボタンサイズを統一 */
-    min-width: 150px !important;
-    max-width: 150px !important;
-    width: 150px !important;
+    /* ★重要：幅を180pxに拡大 */
+    min-width: 180px !important;
+    max-width: 180px !important;
+    width: 180px !important;
     height: 44px !important;
     justify-content: center !important;
     text-align: center !important;
+    white-space: nowrap !important; /* ★重要：改行を防止 */
 }
 
 .answer-control-btn:hover {
@@ -232,9 +233,9 @@
     background: linear-gradient(135deg, #dc3545 0%, #c82333 100%) !important;
     box-shadow: 0 4px 15px rgba(220, 53, 69, 0.3) !important;
     /* ★重要：同じサイズを強制適用 */
-    min-width: 150px !important;
-    max-width: 150px !important;
-    width: 150px !important;
+    min-width: 180px !important;
+    max-width: 180px !important;
+    width: 180px !important;
     height: 44px !important;
 }
 
@@ -453,6 +454,7 @@
     .answer-button-container {
         width: 100% !important;
         min-width: 100% !important;
+        height: 44px !important;
     }
     
     .answer-controls .answer-button-container .answer-control-btn {
@@ -460,6 +462,7 @@
         max-width: 100% !important;
         width: 100% !important;
         justify-content: center !important;
+        white-space: nowrap !important;
     }
     
     .answer-info {
@@ -506,8 +509,9 @@
     
     .answer-controls .answer-button-container .answer-control-btn {
         font-size: 0.9rem;
-        padding: 10px 20px;
+        padding: 10px 15px;
         height: 40px !important;
+        white-space: nowrap !important;
     }
     
     .answer-char-count {
@@ -530,7 +534,7 @@
 .answer-button-container {
     position: relative;
     display: inline-block;
-    min-width: 150px;
+    min-width: 180px;
     height: 44px;
 }
 
