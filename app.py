@@ -9180,6 +9180,7 @@ def admin_essay_add_problem():
                 file_ext = filename.rsplit('.', 1)[1].lower() if '.' in filename else ''
                 
                 if file_ext not in allowed_extensions:
+                    db.session.rollback()  # ★重要：ロールバックを追加
                     return jsonify({
                         'status': 'error',
                         'message': f'サポートされていない画像形式です。{", ".join(allowed_extensions)}を使用してください。'
@@ -9190,17 +9191,44 @@ def admin_essay_add_problem():
                 
                 # S3にアップロード（利用可能な場合）
                 if S3_AVAILABLE:
-                    image_url = upload_image_to_s3(image_file, image_filename)
-                    if image_url:
-                        new_problem.image_url = image_url
-                        image_saved = True
-                        logger.info(f"画像S3アップロード成功: {image_url}")
-                    else:
-                        # S3失敗時はローカル保存にフォールバック
-                        return save_image_locally(image_file, image_filename, new_problem)
+                    try:
+                        image_url = upload_image_to_s3(image_file, image_filename)
+                        if image_url:
+                            new_problem.image_url = image_url
+                            image_saved = True
+                            logger.info(f"画像S3アップロード成功: {image_url}")
+                        else:
+                            # S3失敗時はローカル保存にフォールバック
+                            logger.warning("S3アップロード失敗、ローカル保存にフォールバック")
+                            local_success = save_image_locally(image_file, image_filename, new_problem)
+                            if local_success:
+                                image_saved = True
+                                logger.info(f"画像ローカル保存成功: static/uploads/essay_images/{image_filename}")
+                            else:
+                                logger.error("ローカル画像保存も失敗")
+                    except Exception as s3_error:
+                        logger.error(f"S3アップロード中にエラー: {s3_error}")
+                        # S3でエラーが発生した場合もローカル保存を試行
+                        try:
+                            local_success = save_image_locally(image_file, image_filename, new_problem)
+                            if local_success:
+                                image_saved = True
+                                logger.info(f"画像ローカル保存成功: static/uploads/essay_images/{image_filename}")
+                            else:
+                                logger.error("ローカル画像保存も失敗")
+                        except Exception as local_error:
+                            logger.error(f"ローカル保存中にエラー: {local_error}")
                 else:
                     # boto3が利用できない場合はローカル保存
-                    return save_image_locally(image_file, image_filename, new_problem)
+                    try:
+                        local_success = save_image_locally(image_file, image_filename, new_problem)
+                        if local_success:
+                            image_saved = True
+                            logger.info(f"画像ローカル保存成功: static/uploads/essay_images/{image_filename}")
+                        else:
+                            logger.error("ローカル画像保存失敗")
+                    except Exception as local_error:
+                        logger.error(f"ローカル保存中にエラー: {local_error}")
         
         # 全てをコミット
         db.session.commit()
