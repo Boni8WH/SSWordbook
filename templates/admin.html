@@ -2711,7 +2711,7 @@ function showEditDialog(problem) {
     document.body.insertAdjacentHTML('beforeend', modalHTML);
 
     initializeCharCount('edit_answer', 'answerLength');
-    
+
     // モーダル表示
     const modal = new bootstrap.Modal(document.getElementById('editEssayModal'));
     modal.show();
@@ -4201,6 +4201,24 @@ function initializeCharCount(textareaId, counterId) {
     .table-controls .col-md-6 {
         margin-bottom: 10px;
     }
+    
+    /* 文字数カウンターのレスポンシブ対応 */
+    .char-counter {
+        font-size: 0.75rem;
+        padding: 3px 6px;
+        bottom: 8px;
+        right: 8px;
+    }
+    
+    .essay-answer-input,
+    #edit_answer {
+        padding-bottom: 30px !important;
+        min-height: 140px !important; /* タブレットでも適切な高さ */
+    }
+    
+    .essay-answer-input {
+        min-height: 160px !important;
+    }
 }
 
 @media (max-width: 480px) {
@@ -4225,6 +4243,24 @@ function initializeCharCount(textareaId, counterId) {
     
     .table {
         font-size: 0.75rem;
+    }
+    
+    /* 小画面での文字数カウンター調整 */
+    .char-counter {
+        font-size: 0.7rem;
+        padding: 2px 4px;
+        bottom: 6px;
+        right: 6px;
+    }
+    
+    .essay-answer-input,
+    #edit_answer {
+        padding-bottom: 25px !important;
+        min-height: 120px !important; /* スマホでも最低限の高さ */
+    }
+    
+    .essay-answer-input {
+        min-height: 140px !important;
     }
 }
 
@@ -4948,20 +4984,20 @@ function initializeCharCount(textareaId, counterId) {
 }
 
 /* ========================================
-   15. 論述問題公開設定マトリックス - CSS Grid レイアウト
+   15. 論述問題公開設定マトリックス - CSS Grid レイアウト（修正版）
    ======================================== */
 .visibility-matrix {
     background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
     border-radius: 10px;
-    padding: 0 !important; /* ★重要：paddingを0に設定 */
-    margin: 15px 0 !important; /* ★重要：marginを他のセクションと統一 */
+    padding: 0 !important;
+    margin: 15px 0 !important;
 }
 
 .matrix-header {
     color: #495057;
     font-weight: 600;
     margin-bottom: 20px;
-    padding: 20px 20px 0 20px !important; /* ★重要：上と左右にpaddingを追加 */
+    padding: 20px 20px 0 20px !important;
 }
 
 .matrix-header h4 {
@@ -4975,9 +5011,8 @@ function initializeCharCount(textareaId, counterId) {
     margin-bottom: 20px;
 }
 
-/* ★重要：CSS Grid による固定レイアウト */
 .visibility-grid {
-    margin: 0 20px 20px 20px !important; /* ★重要：左右と下にmarginを追加 */
+    margin: 0 20px 20px 20px !important;
     display: grid !important;
     grid-template-columns: 120px repeat(var(--type-count, 4), 1fr) !important;
     gap: 3px !important;
@@ -4988,7 +5023,6 @@ function initializeCharCount(textareaId, counterId) {
     border: 1px solid #dee2e6 !important;
 }
 
-/* グリッドヘッダー */
 .grid-header {
     background: linear-gradient(135deg, #343a40 0%, #495057 100%) !important;
     color: white !important;
@@ -5001,7 +5035,6 @@ function initializeCharCount(textareaId, counterId) {
     font-size: 0.9rem !important;
 }
 
-/* 章名セル（クリック可能） */
 .grid-cell-chapter {
     background: linear-gradient(135deg, #e9ecef 0%, #f8f9fa 100%) !important;
     color: #495057 !important;
@@ -5025,7 +5058,6 @@ function initializeCharCount(textareaId, counterId) {
     box-shadow: 0 2px 6px rgba(40, 167, 69, 0.3) !important;
 }
 
-/* ★重要：公開設定セル - 安定したレイアウト */
 .grid-cell-setting {
     background: #fff !important;
     border: 2px solid #dee2e6 !important;
@@ -5043,7 +5075,6 @@ function initializeCharCount(textareaId, counterId) {
     box-sizing: border-box !important;
 }
 
-/* アイコンとテキストのスタイル（固定サイズ） */
 .grid-cell-setting .setting-icon {
     font-size: 1.3em !important;
     line-height: 1 !important;
@@ -5065,7 +5096,6 @@ function initializeCharCount(textareaId, counterId) {
     text-align: center !important;
 }
 
-/* 公開状態 */
 .grid-cell-setting.visible {
     background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%) !important;
     border-color: #28a745 !important;
@@ -5076,7 +5106,6 @@ function initializeCharCount(textareaId, counterId) {
     color: #28a745 !important;
 }
 
-/* 非公開状態 */
 .grid-cell-setting.hidden {
     background: linear-gradient(135deg, #f8d7da 0%, #f1b0b7 100%) !important;
     border-color: #dc3545 !important;
@@ -5087,73 +5116,18 @@ function initializeCharCount(textareaId, counterId) {
     color: #dc3545 !important;
 }
 
-/* ホバー効果 */
 .grid-cell-setting:hover {
     transform: scale(1.05) !important;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2) !important;
     z-index: 10 !important;
 }
 
-/* 保存セクション */
 .save-section {
     background: rgba(255, 255, 255, 0.8);
     padding: 20px;
     border-radius: 8px;
     border: 1px solid #dee2e6;
-    margin: 0 20px 20px 20px !important; /* ★重要：左右と下にmarginを追加 */
-}
-
-/* レスポンシブ対応 */
-@media (max-width: 768px) {
-    .visibility-grid {
-        grid-template-columns: 100px repeat(var(--type-count, 4), 1fr) !important;
-        gap: 2px !important;
-        font-size: 0.8em;
-        margin: 0 15px 15px 15px !important;
-    }
-    
-    .grid-cell-setting {
-        min-height: 50px !important;
-        max-height: 50px !important;
-        gap: 2px !important;
-    }
-    
-    .grid-cell-setting .setting-icon {
-        font-size: 1.1em !important;
-    }
-    
-    .grid-cell-setting .setting-text {
-        font-size: 0.7em !important;
-    }
-    
-    .grid-cell-chapter {
-        padding: 10px 4px !important;
-        font-size: 0.8rem !important;
-        min-height: 50px !important;
-    }
-    
-    .matrix-header {
-        padding: 15px 15px 0 15px !important;
-    }
-    
-    .save-section {
-        margin: 0 15px 15px 15px !important;
-    }
-}
-
-@media (max-width: 480px) {
-    .visibility-grid {
-        margin: 0 10px 10px 10px !important;
-    }
-    
-    .matrix-header {
-        padding: 10px 10px 0 10px !important;
-    }
-    
-    .save-section {
-        margin: 0 10px 10px 10px !important;
-        padding: 15px;
-    }
+    margin: 0 20px 20px 20px !important;
 }
 
 /* ========================================
@@ -5244,7 +5218,6 @@ function initializeCharCount(textareaId, counterId) {
     color: white;
 }
 
-/* ソート可能なヘッダーのスタイル */
 th[style*="cursor: pointer"] {
     user-select: none;
     background-color: #495057 !important;
@@ -5279,11 +5252,11 @@ th[style*="cursor: pointer"]:hover {
         padding: 10px;
     }
     
-    /* ★重要：公開設定マトリックスのレスポンシブ */
     .visibility-grid {
         grid-template-columns: 100px repeat(var(--type-count, 4), 1fr) !important;
         gap: 2px !important;
         font-size: 0.8em;
+        margin: 0 15px 15px 15px !important;
     }
     
     .grid-cell-setting {
@@ -5304,6 +5277,14 @@ th[style*="cursor: pointer"]:hover {
         padding: 10px 4px !important;
         font-size: 0.8rem !important;
         min-height: 50px !important;
+    }
+    
+    .matrix-header {
+        padding: 15px 15px 0 15px !important;
+    }
+    
+    .save-section {
+        margin: 0 15px 15px 15px !important;
     }
 }
 
@@ -5343,6 +5324,19 @@ th[style*="cursor: pointer"]:hover {
         padding: 6px 4px;
         white-space: nowrap;
     }
+    
+    .visibility-grid {
+        margin: 0 10px 10px 10px !important;
+    }
+    
+    .matrix-header {
+        padding: 10px 10px 0 10px !important;
+    }
+    
+    .save-section {
+        margin: 0 10px 10px 10px !important;
+        padding: 15px;
+    }
 }
 
 /* ========================================
@@ -5359,11 +5353,11 @@ th[style*="cursor: pointer"]:hover {
     font-size: 12px;
     max-width: 300px;
     z-index: 9999;
-    display: none; /* 本番では非表示 */
+    display: none;
 }
 
 /* ========================================
-   文字数カウンター用スタイル
+   20. 文字数カウンター用スタイル（完全版）
    ======================================== */
 
 /* テキストエリア用のラッパー */
@@ -5372,21 +5366,21 @@ th[style*="cursor: pointer"]:hover {
     display: block;
 }
 
-/* 文字数カウンター */
+/* 文字数カウンター（位置微調整） */
 .char-counter {
     position: absolute;
-    bottom: 8px;
+    bottom: 10px;
     right: 12px;
-    background: rgba(255, 255, 255, 0.9);
+    background: rgba(255, 255, 255, 0.95);
     color: #6c757d;
     font-size: 0.8rem;
     font-weight: 600;
     padding: 4px 8px;
     border-radius: 4px;
     border: 1px solid #dee2e6;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
     pointer-events: none;
-    z-index: 5;
+    z-index: 10;
     font-family: monospace;
     white-space: nowrap;
     transition: all 0.3s ease;
@@ -5413,40 +5407,36 @@ th[style*="cursor: pointer"]:hover {
     border-color: #dc3545;
 }
 
-/* テキストエリアの下部余白確保 */
+/* テキストエリアの下部余白確保と高さ調整 */
 .essay-answer-input,
 #edit_answer {
     padding-bottom: 35px !important;
     resize: vertical;
+    min-height: 150px !important;
 }
 
-/* レスポンシブ対応 */
-@media (max-width: 768px) {
-    .char-counter {
-        font-size: 0.75rem;
-        padding: 3px 6px;
-        bottom: 6px;
-        right: 8px;
-    }
-    
-    .essay-answer-input,
-    #edit_answer {
-        padding-bottom: 30px !important;
-    }
+/* 新規登録フォーム用のテキストエリア（より大きく） */
+.essay-answer-input {
+    min-height: 180px !important;
 }
 
-@media (max-width: 480px) {
-    .char-counter {
-        font-size: 0.7rem;
-        padding: 2px 4px;
-        bottom: 4px;
-        right: 6px;
-    }
-    
-    .essay-answer-input,
-    #edit_answer {
-        padding-bottom: 25px !important;
-    }
+/* 編集モーダル用のテキストエリア */
+#edit_answer {
+    min-height: 160px !important;
+}
+
+/* 既存のスタイルを上書き */
+.essay-question-input,
+.essay-answer-input {
+    min-height: 120px !important;
+    resize: vertical;
+    line-height: 1.6;
+}
+
+/* 模範解答入力欄のみ高さを大きく */
+.essay-answer-input {
+    min-height: 180px !important;
 }
 </style>
+
 {% endblock %}
