@@ -402,6 +402,7 @@
     gap: 10px;
 }
 
+/* ★重要：アイコンとテキストの位置合わせを修正 */
 .answer-char-count {
     background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
     color: #1565c0;
@@ -410,15 +411,20 @@
     font-size: 0.9rem;
     font-weight: 600;
     display: flex;
-    align-items: center;
+    align-items: center; /* ★重要：垂直方向の中央揃え */
     gap: 6px;
     border: 1px solid #90caf9;
     box-shadow: 0 2px 8px rgba(21, 101, 192, 0.15);
+    line-height: 1; /* ★重要：行高さを統一 */
 }
 
 .answer-char-count i {
     color: #1976d2;
     font-size: 0.85rem;
+    line-height: 1; /* ★重要：アイコンの行高さも統一 */
+    vertical-align: baseline; /* ★重要：ベースライン揃え */
+    display: inline-flex; /* ★重要：インラインフレックス */
+    align-items: center; /* ★重要：アイコン内での中央揃え */
 }
 
 /* レスポンシブ対応 */
@@ -437,6 +443,11 @@
         justify-content: center;
         font-size: 0.85rem;
         padding: 6px 12px;
+        line-height: 1; /* ★重要：モバイルでも行高さ統一 */
+    }
+    
+    .answer-char-count i {
+        font-size: 0.8rem;
     }
 }
 
@@ -448,9 +459,13 @@
     .answer-char-count {
         font-size: 0.8rem;
         padding: 5px 10px;
+        line-height: 1; /* ★重要：小画面でも行高さ統一 */
+    }
+    
+    .answer-char-count i {
+        font-size: 0.75rem;
     }
 }
-
 </style>
 {% endblock %}
 
@@ -557,18 +572,16 @@
             <i class="fas fa-eye"></i>
             解答を表示
         </button>
-        
+        <button class="answer-control-btn hide-answer-btn" id="hideAnswerBtn" style="display: none;">
+            <i class="fas fa-eye-slash"></i>
+            解答を非表示
+        </button>
         <div class="answer-info">
             <span class="answer-char-count">
                 <i class="fas fa-text-width"></i>
                 模範解答：{{ problem.answer_length }}字
             </span>
-        </div>
-        
-        <button class="answer-control-btn hide-answer-btn" id="hideAnswerBtn" style="display: none;">
-            <i class="fas fa-eye-slash"></i>
-            解答を非表示
-        </button>
+        </div> 
     </div>
 
     <!-- 解答セクション -->
