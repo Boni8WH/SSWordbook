@@ -7796,14 +7796,20 @@ def essay_index():
             
             # この章の問題を取得（公開設定に従って）
             visible_problems = []
-            for problem_type, is_visible in types.items():
-                if is_visible:
+            # ✅ より明確な書き方
+            for problem_type in ['A', 'B', 'C', 'D']:
+                # 設定がない場合はデフォルトで公開、設定がある場合はその値を使用
+                is_visible = visibility_settings.get(chapter, {}).get(problem_type, True)
+                
+                # 明示的にFalseでない限り表示
+                if is_visible != False:
                     problems = EssayProblem.query.filter_by(
                         chapter=chapter,
                         type=problem_type,
                         enabled=True
                     ).all()
                     visible_problems.extend(problems)
+
             
             if not visible_problems:
                 app.logger.info(f"⏭️ {chapter_name}: 実際の問題なし（スキップ）")
