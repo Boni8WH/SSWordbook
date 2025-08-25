@@ -652,14 +652,18 @@
                             </div>
                             <div class="col-md-6">
                                 <label for="essaySearch">キーワード検索:</label>
-                                <input type="text" id="essaySearch" class="form-control" placeholder="問題文や大学名で検索..." onkeyup="filterEssayProblems()">
+                                <input type="text" id="essaySearch" class="form-control" placeholder="問題文や大学名で検索（3文字以上）...">
                             </div>
                         </div>
                     </div>
                     
                     <!-- 問題一覧 -->
                     <div id="essay-problems-container">
-                        <p class="text-info">📋 問題一覧を読み込み中...</p>
+                        <div class="text-center text-muted p-4">
+                            <i class="fas fa-search fa-2x mb-3"></i><br>
+                            <strong>検索条件を指定してください</strong><br>
+                            <small>章、タイプ、またはキーワードを入力すると問題一覧が表示されます</small>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -862,13 +866,8 @@ function initializeCollapseSections() {
 // ========================================
 // 2. 既存の管理機能（元のスクリプトから移植）
 // ========================================
-
-console.log('🔧 admin.html スクリプト読み込み開始');
-
 // 部屋設定を再読み込みする関数
 function loadRoomSettings() {
-    console.log('🔄 部屋設定を再読み込み中...');
-    
     document.querySelectorAll('.csv-setting-select').forEach(select => {
         const roomNumber = select.dataset.roomNumber;
         if (!roomNumber) return;
@@ -882,7 +881,6 @@ function loadRoomSettings() {
         .then(data => {
             if (data.status === 'success') {
                 const csvFilename = data.csv_filename || 'words.csv';
-                console.log(`📋 部屋${roomNumber}の設定読み込み: ${csvFilename}`);
                 
                 select.value = csvFilename;
                 
@@ -893,7 +891,6 @@ function loadRoomSettings() {
                     newOption.textContent = csvFilename;
                     select.appendChild(newOption);
                     select.value = csvFilename;
-                    console.log(`➕ 新しいオプション追加: ${csvFilename}`);
                 }
             }
         })
@@ -905,7 +902,6 @@ function loadRoomSettings() {
 
 // CSVファイル一覧を読み込む関数
 function loadCsvFilesList() {
-    console.log('🔍 CSV ファイル一覧読み込み開始...');
     
     const container = document.getElementById('csv-files-container');
     if (container) {
@@ -914,14 +910,10 @@ function loadCsvFilesList() {
     
     fetch('{{ url_for("admin_list_room_csv_files") }}')
         .then(response => {
-            console.log('📡 レスポンス受信:', response.status);
             return response.json();
         })
         .then(data => {
-            console.log('📊 受信データ:', data);
-            
             if (data.status === 'success') {
-                console.log(`✅ ファイル一覧取得成功: ${data.files.length}件`);
                 updateCsvFilesDisplay(data.files);
                 updateCsvSelectOptions(data.files);
             } else {
@@ -953,7 +945,6 @@ function addHoursToTimestamp(dateString, hours) {
 
 // CSVファイル表示を更新する関数
 function updateCsvFilesDisplay(files) {
-    console.log('🔄 ファイル表示更新:', files);
     
     const container = document.getElementById('csv-files-container');
     if (!container) {
@@ -962,12 +953,9 @@ function updateCsvFilesDisplay(files) {
     }
     
     if (files.length === 0) {
-        console.log('📭 アップロードされたファイルなし');
         container.innerHTML = '<p class="text-muted">📭 アップロードされたCSVファイルはありません。</p>';
         return;
     }
-    
-    console.log(`📋 ${files.length}件のファイルを表示中...`);
     
     let html = '<div class="table-responsive"><table class="table table-sm table-striped">';
     html += '<thead class="table-dark"><tr><th>ファイル名</th><th>単語数</th><th>サイズ</th><th>更新日時</th><th>操作</th></tr></thead><tbody>';
@@ -987,16 +975,11 @@ function updateCsvFilesDisplay(files) {
     
     html += '</tbody></table></div>';
     container.innerHTML = html;
-    
-    console.log('✅ ファイル表示更新完了');
 }
 
 // セレクトボックスのオプションを更新する関数
-function updateCsvSelectOptions(files) {
-    console.log('🔄 CSVセレクトオプション更新:', files);
-    
+function updateCsvSelectOptions(files) { 
     const selects = document.querySelectorAll('.csv-setting-select');
-    console.log(`📋 更新対象セレクト数: ${selects.length}`);
     
     selects.forEach((select, index) => {
         const roomNumber = select.dataset.roomNumber;
@@ -1068,7 +1051,6 @@ function initializeUserTableSort() {
 
 // ユーザーテーブル初期化
 function initializeUserTable() {
-    console.log('🔧 ユーザーテーブル機能を初期化中...');
     
     const sortIcons = document.querySelectorAll('.sort-icon[data-column]');
     
@@ -1080,7 +1062,6 @@ function initializeUserTable() {
     sortIcons.forEach(icon => {
         icon.addEventListener('click', function() {
             const column = this.getAttribute('data-column');
-            console.log(`📊 ソート実行: ${column}列`);
             
             // 現在のソート状態を確認
             const isCurrentlyAscending = this.classList.contains('fa-sort-up');
@@ -1098,15 +1079,12 @@ function initializeUserTable() {
             sortUserTable(column, newAscending);
         });
         
-        console.log(`✅ ソートアイコン設定完了: ${icon.getAttribute('data-column')}`);
     });
     
-    console.log(`✅ ユーザーテーブル初期化完了: ${sortIcons.length}個のソートアイコン`);
 }
 
 // ★修正：ソート関数（最終ログイン列削除に対応）
 function sortUserTable(column, ascending) {
-    console.log(`🔄 テーブルソート実行: ${column}, 昇順=${ascending}`);
     
     const tbody = document.getElementById('userTableBody');
     if (!tbody) {
@@ -1114,9 +1092,7 @@ function sortUserTable(column, ascending) {
         return;
     }
     
-    const rows = Array.from(tbody.querySelectorAll('tr'));
-    console.log(`📋 ソート対象行数: ${rows.length}`);
-    
+    const rows = Array.from(tbody.querySelectorAll('tr'));    
     if (rows.length === 0) {
         console.warn('⚠️ ソート対象の行がありません');
         return;
@@ -1154,12 +1130,9 @@ function sortUserTable(column, ascending) {
     // テーブルを再構築
     tbody.innerHTML = '';
     rows.forEach(row => tbody.appendChild(row));
-    
-    console.log(`✅ ソート完了: ${column} (昇順=${ascending})`);
 }
 
 function initializeUserFiltering() {
-    console.log('🔍 フィルタリング機能を初期化中...');
     
     const roomSelect = document.getElementById('roomSortSelect');
     const searchInput = document.getElementById('userSearchInput');
@@ -1176,22 +1149,17 @@ function initializeUserFiltering() {
     
     // 部屋選択のイベントリスナー
     roomSelect.addEventListener('change', function() {
-        console.log(`🏠 部屋フィルター変更: "${this.value}"`);
         filterUsers();
     });
     
     // 検索入力のイベントリスナー
     searchInput.addEventListener('input', function() {
-        console.log(`🔍 検索フィルター変更: "${this.value}"`);
         filterUsers();
     });
-    
-    console.log('✅ フィルタリング機能初期化完了');
 }
 
 // ★修正：フィルター関数（デバッグ情報を追加）
 function filterUsers() {
-    console.log('🔄 フィルター関数実行開始');
     
     const roomSelect = document.getElementById('roomSortSelect');
     const searchInput = document.getElementById('userSearchInput');
@@ -1205,29 +1173,14 @@ function filterUsers() {
     const selectedRoom = roomSelect ? roomSelect.value : '';
     const searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
     
-    console.log(`🔍 フィルター条件:`);
-    console.log(`  - 選択された部屋: "${selectedRoom}"`);
-    console.log(`  - 検索語: "${searchTerm}"`);
-    
     const rows = tbody.querySelectorAll('tr');
     let visibleCount = 0;
-    
-    console.log(`📋 処理対象行数: ${rows.length}`);
-    
+        
     rows.forEach((row, index) => {
         // データ属性から値を取得
         const roomValue = row.getAttribute('data-room') || '';
         const nameValue = row.getAttribute('data-name') || '';
         const studentValue = row.getAttribute('data-student') || '';
-        
-        // デバッグ：最初の数行の情報を出力
-        if (index < 3) {
-            console.log(`🔍 行${index + 1}:`, {
-                roomValue,
-                nameValue,
-                studentValue
-            });
-        }
         
         // フィルター条件の判定
         const roomMatch = !selectedRoom || roomValue === selectedRoom;
@@ -1239,43 +1192,25 @@ function filterUsers() {
         row.style.display = shouldShow ? '' : 'none';
         
         if (shouldShow) visibleCount++;
-    });
-    
-    console.log(`✅ フィルター完了: ${visibleCount}行表示`);
+    });    
 }
 
 // ★修正：デバッグ関数（問題診断用）
-function debugUserTable() {
-    console.log('🐛 ユーザーテーブルデバッグ情報:');
-    
+function debugUserTable() {    
     const tbody = document.getElementById('userTableBody');
     const roomSelect = document.getElementById('roomSortSelect');
     const searchInput = document.getElementById('userSearchInput');
     const sortIcons = document.querySelectorAll('.sort-icon[data-column]');
     
-    console.log('DOM要素の存在確認:');
-    console.log(`- userTableBody: ${tbody ? '✅' : '❌'}`);
-    console.log(`- roomSortSelect: ${roomSelect ? '✅' : '❌'}`);
-    console.log(`- userSearchInput: ${searchInput ? '✅' : '❌'}`);
-    console.log(`- sortIcons: ${sortIcons.length}個`);
-    
     if (tbody) {
-        const rows = tbody.querySelectorAll('tr');
-        console.log(`テーブル行数: ${rows.length}`);
-        
+        const rows = tbody.querySelectorAll('tr');        
         if (rows.length > 0) {
             const firstRow = rows[0];
-            console.log('最初の行のデータ属性:');
-            console.log(`- data-room: "${firstRow.getAttribute('data-room')}"`);
-            console.log(`- data-name: "${firstRow.getAttribute('data-name')}"`);
-            console.log(`- data-student: "${firstRow.getAttribute('data-student')}"`);
         }
     }
     
     if (roomSelect) {
-        console.log('部屋選択オプション:');
         Array.from(roomSelect.options).forEach((option, index) => {
-            console.log(`  ${index}: "${option.value}" - "${option.textContent}"`);
         });
     }
 }
@@ -1316,21 +1251,18 @@ window.filterUsers = filterUsers;
 // 3. DOMContentLoaded イベントリスナー
 // ========================================
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('🎉 DOMContentLoaded - 管理画面統合初期化開始');
     
     // ========================================
     // 1. 基本機能の初期化（最優先）
     // ========================================
     
     // 折りたたみ機能の初期化
-    console.log('📁 折りたたみ機能初期化中...');
     initializeCollapseSections();
     
     // ========================================
     // 2. ユーザー削除機能（イベント委譲）
     // ========================================
     
-    console.log('👤 ユーザー削除機能初期化中...');
     document.addEventListener('click', function(event) {
         if (event.target.closest('.delete-user-btn')) {
             event.preventDefault();
@@ -1352,7 +1284,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // ========================================
     
     setTimeout(() => {
-        console.log('📝 論述問題フォーム初期化中...');
         
         const essayForm = document.getElementById('newEssayProblemForm');
         
@@ -1475,7 +1406,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // ========================================
     
     setTimeout(() => {
-        console.log('📋 CSVファイル一覧を自動読み込み中...');
         if (typeof loadCsvFilesList === 'function') {
             loadCsvFilesList();
         } else {
@@ -1488,13 +1418,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // ========================================
     
     setTimeout(() => {
-        console.log('🏠 部屋設定を自動読み込み中...');
         if (typeof loadRoomSettings === 'function') {
             loadRoomSettings();
         }
-        
-        // 部屋設定保存ボタンの初期化
-        console.log('💾 部屋設定保存ボタン初期化中...');
         
         // 既存のイベントリスナーを削除して新しいものに置き換え
         document.querySelectorAll('.save-room-setting-btn').forEach(button => {
@@ -1506,9 +1432,7 @@ document.addEventListener('DOMContentLoaded', function() {
             button.addEventListener('click', function() {
                 const roomNumber = this.dataset.roomNumber;
                 const csvFileSelect = document.getElementById('csvFile_' + roomNumber);
-                
-                console.log(`🔧 部屋設定保存開始: ${roomNumber}`);
-                
+                                
                 if (!csvFileSelect) {
                     alert('設定要素が見つかりません。');
                     return;
@@ -1517,12 +1441,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 // 選択された単元を取得
                 const selectedUnits = getSelectedUnits(roomNumber);
                 const csvFilename = csvFileSelect.value;
-                
-                console.log(`📝 保存する設定:`, {
-                    roomNumber: roomNumber,
-                    selectedUnits: selectedUnits,
-                    csvFilename: csvFilename
-                });
 
                 // ボタンを無効化して重複実行を防ぐ
                 this.disabled = true;
@@ -1548,15 +1466,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     })
                 ])
                 .then(responses => {
-                    console.log('📡 サーバーレスポンス受信:', responses.map(r => r.status));
                     return Promise.all(responses.map(r => r.json()));
                 })
                 .then(results => {
                     const unitResult = results[0];
                     const csvResult = results[1];
-                    
-                    console.log('📊 保存結果:', { unitResult, csvResult });
-                    
+                                        
                     if (unitResult.status === 'success' && csvResult.status === 'success') {
                         alert(`✅ 部屋 ${roomNumber} の設定を更新しました:\n・有効単元: ${selectedUnits.length}個\n・CSVファイル: ${csvFilename}`);
                         
@@ -1586,8 +1501,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // ========================================
     
     setTimeout(function() {
-        console.log('👥 ユーザー管理初期化中...');
-        
         // デバッグ情報を出力
         if (typeof debugUserTable === 'function') {
             debugUserTable();
@@ -1602,28 +1515,25 @@ document.addEventListener('DOMContentLoaded', function() {
         if (typeof initializeUserFiltering === 'function') {
             initializeUserFiltering();
         }
-        
-        console.log('✅ ユーザー管理初期化完了');
     }, 2000);
     
     // ========================================
     // 7. 論述問題関連の初期化
     // ========================================
     
-    setTimeout(() => {
-        console.log('📚 論述問題関連初期化中...');
-        
-        // 論述問題統計とリストを読み込み
+    setTimeout(() => {        
+        // 論述問題統計のみ読み込み（問題一覧は検索時のみ）
         if (document.getElementById('essay-stats-container')) {
             if (typeof loadEssayStats === 'function') {
                 loadEssayStats();
             }
         }
-        if (document.getElementById('essay-problems-container')) {
-            if (typeof loadEssayProblems === 'function') {
-                loadEssayProblems();
-            }
+        // 初期状態のメッセージを設定
+        const problemsContainer = document.getElementById('essay-problems-container');
+        if (problemsContainer) {
+            problemsContainer.innerHTML = '<div class="text-center text-muted p-4"><i class="fas fa-search"></i><br>章、タイプ、またはキーワードを指定して検索してください</div>';
         }
+
         
         // 論述問題フィルター機能の初期化
         const essayChapterFilter = document.getElementById('essayChapterFilter');
@@ -1653,16 +1563,20 @@ document.addEventListener('DOMContentLoaded', function() {
             essaySearch.addEventListener('input', function() {
                 clearTimeout(searchTimeout);
                 searchTimeout = setTimeout(() => {
+                    // 入力値が3文字未満の場合は検索しない（空白の場合は初期状態に戻す）
+                    const searchValue = this.value.trim();
+                    if (searchValue.length > 0 && searchValue.length < 3) {
+                        return; // 3文字未満は検索しない
+                    }
+                    
                     if (typeof loadEssayProblems === 'function') {
                         loadEssayProblems();
                     } else if (typeof filterEssayProblems === 'function') {
                         filterEssayProblems();
                     }
-                }, 500);
+                }, 800); // デバウンス時間を500ms→800msに延長
             });
         }
-        
-        console.log('✅ 論述問題関連初期化完了');
     }, 2500);
     
     // ========================================
@@ -1670,51 +1584,26 @@ document.addEventListener('DOMContentLoaded', function() {
     // ========================================
     
     setTimeout(() => {
-        console.log('👁️ 論述問題公開設定初期化中...');
         if (typeof initializeVisibilitySettings === 'function') {
             initializeVisibilitySettings();
         }
-        console.log('✅ 論述問題公開設定初期化完了');
     }, 3000);
     
     // ========================================
-    // 9. デバッグモード設定
+    // 9. デバッグモード設定（削除済み）
     // ========================================
-    
-    setTimeout(() => {
-        // デバッグモードの場合のみ（本番では削除推奨）
-        if (window.location.hostname === 'localhost' || window.location.hostname.includes('127.0.0.1')) {
-            console.log('🔧 デバッグモードが有効です');
-            console.log('📝 使用可能なデバッグコマンド:');
-            console.log('   debugVisibilitySettings() - 設定状況を表示');
-            console.log('   testIndividualClick(章, タイプ) - 個別クリックをテスト');
-            console.log('   showCurrentSettings() - 現在の設定を表示');
-        }
-    }, 3500);
-    
+
     // ========================================
     // 10. 最終チェック
     // ========================================
     
-    setTimeout(() => {
-        console.log('🔍 最終チェック中...');
-        
+    setTimeout(() => {        
         // 各種要素の存在確認
         const essayForm = document.getElementById('newEssayProblemForm');
         const userTable = document.getElementById('userTable');
         const csvUpload = document.getElementById('csvUploadForm');
-        const visibilityMatrix = document.getElementById('visibilityMatrix');
-        
-        console.log('📊 要素存在確認:');
-        console.log('  - 論述問題フォーム:', essayForm ? '✅' : '❌');
-        console.log('  - ユーザーテーブル:', userTable ? '✅' : '❌');
-        console.log('  - CSVアップロード:', csvUpload ? '✅' : '❌');
-        console.log('  - 公開設定マトリックス:', visibilityMatrix ? '✅' : '❌');
-        
-        console.log('🎯 すべての統合初期化完了');
-    }, 4000);
-    
-    console.log('✅ 管理画面統合初期化スケジュール設定完了');
+        const visibilityMatrix = document.getElementById('visibilityMatrix');       
+    }, 4000);    
 });
 
 // ========================================
@@ -2043,16 +1932,12 @@ function initializeAllStats() {
     }
 }
 
-console.log('🎉 admin.html スクリプト読み込み完了');
-
 // ========================================
 // 単元選択管理機能
 // ========================================
 
 // 利用可能な単元一覧を読み込む
-function loadAvailableUnits(roomNumber) {
-    console.log(`🔍 単元一覧読み込み: 部屋${roomNumber}`);
-    
+function loadAvailableUnits(roomNumber) {    
     const container = document.getElementById(`unitCheckboxes_${roomNumber}`);
     if (!container) return;
     
@@ -2102,8 +1987,6 @@ function displayUnitCheckboxes(roomNumber, availableUnits) {
     
     html += '</div>';
     container.innerHTML = html;
-    
-    console.log(`✅ 単元チェックボックス表示完了: ${availableUnits.length}個`);
 }
 
 // 現在の単元設定を読み込み
@@ -2127,7 +2010,6 @@ function loadCurrentUnitSettings(roomNumber) {
             });
             
             updateSelectedCount(roomNumber);
-            console.log(`✅ 現在の設定適用: ${enabledUnits.length}個の単元が有効`);
         }
     })
     .catch(error => {
@@ -2152,7 +2034,6 @@ function selectAllUnits(roomNumber) {
         checkbox.checked = true;
     });
     updateSelectedCount(roomNumber);
-    console.log(`✅ 全単元選択: 部屋${roomNumber}`);
 }
 
 // 全ての単元選択を解除
@@ -2162,7 +2043,6 @@ function clearAllUnits(roomNumber) {
         checkbox.checked = false;
     });
     updateSelectedCount(roomNumber);
-    console.log(`🔄 全単元解除: 部屋${roomNumber}`);
 }
 
 // 選択された単元のリストを取得
@@ -2284,16 +2164,22 @@ document.getElementById('essayUploadForm').addEventListener('submit', function(e
     });
 });
 
-// 既存のloadEssayProblems関数を以下で完全に置き換える
 function loadEssayProblems() {
     const container = document.getElementById('essay-problems-container');
     if (!container) return;
     
-    container.innerHTML = '<p class="text-info">📋 問題一覧を読み込み中...</p>';
-    
     const chapter = document.getElementById('essayChapterFilter')?.value || '';
     const type = document.getElementById('essayTypeFilter')?.value || '';
     const search = document.getElementById('essaySearch')?.value || '';
+    
+    // フィルター条件が何も指定されていない場合は表示しない
+    if (!chapter && !type && !search) {
+        container.innerHTML = '<div class="text-center text-muted p-4"><i class="fas fa-search"></i><br>章、タイプ、またはキーワードを指定して検索してください</div>';
+        return;
+    }
+    
+    container.innerHTML = '<p class="text-info">📋 問題一覧を読み込み中...</p>';
+
     
     const params = new URLSearchParams();
     if (chapter) params.append('chapter', chapter);
@@ -2311,24 +2197,17 @@ function loadEssayProblems() {
                 
                 // 問題一覧を表示
                 if (data.problems && data.problems.length > 0) {
-                    // 統計サマリーを追加
+                    // 統計サマリーを簡略化
                     let html = `
                         <div class="essay-stats-summary">
                             <div class="stat-item">
-                                <div class="stat-value">${data.pagination.total}</div>
-                                <div class="stat-label">総問題数</div>
-                            </div>
-                            <div class="stat-item">
                                 <div class="stat-value">${data.problems.length}</div>
-                                <div class="stat-label">表示中</div>
-                            </div>
-                            <div class="stat-item">
-                                <div class="stat-value">${data.pagination.pages}</div>
-                                <div class="stat-label">総ページ数</div>
+                                <div class="stat-label">検索結果</div>
                             </div>
                         </div>
                         <div class="essay-problems-list">
                     `;
+
                     
                     // 各問題を表示
                     data.problems.forEach(problem => {
@@ -2882,7 +2761,6 @@ function toggleEssayProblem(problemId, currentEnabled) {
 // loadEssayStats関数が定義されていない場合のフォールバック
 if (typeof loadEssayStats === 'undefined') {
     window.loadEssayStats = function() {
-        console.log('loadEssayStats関数は現在利用できません');
         // 統計の再読み込みを試行
         if (typeof updateEssayStatistics === 'function') {
             updateEssayStatistics();
@@ -3016,9 +2894,7 @@ function addEssayProblem() {
         answer_length: document.getElementById('add_answer_length').value,
         enabled: document.getElementById('add_enabled').checked
     };
-    
-    console.log('追加データ:', formData);
-    
+        
     fetch('/admin/essay/add', {
         method: 'POST',
         headers: {
@@ -3027,7 +2903,6 @@ function addEssayProblem() {
         body: JSON.stringify(formData)
     })
     .then(response => {
-        console.log('レスポンステータス:', response.status);
         
         // レスポンスの内容タイプをチェック
         const contentType = response.headers.get('content-type');
@@ -3038,7 +2913,6 @@ function addEssayProblem() {
         return response.json();
     })
     .then(data => {
-        console.log('追加結果:', data);
         
         if (data.status === 'success') {
             alert(data.message);
@@ -3127,21 +3001,15 @@ function loadVisibilitySettings() {
     const roomNumber = document.getElementById('visibilityRoomSelect').value;
     if (!roomNumber) return;
     
-    console.log(`🔄 設定読み込み開始: 部屋${roomNumber}`);
     showVisibilityStatus('info', '設定を読み込み中...');
     
     fetch(`/admin/essay_visibility_settings/${roomNumber}`)
         .then(response => response.json())
         .then(data => {
-            console.log('📨 サーバーレスポンス:', data);
             
             if (data.status === 'success') {
                 currentVisibilitySettings = data.settings;
                 availableChapters = data.chapters;
-                
-                console.log('📊 読み込んだ設定:', currentVisibilitySettings);
-                console.log('📚 利用可能な章:', availableChapters);
-                console.log('🏷️ 利用可能なタイプ:', availableTypes);
                 
                 createVisibilityMatrix();
                 updateSettingsSummary();
@@ -3166,9 +3034,7 @@ function createVisibilityMatrix() {
     
     // CSS変数を動的に設定
     document.documentElement.style.setProperty('--type-count', availableTypes.length);
-    
-    console.log(`📊 簡素化CSS Grid マトリックス生成: ${availableChapters.length}章 × ${availableTypes.length}タイプ`);
-    
+        
     // 各章ごとにグリッド行を生成
     availableChapters.forEach(chapter => {
         // 章名セル（クリック可能）
@@ -3212,7 +3078,6 @@ function createVisibilityMatrix() {
             // クリックイベント
             cell.addEventListener('click', function(event) {
                 event.stopPropagation();
-                console.log(`🖱️ セル クリック: 第${chapter}章 タイプ${type}`);
                 toggleIndividualVisibility(chapter, type, cell);
             });
             
@@ -3227,12 +3092,9 @@ function createVisibilityMatrix() {
     
     document.getElementById('visibilityMatrix').style.display = 'block';
     
-    console.log('✅ 簡素化CSS Grid マトリックス生成完了');
 }
 
-function updateCellAppearance(cell, isVisible) {
-    console.log(`🎨 セル更新: 第${cell.getAttribute('data-chapter')}章${cell.getAttribute('data-type')}問題 → ${isVisible ? '公開' : '非公開'}`);
-    
+function updateCellAppearance(cell, isVisible) {    
     // ★重要：セル内容を完全にクリアしてから再構築
     cell.innerHTML = '';
     
@@ -3256,12 +3118,10 @@ function updateCellAppearance(cell, isVisible) {
     // データ属性更新
     cell.setAttribute('data-visible', isVisible);
     
-    console.log(`✅ セル完全再構築完了: "${textElement.textContent}"`);
 }
 
 // 章全体の一括設定機能
 function toggleChapterVisibility(chapter) {
-    console.log(`📚 章一括設定: 第${chapter}章`);
     
     // 該当章の現在の状態を確認
     const chapterCells = document.querySelectorAll(`[data-chapter="${chapter}"].grid-cell-setting`);
@@ -3281,9 +3141,7 @@ function toggleChapterVisibility(chapter) {
     
     // 過半数が公開なら非公開に、そうでなければ公開に
     const newVisibility = visibleCount < (chapterCells.length / 2);
-    
-    console.log(`第${chapter}章: 現在公開数=${visibleCount}/${chapterCells.length} → ${newVisibility ? '全て公開' : '全て非公開'}`);
-    
+        
     // 各セルを更新
     chapterCells.forEach(cell => {
         const type = cell.getAttribute('data-type');
@@ -3328,20 +3186,15 @@ function getVisibilitySetting(chapter, type) {
 }
 
 // デバッグ用：マトリックスの状態確認
-function debugMatrixState() {
-    console.log('=== マトリックス状態デバッグ ===');
-    
+function debugMatrixState() {    
     const cells = document.querySelectorAll('.visibility-cell');
     cells.forEach((cell, index) => {
         const chapter = cell.getAttribute('data-chapter');
         const type = cell.getAttribute('data-type');
         const isVisible = cell.getAttribute('data-visible') === 'true';
-        const hasContent = cell.querySelector('.visibility-cell-content');
-        
-        console.log(`セル${index + 1}: 第${chapter}章${type}問題, ${isVisible ? '公開' : '非公開'}, コンテナ: ${hasContent ? 'あり' : 'なし'}`);
+        const hasContent = cell.querySelector('.visibility-cell-content');        
     });
-    
-    console.log('=== デバッグ終了 ===');
+
 }
 
 function toggleIndividualVisibility(chapter, type, cell) {
@@ -3359,8 +3212,6 @@ function toggleIndividualVisibility(chapter, type, cell) {
     
     // セルの表示を更新
     updateCellAppearance(cell, newStatus);
-    
-    console.log(`章${chapter} タイプ${type}: ${currentStatus ? '公開' : '非公開'} → ${newStatus ? '公開' : '非公開'}`);
 }
 
 function setTypeVisible(targetType, isVisible) {
@@ -3412,9 +3263,6 @@ function saveVisibilitySettings() {
         return;
     }
     
-    console.log('💾 保存開始:', roomNumber);
-    console.log('📊 現在の設定:', currentVisibilitySettings);
-    
     // 保存ボタンを無効化して連続クリックを防止
     const saveBtn = document.getElementById('saveVisibilitySettings');
     const originalText = saveBtn.innerHTML;
@@ -3434,14 +3282,12 @@ function saveVisibilitySettings() {
         })
     })
     .then(response => {
-        console.log('📡 レスポンス受信:', response.status, response.statusText);
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
         return response.json();
     })
     .then(data => {
-        console.log('✅ 保存レスポンス:', data);
         if (data.status === 'success') {
             showVisibilityStatus('success', `${data.message}`);
         } else {
@@ -3496,9 +3342,6 @@ function showVisibilityStatus(type, message) {
         </div>
     `;
     
-    // コンソールにも出力
-    console.log(`📢 ステータス [${type.toUpperCase()}]: ${message}`);
-    
     // 5秒後に自動で非表示
     setTimeout(() => {
         const alert = statusDiv.querySelector('.alert');
@@ -3515,30 +3358,20 @@ function showVisibilityStatus(type, message) {
 
 // デバッグ用ヘルパー関数
 function debugVisibilitySettings() {
-    console.log('🔍 === 論述問題公開設定デバッグ情報 ===');
-    console.log('📋 currentVisibilitySettings:', currentVisibilitySettings);
-    console.log('📊 availableChapters:', availableChapters);
-    console.log('🎯 availableTypes:', availableTypes);
-    
     // 各セルの状態をチェック
     availableChapters.forEach(chapter => {
         availableTypes.forEach(type => {
             const cell = document.querySelector(`[data-chapter="${chapter}"][data-type="${type}"]`);
             const setting = getVisibilitySetting(chapter, type);
-            console.log(`📱 第${chapter}章 タイプ${type}: 設定=${setting}, セル存在=${!!cell}`);
             if (cell) {
-                console.log(`   → セルクラス: ${cell.className}`);
-                console.log(`   → セル内容: ${cell.innerHTML.replace(/\s+/g, ' ').trim()}`);
             }
         });
     });
     
-    console.log('🔚 === デバッグ情報終了 ===');
 }
 
 // テスト用の関数
 function testIndividualClick(chapter, type) {
-    console.log(`🧪 テスト: 第${chapter}章 タイプ${type}をクリック`);
     const cell = document.querySelector(`[data-chapter="${chapter}"][data-type="${type}"]`);
     if (cell) {
         cell.click();
@@ -3551,11 +3384,8 @@ function testIndividualClick(chapter, type) {
 function showCurrentSettings() {
     const roomNumber = document.getElementById('visibilityRoomSelect').value;
     if (!roomNumber) {
-        console.log('⚠️ 部屋が選択されていません');
         return;
     }
-    
-    console.log(`📊 部屋 ${roomNumber} の現在の設定:`);
     console.table(currentVisibilitySettings);
 }
 
@@ -3568,10 +3398,7 @@ window.showCurrentSettings = showCurrentSettings;
 function deleteRoom(roomNumber) {
     if (!confirm(`部屋${roomNumber}を本当に削除しますか？\n\n⚠️ この操作は元に戻せません。\n※ 部屋にユーザーが存在する場合は削除できません。`)) {
         return;
-    }
-    
-    console.log(`🗑️ 部屋${roomNumber}の削除を開始`);
-    
+    }    
     fetch('/admin/delete_room', {
         method: 'POST',
         headers: {
@@ -3583,7 +3410,6 @@ function deleteRoom(roomNumber) {
     })
     .then(response => response.json())
     .then(data => {
-        console.log('削除結果:', data);
         
         if (data.status === 'success') {
             alert(data.message);
@@ -3612,8 +3438,6 @@ function toggleRoomSuspension(buttonElement) {
         return;
     }
     
-    console.log(`🔄 部屋${roomNumber}の${action}処理を開始`);
-    
     // ✅ buttonElement を使用（button ではない）
     const originalHTML = buttonElement.innerHTML;
     buttonElement.disabled = true;
@@ -3630,7 +3454,6 @@ function toggleRoomSuspension(buttonElement) {
     })
     .then(response => response.json())
     .then(data => {
-        console.log('一時停止切り替え結果:', data);
         
         if (data.status === 'success') {
             alert(data.message);
@@ -3699,7 +3522,6 @@ function hideImageUploadInEdit(problemId) {
 
 // 編集モーダルから画像アップロード（改良版）
 function uploadEssayImageFromEdit(problemId) {
-    console.log('画像アップロード開始:', problemId);
     
     const fileInput = document.getElementById('imageInput_' + problemId);
     
@@ -3729,7 +3551,6 @@ function uploadEssayImageFromEdit(problemId) {
     })
     .then(response => response.json())
     .then(data => {
-        console.log('アップロード結果:', data);
         
         if (data.status === 'success') {
             alert(data.message);
@@ -3828,9 +3649,6 @@ function updateAnswerCharCount(textareaId, counterId) {
     } else if (currentLength > 300) {
         counter.classList.add('warning');
     }
-    
-    // デバッグ用（本番では削除可能）
-    console.log(`📝 文字数更新: ${textareaId} = ${currentLength}字`);
 }
 
 function initializeCharCount(textareaId, counterId) {
