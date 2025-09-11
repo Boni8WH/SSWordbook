@@ -1361,12 +1361,13 @@ function showQuizResult() {
             }
         }
     }, 300);
+    
     updateRestartButtonText();
 
-    // 1. 問題のカテゴリを収集する
-    const sessionCategories = new Set(); // Setを使ってカテゴリの重複を防ぐ
+    // 1. 今回出題された全ての問題のカテゴリを収集する
+    const sessionCategories = new Set();
     
-    currentQuizData.forEach(word => { // <--- currentQuizData (全問題) を直接ループ
+    currentQuizData.forEach(word => {
         if (word.category) {
             sessionCategories.add(word.category);
         }
@@ -1392,10 +1393,9 @@ function showQuizResult() {
         .then(response => response.json())
         .then(data => {
             if (data.essays && data.essays.length > 0) {
-                // 4. 受け取った問題リストを画面に表示する
+                // 4.【見つかった場合】受け取った問題リストを画面に表示する
                 data.essays.forEach(essay => {
                     const li = document.createElement('li');
-                    // aタグで論述問題ページへのリンクを作成
                     li.innerHTML = `
                         <a href="/essay/problem/${essay.id}" class="recommended-essay-link">
                             <strong>${essay.university} ${essay.year}年</strong>
@@ -1404,8 +1404,13 @@ function showQuizResult() {
                     `;
                     recommendedContainer.appendChild(li);
                 });
-                // エリア全体を表示する
                 recommendedSection.classList.remove('hidden');
+            } else {
+                // --- ▼ここが修正・追加された部分▼ ---
+                // 4.【見つからなかった場合】メッセージを表示する
+                recommendedContainer.innerHTML = '<li class="no-recommendation">関連する論述問題は見つかりませんでした。幅広い分野を学習してみましょう！</li>';
+                recommendedSection.classList.remove('hidden'); // エリア自体は表示する
+                // --- ▲ここまで▲ ---
             }
         })
         .catch(error => {

@@ -4118,3 +4118,11 @@ a.nav-link.btn.change-username-button:hover,
     color: #555;
     line-height: 1.4;
 }
+
+.no-recommendation {
+    padding: 15px;
+    text-align: center;
+    color: #6c757d;
+    font-size: 0.9em;
+    list-style-type: none;
+}
