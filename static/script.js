@@ -1361,8 +1361,63 @@ function showQuizResult() {
             }
         }
     }, 300);
-        
     updateRestartButtonText();
+
+    // 1. 今回間違えた問題のカテゴリを収集する
+    const incorrectCategories = new Set(); // Setを使ってカテゴリの重複を防ぐ
+    
+    // 現在のクイズで間違えた問題を取得
+    const incorrectWordsInThisQuiz = currentQuizData.filter(word => {
+        const wordId = generateProblemId(word);
+        return incorrectWords.includes(wordId);
+    });
+
+    incorrectWordsInThisQuiz.forEach(word => {
+        if (word.category) {
+            incorrectCategories.add(word.category);
+        }
+    });
+
+    // 2. おすすめ論述問題の表示エリアを一度リセット
+    const recommendedSection = document.getElementById('recommendedEssaysSection');
+    const recommendedContainer = document.getElementById('recommendedEssaysContainer');
+    recommendedSection.classList.add('hidden');
+    recommendedContainer.innerHTML = '';
+
+    // 3. 収集したカテゴリがあれば、APIに問い合わせる
+    if (incorrectCategories.size > 0) {
+        const categoriesArray = Array.from(incorrectCategories);
+
+        fetch('/api/find_related_essays', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ categories: categoriesArray }),
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.essays && data.essays.length > 0) {
+                // 4. 受け取った問題リストを画面に表示する
+                data.essays.forEach(essay => {
+                    const li = document.createElement('li');
+                    // aタグで論述問題ページへのリンクを作成
+                    li.innerHTML = `
+                        <a href="/essay/problem/${essay.id}" class="recommended-essay-link">
+                            <strong>${essay.university} ${essay.year}年</strong>
+                            <p>${essay.question_snippet}</p>
+                        </a>
+                    `;
+                    recommendedContainer.appendChild(li);
+                });
+                // エリア全体を表示する
+                recommendedSection.classList.remove('hidden');
+            }
+        })
+        .catch(error => {
+            console.error('おすすめ論述問題の取得エラー:', error);
+        });
+    }
 }
 
 function updateUserStatsAsync() {
