@@ -1364,12 +1364,13 @@ function showQuizResult() {
     
     updateRestartButtonText();
 
-    // 1. 今回出題された全ての問題のカテゴリを収集する
-    const sessionCategories = new Set();
-    
+    // 1. 今回【出題された全ての問題】の【答え】をキーワードとして収集する
+    const sessionKeywords = new Set(); // Setを使ってキーワードの重複を防ぐ
+
     currentQuizData.forEach(word => {
-        if (word.category) {
-            sessionCategories.add(word.category);
+        // 答えが存在し、2文字以上の場合のみキーワードとして追加
+        if (word.answer && word.answer.length > 1) {
+            sessionKeywords.add(word.answer);
         }
     });
 
@@ -1379,16 +1380,17 @@ function showQuizResult() {
     recommendedSection.classList.add('hidden');
     recommendedContainer.innerHTML = '';
 
-    // 3. 収集したカテゴリがあれば、APIに問い合わせる
-    if (sessionCategories.size > 0) {
-        const categoriesArray = Array.from(sessionCategories);
+    // 3. 収集したキーワードがあれば、APIに問い合わせる
+    if (sessionKeywords.size > 0) {
+        const keywordsArray = Array.from(sessionKeywords);
 
         fetch('/api/find_related_essays', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ categories: categoriesArray }),
+            // 'categories' ではなく 'keywords' を送るように変更
+            body: JSON.stringify({ keywords: keywordsArray }),
         })
         .then(response => response.json())
         .then(data => {
@@ -1406,11 +1408,9 @@ function showQuizResult() {
                 });
                 recommendedSection.classList.remove('hidden');
             } else {
-                // --- ▼ここが修正・追加された部分▼ ---
                 // 4.【見つからなかった場合】メッセージを表示する
                 recommendedContainer.innerHTML = '<li class="no-recommendation">関連する論述問題は見つかりませんでした。幅広い分野を学習してみましょう！</li>';
-                recommendedSection.classList.remove('hidden'); // エリア自体は表示する
-                // --- ▲ここまで▲ ---
+                recommendedSection.classList.remove('hidden');
             }
         })
         .catch(error => {
