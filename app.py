@@ -11069,6 +11069,68 @@ with app.app_context():
     except Exception as e:
         app.logger.error(f"❌ データベース初期化エラー: {e}")
 
+
+@app.route('/api/find_related_essays', methods=['POST'])
+def find_related_essays():
+    """
+    カテゴリのリストを受け取り、関連する論述問題を探して返すAPI
+    """
+    if 'user_id' not in session:
+        return jsonify({'status': 'error', 'message': 'ログインが必要です'}), 401
+
+    data = request.get_json()
+    if not data or 'categories' not in data:
+        return jsonify({'status': 'error', 'message': 'カテゴリが指定されていません'}), 400
+
+    categories = data['categories']
+    # カテゴリリストが空なら、何も返さない
+    if not categories:
+        return jsonify({'essays': []})
+
+    # ユーザーの部屋番号を取得して、公開設定を考慮する
+    user = User.query.get(session['user_id'])
+    if not user:
+        return jsonify({'status': 'error', 'message': 'ユーザーが見つかりません'}), 404
+    
+    # 検索条件を作成
+    # 各カテゴリが問題文か解答文に含まれているものをOR条件で探す
+    search_conditions = []
+    for category in categories:
+        # 空のカテゴリは無視
+        if category:
+            search_pattern = f'%{category}%'
+            search_conditions.append(EssayProblem.question.ilike(search_pattern))
+            search_conditions.append(EssayProblem.answer.ilike(search_pattern))
+
+    if not search_conditions:
+        return jsonify({'essays': []})
+
+    # 公開設定を考慮した問題を取得
+    visible_problems = get_filtered_essay_problems_with_visibility(
+        chapter=None,  # 全ての章を対象
+        room_number=user.room_number,
+        user_id=user.id
+    )
+    
+    # 関連問題をフィルタリング
+    related_essays = []
+    for problem in visible_problems:
+        for category in categories:
+            if category and (category in problem.question or category in problem.answer):
+                # 辞書形式に変換して追加
+                related_essays.append({
+                    'id': problem.id,
+                    'university': problem.university,
+                    'year': problem.year,
+                    'question_snippet': (problem.question[:50] + '...') if len(problem.question) > 50 else problem.question
+                })
+                break # 重複して追加しないように
+
+    # 最大5件に絞り、新しいものから順に表示
+    recommended_essays = sorted(related_essays, key=lambda x: x.get('year', 0), reverse=True)[:5]
+    
+    return jsonify({'essays': recommended_essays})
+
 # ===== メイン起動処理の修正 =====
 if __name__ == '__main__':
     try:
