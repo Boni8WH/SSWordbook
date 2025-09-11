@@ -4094,3 +4094,27 @@ a.nav-link.btn.change-username-button:hover,
     pointer-events: none !important;
 }
 
+.recommended-essay-link {
+    display: block;
+    text-decoration: none;
+    color: #34495e;
+    padding: 10px;
+    border-radius: 6px;
+    transition: background-color 0.2s ease;
+}
+
+.recommended-essay-link:hover {
+    background-color: #ecf0f1;
+}
+
+.recommended-essay-link strong {
+    color: #2980b9;
+    font-size: 0.9em;
+}
+
+.recommended-essay-link p {
+    font-size: 0.85em;
+    margin: 5px 0 0 0;
+    color: #555;
+    line-height: 1.4;
+}
