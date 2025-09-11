@@ -1363,18 +1363,12 @@ function showQuizResult() {
     }, 300);
     updateRestartButtonText();
 
-    // 1. 今回間違えた問題のカテゴリを収集する
-    const incorrectCategories = new Set(); // Setを使ってカテゴリの重複を防ぐ
+    // 1. 問題のカテゴリを収集する
+    const sessionCategories = new Set(); // Setを使ってカテゴリの重複を防ぐ
     
-    // 現在のクイズで間違えた問題を取得
-    const incorrectWordsInThisQuiz = currentQuizData.filter(word => {
-        const wordId = generateProblemId(word);
-        return incorrectWords.includes(wordId);
-    });
-
-    incorrectWordsInThisQuiz.forEach(word => {
+    currentQuizData.forEach(word => { // <--- currentQuizData (全問題) を直接ループ
         if (word.category) {
-            incorrectCategories.add(word.category);
+            sessionCategories.add(word.category);
         }
     });
 
@@ -1385,8 +1379,8 @@ function showQuizResult() {
     recommendedContainer.innerHTML = '';
 
     // 3. 収集したカテゴリがあれば、APIに問い合わせる
-    if (incorrectCategories.size > 0) {
-        const categoriesArray = Array.from(incorrectCategories);
+    if (sessionCategories.size > 0) {
+        const categoriesArray = Array.from(sessionCategories);
 
         fetch('/api/find_related_essays', {
             method: 'POST',
