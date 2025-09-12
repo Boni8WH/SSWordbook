@@ -545,6 +545,56 @@
     left: 0 !important;
     margin: 0 !important; /* すべてのmarginを0に設定 */
 }
+
+.memo-group {
+    grid-column: 1 / -1;
+}
+
+/* ========================================
+   アクションボタンのレイアウト
+   ======================================== */
+.action-buttons-container {
+    display: flex;         /* ボタンを横並びに */
+    justify-content: center; /* 全体を中央揃え */
+    align-items: center;   /* 上下の位置を中央に揃える */
+    flex-wrap: wrap;       /* 画面が狭い場合は折り返す */
+    gap: 15px;             /* ボタン間の隙間 */
+    margin: 25px 0;        /* 上下の余白 */
+}
+
+/* 各ボタン・要素のスタイルを統一 */
+.action-buttons-container .action-btn {
+    height: 44px;          /* 高さを統一 */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* 「準備運動！」ボタンの個別スタイル */
+.action-buttons-container #startWarmUpQuizBtn {
+    font-weight: 600;
+    padding: 0 25px;
+    border-radius: 22px;
+    box-shadow: 0 2px 8px rgba(40, 167, 69, 0.2);
+    border-width: 2px;
+}
+
+/* スマホ・タブレットでの表示を調整 */
+@media (max-width: 768px) {
+    .action-buttons-container {
+        gap: 10px;
+        flex-direction: column; /* 縦並びにする */
+        align-items: stretch;  /* 横幅をいっぱいにする */
+    }
+
+    .action-buttons-container .action-btn {
+        width: 100%; /* 全てのボタンを画面幅いっぱいに */
+    }
+
+    .answer-button-container {
+        min-width: 100% !important;
+    }
+}
 </style>
 
 {% endblock %}
@@ -646,27 +696,23 @@
         {% endif %}
     </div>
 
-    <div class="warm-up-quiz-section">
-        <button class="btn btn-outline-success" id="startWarmUpQuizBtn" data-problem-id="{{ problem.id }}">
+    <div class="action-buttons-container">
+        <button class="btn btn-outline-success action-btn" id="startWarmUpQuizBtn" data-problem-id="{{ problem.id }}">
             <i class="fas fa-running"></i> 準備運動！
         </button>
-    </div>
 
-    <!-- 解答表示/非表示ボタン -->
-    <div class="answer-controls">
-        <div class="answer-button-container">
+        <div class="answer-button-container action-btn">
             <button class="answer-control-btn" id="showAnswerBtn">
                 <i class="fas fa-eye"></i>
                 解答を表示
             </button>
-            
             <button class="answer-control-btn hide-answer-btn" id="hideAnswerBtn" style="display: none;">
                 <i class="fas fa-eye-slash"></i>
                 解答を非表示
             </button>
         </div>
         
-        <div class="answer-info">
+        <div class="answer-info action-btn">
             <span class="answer-char-count">
                 <i class="fas fa-text-width"></i>
                 模範解答：{{ problem.answer_length }}字
@@ -721,11 +767,11 @@
                 </div>
             </div>
             
-            <div class="control-group">
+            <div class="control-group memo-group">
                 <label for="memo">メモ</label>
                 <textarea id="memo" 
-                          class="memo-input" 
-                          placeholder="この問題についてのメモを記入...">{% if problem.progress and problem.progress.memo %}{{ problem.progress.memo }}{% endif %}</textarea>
+                        class="memo-input" 
+                        placeholder="この問題についてのメモを記入...">{% if problem.progress and problem.progress.memo %}{{ problem.progress.memo }}{% endif %}</textarea>
             </div>
         </div>
         
