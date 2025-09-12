@@ -668,10 +668,11 @@ if database_url:
     app.config['SQLALCHEMY_DATABASE_URI'] = database_url
     app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
         'pool_timeout': 20,
-        'pool_recycle': -1,
+        'pool_recycle': 280,
         'pool_pre_ping': True,
         'connect_args': {
             'connect_timeout': 10,
+            'sslmode': 'require'
         }
     }
     logger.info("✅ PostgreSQL接続設定完了")
