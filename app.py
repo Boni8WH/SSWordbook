@@ -593,6 +593,31 @@ class EssayCsvFile(db.Model):
     problem_count = db.Column(db.Integer, default=0, nullable=False)
     upload_date = db.Column(db.DateTime, default=lambda: datetime.now(JST))
 
+class DailyQuiz(db.Model):
+    """その日の問題セットを部屋ごとに保存するテーブル"""
+    __tablename__ = 'daily_quiz'
+    id = db.Column(db.Integer, primary_key=True)
+    room_number = db.Column(db.String(50), nullable=False, index=True)
+    date = db.Column(db.Date, nullable=False, index=True)
+    # 問題のIDをJSON形式のリストで保存 (例: ["1-1-...", "2-5-..."])
+    question_ids = db.Column(JSONEncodedDict, nullable=False)
+    
+    __table_args__ = (db.UniqueConstraint('room_number', 'date', name='uq_room_date'),)
+
+class DailyQuizAttempt(db.Model):
+    """ユーザーの挑戦結果を保存するテーブル"""
+    __tablename__ = 'daily_quiz_attempt'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False)
+    daily_quiz_id = db.Column(db.Integer, db.ForeignKey('daily_quiz.id', ondelete='CASCADE'), nullable=False)
+    date = db.Column(db.Date, nullable=False, index=True)
+    score = db.Column(db.Integer, nullable=False) # 正解数
+    time_taken = db.Column(db.Float, nullable=False) # 解答にかかった秒数
+    completed_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))
+    
+    user = db.relationship('User')
+    daily_quiz = db.relationship('DailyQuiz')
+
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, Response, abort
 from flask_sqlalchemy import SQLAlchemy
 from flask_mail import Mail, Message
