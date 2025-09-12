@@ -11110,8 +11110,9 @@ def find_related_essays():
                         'id': problem.id,
                         'university': problem.university,
                         'year': problem.year,
+                        'type': problem.type,
                         'question_snippet': (problem.question[:50] + '...') if len(problem.question) > 50 else problem.question,
-                        'chapter': problem.chapter # <--- ソートで使うためchapter情報を追加
+                        'chapter': problem.chapter
                     })
                     found_ids.add(problem.id)
                     # 一致する問題が見つかったら、この問題に対するキーワード検索は終了
