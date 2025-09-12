@@ -1,4 +1,5 @@
 // static/script.js - 完全修正版（全機能保持）
+(function() {
 
 // デバッグ用: window オブジェクトが存在するかどうかを確認
 if (typeof window === 'undefined') {
@@ -2486,3 +2487,5 @@ window.checkWeakProblemsStatus = function() {
 // グローバル関数として関数を公開（onclickから呼び出せるように）
 window.toggleIncorrectAnswer = toggleIncorrectAnswer;
 window.toggleWeakAnswer = toggleWeakAnswer;
+
+})();

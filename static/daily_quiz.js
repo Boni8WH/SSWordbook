@@ -1,3 +1,4 @@
+(function() {
 document.addEventListener('DOMContentLoaded', () => {
     const dailyQuizButton = document.getElementById('dailyQuizButton');
     if (dailyQuizButton) {
@@ -179,3 +180,5 @@ function createDailyQuizModal() {
 
     return new bootstrap.Modal(modalElement);
 }
+
+})();
