@@ -8202,11 +8202,12 @@ def set_essay_visibility_setting(room_number, chapter, problem_type, is_visible)
 def get_filtered_essay_problems_with_visibility(chapter, room_number, type_filter=None, university_filter=None, year_from=None, year_to=None, keyword=None, user_id=None):
     """部屋の公開設定を考慮した論述問題の取得（progress情報付き）"""
     try:
-        # ベースクエリ
-        query = EssayProblem.query.filter(
-            EssayProblem.chapter == chapter,
-            EssayProblem.enabled == True
-        )
+        # ベースクエリ (有効な問題のみをまず取得)
+        query = EssayProblem.query.filter(EssayProblem.enabled == True) # <--- ★まず章で絞らない
+
+        # もし章が指定されていたら、その章で絞り込む <--- ★このif文を追加
+        if chapter:
+            query = query.filter(EssayProblem.chapter == chapter)
         
         # フィルタリング
         if type_filter:
@@ -8242,36 +8243,30 @@ def get_filtered_essay_problems_with_visibility(chapter, room_number, type_filte
         # 結果を処理し、公開設定でフィルタリング
         problems = []
         for problem in results:
-            # 公開設定をチェック
             if not is_essay_problem_visible(room_number, problem.chapter, problem.type):
-                continue  # 非公開の問題はスキップ
+                continue
             
-            # 進捗情報を取得（user_idが提供されている場合のみ）
             progress_data = {
-                'viewed_answer': False,
-                'understood': False,
-                'difficulty_rating': None,
-                'review_flag': False
+                'viewed_answer': False, 'understood': False,
+                'difficulty_rating': None, 'review_flag': False
             }
             
             if user_id:
                 try:
                     progress = EssayProgress.query.filter_by(
-                        user_id=user_id,
-                        problem_id=problem.id
+                        user_id=user_id, problem_id=problem.id
                     ).first()
                     
                     if progress:
-                        progress_data = {
+                        progress_data.update({
                             'viewed_answer': progress.viewed_answer,
                             'understood': progress.understood,
                             'difficulty_rating': progress.difficulty_rating,
                             'review_flag': progress.review_flag
-                        }
+                        })
                 except Exception as progress_error:
                     print(f"Error getting progress for problem {problem.id}: {progress_error}")
             
-            # 問題オブジェクトに進捗情報を追加
             problem.progress = progress_data
             problems.append(problem)
         
