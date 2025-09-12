@@ -18,12 +18,9 @@ let incorrectWords = [];
 let quizStartTime;
 let isAnswerButtonDisabled = false;
 let answerButtonTimeout = null;
-let hasBeenRestricted = false; // 一度でも制限されたかのフラグ
-let restrictionReleased = false; // 制限が解除されたかのフラグ
-
-// word_data をグローバルに明示的に定義
-window.word_data = [];  // この行を追加
-let word_data = window.word_data;  // この行も追加
+let hasBeenRestricted = false;
+let restrictionReleased = false;
+let word_data = [];
 
 // DOM要素
 const startButton = document.getElementById('startButton');
