@@ -1364,14 +1364,19 @@ function showQuizResult() {
     
     updateRestartButtonText();
 
-    // 1. 今回【出題された全ての問題】の【答え】をキーワードとして収集する
-    const sessionKeywords = new Set(); // Setを使ってキーワードの重複を防ぐ
+    // 1. 今回出題された全ての問題の【答え】と【章】を収集する <--- ★変更点
+    const sessionKeywords = new Set();
+    const sessionChapters = new Set(); // <--- ★章を保存するSetを追加
 
     currentQuizData.forEach(word => {
-        // 答えが存在し、2文字以上の場合のみキーワードとして追加
+        // 答えをキーワードとして追加
         if (word.answer && word.answer.length > 1) {
             sessionKeywords.add(word.answer);
         }
+        // 章を追加 <--- ★ここから追加
+        if (word.chapter) {
+            sessionChapters.add(word.chapter);
+        } // <--- ★ここまで追加
     });
 
     // 2. おすすめ論述問題の表示エリアを一度リセット
@@ -1383,14 +1388,13 @@ function showQuizResult() {
     // 3. 収集したキーワードがあれば、APIに問い合わせる
     if (sessionKeywords.size > 0) {
         const keywordsArray = Array.from(sessionKeywords);
+        const chaptersArray = Array.from(sessionChapters); // <--- ★章の配列を作成
 
         fetch('/api/find_related_essays', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            // 'categories' ではなく 'keywords' を送るように変更
-            body: JSON.stringify({ keywords: keywordsArray }),
+            headers: { /* ... */ },
+            // bodyに章の情報を追加して送る <--- ★変更点
+            body: JSON.stringify({ keywords: keywordsArray, chapters: chaptersArray }),
         })
         .then(response => response.json())
         .then(data => {
