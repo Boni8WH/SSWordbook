@@ -63,9 +63,9 @@ async function startWarmUpQuiz(problemId) {
             <div class="quiz-question">${word.question}</div>
             <div class="quiz-answer" style="display: none;">${word.answer}</div>
             <div class="quiz-buttons">
-                <button class="btn btn-primary" id="showAnswerBtn">答えを見る</button>
-                <button class="btn btn-success" id="correctBtn" style="display: none;">正解</button>
-                <button class="btn btn-danger" id="incorrectBtn" style="display: none;">不正解</button>
+                <button class="btn btn-primary" id="warmupShowAnswerBtn">答えを見る</button>
+                <button class="btn btn-success" id="warmupCorrectBtn" style="display: none;">正解</button>
+                <button class="btn btn-danger" id="warmupIncorrectBtn" style="display: none;">不正解</button>
             </div>
         `;
         setupButtonListeners();
@@ -73,15 +73,15 @@ async function startWarmUpQuiz(problemId) {
 
     // 5. ボタンのイベントリスナーを設定
     function setupButtonListeners() {
-        document.getElementById('showAnswerBtn').addEventListener('click', () => {
-            document.querySelector('.quiz-answer').style.display = 'block';
-            document.getElementById('showAnswerBtn').style.display = 'none';
-            document.getElementById('correctBtn').style.display = 'inline-block';
-            document.getElementById('incorrectBtn').style.display = 'inline-block';
+        document.getElementById('warmupShowAnswerBtn').addEventListener('click', () => {
+            document.querySelector('#warmUpQuizModal .quiz-answer').style.display = 'block';
+            document.getElementById('warmupShowAnswerBtn').style.display = 'none';
+            document.getElementById('warmupCorrectBtn').style.display = 'inline-block';
+            document.getElementById('warmupIncorrectBtn').style.display = 'inline-block';
         });
 
-        document.getElementById('correctBtn').addEventListener('click', () => handleAnswer(true));
-        document.getElementById('incorrectBtn').addEventListener('click', () => handleAnswer(false));
+        document.getElementById('warmupCorrectBtn').addEventListener('click', () => handleAnswer(true));
+        document.getElementById('warmupIncorrectBtn').addEventListener('click', () => handleAnswer(false));
     }
 
     // 6. 回答を処理する関数
