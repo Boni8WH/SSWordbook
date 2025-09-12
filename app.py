@@ -1961,8 +1961,7 @@ def check_data_persistence():
     except Exception as e:
         print(f"❌ データ永続化チェックエラー: {e}")
         return False
-
-# ヘルパー関数
+    
 def generate_reset_token():
     """セキュアなリセットトークンを生成"""
     return secrets.token_urlsafe(32)
@@ -2510,6 +2509,80 @@ def admin_cleanup_orphaned_tokens():
     except Exception as e:
         db.session.rollback()
         return jsonify({'status': 'error', 'message': str(e)}), 500
+
+def extract_keywords_from_text(text):
+    """
+    文章から一問一答のキーワード候補を抜き出す（ライブラリ不要版）
+    """
+    # データベースから全ての一問一答の「答え」を取得
+    # 注意: 問題数が増えるとパフォーマンスに影響する可能性があります
+    try:
+        # CsvFileContentからすべてのCSVコンテンツを取得
+        all_csv_content = db.session.query(CsvFileContent.content).all()
+        
+        all_answers = set()
+        for (content,) in all_csv_content:
+            reader = csv.DictReader(StringIO(content))
+            for row in reader:
+                answer = row.get('answer', '').strip()
+                if len(answer) >= 2: # 2文字以上の答えのみをキーワード候補とする
+                    all_answers.add(answer)
+
+    except Exception as e:
+        print(f"キーワード抽出のための単語データ取得エラー: {e}")
+        return []
+
+    # テキストに含まれるキーワードを抽出
+    found_keywords = []
+    for answer in all_answers:
+        if answer in text:
+            found_keywords.append(answer)
+    
+    # 文字数が長いものから順に並べ替え、最大10件に絞る
+    found_keywords.sort(key=len, reverse=True)
+    
+    return found_keywords[:10]
+
+@app.route('/api/essay/get_keywords/<int:problem_id>')
+def get_essay_keywords(problem_id):
+    """
+    論述問題IDを受け取り、その問題のキーワードを返すAPI
+    """
+    if 'user_id' not in session:
+        return jsonify({'status': 'error', 'message': 'ログインが必要です'}), 401
+    
+    problem = EssayProblem.query.get(problem_id)
+    if not problem:
+        return jsonify({'status': 'error', 'message': '問題が見つかりません'}), 404
+
+    # 問題文と解答文を結合してキーワードを抽出
+    combined_text = problem.question + " " + problem.answer
+    keywords = extract_keywords_from_text(combined_text)
+
+    # 抽出したキーワードに対応する一問一答の問題を取得
+    quiz_data = []
+    if keywords:
+        # CsvFileContentからすべてのCSVコンテンツを取得
+        all_csv_content = db.session.query(CsvFileContent.content).all()
+        all_words = []
+        for (content,) in all_csv_content:
+            reader = csv.DictReader(StringIO(content))
+            all_words.extend(list(reader))
+
+        for keyword in keywords:
+            # 答えがキーワードと一致する問題を探す
+            for word in all_words:
+                if word.get('answer', '').strip() == keyword:
+                    quiz_data.append(word)
+                    # 同じキーワードで複数の問題が見つからないように一度見つけたらループを抜ける
+                    break 
+    
+    return jsonify({
+        'status': 'success',
+        'problem_id': problem_id,
+        'quiz_data': quiz_data # 問題と答えのペアのリストを返す
+    })
+
 # ====================================================================
 # ルーティング
 # ====================================================================
