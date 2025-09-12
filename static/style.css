@@ -4185,3 +4185,98 @@ a.nav-link.btn.change-username-button:hover,
     min-height: 50px; /* ボタンエリアの高さを確保 */
     gap: 10px; /* ボタン間の隙間 */
 }
+
+/* 「今日の10問」クイズ用スタイル */
+.dq-header {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.9em;
+    color: #6c757d;
+    margin-bottom: 20px;
+}
+.dq-question {
+    font-size: 1.4em;
+    font-weight: 600;
+    margin-bottom: 25px;
+    min-height: 100px;
+}
+.dq-choices {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+}
+.dq-choice {
+    width: 100%;
+    padding: 15px;
+    font-size: 1.1em;
+    text-align: left;
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.dq-choice:hover:not(:disabled) {
+    background-color: #e9ecef;
+    border-color: #007bff;
+}
+.dq-choice:disabled {
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+.dq-choice.correct {
+    background-color: #d1e7dd;
+    border-color: #28a745;
+    color: #0f5132;
+    font-weight: bold;
+}
+.dq-choice.incorrect {
+    background-color: #f8d7da;
+    border-color: #dc3545;
+    color: #842029;
+}
+.dq-feedback {
+    margin-top: 20px;
+    font-size: 1.2em;
+    font-weight: bold;
+    min-height: 30px;
+}
+.dq-feedback-correct { color: #28a745; }
+.dq-feedback-incorrect { color: #dc3545; }
+
+/* 結果表示スタイル */
+.dq-result-header {
+    text-align: center;
+    font-size: 1.8em;
+    font-weight: bold;
+    color: #007bff;
+    margin-bottom: 25px;
+}
+.dq-result-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 15px;
+    margin-bottom: 25px;
+}
+.dq-result-item {
+    background-color: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+    text-align: center;
+}
+.dq-result-label {
+    display: block;
+    font-size: 0.9em;
+    color: #6c757d;
+}
+.dq-result-value {
+    display: block;
+    font-size: 1.8em;
+    font-weight: bold;
+    color: #343a40;
+}
+.dq-result-footer {
+    text-align: center;
+    color: #6c757d;
+    margin-top: 20px;
+}
