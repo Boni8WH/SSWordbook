@@ -733,6 +733,7 @@ def get_app_info_dict(user_id=None, username=None, room_number=None):
         
         return info_dict
     except Exception as e:
+        db.session.rollback()
         print(f"Error getting app info: {e}")
         # エラー時も最新のDB情報を取得しようと試行
         try:
@@ -823,6 +824,7 @@ def load_word_data_for_room(room_number):
                         row['number'] = str(row['number'])
                         word_data.append(row)
             except FileNotFoundError:
+                db.session.rollback()
                 print(f"❌ デフォルトファイルが見つかりません: words.csv")
                 return []
         else:
@@ -2554,6 +2556,7 @@ def extract_keywords_from_text(text):
                     all_answers.add(answer)
 
     except Exception as e:
+        db.session.rollback()
         print(f"キーワード抽出のための単語データ取得エラー: {e}")
         return []
 
@@ -2684,6 +2687,7 @@ def index():
                                 chapter_data=sorted_all_chapter_unit_status)
     
     except Exception as e:
+        db.session.rollback()
         print(f"Error in index route: {e}")
         import traceback
         traceback.print_exc()
@@ -2827,6 +2831,7 @@ def first_time_password_change():
         return render_template('first_time_password_change.html', **context)
         
     except Exception as e:
+        db.session.rollback()
         print(f"Error in first_time_password_change: {e}")
         import traceback
         traceback.print_exc()
@@ -2883,6 +2888,7 @@ def password_change_page():
         context = get_template_context()
         return render_template('password_change.html', **context)
     except Exception as e:
+        db.session.rollback()
         print(f"Error in password_change_page: {e}")
         import traceback
         traceback.print_exc()
@@ -3040,6 +3046,7 @@ def password_reset_request():
         return render_template('password_reset_request.html', **context)
         
     except Exception as e:
+        db.session.rollback()
         print(f"Error in password_reset_request: {e}")
         flash('システムエラーが発生しました。', 'danger')
         return redirect(url_for('login_page'))
@@ -3490,6 +3497,7 @@ def password_reset(token):
         return render_template('password_reset.html', **context)
         
     except Exception as e:
+        db.session.rollback()
         print(f"❌ パスワードリセットエラー: {e}")
         flash('システムエラーが発生しました。', 'danger')
         return redirect(url_for('login_page'))
@@ -5331,6 +5339,7 @@ def progress_page():
                                **context)
     
     except Exception as e:
+        db.session.rollback()
         print(f"Error in progress_page: {e}")
         import traceback
         traceback.print_exc()
@@ -5383,6 +5392,7 @@ def api_ranking_data():
                 return fallback_ranking_calculation(current_user, start_time)
             
         except Exception as stats_error:
+            db.session.rollback()
             print(f"⚠️ 統計テーブルアクセスエラー: {stats_error}")
             print("従来方式で計算します...")
             return fallback_ranking_calculation(current_user, start_time)
@@ -5453,6 +5463,7 @@ def api_ranking_data():
         })
         
     except Exception as e:
+        db.session.rollback()
         print(f"❌ ランキング取得エラー: {e}")
         # 最終フォールバック：エラー時は従来方式
         try:
@@ -6058,6 +6069,7 @@ def admin_page():
         return render_template('admin.html', **template_context)
         
     except Exception as e:
+        db.session.rollback()
         print(f"❌ 管理者ページエラー: {e}")
         import traceback
         traceback.print_exc()
@@ -6230,6 +6242,7 @@ def admin_add_user():
         return redirect(url_for('admin_page'))
 
     except Exception as e:
+        db.session.rollback()
         print(f"Error in admin_add_user: {e}")
         db.session.rollback()
         flash(f'ユーザー追加中にエラーが発生しました: {str(e)}', 'danger')
