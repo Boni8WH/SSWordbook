@@ -4154,13 +4154,34 @@ a.nav-link.btn.change-username-button:hover,
     font-weight: 500;
 }
 
-.quiz-buttons .btn.is-hidden,
+/* 解答欄はガタつき防止のため、高さを維持する visibility: hidden を使う */
 .quiz-answer.is-hidden {
-    /* 透明で見えないが、場所は確保したままにする */
     visibility: hidden;
+}
+
+/* ボタンはレイアウトから完全に消すため、display: none を使う */
+.quiz-buttons .btn.is-hidden {
+    display: none;
 }
 
 /* ボタンの表示形式を inline-block に統一 */
 .quiz-buttons .btn {
     display: inline-block;
+}
+
+/* 準備運動クイズのレイアウト安定化 */
+#quizCardContainer {
+    min-height: 220px; /* スマホ画面でも十分な高さを確保 */
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+/* 準備運動クイズのボタンレイアウト修正 */
+.quiz-buttons {
+    display: flex;
+    justify-content: center; /* ボタンを中央揃え */
+    align-items: center;
+    min-height: 50px; /* ボタンエリアの高さを確保 */
+    gap: 10px; /* ボタン間の隙間 */
 }

@@ -1,20 +1,11 @@
 //　論述問題ページでの「準備運動クイズ」機能専用
 
 // クイズ用のモーダル（ポップアップウィンドウ）を生成する関数
+// 差し替え後の createQuizModal 関数
 function createQuizModal() {
-    // 既存のモーダルがあれば、Bootstrapの正しい方法で閉じてから削除する
-    const existingModalElement = document.getElementById('warmUpQuizModal');
-    if (existingModalElement) {
-        const modalInstance = bootstrap.Modal.getInstance(existingModalElement);
-        if (modalInstance) {
-            // Bootstrapの公式な hide メソッドを呼び出す
-            modalInstance.hide();
-        }
-        // hideのアニメーションが終わった後に、DOMから要素を完全に削除する
-        existingModalElement.addEventListener('hidden.bs.modal', () => {
-            existingModalElement.remove();
-        }, { once: true });
-    }
+    // 既存のモーダルはここでは削除しない
+    const existingModal = document.getElementById('warmUpQuizModal');
+    if (existingModal) existingModal.remove();
 
     const modalHTML = `
         <div class="modal fade" id="warmUpQuizModal" tabindex="-1" aria-labelledby="quizModalLabel" aria-hidden="true">
@@ -35,7 +26,119 @@ function createQuizModal() {
         </div>
     `;
     document.body.insertAdjacentHTML('beforeend', modalHTML);
-    return new bootstrap.Modal(document.getElementById('warmUpQuizModal'));
+    const modalElement = document.getElementById('warmUpQuizModal');
+    
+    // モーダルが完全に閉じられた時にDOMから削除する
+    modalElement.addEventListener('hidden.bs.modal', () => {
+        modalElement.remove();
+    }, { once: true });
+
+    return new bootstrap.Modal(modalElement);
+}
+
+// 差し替え後の startWarmUpQuiz 関数
+async function startWarmUpQuiz(problemId) {
+    const existingModal = document.getElementById('warmUpQuizModal');
+    // もし既存のモーダルがあれば、まず正しく閉じる
+    if (existingModal) {
+        const modalInstance = bootstrap.Modal.getInstance(existingModal);
+        if (modalInstance) {
+            // hideイベントが完了してから次の処理へ
+            await new Promise(resolve => {
+                existingModal.addEventListener('hidden.bs.modal', resolve, { once: true });
+                modalInstance.hide();
+            });
+        }
+    }
+    
+    const response = await fetch(`/api/essay/get_keywords/${problemId}`);
+    const data = await response.json();
+
+    if (data.status !== 'success' || !data.quiz_data || data.quiz_data.length === 0) {
+        alert('この問題に関連する一問一答問題が見つかりませんでした。');
+        return;
+    }
+
+    const quizModal = createQuizModal();
+    quizModal.show();
+    
+    // (これ以降のクイズロジックは変更なし)
+    let currentQuestionIndex = 0;
+    let quizData = data.quiz_data;
+    let correctCount = 0;
+    let incorrectCount = 0;
+    const quizCardContainer = document.getElementById('quizCardContainer');
+
+    function showNextQuestion() {
+        if (currentQuestionIndex >= quizData.length) {
+            showQuizResult();
+            return;
+        }
+        const word = quizData[currentQuestionIndex];
+        quizCardContainer.innerHTML = `
+            <div class="quiz-progress">${currentQuestionIndex + 1} / ${quizData.length} 問</div>
+            <div class="quiz-question">${word.question}</div>
+            <div class="quiz-answer is-hidden">${word.answer}</div>
+            <div class="quiz-buttons">
+                <button class="btn btn-primary" id="warmupShowAnswerBtn">答えを見る</button>
+                <button class="btn btn-success is-hidden" id="warmupCorrectBtn">正解</button>
+                <button class="btn btn-danger is-hidden" id="warmupIncorrectBtn">不正解</button>
+            </div>
+        `;
+        setupButtonListeners();
+    }
+
+    function setupButtonListeners() {
+        document.getElementById('warmupShowAnswerBtn').addEventListener('click', () => {
+            document.querySelector('#warmUpQuizModal .quiz-answer').classList.remove('is-hidden');
+            document.getElementById('warmupShowAnswerBtn').classList.add('is-hidden');
+            document.getElementById('warmupCorrectBtn').classList.remove('is-hidden');
+            document.getElementById('warmupIncorrectBtn').classList.remove('is-hidden');
+        });
+        document.getElementById('warmupCorrectBtn').addEventListener('click', () => handleAnswer(true));
+        document.getElementById('warmupIncorrectBtn').addEventListener('click', () => handleAnswer(false));
+    }
+
+    function handleAnswer(isCorrect) {
+        const word = quizData[currentQuestionIndex];
+        const problemId = generateProblemId(word);
+        if (isCorrect) correctCount++;
+        else incorrectCount++;
+        if (!window.problemHistory[problemId]) {
+            window.problemHistory[problemId] = { correct_attempts: 0, incorrect_attempts: 0, correct_streak: 0 };
+        }
+        const history = window.problemHistory[problemId];
+        if (isCorrect) {
+            history.correct_attempts++;
+            history.correct_streak++;
+            if (history.correct_streak >= 2) {
+                const index = window.incorrectWords.indexOf(problemId);
+                if (index > -1) window.incorrectWords.splice(index, 1);
+            }
+        } else {
+            history.incorrect_attempts++;
+            history.correct_streak = 0;
+            if (!window.incorrectWords.includes(problemId)) {
+                window.incorrectWords.push(problemId);
+            }
+        }
+        currentQuestionIndex++;
+        showNextQuestion();
+    }
+    
+    function showQuizResult() {
+        const accuracy = quizData.length > 0 ? (correctCount / quizData.length * 100).toFixed(1) : 0;
+        quizCardContainer.innerHTML = `
+            <h4>準備運動完了！</h4>
+            <p>正解数: ${correctCount} / ${quizData.length} 問</p>
+            <p>正答率: ${accuracy}%</p>
+            <p>学習結果がスコアに反映されました。</p>
+            <button class="btn btn-primary" onclick="startWarmUpQuiz(${problemId})">もう一度挑戦</button>
+        `;
+        saveQuizProgressToServer();
+    }
+
+    showNextQuestion();
 }
 
 // クイズを開始するメインの関数
