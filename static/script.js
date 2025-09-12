@@ -1405,7 +1405,7 @@ function showQuizResult() {
                     const li = document.createElement('li');
                     li.innerHTML = `
                         <a href="/essay/problem/${essay.id}" class="recommended-essay-link">
-                            <strong>${essay.university} ${essay.year}年</strong>
+                            <strong>${essay.university} ${essay.year}年 (${essay.type})</strong>
                             <p>${essay.question_snippet}</p>
                         </a>
                     `;
