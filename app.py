@@ -2685,7 +2685,8 @@ def index():
         # ★重要な修正：JavaScriptで使う変数名を変更
         return render_template('index.html',
                                 app_info_for_js=app_info_for_js,
-                                chapter_data=sorted_all_chapter_unit_status)
+                                chapter_data=sorted_all_chapter_unit_status,
+                                **context)
     
     except Exception as e:
         db.session.rollback()
