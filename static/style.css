@@ -4142,3 +4142,25 @@ a.nav-link.btn.change-username-button:hover,
     transform: translateY(-2px);
     box-shadow: 0 6px 20px rgba(40, 167, 69, 0.3);
 }
+
+/* 準備運動クイズ用のスタイル */
+.quiz-answer {
+    /* 解答欄に最低限の高さを設定し、場所を確保する */
+    min-height: 60px;
+    padding: 10px;
+    background-color: #fff3cd;
+    border-radius: 5px;
+    color: #856404;
+    font-weight: 500;
+}
+
+.quiz-buttons .btn.is-hidden,
+.quiz-answer.is-hidden {
+    /* 透明で見えないが、場所は確保したままにする */
+    visibility: hidden;
+}
+
+/* ボタンの表示形式を inline-block に統一 */
+.quiz-buttons .btn {
+    display: inline-block;
+}
