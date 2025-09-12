@@ -162,20 +162,14 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
-<script src="{{ url_for('static', filename='script.js') }}"></script>
-<script src="{{ url_for('static', filename='essay_quiz.js') }}"></script>
-<script src="{{ url_for('static', filename='daily_quiz.js') }}"></script>
+    <script id="flask-data" type="application/json">
+        {
+            "appInfo": {{ app_info_for_js | tojson | safe }},
+            "chapterData": {{ chapter_data | tojson | safe }}
+        }
+    </script>
 
-<script>
-    // Flaskからのデータをグローバル変数として設定
-    if (typeof window.appInfoFromFlask === 'undefined' && typeof {{ app_info_for_js | tojson | safe }} !== 'undefined') {
-        window.appInfoFromFlask = {{ app_info_for_js | tojson | safe }};
-    }
-    if (typeof window.chapterDataFromFlask === 'undefined' && typeof {{ chapter_data | tojson | safe }} !== 'undefined') {
-        window.chapterDataFromFlask = {{ chapter_data | tojson | safe }};
-    }
-</script>
+    {{ super() }}
 
 <style>
 /* 苦手問題制限時のレイアウト調整 */
