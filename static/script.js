@@ -1392,8 +1392,9 @@ function showQuizResult() {
 
         fetch('/api/find_related_essays', {
             method: 'POST',
-            headers: { /* ... */ },
-            // bodyに章の情報を追加して送る <--- ★変更点
+            headers: { // <--- この headers の3行を追加してください
+                'Content-Type': 'application/json',
+            },
             body: JSON.stringify({ keywords: keywordsArray, chapters: chaptersArray }),
         })
         .then(response => response.json())
