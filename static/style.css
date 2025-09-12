@@ -4126,3 +4126,19 @@ a.nav-link.btn.change-username-button:hover,
     font-size: 0.9em;
     list-style-type: none;
 }
+
+.warm-up-quiz-section {
+    text-align: center;
+    margin: 25px 0;
+}
+.warm-up-quiz-section .btn {
+    font-weight: 600;
+    padding: 12px 25px;
+    border-radius: 25px;
+    box-shadow: 0 4px 15px rgba(40, 167, 69, 0.2);
+    transition: all 0.3s ease;
+}
+.warm-up-quiz-section .btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(40, 167, 69, 0.3);
+}
