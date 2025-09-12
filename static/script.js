@@ -67,29 +67,7 @@ if (typeof window.chapterDataFromFlask === 'undefined') {
     console.error("Error: window.chapterDataFromFlask is undefined. Make sure it's passed from Flask.");
 }
 
-if (typeof window.appInfoFromFlask === 'undefined') {
-    console.error("Error: window.appInfoFromFlask is undefined. Make sure it's passed from Flask.");
-} else {
-    // 基本情報の設定
-    if (lastUpdatedDateSpan) lastUpdatedDateSpan.textContent = window.appInfoFromFlask.lastUpdatedDate;
-    if (updateContentP) updateContentP.textContent = window.appInfoFromFlask.updateContent;
-    
-    // アプリ名の設定
-    const appInfoTitle = document.getElementById('appInfoTitle');
-    if (appInfoTitle) {
-        appInfoTitle.textContent = window.appInfoFromFlask.appName || 'アプリ情報';
-    }
-    
-    // 連絡先情報の設定
-    const contactSection = document.getElementById('contactSection');
-    const contactEmail = document.getElementById('contactEmail');
-    
-    if (contactSection && contactEmail && window.appInfoFromFlask.contactEmail) {
-        contactEmail.href = 'mailto:' + window.appInfoFromFlask.contactEmail;
-        contactEmail.textContent = window.appInfoFromFlask.contactEmail;
-        contactSection.style.display = 'block';
-    }
-}
+
 
 // =========================================================
 // スマホ対応関数
@@ -290,6 +268,25 @@ function generateProblemId(word) {
 // =========================================================
 document.addEventListener('DOMContentLoaded', () => {
     try {
+        // ページの準備が完了したこのタイミングで、情報を表示する
+        if (typeof window.appInfoFromFlask !== 'undefined') {
+            if (lastUpdatedDateSpan) lastUpdatedDateSpan.textContent = window.appInfoFromFlask.lastUpdatedDate;
+            if (updateContentP) updateContentP.textContent = window.appInfoFromFlask.updateContent;
+            
+            const appInfoTitle = document.getElementById('appInfoTitle');
+            if (appInfoTitle) {
+                appInfoTitle.textContent = window.appInfoFromFlask.appName || 'アプリ情報';
+            }
+            
+            const contactSection = document.getElementById('contactSection');
+            const contactEmail = document.getElementById('contactEmail');
+            if (contactSection && contactEmail && window.appInfoFromFlask.contactEmail) {
+                contactEmail.href = 'mailto:' + window.appInfoFromFlask.contactEmail;
+                contactEmail.textContent = window.appInfoFromFlask.contactEmail;
+                contactSection.style.display = 'block';
+            }
+        }
+
         updateIncorrectOnlyRadio();
         loadUserData();
         loadWordDataFromServer();
@@ -313,6 +310,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.addEventListener('keydown', handleEscapeKey);
 });
+
 function loadUserData() {
     fetch('/api/load_quiz_progress')
         .then(response => response.json())
