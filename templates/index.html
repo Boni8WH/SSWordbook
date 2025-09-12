@@ -67,13 +67,11 @@
         <div class="bottom-controls">
             <button id="startButton" class="primary-button">学習開始</button>
             <button id="resetSelectionButton" class="secondary-button">選択リセット</button>
-            
-            <button id="dailyQuizButton" class="primary-button" style="background-color: #e67e22;">今日の10問</button>
-            
             <button id="showWeakWordsButton" class="secondary-button" {% if not session.get('user_id') %}style="display: none;"{% endif %}>苦手問題一覧</button>
             <a href="{{ url_for('essay_index') }}" class="secondary-button essay-nav-btn">
                 <i class="fas fa-edit"></i> 論述問題集
             </a>
+            <button id="dailyQuizButton" class="primary-button" style="background-color: #e67e22;">今日の10問</button>
         </div>
     </div>
 </section>
@@ -164,61 +162,20 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
-function debugRoomSetting(roomNumber) {
-    console.log(`🔍 部屋${roomNumber}のデバッグ情報:`);
-    
-    const maxUnitInput = document.getElementById('maxUnit_' + roomNumber);
-    const csvFileSelect = document.getElementById('csvFile_' + roomNumber);
-    const currentCsvDisplay = document.getElementById('current_csv_' + roomNumber);
-    
-    console.log('📋 DOM要素:', {
-        maxUnit: maxUnitInput ? maxUnitInput.value : 'なし',
-        csvFile: csvFileSelect ? csvFileSelect.value : 'なし',
-        currentDisplay: currentCsvDisplay ? currentCsvDisplay.textContent : 'なし'
-    });
-    
-    console.log('🎯 セレクトボックスオプション:');
-    if (csvFileSelect) {
-        Array.from(csvFileSelect.options).forEach((option, index) => {
-            console.log(`  ${index}: ${option.value} (${option.selected ? '選択中' : '未選択'})`);
-        });
-    }
-    
-    // サーバーから最新の設定を取得
-    fetch('/admin/get_room_setting', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ room_number: roomNumber })
-    })
-    .then(response => response.json())
-    .then(data => {
-        console.log('📡 サーバーからの設定:', data);
-        
-        if (data.status === 'success') {
-            // 表示を更新
-            if (currentCsvDisplay) {
-                currentCsvDisplay.textContent = data.csv_filename;
-            }
-            if (csvFileSelect) {
-                csvFileSelect.value = data.csv_filename;
-            }
-        }
-    })
-    .catch(error => {
-        console.error('❌ 設定取得エラー:', error);
-    });
-}
-</script>
+<script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+<script src="{{ url_for('static', filename='script.js') }}"></script>
+<script src="{{ url_for('static', filename='essay_quiz.js') }}"></script>
+<script src="{{ url_for('static', filename='daily_quiz.js') }}"></script>
+
 <script>
     // Flaskからのデータをグローバル変数として設定
-    window.appInfoFromFlask = {{ app_info_for_js | tojson | safe }};
-    window.chapterDataFromFlask = {{ chapter_data | tojson | safe }};
+    if (typeof window.appInfoFromFlask === 'undefined' && typeof {{ app_info_for_js | tojson | safe }} !== 'undefined') {
+        window.appInfoFromFlask = {{ app_info_for_js | tojson | safe }};
+    }
+    if (typeof window.chapterDataFromFlask === 'undefined' && typeof {{ chapter_data | tojson | safe }} !== 'undefined') {
+        window.chapterDataFromFlask = {{ chapter_data | tojson | safe }};
+    }
 </script>
-<!-- html2canvas ライブラリの読み込み -->
-<script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
-<!-- メインのJavaScriptファイル -->
-<script src="{{ url_for('static', filename='script.js') }}"></script>
 
 <style>
 /* 苦手問題制限時のレイアウト調整 */
