@@ -1,9 +1,18 @@
-(function() {
+// script.jsから呼び出される初期化関数
+function initializeEssayQuiz() {
+    // script.jsからメインの学習履歴がロードされるのを待つ必要があるので、
+    // 少しだけ遅延させてボタンにイベントを設定します。
+    setTimeout(() => {
+        const startBtn = document.getElementById('startWarmUpQuizBtn');
+        if (startBtn) {
+            startBtn.addEventListener('click', () => {
+                const problemId = startBtn.dataset.problemId;
+                startWarmUpQuiz(problemId);
+            });
+        }
+    }, 500); // 0.5秒待つ
+}
 
-/**
- * クイズ用のモーダル（ポップアップウィンドウ）を生成し、インスタンスを返す関数。
- * モーダルが閉じられた際には、自動的にHTMLから要素を削除する後片付けも行います。
- */
 function createQuizModal() {
     // 既存のモーダルがあれば念のため削除
     const existingModal = document.getElementById('warmUpQuizModal');
@@ -190,5 +199,3 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }, 1000); // 1秒待ってから実行
 });
-
-})(); 

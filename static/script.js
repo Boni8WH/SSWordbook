@@ -21,9 +21,11 @@ let isAnswerButtonDisabled = false;
 let answerButtonTimeout = null;
 let hasBeenRestricted = false;
 let restrictionReleased = false;
-let word_data = [];
-let quizTimer; // daily_quiz.jsで使っていたものも、ここで宣言
-let timeElapsed = 0; // daily_quiz.jsで使っていたものも、ここで宣言
+let word_data = []; 
+let quizTimer; 
+let timeElapsed = 0;
+let chapterDataFromFlask = {};
+let appInfoFromFlask = {};
 
 // DOM要素
 const startButton = document.getElementById('startButton');
@@ -267,31 +269,36 @@ function generateProblemId(word) {
 // 初期ロードとデータ取得
 // =========================================================
 document.addEventListener('DOMContentLoaded', () => {
-    try {
-        // ページの準備が完了したこのタイミングで、情報を表示する
-        if (typeof window.appInfoFromFlask !== 'undefined') {
-            if (lastUpdatedDateSpan) lastUpdatedDateSpan.textContent = window.appInfoFromFlask.lastUpdatedDate;
-            if (updateContentP) updateContentP.textContent = window.appInfoFromFlask.updateContent;
-            
-            const appInfoTitle = document.getElementById('appInfoTitle');
-            if (appInfoTitle) {
-                appInfoTitle.textContent = window.appInfoFromFlask.appName || 'アプリ情報';
-            }
-            
-            const contactSection = document.getElementById('contactSection');
-            const contactEmail = document.getElementById('contactEmail');
-            if (contactSection && contactEmail && window.appInfoFromFlask.contactEmail) {
-                contactEmail.href = 'mailto:' + window.appInfoFromFlask.contactEmail;
-                contactEmail.textContent = window.appInfoFromFlask.contactEmail;
-                contactSection.style.display = 'block';
-            }
+    // 1. HTMLに埋め込まれた安全なデータ(<script id="flask-data">)を読み込む
+    const flaskDataElement = document.getElementById('flask-data');
+    if (flaskDataElement) {
+        try {
+            const flaskData = JSON.parse(flaskDataElement.textContent);
+            // グローバル変数にデータを格納
+            chapterDataFromFlask = flaskData.chapterData;
+            appInfoFromFlask = flaskData.appInfo;
+            console.log("✅ Flask data loaded from data-island successfully.");
+        } catch (e) {
+            console.error("❌ Failed to parse Flask data from data-island:", e);
+            // エラーが発生しても処理が止まらないように、変数を空のオブジェクトで初期化
+            chapterDataFromFlask = {};
+            appInfoFromFlask = {};
         }
+    } else {
+        // index.html以外（例えばprogress.htmlなど）ではこの要素は存在しないので、これはエラーではない
+        console.log("ⓘ Data-island (#flask-data) not found on this page.");
+    }
 
+    // 2. 読み込んだデータを使って、すべての初期化処理を順番に実行
+    try {
+        // 各機能の初期化
+        populateInfoPanel();
         updateIncorrectOnlyRadio();
         loadUserData();
         loadWordDataFromServer();
         setupEventListeners();
 
+        // 少し遅延させて実行する初期化処理
         setTimeout(() => {
             loadSelectionState();
             initializeSelectAllButtons();
@@ -300,16 +307,50 @@ document.addEventListener('DOMContentLoaded', () => {
             optimizeScrolling();
             updateIncorrectOnlySelection();
         }, 1500);
+
+        // 他のJSファイルの初期化関数を呼び出す
+        if (typeof initializeDailyQuiz === 'function') {
+            initializeDailyQuiz();
+            console.log("✅ Daily Quiz Initialized.");
+        }
+        if (typeof initializeEssayQuiz === 'function') {
+            initializeEssayQuiz();
+            console.log("✅ Essay Quiz Initialized.");
+        }
         
         if (noWeakWordsMessage) {
             noWeakWordsMessage.classList.add('hidden');
         }
+
     } catch (error) {
-        console.error('❌ 初期化エラー:', error);
+        console.error('❌ Initialization error:', error);
     }
 
     document.addEventListener('keydown', handleEscapeKey);
 });
+
+function populateInfoPanel() {
+    // window.appInfoFromFlaskではなく、新しく定義したappInfoFromFlask変数を使う
+    if (typeof appInfoFromFlask !== 'undefined' && appInfoFromFlask) {
+        if (lastUpdatedDateSpan) lastUpdatedDateSpan.textContent = appInfoFromFlask.lastUpdatedDate;
+        if (updateContentP) updateContentP.textContent = appInfoFromFlask.updateContent;
+        
+        const appInfoTitle = document.getElementById('appInfoTitle');
+        if (appInfoTitle) {
+            appInfoTitle.textContent = appInfoFromFlask.appName || 'アプリ情報';
+        }
+        
+        const contactSection = document.getElementById('contactSection');
+        const contactEmail = document.getElementById('contactEmail');
+        if (contactSection && contactEmail && appInfoFromFlask.contactEmail) {
+            contactEmail.href = 'mailto:' + appInfoFromFlask.contactEmail;
+            contactEmail.textContent = appInfoFromFlask.contactEmail;
+            contactSection.style.display = 'block';
+        }
+    } else {
+        console.warn("アプリ情報(appInfoFromFlask)が見つかりませんでした。");
+    }
+}
 
 function loadUserData() {
     fetch('/api/load_quiz_progress')

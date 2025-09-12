@@ -1,10 +1,9 @@
-(function() {
-document.addEventListener('DOMContentLoaded', () => {
+function initializeDailyQuiz() {
     const dailyQuizButton = document.getElementById('dailyQuizButton');
     if (dailyQuizButton) {
         dailyQuizButton.addEventListener('click', handleDailyQuizClick);
     }
-});
+}
 
 // 「今日の10問」ボタンが押されたときの処理
 async function handleDailyQuizClick() {
@@ -177,5 +176,3 @@ function createDailyQuizModal() {
 
     return new bootstrap.Modal(modalElement);
 }
-
-})();
