@@ -808,206 +808,148 @@
 {% endblock %}
 
 {% block scripts %}
-<!-- データ属性でJavaScriptに値を渡す -->
-<div id="problem-data" 
-     data-problem-id="{{ problem.id }}"
-     data-current-rating="{% if problem.progress and problem.progress.difficulty_rating %}{{ problem.progress.difficulty_rating }}{% else %}0{% endif %}"
-     data-viewed-answer="{% if problem.progress and problem.progress.viewed_answer %}true{% else %}false{% endif %}"
-     style="display: none;"></div>
+    {{ super() }}
 
-<script>
+    <div id="problem-data" 
+         data-problem-id="{{ problem.id }}"
+         data-current-rating="{% if problem.progress and problem.progress.difficulty_rating %}{{ problem.progress.difficulty_rating }}{% else %}0{% endif %}"
+         data-viewed-answer="{% if problem.progress and problem.progress.viewed_answer %}true{% else %}false{% endif %}"
+         style="display: none;"></div>
 
-document.addEventListener('DOMContentLoaded', function() {    
-    // HTMLのdata属性からJavaScript変数を取得
-    var problemData = document.getElementById('problem-data');    
-    if (!problemData) {
-        console.error('problem-data要素が見つかりません');
-        return;
-    }
-    
-    var problemId = parseInt(problemData.getAttribute('data-problem-id'));
-    var currentRating = parseInt(problemData.getAttribute('data-current-rating'));
-    var viewedAnswer = problemData.getAttribute('data-viewed-answer') === 'true';
+    <script>
+    // このページ専用の進捗保存ロジ
+    document.addEventListener('DOMContentLoaded', function() {    
+        var problemData = document.getElementById('problem-data');    
+        if (!problemData) {
+            console.error('problem-data要素が見つかりません');
+            return;
+        }
         
-    // 各ボタン要素の存在確認
-    var showAnswerBtn = document.getElementById('showAnswerBtn');
-    var hideAnswerBtn = document.getElementById('hideAnswerBtn');
-    var saveProgressBtn = document.getElementById('saveProgressBtn');
-    var answerSection = document.getElementById('answerSection');
-    
-    // ★修正：初期状態は常に解答を非表示にする
-    if (answerSection) {
-        answerSection.classList.remove('show');
-    }
-    if (showAnswerBtn) {
-        showAnswerBtn.style.display = 'flex';
-    }
-    if (hideAnswerBtn) {
-        hideAnswerBtn.style.display = 'none';
-    }
-    
-    // 星評価の初期化
-    if (currentRating > 0) {
-        setRating(currentRating);
-    }
-    
-    // 解答表示ボタンのイベントリスナー
-    if (showAnswerBtn) {
-        showAnswerBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            showAnswer(problemId);
-        });
-    } else {
-        console.error('解答表示ボタンが見つかりません');
-    }
-    
-    // 解答非表示ボタンのイベントリスナー
-    if (hideAnswerBtn) {
-        hideAnswerBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            hideAnswer();
-        });
-    } else {
-        console.error('解答非表示ボタンが見つかりません');
-    }
-    
-    // 進捗保存ボタンのイベントリスナー
-    if (saveProgressBtn) {
-        saveProgressBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            console.log('進捗保存ボタンがクリックされました');
-            saveProgress(problemId, currentRating);
-        });
-    } else {
-        console.error('進捗保存ボタンが見つかりません');
-    }
-    
-    // 星評価のクリックイベント
-    var stars = document.querySelectorAll('.star-rating');
-    
-    for (var i = 0; i < stars.length; i++) {
-        stars[i].addEventListener('click', function(e) {
-            e.preventDefault();
-            var rating = this.getAttribute('data-rating');
-            currentRating = parseInt(rating);
-            setRating(currentRating);
-        });
-    }
-    
-    if (stars.length > 0) {
-    } else {
-        console.error('星評価要素が見つかりません');
-    }    
-});
-
-function showAnswer(problemId) {
-    var answerSection = document.getElementById('answerSection');
-    var showBtn = document.getElementById('showAnswerBtn');
-    var hideBtn = document.getElementById('hideAnswerBtn');
-    
-    if (answerSection && showBtn && hideBtn) {
-        answerSection.classList.add('show');
-        showBtn.style.display = 'none';
-        hideBtn.style.display = 'flex';
+        var problemId = parseInt(problemData.getAttribute('data-problem-id'));
+        var currentRating = parseInt(problemData.getAttribute('data-current-rating'));
         
-        // 解答閲覧を記録
-        updateProgress(problemId, { viewed_answer: true });
-    } else {
-        console.error('必要な要素が見つかりません');
-    }
-}
-
-function hideAnswer() {
-    var answerSection = document.getElementById('answerSection');
-    var showBtn = document.getElementById('showAnswerBtn');
-    var hideBtn = document.getElementById('hideAnswerBtn');
-    
-    if (answerSection && showBtn && hideBtn) {
-        answerSection.classList.remove('show');
-        showBtn.style.display = 'flex';
-        hideBtn.style.display = 'none';
-    } else {
-        console.error('必要な要素が見つかりません');
-    }
-}
-
-function setRating(rating) {
-    var ratingNum = parseInt(rating);
-    if (ratingNum >= 1 && ratingNum <= 5) {
-        console.log('新しい評価を設定:', ratingNum);
+        var showAnswerBtn = document.getElementById('showAnswerBtn');
+        var hideAnswerBtn = document.getElementById('hideAnswerBtn');
+        var saveProgressBtn = document.getElementById('saveProgressBtn');
+        var answerSection = document.getElementById('answerSection');
+        
+        if (answerSection) answerSection.classList.remove('show');
+        if (showAnswerBtn) showAnswerBtn.style.display = 'flex';
+        if (hideAnswerBtn) hideAnswerBtn.style.display = 'none';
+        
+        if (currentRating > 0) setRating(currentRating);
+        
+        if (showAnswerBtn) {
+            showAnswerBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                showAnswer(problemId);
+            });
+        }
+        
+        if (hideAnswerBtn) {
+            hideAnswerBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                hideAnswer();
+            });
+        }
+        
+        if (saveProgressBtn) {
+            saveProgressBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                saveProgress(problemId, currentRating);
+            });
+        }
+        
         var stars = document.querySelectorAll('.star-rating');
-        for (var i = 0; i < stars.length; i++) {
-            if (i < ratingNum) {
-                stars[i].classList.add('active');
-            } else {
-                stars[i].classList.remove('active');
-            }
-        }
-    } else {
-        console.error('無効な評価値:', rating);
-    }
-}
-
-function saveProgress(problemId, currentRating) {
-    var understoodEl = document.getElementById('understood');
-    var reviewFlagEl = document.getElementById('reviewFlag');
-    var memoEl = document.getElementById('memo');
-    
-    if (!understoodEl || !reviewFlagEl || !memoEl) {
-        console.error('フォーム要素が見つかりません');
-        alert('フォーム要素が見つかりません');
-        return;
-    }
-    
-    var updates = {
-        understood: understoodEl.checked,
-        review_flag: reviewFlagEl.checked,
-        memo: memoEl.value
-    };
-    
-    if (currentRating > 0) {
-        updates.difficulty_rating = currentRating;
-    }
-    
-    updateProgress(problemId, updates);
-}
-
-function updateProgress(problemId, updates) {
-    
-    if (!problemId || problemId === 0) {
-        console.error('問題IDが無効です:', problemId);
-        alert('問題IDが取得できませんでした');
-        return;
-    }
-    
-    fetch('/api/essay/progress/update', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            problem_id: problemId,
-            updates: updates
-        })
-    })
-    .then(function(response) {
-        return response.json();
-    })
-    .then(function(data) {
-        if (data.status === 'success') {
-            if (updates.understood !== undefined || updates.review_flag !== undefined || updates.memo !== undefined) {
-                alert('進捗を保存しました');
-                location.reload();
-            }
-        } else {
-            console.error('APIエラー:', data.message);
-            alert('エラー: ' + (data.message || '不明なエラー'));
-        }
-    })
-    .catch(function(error) {
-        console.error('更新エラー:', error);
-        alert('進捗の保存中にエラーが発生しました');
+        stars.forEach(star => {
+            star.addEventListener('click', function(e) {
+                e.preventDefault();
+                var rating = this.getAttribute('data-rating');
+                currentRating = parseInt(rating);
+                setRating(currentRating);
+            });
+        });    
     });
-}
-</script>
+
+    function showAnswer(problemId) {
+        var answerSection = document.getElementById('answerSection');
+        var showBtn = document.getElementById('showAnswerBtn');
+        var hideBtn = document.getElementById('hideAnswerBtn');
+        
+        if (answerSection && showBtn && hideBtn) {
+            answerSection.classList.add('show');
+            showBtn.style.display = 'none';
+            hideBtn.style.display = 'flex';
+            updateProgress(problemId, { viewed_answer: true });
+        }
+    }
+
+    function hideAnswer() {
+        var answerSection = document.getElementById('answerSection');
+        var showBtn = document.getElementById('showAnswerBtn');
+        var hideBtn = document.getElementById('hideAnswerBtn');
+        
+        if (answerSection && showBtn && hideBtn) {
+            answerSection.classList.remove('show');
+            showBtn.style.display = 'flex';
+            hideBtn.style.display = 'none';
+        }
+    }
+
+    function setRating(rating) {
+        var stars = document.querySelectorAll('.star-rating');
+        stars.forEach((star, index) => {
+            if (index < rating) {
+                star.classList.add('active');
+            } else {
+                star.classList.remove('active');
+            }
+        });
+    }
+
+    function saveProgress(problemId, currentRating) {
+        var understoodEl = document.getElementById('understood');
+        var reviewFlagEl = document.getElementById('reviewFlag');
+        var memoEl = document.getElementById('memo');
+
+        var updates = {
+            understood: understoodEl.checked,
+            review_flag: reviewFlagEl.checked,
+            memo: memoEl.value,
+            difficulty_rating: currentRating
+        };
+        
+        updateProgress(problemId, updates);
+    }
+
+    function updateProgress(problemId, updates) {
+        if (!problemId || problemId === 0) {
+            alert('問題IDが取得できませんでした');
+            return;
+        }
+        
+        fetch('/api/essay/progress/update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                problem_id: problemId,
+                updates: updates
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                if (updates.understood !== undefined || updates.review_flag !== undefined || updates.memo !== undefined) {
+                    alert('進捗を保存しました');
+                    location.reload();
+                }
+            } else {
+                alert('エラー: ' + (data.message || '不明なエラー'));
+            }
+        })
+        .catch(error => {
+            alert('進捗の保存中にエラーが発生しました');
+        });
+    }
+    </script>
 {% endblock %}
