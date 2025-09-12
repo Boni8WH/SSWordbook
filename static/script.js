@@ -64,13 +64,6 @@ const updateContentP = document.getElementById('updateContent');
 const shareXButton = document.getElementById('shareXButton');
 const downloadImageButton = document.getElementById('downloadImageButton');
 
-// Flaskから渡されるデータ（index.htmlで定義）
-if (typeof window.chapterDataFromFlask === 'undefined') {
-    console.error("Error: window.chapterDataFromFlask is undefined. Make sure it's passed from Flask.");
-}
-
-
-
 // =========================================================
 // スマホ対応関数
 // =========================================================
