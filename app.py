@@ -11231,6 +11231,229 @@ def find_related_essays():
     
     return jsonify({'essays': recommended_essays})
 
+import random
+from datetime import date # dateオブジェクトをインポート
+
+# ====================================================================
+# 「今日の10問」機能 ヘルパー関数
+# ====================================================================
+
+def get_or_create_daily_quiz(room_number):
+    """
+    その日のクイズをデータベースから取得、なければ新規作成する。
+    """
+    today = date.today()
+    
+    # 今日の日付と部屋番号で、すでにクイズが作成済みか確認
+    daily_quiz = DailyQuiz.query.filter_by(room_number=room_number, date=today).first()
+    
+    if daily_quiz:
+        # あれば、それを返す
+        return daily_quiz
+    
+    # なければ、新しいクイズを作成
+    # 部屋で利用可能な全ての問題を取得
+    all_words_in_room = load_word_data_for_room(room_number)
+    if len(all_words_in_room) < 10:
+        return None # 問題が10問未満の場合はクイズを作成しない
+
+    # 日付と部屋番号を元に乱数を初期化。これで毎日同じ問題が選ばれる
+    seed = f"{today.isoformat()}-{room_number}"
+    seeded_random = random.Random(seed)
+    
+    # 問題をシャッフルして10問選ぶ
+    seeded_random.shuffle(all_words_in_room)
+    selected_words = all_words_in_room[:10]
+    
+    # 問題IDのリストを作成
+    question_ids = [get_problem_id(word) for word in selected_words]
+    
+    # データベースに保存
+    new_daily_quiz = DailyQuiz(
+        room_number=room_number,
+        date=today,
+        question_ids=question_ids
+    )
+    db.session.add(new_daily_quiz)
+    db.session.commit()
+    
+    return new_daily_quiz
+
+def get_distractors(correct_answer, all_answers_set, count=3):
+    """
+    正解以外の選択肢（ダミー）をランダムに生成する。
+    """
+    # 候補から正解を除外
+    distractor_pool = list(all_answers_set - {correct_answer})
+    
+    # プールが足りない場合は空文字で埋める
+    while len(distractor_pool) < count:
+        distractor_pool.append("（選択肢候補不足）")
+        
+    return random.sample(distractor_pool, count)
+
+# ====================================================================
+# 「今日の10問」機能 APIエンドポイント
+# ====================================================================
+
+@app.route('/api/daily_quiz/status')
+def daily_quiz_status():
+    """
+    ユーザーが「今日の10問」に挑戦済みか、挑戦可能かを返す。
+    """
+    if 'user_id' not in session:
+        return jsonify({'status': 'error', 'message': 'ログインが必要です'}), 401
+    
+    user = User.query.get(session['user_id'])
+    today = date.today()
+
+    # 今日のクイズを取得・作成
+    daily_quiz = get_or_create_daily_quiz(user.room_number)
+    if not daily_quiz:
+        return jsonify({'status': 'unavailable', 'message': '今日の10問を作成できませんでした。問題数が不足している可能性があります。'})
+
+    # 挑戦履歴を確認
+    attempt = DailyQuizAttempt.query.filter_by(user_id=user.id, daily_quiz_id=daily_quiz.id).first()
+
+    if attempt:
+        # 挑戦済みの場合：結果とランキングを返す
+        # 同じ部屋の挑戦者全員の記録を取得
+        all_attempts = DailyQuizAttempt.query.filter_by(daily_quiz_id=daily_quiz.id)\
+            .order_by(DailyQuizAttempt.score.desc(), DailyQuizAttempt.time_taken.asc()).all()
+        
+        user_rank = -1
+        for i, att in enumerate(all_attempts):
+            if att.user_id == user.id:
+                user_rank = i + 1
+                break
+        
+        return jsonify({
+            'status': 'completed',
+            'score': attempt.score,
+            'time_taken': round(attempt.time_taken, 2),
+            'total_questions': len(daily_quiz.question_ids),
+            'rank': user_rank,
+            'total_challengers': len(all_attempts)
+        })
+    else:
+        # 未挑戦の場合
+        return jsonify({'status': 'ready'})
+
+@app.route('/api/daily_quiz/start')
+def daily_quiz_start():
+    """
+    「今日の10問」の問題データ（4択の選択肢付き）を返す。
+    """
+    if 'user_id' not in session:
+        return jsonify({'status': 'error', 'message': 'ログインが必要です'}), 401
+
+    user = User.query.get(session['user_id'])
+    
+    # 今日のクイズを取得・作成
+    daily_quiz = get_or_create_daily_quiz(user.room_number)
+    if not daily_quiz:
+        return jsonify({'status': 'error', 'message': 'クイズを作成できませんでした。'}), 500
+
+    # 全ての一問一答データを取得
+    all_words_in_room = load_word_data_for_room(user.room_number)
+    # 全ての「答え」をセットとして持っておく（ダミー選択肢生成用）
+    all_answers_set = {word.get('answer', '').strip() for word in all_words_in_room if word.get('answer', '').strip()}
+
+    # 今日の問題IDリストに対応する問題データを取得
+    daily_questions_data = []
+    for q_id in daily_quiz.question_ids:
+        found_word = next((word for word in all_words_in_room if get_problem_id(word) == q_id), None)
+        if found_word:
+            daily_questions_data.append(found_word)
+    
+    # 各問題に4択の選択肢を生成して追加
+    quiz_payload = []
+    for word in daily_questions_data:
+        correct_answer = word.get('answer', '')
+        distractors = get_distractors(correct_answer, all_answers_set)
+        
+        choices = distractors + [correct_answer]
+        random.shuffle(choices)
+        
+        quiz_payload.append({
+            'question': word.get('question', ''),
+            'choices': choices,
+            'answer': correct_answer
+        })
+
+    return jsonify({'status': 'success', 'quiz_questions': quiz_payload})
+
+@app.route('/api/daily_quiz/submit', methods=['POST'])
+def daily_quiz_submit():
+    """
+    ユーザーの解答を受け取り、結果を保存・集計して返す。
+    """
+    if 'user_id' not in session:
+        return jsonify({'status': 'error', 'message': 'ログインが必要です'}), 401
+    
+    user = User.query.get(session['user_id'])
+    today = date.today()
+    data = request.get_json()
+
+    user_answers = data.get('answers')
+    time_taken = data.get('time_taken')
+
+    if not user_answers or time_taken is None:
+        return jsonify({'status': 'error', 'message': 'データが不完全です'}), 400
+
+    # 今日のクイズを取得
+    daily_quiz = get_or_create_daily_quiz(user.room_number)
+    if not daily_quiz:
+        return jsonify({'status': 'error', 'message': 'クイズが見つかりません'}), 404
+        
+    # 挑戦済みか再度チェック
+    if DailyQuizAttempt.query.filter_by(user_id=user.id, daily_quiz_id=daily_quiz.id).first():
+        return jsonify({'status': 'error', 'message': 'すでに挑戦済みです'}), 409
+
+    # 正解を取得
+    all_words_in_room = load_word_data_for_room(user.room_number)
+    correct_answers = []
+    for q_id in daily_quiz.question_ids:
+        found_word = next((word for word in all_words_in_room if get_problem_id(word) == q_id), None)
+        if found_word:
+            correct_answers.append(found_word.get('answer'))
+
+    # スコア計算
+    score = 0
+    for i, user_answer in enumerate(user_answers):
+        if i < len(correct_answers) and user_answer == correct_answers[i]:
+            score += 1
+
+    # 挑戦結果をデータベースに保存
+    new_attempt = DailyQuizAttempt(
+        user_id=user.id,
+        daily_quiz_id=daily_quiz.id,
+        date=today,
+        score=score,
+        time_taken=time_taken
+    )
+    db.session.add(new_attempt)
+    db.session.commit()
+
+    # ランキングを計算
+    all_attempts = DailyQuizAttempt.query.filter_by(daily_quiz_id=daily_quiz.id)\
+        .order_by(DailyQuizAttempt.score.desc(), DailyQuizAttempt.time_taken.asc()).all()
+    
+    user_rank = -1
+    for i, attempt in enumerate(all_attempts):
+        if attempt.user_id == user.id:
+            user_rank = i + 1
+            break
+            
+    return jsonify({
+        'status': 'success',
+        'score': score,
+        'time_taken': round(time_taken, 2),
+        'total_questions': len(correct_answers),
+        'rank': user_rank,
+        'total_challengers': len(all_attempts)
+    })
+
 # ===== メイン起動処理の修正 =====
 if __name__ == '__main__':
     try:
