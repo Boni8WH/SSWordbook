@@ -2,9 +2,19 @@
 
 // クイズ用のモーダル（ポップアップウィンドウ）を生成する関数
 function createQuizModal() {
-    // 既存のモーダルがあれば削除
-    const existingModal = document.getElementById('warmUpQuizModal');
-    if (existingModal) existingModal.remove();
+    // 既存のモーダルがあれば、Bootstrapの正しい方法で閉じてから削除する
+    const existingModalElement = document.getElementById('warmUpQuizModal');
+    if (existingModalElement) {
+        const modalInstance = bootstrap.Modal.getInstance(existingModalElement);
+        if (modalInstance) {
+            // Bootstrapの公式な hide メソッドを呼び出す
+            modalInstance.hide();
+        }
+        // hideのアニメーションが終わった後に、DOMから要素を完全に削除する
+        existingModalElement.addEventListener('hidden.bs.modal', () => {
+            existingModalElement.remove();
+        }, { once: true });
+    }
 
     const modalHTML = `
         <div class="modal fade" id="warmUpQuizModal" tabindex="-1" aria-labelledby="quizModalLabel" aria-hidden="true">
@@ -61,11 +71,11 @@ async function startWarmUpQuiz(problemId) {
         quizCardContainer.innerHTML = `
             <div class="quiz-progress">${currentQuestionIndex + 1} / ${quizData.length} 問</div>
             <div class="quiz-question">${word.question}</div>
-            <div class="quiz-answer" style="display: none;">${word.answer}</div>
+            <div class="quiz-answer is-hidden">${word.answer}</div>
             <div class="quiz-buttons">
                 <button class="btn btn-primary" id="warmupShowAnswerBtn">答えを見る</button>
-                <button class="btn btn-success" id="warmupCorrectBtn" style="display: none;">正解</button>
-                <button class="btn btn-danger" id="warmupIncorrectBtn" style="display: none;">不正解</button>
+                <button class="btn btn-success is-hidden" id="warmupCorrectBtn">正解</button>
+                <button class="btn btn-danger is-hidden" id="warmupIncorrectBtn">不正解</button>
             </div>
         `;
         setupButtonListeners();
@@ -74,11 +84,12 @@ async function startWarmUpQuiz(problemId) {
     // 5. ボタンのイベントリスナーを設定
     function setupButtonListeners() {
         document.getElementById('warmupShowAnswerBtn').addEventListener('click', () => {
-            document.querySelector('#warmUpQuizModal .quiz-answer').style.display = 'block';
-            document.getElementById('warmupShowAnswerBtn').style.display = 'none';
-            document.getElementById('warmupCorrectBtn').style.display = 'inline-block';
-            document.getElementById('warmupIncorrectBtn').style.display = 'inline-block';
-        });
+        // is-hidden クラスの付け外しで表示を切り替える
+        document.querySelector('#warmUpQuizModal .quiz-answer').classList.remove('is-hidden');
+        document.getElementById('warmupShowAnswerBtn').classList.add('is-hidden');
+        document.getElementById('warmupCorrectBtn').classList.remove('is-hidden');
+        document.getElementById('warmupIncorrectBtn').classList.remove('is-hidden');
+    });
 
         document.getElementById('warmupCorrectBtn').addEventListener('click', () => handleAnswer(true));
         document.getElementById('warmupIncorrectBtn').addEventListener('click', () => handleAnswer(false));
@@ -124,7 +135,6 @@ async function startWarmUpQuiz(problemId) {
             <h4>準備運動完了！</h4>
             <p>正解数: ${correctCount} / ${quizData.length} 問</p>
             <p>正答率: ${accuracy}%</p>
-            <p>学習結果がスコアに反映されました。</p>
             <button class="btn btn-primary" onclick="startWarmUpQuiz(${problemId})">もう一度挑戦</button>
         `;
         // ★重要：クイズが終わったらサーバーに進捗を保存
