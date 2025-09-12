@@ -11072,65 +11072,68 @@ with app.app_context():
 @app.route('/api/find_related_essays', methods=['POST'])
 def find_related_essays():
     """
-    キーワードのリストを受け取り、関連する論述問題を探して返すAPI
+    キーワードと章のリストを受け取り、関連する論述問題を探して返すAPI
+    (同じ章の問題を優先ソートする機能付き)
     """
     if 'user_id' not in session:
         return jsonify({'status': 'error', 'message': 'ログインが必要です'}), 401
 
     data = request.get_json()
-    # 'categories' ではなく 'keywords' を受け取るように変更
-    if not data or 'keywords' not in data:
-        return jsonify({'status': 'error', 'message': 'キーワードが指定されていません'}), 400
+    if not data:
+        return jsonify({'status': 'error', 'message': 'データがありません'}), 400
 
-    keywords = data['keywords']
+    keywords = data.get('keywords', [])
+    # フロントエンドから送られてきた章のリストを受け取る <--- 変更点
+    session_chapters = data.get('chapters', [])
+
     if not keywords:
         return jsonify({'essays': []})
 
     user = User.query.get(session['user_id'])
     if not user:
         return jsonify({'status': 'error', 'message': 'ユーザーが見つかりません'}), 404
-    
-    # 検索条件を作成
-    search_conditions = []
-    # 短すぎる単語や一般的すぎる単語を除外
-    stop_words = {'年', '月', '日', 'の', 'は', 'が', 'を'} 
-    for keyword in keywords:
-        # 2文字以上で、ストップワードでないキーワードのみを対象にする
-        if keyword and len(keyword) > 1 and keyword not in stop_words:
-            search_pattern = f'%{keyword}%'
-            search_conditions.append(EssayProblem.question.ilike(search_pattern))
-            search_conditions.append(EssayProblem.answer.ilike(search_pattern))
 
-    if not search_conditions:
-        return jsonify({'essays': []})
-    
-    # 公開設定を考慮した問題を取得
-    # get_filtered_essay_problems_with_visibility は章を指定しない場合、
-    # 全ての公開問題を返すようにする必要があります（既存のままで大丈夫です）。
+    # 公開設定を考慮した、全ての章の問題を取得
     visible_problems = get_filtered_essay_problems_with_visibility(
         chapter=None,
         room_number=user.room_number,
         user_id=user.id
     )
-    
+
     # 関連問題をフィルタリング
     related_essays = []
     found_ids = set() # 重複を防ぐためのセット
+    
+    # 短すぎる単語や一般的すぎる単語を除外
+    stop_words = {'年', '月', '日', 'の', 'は', 'が', 'を'}
+
     for problem in visible_problems:
         for keyword in keywords:
-             if keyword and len(keyword) > 1 and keyword not in stop_words:
+            if keyword and len(keyword) > 1 and keyword not in stop_words:
                 if (keyword in problem.question or keyword in problem.answer) and problem.id not in found_ids:
                     related_essays.append({
                         'id': problem.id,
                         'university': problem.university,
                         'year': problem.year,
-                        'question_snippet': (problem.question[:50] + '...') if len(problem.question) > 50 else problem.question
+                        'question_snippet': (problem.question[:50] + '...') if len(problem.question) > 50 else problem.question,
+                        'chapter': problem.chapter # <--- ソートで使うためchapter情報を追加
                     })
                     found_ids.add(problem.id)
-                    break 
+                    # 一致する問題が見つかったら、この問題に対するキーワード検索は終了
+                    break
 
-    # 最大5件に絞り、新しいものから順に表示
-    recommended_essays = sorted(related_essays, key=lambda x: x.get('year', 0), reverse=True)[:5]
+    # --- ▼ここが優先順位付けのロジックです▼ ---
+    # 1. 解いた問題と同じ章かどうか (True=1, False=0)
+    # 2. 年度の新しい順
+    # この2つの条件で並べ替える
+    recommended_essays = sorted(
+        related_essays,
+        key=lambda essay: (
+            essay.get('chapter') in session_chapters, # 同じ章ならTrue (優先)
+            essay.get('year', 0)                      # 次に年度で比較
+        ),
+        reverse=True # True(同じ章)が先、年度が新しいものが先に来るように降順ソート
+    )[:5] # 上位5件に絞る
     
     return jsonify({'essays': recommended_essays})
 
