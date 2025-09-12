@@ -22,6 +22,8 @@ let answerButtonTimeout = null;
 let hasBeenRestricted = false;
 let restrictionReleased = false;
 let word_data = [];
+let quizTimer; // daily_quiz.jsで使っていたものも、ここで宣言
+let timeElapsed = 0; // daily_quiz.jsで使っていたものも、ここで宣言
 
 // DOM要素
 const startButton = document.getElementById('startButton');

@@ -6,9 +6,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-let quizTimer;
-let timeElapsed = 0;
-
 // 「今日の10問」ボタンが押されたときの処理
 async function handleDailyQuizClick() {
     // まず、ユーザーが挑戦済みか確認
