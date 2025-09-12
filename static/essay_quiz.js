@@ -158,7 +158,6 @@ async function startWarmUpQuiz(problemId) {
                 <h4>準備運動完了！</h4>
                 <p>正解数: ${correctCount} / ${quizData.length} 問</p>
                 <p>正答率: ${accuracy}%</p>
-                <p>学習結果がスコアに反映されました。</p>
                 <button class="btn btn-primary" id="restartWarmupQuizBtn">もう一度挑戦</button>
             </div>
         `;
