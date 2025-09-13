@@ -102,32 +102,33 @@ class JSONEncodedDict(TypeDecorator):
             return None
         return json.loads(value)
 
+# app.py の既存の class User(db.Model): ... を丸ごとこちらに置き換え
+
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     room_number = db.Column(db.String(50), nullable=False)
-    student_id = db.Column(db.String(50), unique=True, nullable=False)
-    username = db.Column(db.String(80), unique=True, nullable=False)
-    # パスワードはハッシュ化して保存
-    _room_password_hash = db.Column(db.String(128), nullable=False)
-    _individual_password_hash = db.Column(db.String(128), nullable=False)
-    __table_args__ = (
-        db.UniqueConstraint('room_number', 'student_id', 
-                          name='unique_room_student_id'),
-    )
+    student_id = db.Column(db.String(50), nullable=False) # unique=True を削除
+    username = db.Column(db.String(80), nullable=False)   # unique=True を削除
     
-    # アカウント名変更・初回ログイン・制限状態管理用フィールド
+    _room_password_hash = db.Column(db.String(255), nullable=False)
+    _individual_password_hash = db.Column(db.String(255), nullable=False)
+    
+    # ★★★ ここからが重要な修正 ★★★
+    # 正しいユニーク制約（部屋番号と出席番号の組み合わせ、部屋番号とユーザー名の組み合わせ）
+    __table_args__ = (
+        db.UniqueConstraint('room_number', 'student_id', name='uq_room_student_id'),
+        db.UniqueConstraint('room_number', 'username', name='uq_room_username'),
+    )
+    # ★★★ ここまで ★★★
+
     original_username = db.Column(db.String(80), nullable=False)
     is_first_login = db.Column(db.Boolean, default=True, nullable=False)
     password_changed_at = db.Column(db.DateTime)
     username_changed_at = db.Column(db.DateTime)
     restriction_triggered = db.Column(db.Boolean, default=False, nullable=False)
     restriction_released = db.Column(db.Boolean, default=False, nullable=False)
-    
-    # 問題履歴をJSON形式で保存 (問題ID: {total: N, correct: M, consecutive_correct: K})
     problem_history = db.Column(JSONEncodedDict, default={})
-    # 苦手問題をJSON形式で保存 (問題オブジェクトのリスト)
     incorrect_words = db.Column(JSONEncodedDict, default=[])
-    # 最終ログイン日時
     last_login = db.Column(db.DateTime, default=lambda: datetime.now(JST))
 
     def set_room_password(self, password):
@@ -146,54 +147,37 @@ class User(db.Model):
         return f'<User {self.username} (Room: {self.room_number}, ID: {self.student_id})>'
     
     def get_problem_history(self):
-        """問題履歴を取得"""
-        if self.problem_history:
-            return self.problem_history
-        return {}
+        return self.problem_history or {}
 
     def set_problem_history(self, history):
-        """問題履歴を設定"""
         self.problem_history = history
 
     def get_incorrect_words(self):
-        """苦手問題を取得"""
-        if self.incorrect_words:
-            return self.incorrect_words
-        return []
+        return self.incorrect_words or []
 
     def set_incorrect_words(self, words):
-        """苦手問題を設定"""
         self.incorrect_words = words
 
     def change_username(self, new_username):
-        """アカウント名を変更する"""
         if not self.original_username:
             self.original_username = self.username
-        
         self.username = new_username
         self.username_changed_at = datetime.now(JST)
     
     def mark_first_login_completed(self):
-        """初回ログインを完了としてマークする"""
         self.is_first_login = False
     
     def change_password_first_time(self, new_password):
-        """初回パスワード変更（個別パスワードのみ）"""
         self.set_individual_password(new_password)
         self.password_changed_at = datetime.now(JST)
         self.mark_first_login_completed()
     
     def set_restriction_state(self, triggered, released):
-        """制限状態を設定"""
         self.restriction_triggered = triggered
         self.restriction_released = released
     
     def get_restriction_state(self):
-        """制限状態を取得"""
-        return {
-            'hasBeenRestricted': self.restriction_triggered,
-            'restrictionReleased': self.restriction_released
-        }
+        return {'hasBeenRestricted': self.restriction_triggered, 'restrictionReleased': self.restriction_released}
 
 class AdminUser(db.Model):
     __tablename__ = 'admin_user'
@@ -1218,6 +1202,44 @@ def admin_fix_all_data():
     except Exception as e:
         flash(f'データ修正エラー: {str(e)}', 'danger')
     
+    return redirect(url_for('admin_page'))
+
+# app.py のルーティングエリアに追加
+
+@app.route('/admin/emergency_fix_user_schema', methods=['POST'])
+@admin_required
+def emergency_fix_user_schema():
+    """管理者用: Userテーブルのユニーク制約を修正する"""
+    try:
+        with db.engine.connect() as conn:
+            # PostgreSQLの制約名を取得 (Render環境で一般的)
+            constraints = conn.execute(text(
+                "SELECT constraint_name FROM information_schema.table_constraints "
+                "WHERE table_name = 'user' AND constraint_type = 'UNIQUE'"
+            )).fetchall()
+            
+            for (constraint_name,) in constraints:
+                # ユーザー名と出席番号の古いグローバルユニーク制約を削除
+                if 'username' in constraint_name or 'student_id' in constraint_name:
+                    print(f"🔧 古い制約を削除します: {constraint_name}")
+                    conn.execute(text(f'ALTER TABLE "user" DROP CONSTRAINT {constraint_name}'))
+
+            # 新しい複合ユニーク制約を追加
+            print("🔧 新しい複合ユニーク制約を追加します...")
+            conn.execute(text('ALTER TABLE "user" ADD CONSTRAINT uq_room_student_id UNIQUE (room_number, student_id)'))
+            conn.execute(text('ALTER TABLE "user" ADD CONSTRAINT uq_room_username UNIQUE (room_number, username)'))
+            
+            conn.commit()
+            
+        flash('データベースのUserテーブル構造を正常に修復しました。', 'success')
+    except Exception as e:
+        db.session.rollback()
+        # 制約が既に存在する場合のエラーは無視して成功とみなす
+        if 'already exists' in str(e):
+            flash('データベース構造は既に修復済みです。', 'info')
+        else:
+            flash(f'データベース構造の修復中にエラーが発生しました: {str(e)}', 'danger')
+            
     return redirect(url_for('admin_page'))
 
 @app.route('/change_username', methods=['GET', 'POST'])
