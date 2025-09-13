@@ -836,6 +836,16 @@
                         </button>
                     </form>
                 </div>
+                <div class="admin-panel" style="background-color: #f8d7da; border-left: 5px solid #dc3545;">
+                    <h4>⚠️ データベース構造の修復</h4>
+                    <p>
+                        新しい機能（今日の10問など）を追加した後にエラーが出る場合、データベースの構造が最新でない可能性があります。<br>
+                        以下のボタンを押すと、不足しているテーブルやカラムが安全に追加されます。<strong>既存のデータは消えません。</strong>
+                    </p>
+                    <a href="{{ url_for('admin_force_migration') }}" class="btn btn-danger">
+                        <i class="fas fa-database"></i> データベース構造を修復
+                    </a>
+                </div>
             </div>
         </div>
     </div>
