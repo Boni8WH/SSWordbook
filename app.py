@@ -11600,7 +11600,7 @@ def delete_essay_image(problem_id):
 
 @app.route('/api/daily_quiz/today')
 def get_daily_quiz():
-    """今日の10問を取得、または結果を表示するためのAPI（選択肢生成を強化）"""
+    """今日の10問を取得、または結果を表示するためのAPI"""
     if 'user_id' not in session:
         return jsonify({'status': 'error', 'message': 'ログインが必要です'}), 401
     
@@ -11623,7 +11623,7 @@ def get_daily_quiz():
             ranking_data = []
             current_user_rank_info = None
             for i, result in enumerate(all_results, 1):
-                if not result.user: continue # ユーザーが存在しない場合はスキップ
+                if not result.user: continue
                 
                 rank_entry = {
                     'rank': i,
@@ -11651,8 +11651,8 @@ def get_daily_quiz():
         all_words = load_word_data_for_room(user.room_number)
         public_words = [w for w in all_words if w.get('enabled')]
         
-        if len(public_words) < 4: # 4択問題を作るには最低4問必要
-            return jsonify({'status': 'error', 'message': 'クイズを作成するための問題が4問未満です。'})
+        if len(public_words) < 4:
+            return jsonify({'status': 'error', 'message': 'クイズを作成するには問題が4問以上必要です。'})
         
         num_to_select = min(10, len(public_words))
         selected_problems = random.sample(public_words, num_to_select)
@@ -11671,7 +11671,7 @@ def get_daily_quiz():
     all_words = load_word_data_for_room(user.room_number)
     quiz_questions = []
 
-    # ★★★ 修正点：不正解の選択肢候補を先に一度だけ作成する ★★★
+    # 不正解の選択肢候補を先に一度だけ作成
     all_answers = list(set(w['answer'] for w in all_words if w.get('answer')))
 
     for problem_id in problem_ids:
@@ -11679,15 +11679,15 @@ def get_daily_quiz():
         if question_word:
             correct_answer = question_word['answer']
             
-            # ★★★ 修正点：不正解の選択肢を安全に取得する ★★★
+            # 不正解の選択肢を安全に取得
             distractor_pool = [ans for ans in all_answers if ans != correct_answer]
             
             if len(distractor_pool) >= 3:
                 distractors = random.sample(distractor_pool, 3)
             else:
-                # 候補が足りない場合は、あるものだけで作成し、残りはダミーで埋める
+                # 候補が足りない場合はダミーで補完
                 distractors = distractor_pool
-                dummy_options = ["ダミー選択肢A", "ダミー選択肢B", "ダミー選択肢C", "ダミー選択肢D"]
+                dummy_options = ["誤答A", "誤答B", "誤答C", "誤答D"]
                 i = 0
                 while len(distractors) < 3:
                     if dummy_options[i] not in distractors and dummy_options[i] != correct_answer:
@@ -11723,7 +11723,6 @@ def submit_daily_quiz():
     if not daily_quiz:
         return jsonify({'status': 'error', 'message': '今日のクイズが見つかりません。'}), 404
 
-    # 既に結果がある場合はエラー
     if DailyQuizResult.query.filter_by(user_id=user.id, quiz_id=daily_quiz.id).first():
         return jsonify({'status': 'error', 'message': '既に回答済みです。'}), 409
 
