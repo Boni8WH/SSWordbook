@@ -111,8 +111,8 @@ class User(db.Model):
     _room_password_hash = db.Column(db.String(128), nullable=False)
     _individual_password_hash = db.Column(db.String(128), nullable=False)
     __table_args__ = (
-        db.UniqueConstraint('room_number', 'student_id', '_individual_password_hash', 
-                          name='unique_room_student_individual_password'),
+        db.UniqueConstraint('room_number', 'student_id', 
+                          name='unique_room_student_id'),
     )
     
     # アカウント名変更・初回ログイン・制限状態管理用フィールド
@@ -6213,23 +6213,17 @@ def admin_add_user():
             flash('すべての項目を入力してください。', 'danger')
             return redirect(url_for('admin_page'))
 
-        # 🔥 修正: 完全に同一のアカウント（全ての情報が同じ）のみ重複とみなす
-        individual_password_hash = generate_password_hash(individual_password)
-        room_password_hash = generate_password_hash(room_password)
-        
+        # ユーザーの重複チェック（よりシンプルに）
         existing_user = User.query.filter_by(
             room_number=room_number,
             student_id=student_id,
-            username=username,
-            _room_password_hash=room_password_hash,
-            _individual_password_hash=individual_password_hash
-        ).first()
-                    
-        if existing_user:
-            flash(f'完全に同一のアカウント（部屋{room_number}、出席番号{student_id}、ユーザー名{username}、同じパスワード）は既に存在します。', 'danger')
-            return redirect(url_for('admin_page'))
+        ).all()
+        
+        for user in existing_user:
+            if user.check_individual_password(individual_password):
+                flash(f'部屋{room_number}・出席番号{student_id}で同じ個別パスワードのアカウントが既に存在します。', 'danger')
+                return redirect(url_for('admin_page'))
 
-        # ✅ 新規ユーザー作成（同じ部屋・出席番号でも個別パスワードが異なれば作成可能）
         new_user = User(
             room_number=room_number,
             student_id=student_id,
@@ -6239,8 +6233,10 @@ def admin_add_user():
         )
         new_user.set_room_password(room_password)
         new_user.set_individual_password(individual_password)
-        new_user.problem_history = "{}"
-        new_user.incorrect_words = "[]"
+        
+        new_user.problem_history = {}
+        new_user.incorrect_words = []
+        
         new_user.last_login = datetime.now(JST)
 
         db.session.add(new_user)
@@ -6248,16 +6244,15 @@ def admin_add_user():
         
         # 部屋設定の自動作成
         if not RoomSetting.query.filter_by(room_number=room_number).first():
-            default_room_setting = RoomSetting(room_number=room_number, max_enabled_unit_number="9999", csv_filename="words.csv")
+            default_room_setting = RoomSetting(room_number=room_number)
             db.session.add(default_room_setting)
             db.session.commit()
             flash(f'部屋 {room_number} の設定をデフォルトで作成しました。', 'info')
 
-        flash(f'ユーザー {username} (部屋: {room_number}, 出席番号: {student_id}) を登録しました。初回ログイン時にパスワード変更が必要です。', 'success')
+        flash(f'ユーザー {username} (部屋: {room_number}, 出席番号: {student_id}) を登録しました。', 'success')
         return redirect(url_for('admin_page'))
 
     except Exception as e:
-        print(f"Error in admin_add_user: {e}")
         db.session.rollback()
         flash(f'ユーザー追加中にエラーが発生しました: {str(e)}', 'danger')
         return redirect(url_for('admin_page'))
