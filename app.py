@@ -11649,9 +11649,11 @@ def get_daily_quiz():
         'questions': quiz_questions
     })
 
+# app.py
+
 @app.route('/api/daily_quiz/submit', methods=['POST'])
 def submit_daily_quiz():
-    """今日の10問の結果を保存するAPI"""
+    """今日の10問の結果を保存し、その場でランキングを返すAPI"""
     if 'user_id' not in session:
         return jsonify({'status': 'error', 'message': 'ログインが必要です'}), 401
 
@@ -11666,17 +11668,55 @@ def submit_daily_quiz():
     if DailyQuizResult.query.filter_by(user_id=user.id, quiz_id=daily_quiz.id).first():
         return jsonify({'status': 'error', 'message': '既に回答済みです。'}), 409
 
-    new_result = DailyQuizResult(
-        user_id=user.id,
-        quiz_id=daily_quiz.id,
-        score=data.get('score'),
-        time_taken_ms=data.get('time')
-    )
-    db.session.add(new_result)
-    db.session.commit()
+    # --- ▼ ここからが変更・追加部分 ▼ ---
+    try:
+        new_result = DailyQuizResult(
+            user_id=user.id,
+            quiz_id=daily_quiz.id,
+            score=data.get('score'),
+            time_taken_ms=data.get('time')
+        )
+        db.session.add(new_result)
+        db.session.commit()
+        
+        # 結果保存後、すぐにランキングを計算
+        all_results_query = DailyQuizResult.query.filter_by(quiz_id=daily_quiz.id)\
+            .options(joinedload(DailyQuizResult.user))\
+            .order_by(DailyQuizResult.score.desc(), DailyQuizResult.time_taken_ms.asc())
+        all_results = all_results_query.all()
+        
+        ranking_data = []
+        current_user_rank_info = None
+        for i, result in enumerate(all_results, 1):
+            if not result.user: continue
+            
+            rank_entry = {
+                'rank': i,
+                'username': result.user.username,
+                'score': result.score,
+                'time': f"{(result.time_taken_ms / 1000):.2f}秒"
+            }
+            ranking_data.append(rank_entry)
+            if result.user_id == user.id:
+                current_user_rank_info = rank_entry
 
-    return jsonify({'status': 'success', 'message': '結果を保存しました。'})
+        # 成功レスポンスに結果とランキングを含めて返す
+        return jsonify({
+            'status': 'success',
+            'message': '結果を保存しました。',
+            'completed': True, # フロントが結果表示モードになるためのフラグ
+            'user_result': {
+                'score': new_result.score,
+                'time': f"{(new_result.time_taken_ms / 1000):.2f}秒"
+            },
+            'ranking': ranking_data,
+            'user_rank': current_user_rank_info
+        })
 
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"日次クイズ結果の保存/集計エラー: {e}")
+        return jsonify({'status': 'error', 'message': '結果の保存中にサーバーエラーが発生しました。'}), 500
 @app.route('/admin/fix_data_types', methods=['POST'])
 @admin_required
 def admin_fix_data_types():
