@@ -112,14 +112,11 @@ class User(db.Model):
     
     _room_password_hash = db.Column(db.String(255), nullable=False)
     _individual_password_hash = db.Column(db.String(255), nullable=False)
-    
-    # ★★★ ここからが重要な修正 ★★★
-    # 正しいユニーク制約（部屋番号と出席番号の組み合わせ、部屋番号とユーザー名の組み合わせ）
+
     __table_args__ = (
         db.UniqueConstraint('room_number', 'student_id', name='uq_room_student_id'),
         db.UniqueConstraint('room_number', 'username', name='uq_room_username'),
     )
-    # ★★★ ここまで ★★★
 
     original_username = db.Column(db.String(80), nullable=False)
     is_first_login = db.Column(db.Boolean, default=True, nullable=False)
@@ -131,53 +128,29 @@ class User(db.Model):
     incorrect_words = db.Column(JSONEncodedDict, default=[])
     last_login = db.Column(db.DateTime, default=lambda: datetime.now(JST))
 
-    def set_room_password(self, password):
-        self._room_password_hash = generate_password_hash(password)
-
-    def check_room_password(self, password):
-        return check_password_hash(self._room_password_hash, password)
-
-    def set_individual_password(self, password):
-        self._individual_password_hash = generate_password_hash(password)
-
-    def check_individual_password(self, password):
-        return check_password_hash(self._individual_password_hash, password)
-
-    def __repr__(self):
-        return f'<User {self.username} (Room: {self.room_number}, ID: {self.student_id})>'
-    
-    def get_problem_history(self):
-        return self.problem_history or {}
-
-    def set_problem_history(self, history):
-        self.problem_history = history
-
-    def get_incorrect_words(self):
-        return self.incorrect_words or []
-
-    def set_incorrect_words(self, words):
-        self.incorrect_words = words
-
+    # set_password や check_password などのメソッド定義は元のままでOKです
+    def set_room_password(self, password): self._room_password_hash = generate_password_hash(password)
+    def check_room_password(self, password): return check_password_hash(self._room_password_hash, password)
+    def set_individual_password(self, password): self._individual_password_hash = generate_password_hash(password)
+    def check_individual_password(self, password): return check_password_hash(self._individual_password_hash, password)
+    def __repr__(self): return f'<User {self.username} (Room: {self.room_number}, ID: {self.student_id})>'
+    def get_problem_history(self): return self.problem_history or {}
+    def set_problem_history(self, history): self.problem_history = history
+    def get_incorrect_words(self): return self.incorrect_words or []
+    def set_incorrect_words(self, words): self.incorrect_words = words
     def change_username(self, new_username):
-        if not self.original_username:
-            self.original_username = self.username
+        if not self.original_username: self.original_username = self.username
         self.username = new_username
         self.username_changed_at = datetime.now(JST)
-    
-    def mark_first_login_completed(self):
-        self.is_first_login = False
-    
+    def mark_first_login_completed(self): self.is_first_login = False
     def change_password_first_time(self, new_password):
         self.set_individual_password(new_password)
         self.password_changed_at = datetime.now(JST)
         self.mark_first_login_completed()
-    
     def set_restriction_state(self, triggered, released):
         self.restriction_triggered = triggered
         self.restriction_released = released
-    
-    def get_restriction_state(self):
-        return {'hasBeenRestricted': self.restriction_triggered, 'restrictionReleased': self.restriction_released}
+    def get_restriction_state(self): return {'hasBeenRestricted': self.restriction_triggered, 'restrictionReleased': self.restriction_released}
 
 class AdminUser(db.Model):
     __tablename__ = 'admin_user'
