@@ -1750,6 +1750,24 @@ def create_user_stats_table_simple():
         print(f"❌ テーブル作成エラー: {e}")
         return False
 
+try:
+    with app.app_context():
+        # データベースの現在の状態を検査
+        inspector = db.inspect(db.engine)
+        
+        # 依存関係があるため、先に daily_quiz_result テーブルを削除
+        if inspector.has_table('daily_quiz_result'):
+            print("🔧 Deleting existing daily_quiz_result table...")
+            DailyQuizResult.__table__.drop(db.engine)
+            print("✅ daily_quiz_result table deleted.")
+            
+        if inspector.has_table('daily_quiz'):
+            print("🔧 Deleting existing daily_quiz table...")
+            DailyQuiz.__table__.drop(db.engine)
+            print("✅ daily_quiz table deleted.")
+except Exception as e:
+    print(f"⚠️ Could not drop tables (this is okay if they don't exist): {e}")
+
 def create_tables_and_admin_user():
     """データベース初期化関数（UserStats対応版）"""
     try:
