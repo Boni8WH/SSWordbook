@@ -1755,8 +1755,8 @@ def create_tables_and_admin_user():
                         original_username='admin',
                         room_number='ADMIN',
                         student_id='000',
-                        problem_history='{}',
-                        incorrect_words='[]'
+                        problem_history={},
+                        incorrect_words=[]
                     )
                     admin_user.last_login = datetime.now(JST)
                     admin_user.set_room_password('Avignon1309')
@@ -6962,8 +6962,8 @@ def admin_upload_users():
                 new_user._room_password_hash = generate_password_hash(room_password, method='pbkdf2:sha256', salt_length=8)
                 new_user._individual_password_hash = generate_password_hash(individual_password, method='pbkdf2:sha256', salt_length=8)
 
-                new_user.problem_history = "{}"
-                new_user.incorrect_words = "[]"
+                new_user.problem_history = {}
+                new_user.incorrect_words = []
                 new_user.last_login = datetime.now(JST)
 
                 db.session.add(new_user)
