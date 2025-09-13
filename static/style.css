@@ -4379,17 +4379,17 @@ a.nav-link.btn.change-username-button:hover,
 
 /* 2. 選択リセット (ユーティリティボタン) */
 .btn-reset {
-    background-color: #6c757d; /* グレー */
+    background-color: #afbfce;
     color: white;
 }
 .btn-reset:hover {
-    background-color: #5a6268;
+    background-color: #7d8a96;
     color: white;
 }
 
 /* 3. 今日の10問 (特別コンテンツ) */
 .btn-daily {
-    background-color: #28a745; /* 落ち着いたグリーン */
+    background-color: #28a745;
     color: white;
 }
 .btn-daily:hover {
@@ -4399,21 +4399,21 @@ a.nav-link.btn.change-username-button:hover,
 
 /* 4. 苦手問題一覧 (ユーティリティボタン) */
 .btn-weak {
-    background-color: #f8f9fa; /* 明るいグレー（アウトライン風） */
+    background-color: #193c5e;
     color: #495057;
-    border: 1px solid #dee2e6;
+    border: 1px solid #193c5e;
 }
 .btn-weak:hover {
-    background-color: #e2e6ea;
+    background-color: #1a344e;
     color: #343a40;
 }
 
 /* 5. 論述問題集 (特別コンテンツ) */
 .btn-essay {
-    background-color: #6f42c1; /* 上品なパープル */
+    background-color: #2f295b;
     color: white;
 }
 .btn-essay:hover {
-    background-color: #5a32a3;
+    background-color: #070013;
     color: white;
 }
