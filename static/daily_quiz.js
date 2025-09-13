@@ -45,11 +45,14 @@ function createDailyQuizModal() {
     const modalElement = document.getElementById('dailyQuizModal');
     
     modalElement.addEventListener('hidden.bs.modal', () => {
-        clearInterval(quizTimerInterval); // モーダルが閉じたらタイマーを停止
+        clearInterval(quizTimerInterval);
+        window.removeEventListener('beforeunload', beforeUnloadHandler);
         modalElement.remove();
     }, { once: true });
-
-    return new bootstrap.Modal(modalElement);
+    return new bootstrap.Modal(modalElement, {
+        backdrop: 'static', // 背景をクリックしても閉じない
+        keyboard: false     // Escキーで閉じない
+    });
 }
 
 /**
@@ -89,6 +92,20 @@ function runQuiz(questions) {
     let score = 0;
 
     const quizContainer = document.getElementById('dailyQuizContainer');
+    const modalElement = document.getElementById('dailyQuizModal');
+
+    // ページ離脱を警告する関数
+    const beforeUnloadHandler = (e) => {
+        e.preventDefault();
+        e.returnValue = ''; // 古いブラウザ用の設定
+    };
+
+    // クイズ中は閉じるボタンを無効化＆離脱警告を設定
+    if (modalElement) {
+        modalElement.querySelector('.btn-close').disabled = true;
+        modalElement.querySelector('.modal-footer .btn-secondary').disabled = true;
+        window.addEventListener('beforeunload', beforeUnloadHandler);
+    }
 
     function showQuestion() {
         if (currentQuestionIndex >= questions.length) {
@@ -166,7 +183,15 @@ function runQuiz(questions) {
 async function submitQuizResult(score, time) {
     const quizContainer = document.getElementById('dailyQuizContainer');
     quizContainer.innerHTML = `<div class="text-center"><p>結果を送信中...</p></div>`;
-
+    window.removeEventListener('beforeunload', beforeUnloadHandler);
+    
+    // 閉じるボタンを再度有効化
+    const modalElement = document.getElementById('dailyQuizModal');
+    if (modalElement) {
+        modalElement.querySelector('.btn-close').disabled = false;
+        modalElement.querySelector('.modal-footer .btn-secondary').disabled = false;
+    }
+    
     try {
         await fetch('/api/daily_quiz/submit', {
             method: 'POST',

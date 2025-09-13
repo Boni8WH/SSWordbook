@@ -4324,3 +4324,25 @@ a.nav-link.btn.change-username-button:hover,
     background-color: #fff3cd;
     font-weight: bold;
 }
+
+/* ランキング表の見出しを見やすく */
+.daily-quiz-modal .ranking-table th {
+    background-color: #27ae60; /* ヘッダーと同じ緑色 */
+    color: white;
+    font-weight: 600;
+}
+
+/* 自分の順位をハイライト（より分かりやすい色に） */
+.daily-quiz-modal .current-user-rank {
+    background-color: #e8f4fd !important; /* 明るい青色 */
+    color: #1565c0;
+    font-weight: bold;
+    border-left: 4px solid #3498db;
+    border-right: 4px solid #3498db;
+}
+
+/* 全体のテキストを少し濃く */
+.daily-quiz-modal .result-summary p,
+.daily-quiz-modal .ranking-table td {
+    color: #34495e;
+}
