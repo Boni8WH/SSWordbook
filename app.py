@@ -857,6 +857,28 @@ def load_word_data_for_room(room_number):
         print(f"❌ 読み込みエラー: {e}")
         return []
 
+def generate_problem_id(word):
+    """
+    問題IDを生成するヘルパー関数（JavaScript側とロジックを統一）
+    """
+    try:
+        chapter = str(word.get('chapter', '0')).zfill(3)
+        number = str(word.get('number', '0')).zfill(3)
+        question = str(word.get('question', ''))
+        answer = str(word.get('answer', ''))
+        
+        # 問題文と答えから英数字と日本語文字のみ抽出
+        question_clean = re.sub(r'[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]', '', question[:15])
+        answer_clean = re.sub(r'[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]', '', answer[:10])
+        
+        problem_id = f"{chapter}-{number}-{question_clean}-{answer_clean}"
+        return problem_id
+        
+    except Exception as e:
+        chapter = str(word.get('chapter', '0')).zfill(3)
+        number = str(word.get('number', '0')).zfill(3)
+        return f"{chapter}-{number}-error"
+
 def filter_special_problems(word_data, room_number):
     """Z問題（特別問題）のフィルタリング処理"""
     chapters = {}
