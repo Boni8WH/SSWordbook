@@ -339,6 +339,10 @@
                                         <div class="btn-group-vertical btn-group-sm">
                                             <button class="btn btn-primary btn-sm save-room-setting-btn" 
                                                     data-room-number="{{ room_num }}">保存</button>
+                                            <button class="btn btn-info btn-sm regenerate-quiz-btn" 
+                                                    data-room-number="{{ room_num }}">
+                                                <i class="fas fa-sync-alt"></i> 10問 再選考
+                                            </button>
                                             <button class="btn btn-warning btn-sm me-1" 
                                                     data-room-number="{{ room_num }}"
                                                     data-is-suspended="{{ room_data.get(room_num, {}).get('is_suspended', False)|lower }}"
@@ -809,42 +813,6 @@
                             <i class="fas fa-chart-line"></i> 📊 修正前の状態確認
                         </a>
                     </div>
-                </div>
-
-                <div class="admin-panel" style="background-color: #f8d7da; border-left: 5px solid #dc3545;">
-                    <h4>⚠️ データベース修復</h4>
-                    <p>
-                        ユーザー作成時の不具合により、一部の学習データが正しい形式で保存されていない可能性があります。<br>
-                        以下のボタンを<strong>一度だけ</strong>クリックして、既存の全ユーザーデータを正しい形式に修復してください。<br>
-                        この操作は安全で、既存の学習履歴が消えることはありません。
-                    </p>
-                    <form action="{{ url_for('admin_fix_data_types') }}" method="POST" onsubmit="return confirm('全ユーザーのデータ型を修復します。この操作は安全ですが、実行しますか？');">
-                        <button type="submit" class="btn btn-danger">
-                            <i class="fas fa-tools"></i> 全ユーザーのデータ型を修復
-                        </button>
-                    </form>
-                </div>
-                <div class="admin-panel" style="background-color: #f8d7da; border-left: 5px solid #dc3545;">
-                    <h4>⚠️ データベース構造の根本修復</h4>
-                    <p>
-                        <strong>（重要）</strong>ユーザーの重複に関する問題を解決するため、データベースの構造を修正します。<br>
-                        このボタンを<strong>一度だけ</strong>クリックしてください。データは消えません。
-                    </p>
-                    <form action="{{ url_for('emergency_fix_user_schema') }}" method="POST" onsubmit="return confirm('Userテーブルの構造を修復します。この操作は安全ですが、実行しますか？');">
-                        <button type="submit" class="btn btn-danger">
-                            <i class="fas fa-database"></i> データベース構造を修復
-                        </button>
-                    </form>
-                </div>
-                <div class="admin-panel" style="background-color: #f8d7da; border-left: 5px solid #dc3545;">
-                    <h4>⚠️ データベース構造の修復</h4>
-                    <p>
-                        新しい機能（今日の10問など）を追加した後にエラーが出る場合、データベースの構造が最新でない可能性があります。<br>
-                        以下のボタンを押すと、不足しているテーブルやカラムが安全に追加されます。<strong>既存のデータは消えません。</strong>
-                    </p>
-                    <a href="{{ url_for('admin_force_migration') }}" class="btn btn-danger">
-                        <i class="fas fa-database"></i> データベース構造を修復
-                    </a>
                 </div>
             </div>
         </div>
@@ -3692,6 +3660,49 @@ function initializeCharCount(textareaId, counterId) {
         updateAnswerCharCount(textareaId, counterId);
     }, 100);
 }
+
+// admin.html の <script> タグの末尾に追加
+
+// ========================================
+// 今日の10問 再選考機能
+// ========================================
+document.addEventListener('click', function(event) {
+    // クラス名 .regenerate-quiz-btn を持つボタンを探す
+    const button = event.target.closest('.regenerate-quiz-btn');
+    if (button) {
+        const roomNumber = button.dataset.roomNumber;
+
+        const confirmation = confirm(
+            `部屋${roomNumber}の「今日の10問」を本当に再選考しますか？\n\n` +
+            `⚠️ この操作を行うと、この部屋の今日の解答結果はすべて削除され、ユーザーは再度挑戦できるようになります。`
+        );
+
+        if (confirmation) {
+            // ボタンをローディング状態にする
+            button.disabled = true;
+            button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 処理中...';
+
+            fetch('/admin/regenerate_daily_quiz', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ room_number: roomNumber })
+            })
+            .then(response => response.json())
+            .then(data => {
+                alert(data.message);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('エラーが発生しました。コンソールを確認してください。');
+            })
+            .finally(() => {
+                // ボタンを元の状態に戻す
+                button.disabled = false;
+                button.innerHTML = '<i class="fas fa-sync-alt"></i> 10問 再選考';
+            });
+        }
+    }
+});
 </script>
 
 <style>
