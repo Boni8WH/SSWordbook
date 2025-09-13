@@ -4346,3 +4346,74 @@ a.nav-link.btn.change-username-button:hover,
 .daily-quiz-modal .ranking-table td {
     color: #34495e;
 }
+
+/* =======================================
+   メイン画面コントロールボタンの配色
+   ======================================= */
+.bottom-controls .btn {
+    font-weight: 600;
+    border: none;
+    transition: all 0.2s ease-in-out;
+    padding: 12px 20px;
+    font-size: 0.95rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px; /* アイコンとテキストの間隔 */
+}
+
+.bottom-controls .btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+/* 1. 学習開始 (メインボタン) */
+.btn-start {
+    background-color: #007bff; /* プライマリーブルー */
+    color: white;
+}
+.btn-start:hover {
+    background-color: #0056b3;
+    color: white;
+}
+
+/* 2. 選択リセット (ユーティリティボタン) */
+.btn-reset {
+    background-color: #6c757d; /* グレー */
+    color: white;
+}
+.btn-reset:hover {
+    background-color: #5a6268;
+    color: white;
+}
+
+/* 3. 今日の10問 (特別コンテンツ) */
+.btn-daily {
+    background-color: #28a745; /* 落ち着いたグリーン */
+    color: white;
+}
+.btn-daily:hover {
+    background-color: #218838;
+    color: white;
+}
+
+/* 4. 苦手問題一覧 (ユーティリティボタン) */
+.btn-weak {
+    background-color: #f8f9fa; /* 明るいグレー（アウトライン風） */
+    color: #495057;
+    border: 1px solid #dee2e6;
+}
+.btn-weak:hover {
+    background-color: #e2e6ea;
+    color: #343a40;
+}
+
+/* 5. 論述問題集 (特別コンテンツ) */
+.btn-essay {
+    background-color: #6f42c1; /* 上品なパープル */
+    color: white;
+}
+.btn-essay:hover {
+    background-color: #5a32a3;
+    color: white;
+}
