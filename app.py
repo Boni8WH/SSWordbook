@@ -11,6 +11,9 @@ import string
 from io import StringIO
 from datetime import datetime, timedelta
 from sqlalchemy import inspect, text, func, case, cast, Integer
+from sqlalchemy.orm import joinedload
+from datetime import date
+import random
 import glob
 import pytz
 try:
@@ -205,6 +208,32 @@ class AdminUser(db.Model):
 
     def __repr__(self):
         return f'<AdminUser {self.username}>'
+
+class DailyQuiz(db.Model):
+    """その日の部屋ごとの10問を保存するテーブル"""
+    __tablename__ = 'daily_quiz'
+    id = db.Column(db.Integer, primary_key=True)
+    date = db.Column(db.Date, nullable=False)
+    room_number = db.Column(db.String(50), nullable=False)
+    problem_ids_json = db.Column(db.Text, nullable=False)  # 問題IDのリストをJSON文字列で保存
+
+    __table_args__ = (db.UniqueConstraint('date', 'room_number', name='uq_daily_quiz_date_room'),)
+
+    def get_problem_ids(self):
+        return json.loads(self.problem_ids_json)
+
+class DailyQuizResult(db.Model):
+    """ユーザーごとの今日の10問の結果を保存するテーブル"""
+    __tablename__ = 'daily_quiz_result'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False)
+    quiz_id = db.Column(db.Integer, db.ForeignKey('daily_quiz.id', ondelete='CASCADE'), nullable=False)
+    score = db.Column(db.Integer, nullable=False)  # 正解数
+    time_taken_ms = db.Column(db.Integer, nullable=False)  # ミリ秒単位でのタイム
+    completed_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))
+
+    user = db.relationship('User', backref=db.backref('daily_quiz_results', lazy=True, cascade="all, delete-orphan"))
+    quiz = db.relationship('DailyQuiz', backref=db.backref('results', lazy=True, cascade="all, delete-orphan"))
 
 class RoomSetting(db.Model):
     __table_args__ = {'extend_existing': True}  # ← 重複エラー回避
@@ -11511,3 +11540,122 @@ def delete_essay_image(problem_id):
         app.logger.error(f"画像削除エラー: {str(e)}")
         return jsonify({'status': 'error', 'message': f'削除中にエラーが発生しました: {str(e)}'})
 
+@app.route('/api/daily_quiz/today')
+def get_daily_quiz():
+    """今日の10問を取得、または結果を表示するためのAPI"""
+    if 'user_id' not in session:
+        return jsonify({'status': 'error', 'message': 'ログインが必要です'}), 401
+    
+    user = User.query.get(session['user_id'])
+    today = date.today()
+
+    # 今日のクイズが既に存在するか確認
+    daily_quiz = DailyQuiz.query.filter_by(date=today, room_number=user.room_number).first()
+
+    # ユーザーが既に回答済みか確認
+    if daily_quiz:
+        user_result = DailyQuizResult.query.filter_by(user_id=user.id, quiz_id=daily_quiz.id).first()
+        if user_result:
+            # --- 回答済みの場合、ランキングと結果を返す ---
+            all_results = DailyQuizResult.query.filter_by(quiz_id=daily_quiz.id)\
+                .order_by(DailyQuizResult.score.desc(), DailyQuizResult.time_taken_ms.asc()).all()
+            
+            ranking_data = []
+            current_user_rank = None
+            for i, result in enumerate(all_results, 1):
+                rank_entry = {
+                    'rank': i,
+                    'username': result.user.username,
+                    'score': result.score,
+                    'time': f"{(result.time_taken_ms / 1000):.2f}秒"
+                }
+                ranking_data.append(rank_entry)
+                if result.user_id == user.id:
+                    current_user_rank = rank_entry
+
+            return jsonify({
+                'status': 'success',
+                'completed': True,
+                'user_result': {
+                    'score': user_result.score,
+                    'time': f"{(user_result.time_taken_ms / 1000):.2f}秒"
+                },
+                'ranking': ranking_data,
+                'user_rank': current_user_rank
+            })
+
+    # --- 未回答の場合、新しいクイズを作成または取得 ---
+    if not daily_quiz:
+        # 今日の問題がまだ作られていないので作成
+        all_words = load_word_data_for_room(user.room_number)
+        public_words = [w for w in all_words if w.get('enabled')]
+        
+        if len(public_words) < 10:
+            return jsonify({'status': 'error', 'message': 'クイズを作成するための問題が10問未満です。'})
+
+        selected_problems = random.sample(public_words, 10)
+        problem_ids = [generate_problem_id(p) for p in selected_problems]
+        
+        daily_quiz = DailyQuiz(
+            date=today,
+            room_number=user.room_number,
+            problem_ids_json=json.dumps(problem_ids)
+        )
+        db.session.add(daily_quiz)
+        db.session.commit()
+
+    # 選択肢を作成して問題を返す
+    problem_ids = daily_quiz.get_problem_ids()
+    all_words = load_word_data_for_room(user.room_number)
+    quiz_questions = []
+
+    for problem_id in problem_ids:
+        question_word = next((w for w in all_words if generate_problem_id(w) == problem_id), None)
+        if question_word:
+            # 不正解の選択肢を他の問題の答えからランダムに3つ選ぶ
+            distractors = random.sample(
+                [w['answer'] for w in all_words if w['answer'] != question_word['answer']], 3
+            )
+            choices = distractors + [question_word['answer']]
+            random.shuffle(choices)
+            
+            quiz_questions.append({
+                'question': question_word['question'],
+                'choices': choices,
+                'answer': question_word['answer']
+            })
+
+    return jsonify({
+        'status': 'success',
+        'completed': False,
+        'questions': quiz_questions
+    })
+
+@app.route('/api/daily_quiz/submit', methods=['POST'])
+def submit_daily_quiz():
+    """今日の10問の結果を保存するAPI"""
+    if 'user_id' not in session:
+        return jsonify({'status': 'error', 'message': 'ログインが必要です'}), 401
+
+    user = User.query.get(session['user_id'])
+    today = date.today()
+    data = request.get_json()
+
+    daily_quiz = DailyQuiz.query.filter_by(date=today, room_number=user.room_number).first()
+    if not daily_quiz:
+        return jsonify({'status': 'error', 'message': '今日のクイズが見つかりません。'}), 404
+
+    # 既に結果がある場合はエラー
+    if DailyQuizResult.query.filter_by(user_id=user.id, quiz_id=daily_quiz.id).first():
+        return jsonify({'status': 'error', 'message': '既に回答済みです。'}), 409
+
+    new_result = DailyQuizResult(
+        user_id=user.id,
+        quiz_id=daily_quiz.id,
+        score=data.get('score'),
+        time_taken_ms=data.get('time')
+    )
+    db.session.add(new_result)
+    db.session.commit()
+
+    return jsonify({'status': 'success', 'message': '結果を保存しました。'})
