@@ -96,19 +96,12 @@ function runQuiz(questions) {
 
     const quizContainer = document.getElementById('dailyQuizContainer');
     const modalElement = document.getElementById('dailyQuizModal');
-
-    // ページ離脱を警告する関数
-    const beforeUnloadHandler = (e) => {
-        e.preventDefault();
-        e.returnValue = ''; // 古いブラウザ用の設定
-    };
-
-    // クイズ中は閉じるボタンを無効化＆離脱警告を設定
     if (modalElement) {
-        modalElement.querySelector('.btn-close').disabled = true;
-        modalElement.querySelector('.modal-footer .btn-secondary').disabled = true;
-        window.addEventListener('beforeunload', beforeUnloadHandler);
+        // 右上の×ボタンとフッターの閉じるボタンを非表示にする
+        modalElement.querySelector('.btn-close').style.display = 'none';
+        modalElement.querySelector('.modal-footer .btn-secondary').style.display = 'none';
     }
+    window.addEventListener('beforeunload', beforeUnloadHandler);
 
     function showQuestion() {
         if (currentQuestionIndex >= questions.length) {
@@ -191,8 +184,9 @@ async function submitQuizResult(score, time) {
     window.removeEventListener('beforeunload', beforeUnloadHandler);
     const modalElement = document.getElementById('dailyQuizModal');
     if (modalElement) {
-        modalElement.querySelector('.btn-close').disabled = false;
-        modalElement.querySelector('.modal-footer .btn-secondary').disabled = false;
+        // 非表示にしていたボタンを再度表示する
+        modalElement.querySelector('.btn-close').style.display = 'block';
+        modalElement.querySelector('.modal-footer .btn-secondary').style.display = 'block';
     }
 
     try {
