@@ -3142,7 +3142,8 @@ def admin_cleanup_expired_tokens():
         db.session.rollback()
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
-# app.py の admin_force_migration ルートを修正（約1750行目付近）
+# app.py のルーティングエリア（例えば /admin/app_info の近く）に追加
+
 @app.route('/admin/force_migration', methods=['GET', 'POST'])
 def admin_force_migration():
     """手動でデータベースマイグレーションを実行"""
@@ -3153,121 +3154,33 @@ def admin_force_migration():
         return jsonify({'status': 'error', 'message': '管理者権限が必要です'}), 403
     
     if request.method == 'GET':
-        # GET リクエストの場合は確認ページを表示
+        # GETリクエストの場合は確認ページを表示
         return """
-        <html>
-        <head>
-            <title>データベースマイグレーション</title>
-            <style>
-                body { font-family: Arial, sans-serif; margin: 40px; }
-                .container { max-width: 600px; margin: 0 auto; }
-                .warning { background: #fff3cd; border: 1px solid #ffeaa7; padding: 20px; border-radius: 5px; margin: 20px 0; }
-                .btn { padding: 12px 20px; margin: 10px; border: none; border-radius: 5px; cursor: pointer; text-decoration: none; display: inline-block; }
-                .btn-primary { background: #007bff; color: white; }
-                .btn-secondary { background: #6c757d; color: white; }
-                .btn:hover { opacity: 0.8; }
-            </style>
-        </head>
+        <html><head><title>データベースマイグレーション</title></head>
         <body>
-            <div class="container">
-                <h1>🔧 データベースマイグレーション</h1>
-                <div class="warning">
-                    <h3>⚠️ 注意事項</h3>
-                    <p>この操作は以下を実行します：</p>
-                    <ul>
-                        <li>Userテーブルに制限状態管理用カラムを追加</li>
-                        <li>その他の不足カラムを追加</li>
-                        <li>外部キー制約を修正</li>
-                    </ul>
-                    <p><strong>本番環境での実行のため、慎重に行ってください。</strong></p>
-                </div>
-                
-                <form method="POST" onsubmit="return confirm('本当にマイグレーションを実行しますか？');">
-                    <button type="submit" class="btn btn-primary">🚀 マイグレーションを実行</button>
-                </form>
-                
-                <a href="/admin" class="btn btn-secondary">← 管理者ページに戻る</a>
-            </div>
-        </body>
-        </html>
+            <h1>データベースマイグレーションの確認</h1>
+            <p><strong>警告:</strong> この操作はデータベースのスキーマを更新します。</p>
+            <p>不足しているテーブル（daily_quizなど）やカラムが作成されます。既存のデータは保持されます。</p>
+            <form method="POST" onsubmit="return confirm('本当にデータベースのマイグレーションを実行しますか？');">
+                <button type="submit" style="padding: 10px 20px; font-size: 16px;">マイグレーションを実行</button>
+            </form>
+            <a href="/admin">管理者ページに戻る</a>
+        </body></html>
         """
     
-    # POST リクエストの場合は実際にマイグレーションを実行
+    # POSTリクエストの場合は実際にマイグレーションを実行
     try:
-        print("🔧 手動マイグレーション開始...")
-        
-        # 既存のトランザクションを終了
-        try:
-            db.session.rollback()
-        except:
-            pass
-        
-        # マイグレーション実行
+        print("🔧 手動でのデータベースマイグレーションを開始します...")
+        db.create_all()
+        # migrate_database() 関数も念のため呼び出す
         migrate_database()
-        
-        # 成功時のレスポンス
-        return """
-        <html>
-        <head>
-            <title>マイグレーション完了</title>
-            <style>
-                body { font-family: Arial, sans-serif; margin: 40px; }
-                .container { max-width: 600px; margin: 0 auto; }
-                .success { background: #d4edda; border: 1px solid #c3e6cb; padding: 20px; border-radius: 5px; margin: 20px 0; }
-                .btn { padding: 12px 20px; margin: 10px; border: none; border-radius: 5px; cursor: pointer; text-decoration: none; display: inline-block; }
-                .btn-success { background: #28a745; color: white; }
-                .btn:hover { opacity: 0.8; }
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <h1>✅ マイグレーション完了</h1>
-                <div class="success">
-                    <h3>成功！</h3>
-                    <p>データベースマイグレーションが正常に完了しました。</p>
-                    <p>制限状態管理用のカラムが追加され、アプリケーションが正常に動作するはずです。</p>
-                </div>
-                
-                <a href="/admin" class="btn btn-success">← 管理者ページに戻る</a>
-                <a href="/" class="btn btn-success">🏠 メインページに移動</a>
-            </div>
-        </body>
-        </html>
-        """
-        
+        print("✅ 手動でのデータベースマイグレーションが完了しました。")
+        flash('データベースの構造を正常に更新しました。', 'success')
+        return redirect(url_for('admin_page'))
     except Exception as e:
-        print(f"❌ 手動マイグレーションエラー: {e}")
-        import traceback
-        traceback.print_exc()
-        
-        return f"""
-        <html>
-        <head>
-            <title>マイグレーションエラー</title>
-            <style>
-                body {{ font-family: Arial, sans-serif; margin: 40px; }}
-                .container {{ max-width: 600px; margin: 0 auto; }}
-                .error {{ background: #f8d7da; border: 1px solid #f5c6cb; padding: 20px; border-radius: 5px; margin: 20px 0; }}
-                .btn {{ padding: 12px 20px; margin: 10px; border: none; border-radius: 5px; cursor: pointer; text-decoration: none; display: inline-block; }}
-                .btn-danger {{ background: #dc3545; color: white; }}
-                .btn:hover {{ opacity: 0.8; }}
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <h1>❌ マイグレーションエラー</h1>
-                <div class="error">
-                    <h3>エラーが発生しました</h3>
-                    <p><strong>エラー内容:</strong> {str(e)}</p>
-                    <p>管理者に連絡するか、緊急修復ページを試してください。</p>
-                </div>
-                
-                <a href="/emergency_add_restriction_columns" class="btn btn-danger">🆘 緊急修復を試す</a>
-                <a href="/admin" class="btn btn-danger">← 管理者ページに戻る</a>
-            </div>
-        </body>
-        </html>
-        """
+        print(f"❌ 手動マイグレーション中にエラーが発生しました: {e}")
+        flash(f'データベースの更新中にエラーが発生しました: {str(e)}', 'danger')
+        return redirect(url_for('admin_page'))
 
 def fix_foreign_key_constraints():
     """外部キー制約を修正してCASCADEを追加"""
