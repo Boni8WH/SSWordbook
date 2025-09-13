@@ -11538,14 +11538,11 @@ def get_daily_quiz():
     user = User.query.get(session['user_id'])
     today = date.today()
 
-    # 今日のクイズが既に存在するか確認
     daily_quiz = DailyQuiz.query.filter_by(date=today, room_number=user.room_number).first()
 
-    # ユーザーが既に回答済みか確認
     if daily_quiz:
         user_result = DailyQuizResult.query.filter_by(user_id=user.id, quiz_id=daily_quiz.id).first()
         if user_result:
-            # --- 回答済みの場合、ランキングと結果を返す ---
             all_results_query = DailyQuizResult.query.filter_by(quiz_id=daily_quiz.id)\
                 .options(joinedload(DailyQuizResult.user))\
                 .order_by(DailyQuizResult.score.desc(), DailyQuizResult.time_taken_ms.asc())
@@ -11555,10 +11552,9 @@ def get_daily_quiz():
             top_5_ranking = []
             current_user_rank_info = None
 
-            # トップ5と自分の順位を特定
             for i, result in enumerate(all_results, 1):
                 if not result.user: continue
-
+                
                 rank_entry = {
                     'rank': i,
                     'username': result.user.username,
@@ -11566,28 +11562,19 @@ def get_daily_quiz():
                     'time': f"{(result.time_taken_ms / 1000):.2f}秒"
                 }
                 
-                # トップ5のデータを格納
                 if i <= 5:
                     top_5_ranking.append(rank_entry)
                 
-                # 自分の順位データを格納
                 if result.user_id == user.id:
                     current_user_rank_info = rank_entry
             
-            # user_result は submit_daily_quiz の時だけ必要なので条件分岐
-            user_result_data = {}
-            if 'new_result' in locals(): # submit_daily_quiz の場合
-                user_result_data = {
-                    'score': new_result.score,
-                    'time': f"{(new_result.time_taken_ms / 1000):.2f}秒"
-                }
-            else: # get_daily_quiz の場合
-                user_result_record = next((r for r in all_results if r.user_id == user.id), None)
-                if user_result_record:
-                    user_result_data = {
-                        'score': user_result_record.score,
-                        'time': f"{(user_result_record.time_taken_ms / 1000):.2f}秒"
-                    }
+            # --- ▼▼▼ ここが修正箇所です ▼▼▼ ---
+            # 'new_result' in locals() のチェックを削除し、
+            # データベースから取得した user_result を直接使います。
+            user_result_data = {
+                'score': user_result.score,
+                'time': f"{(user_result.time_taken_ms / 1000):.2f}秒"
+            }
 
             return jsonify({
                 'status': 'success',
@@ -11597,23 +11584,21 @@ def get_daily_quiz():
                 'user_rank': current_user_rank_info,
                 'total_participants': total_participants
             })
+            # --- ▲▲▲ 修正ここまで ▲▲▲ ---
 
-    # --- 未回答の場合、新しいクイズを作成または取得 ---
+    # --- 未回答の場合のロジック (変更なし) ---
     if not daily_quiz:
+        # ( ... この部分は変更ありません ... )
         all_words = load_word_data_for_room(user.room_number)
-        # 部屋の公開設定を取得
         room_setting = RoomSetting.query.filter_by(room_number=user.room_number).first()
         
-        # 部屋設定で公開されている問題のみを抽出
         public_words = []
         for word in all_words:
-            # CSVでの有効設定と、部屋での単元公開設定の両方をチェック
             is_enabled_in_csv = word.get('enabled', False)
             is_enabled_in_room = is_unit_enabled_by_room_setting(word.get('number'), room_setting)
-            
             if is_enabled_in_csv and is_enabled_in_room:
                 public_words.append(word)
-        
+
         if len(public_words) < 4:
             return jsonify({'status': 'error', 'message': 'クイズを作成するには問題が4問以上必要です。'})
         
@@ -11629,35 +11614,26 @@ def get_daily_quiz():
         db.session.add(daily_quiz)
         db.session.commit()
 
-    # 選択肢を作成して問題を返す
     problem_ids = daily_quiz.get_problem_ids()
     all_words = load_word_data_for_room(user.room_number)
     quiz_questions = []
 
-    # 不正解の選択肢候補を先に一度だけ作成
     all_answers = list(set(w['answer'] for w in all_words if w.get('answer')))
 
     for problem_id in problem_ids:
         question_word = next((w for w in all_words if generate_problem_id(w) == problem_id), None)
         if question_word:
             correct_answer = question_word['answer']
-            
-            # --- ▼ここから選択肢生成ロジックを変更▼ ---
             distractor_pool = [ans for ans in all_answers if ans != correct_answer]
             
-            # 正解に近い語句を計算
             distractors_with_distance = []
             for ans in distractor_pool:
                 distance = levenshtein_distance(correct_answer, ans)
                 distractors_with_distance.append((distance, ans))
             
-            # 距離が近い順にソート
             distractors_with_distance.sort(key=lambda x: x[0])
-            
-            # 上位3つを誤答として取得
             distractors = [ans for distance, ans in distractors_with_distance[:3]]
             
-            # もし候補が3つ未満だった場合の安全策
             if len(distractors) < 3:
                 dummy_options = ["誤答A", "誤答B", "誤答C", "誤答D"]
                 i = 0
@@ -11698,7 +11674,6 @@ def submit_daily_quiz():
     if DailyQuizResult.query.filter_by(user_id=user.id, quiz_id=daily_quiz.id).first():
         return jsonify({'status': 'error', 'message': '既に回答済みです。'}), 409
 
-    # --- ▼ ここからが変更・追加部分 ▼ ---
     try:
         new_result = DailyQuizResult(
             user_id=user.id,
@@ -11708,15 +11683,17 @@ def submit_daily_quiz():
         )
         db.session.add(new_result)
         db.session.commit()
+        db.session.refresh(new_result)
         
-        # 結果保存後、すぐにランキングを計算
         all_results_query = DailyQuizResult.query.filter_by(quiz_id=daily_quiz.id)\
             .options(joinedload(DailyQuizResult.user))\
             .order_by(DailyQuizResult.score.desc(), DailyQuizResult.time_taken_ms.asc())
         all_results = all_results_query.all()
         
-        ranking_data = []
+        total_participants = len(all_results)
+        top_5_ranking = []
         current_user_rank_info = None
+
         for i, result in enumerate(all_results, 1):
             if not result.user: continue
             
@@ -11726,22 +11703,27 @@ def submit_daily_quiz():
                 'score': result.score,
                 'time': f"{(result.time_taken_ms / 1000):.2f}秒"
             }
-            ranking_data.append(rank_entry)
+            
+            if i <= 5:
+                top_5_ranking.append(rank_entry)
+            
             if result.user_id == user.id:
                 current_user_rank_info = rank_entry
-
-        # 成功レスポンスに結果とランキングを含めて返す
+        
+        # --- ▼▼▼ この部分をシンプルに修正 ▼▼▼ ---
         return jsonify({
             'status': 'success',
             'message': '結果を保存しました。',
-            'completed': True, # フロントが結果表示モードになるためのフラグ
+            'completed': True,
             'user_result': {
                 'score': new_result.score,
                 'time': f"{(new_result.time_taken_ms / 1000):.2f}秒"
             },
-            'ranking': ranking_data,
-            'user_rank': current_user_rank_info
+            'top_5_ranking': top_5_ranking,
+            'user_rank': current_user_rank_info,
+            'total_participants': total_participants
         })
+        # --- ▲▲▲ 修正ここまで ▲▲▲ ---
 
     except Exception as e:
         db.session.rollback()
