@@ -9,7 +9,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
 let quizTimerInterval;
 let startTime;
-
+const beforeUnloadHandler = (e) => {
+    e.preventDefault();
+    e.returnValue = '';
+};
 /**
  * クイズ用のモーダル（ポップアップ）を作成して表示
  */
@@ -191,7 +194,7 @@ async function submitQuizResult(score, time) {
         modalElement.querySelector('.btn-close').disabled = false;
         modalElement.querySelector('.modal-footer .btn-secondary').disabled = false;
     }
-    
+
     try {
         await fetch('/api/daily_quiz/submit', {
             method: 'POST',
