@@ -4185,3 +4185,142 @@ a.nav-link.btn.change-username-button:hover,
     min-height: 50px; /* ボタンエリアの高さを確保 */
     gap: 10px; /* ボタン間の隙間 */
 }
+
+/* static/style.css の一番下に追加 */
+
+/* =======================================
+   今日の10問 クイズモーダル用スタイル
+   ======================================= */
+
+.daily-quiz-modal .modal-dialog {
+    max-width: 600px;
+}
+
+.daily-quiz-modal .modal-header {
+    background-color: #27ae60;
+    color: white;
+}
+
+.daily-quiz-modal .modal-title i {
+    margin-right: 8px;
+}
+
+.daily-quiz-modal .btn-close {
+    filter: invert(1) grayscale(100%) brightness(200%);
+}
+
+#dailyQuizContainer {
+    text-align: center;
+    padding: 10px;
+}
+
+.quiz-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    font-size: 1.1em;
+}
+
+.quiz-progress-text {
+    font-weight: bold;
+    background-color: #f0f0f0;
+    padding: 5px 10px;
+    border-radius: 15px;
+}
+
+.quiz-timer {
+    font-weight: bold;
+    color: #e74c3c;
+    background-color: #fdd;
+    padding: 5px 10px;
+    border-radius: 15px;
+}
+
+.quiz-question-text {
+    font-size: 1.4em;
+    font-weight: 600;
+    margin-bottom: 25px;
+    min-height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.quiz-choices {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+}
+
+.choice-btn {
+    padding: 15px;
+    font-size: 1.1em;
+    border: 2px solid #bdc3c7;
+    background-color: white;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.choice-btn:hover:not(:disabled) {
+    background-color: #ecf0f1;
+    border-color: #3498db;
+}
+
+.choice-btn:disabled {
+    cursor: not-allowed;
+}
+
+.choice-btn.correct {
+    background-color: #d4edda;
+    border-color: #28a745;
+    color: #155724;
+    font-weight: bold;
+}
+
+.choice-btn.incorrect {
+    background-color: #f8d7da;
+    border-color: #dc3545;
+    color: #721c24;
+}
+
+.feedback-icon {
+    font-size: 2em;
+    margin-left: 10px;
+}
+
+/* クイズ結果画面 */
+.quiz-result-view h4 {
+    color: #27ae60;
+    font-size: 1.8em;
+    margin-bottom: 15px;
+}
+
+.result-summary {
+    font-size: 1.2em;
+    margin-bottom: 20px;
+}
+.result-summary span {
+    font-weight: bold;
+}
+
+.ranking-table {
+    width: 100%;
+    margin-top: 20px;
+    border-collapse: collapse;
+}
+
+.ranking-table th, .ranking-table td {
+    padding: 8px;
+    border-bottom: 1px solid #ddd;
+}
+
+.ranking-table th {
+    background-color: #f2f2f2;
+}
+
+.current-user-rank {
+    background-color: #fff3cd;
+    font-weight: bold;
+}

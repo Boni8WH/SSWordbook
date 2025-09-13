@@ -1,178 +1,228 @@
-function initializeDailyQuiz() {
+// static/daily_quiz.js
+
+document.addEventListener('DOMContentLoaded', () => {
     const dailyQuizButton = document.getElementById('dailyQuizButton');
     if (dailyQuizButton) {
-        dailyQuizButton.addEventListener('click', handleDailyQuizClick);
+        dailyQuizButton.addEventListener('click', initializeDailyQuiz);
+    }
+});
+
+let quizTimerInterval;
+let startTime;
+
+/**
+ * クイズ用のモーダル（ポップアップ）を作成して表示
+ */
+function createDailyQuizModal() {
+    // 既存のモーダルがあれば削除
+    const existingModal = document.getElementById('dailyQuizModal');
+    if (existingModal) existingModal.remove();
+
+    const modalHTML = `
+        <div class="modal fade daily-quiz-modal" id="dailyQuizModal" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title"><i class="fas fa-stopwatch"></i> 今日の10問</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body" id="dailyQuizContainer">
+                        <div class="text-center">
+                            <div class="spinner-border text-success" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-2">今日の問題を取得中...</p>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    const modalElement = document.getElementById('dailyQuizModal');
+    
+    modalElement.addEventListener('hidden.bs.modal', () => {
+        clearInterval(quizTimerInterval); // モーダルが閉じたらタイマーを停止
+        modalElement.remove();
+    }, { once: true });
+
+    return new bootstrap.Modal(modalElement);
+}
+
+/**
+ * クイズの初期化処理
+ */
+async function initializeDailyQuiz() {
+    const quizModal = createDailyQuizModal();
+    quizModal.show();
+
+    try {
+        const response = await fetch('/api/daily_quiz/today');
+        const data = await response.json();
+
+        if (data.status !== 'success') {
+            throw new Error(data.message);
+        }
+
+        if (data.completed) {
+            // 既に回答済みの場合
+            displayQuizResult(data.user_result, data.ranking, data.user_rank);
+        } else {
+            // これから回答する場合
+            runQuiz(data.questions);
+        }
+
+    } catch (error) {
+        document.getElementById('dailyQuizContainer').innerHTML = `<div class="alert alert-danger">${error.message || '問題の取得に失敗しました。'}</div>`;
     }
 }
 
-// 「今日の10問」ボタンが押されたときの処理
-async function handleDailyQuizClick() {
-    // まず、ユーザーが挑戦済みか確認
-    const statusRes = await fetch('/api/daily_quiz/status');
-    const statusData = await statusRes.json();
-
-    if (statusData.status === 'completed') {
-        // 挑戦済みの場合、結果を表示
-        displayDailyQuizResults(statusData);
-    } else if (statusData.status === 'ready') {
-        // 未挑戦の場合、クイズを開始
-        startDailyQuiz();
-    } else {
-        alert(statusData.message || 'エラーが発生しました。');
-    }
-}
-
-// クイズを開始する
-async function startDailyQuiz() {
-    const startRes = await fetch('/api/daily_quiz/start');
-    const startData = await startRes.json();
-
-    if (startData.status !== 'success') {
-        alert(startData.message || 'クイズの開始に失敗しました。');
-        return;
-    }
-
-    const modal = createDailyQuizModal();
-    const modalBody = document.getElementById('dq-modal-body');
-    const quizQuestions = startData.quiz_questions;
+/**
+ * クイズを実行する
+ * @param {Array} questions - サーバーから受け取った問題の配列
+ */
+function runQuiz(questions) {
     let currentQuestionIndex = 0;
-    let userAnswers = [];
+    let score = 0;
 
-    // タイマー開始
-    timeElapsed = 0;
-    quizTimer = setInterval(() => {
-        timeElapsed++;
-        const timerEl = document.getElementById('dq-timer');
-        if(timerEl) timerEl.textContent = `${timeElapsed}秒`;
-    }, 1000);
+    const quizContainer = document.getElementById('dailyQuizContainer');
 
-    renderQuestion();
+    function showQuestion() {
+        if (currentQuestionIndex >= questions.length) {
+            // クイズ終了
+            const timeTaken = Date.now() - startTime;
+            clearInterval(quizTimerInterval);
+            submitQuizResult(score, timeTaken);
+            return;
+        }
 
-    function renderQuestion() {
-        const questionData = quizQuestions[currentQuestionIndex];
-        modalBody.innerHTML = `
-            <div class="dq-header">
-                <span class="dq-progress">${currentQuestionIndex + 1} / ${quizQuestions.length}</span>
-                <span class="dq-timer" id="dq-timer">0秒</span>
+        const q = questions[currentQuestionIndex];
+        quizContainer.innerHTML = `
+            <div class="quiz-header">
+                <span class="quiz-progress-text">${currentQuestionIndex + 1} / ${questions.length}</span>
+                <span class="quiz-timer" id="quizTimer">0.00秒</span>
             </div>
-            <div class="dq-question">${questionData.question}</div>
-            <div class="dq-choices">
-                ${questionData.choices.map((choice, index) => `
-                    <button class="dq-choice" data-index="${index}">${choice}</button>
-                `).join('')}
+            <div class="quiz-question-text">${q.question}</div>
+            <div class="quiz-choices">
+                ${q.choices.map((choice, index) => `<button class="btn choice-btn" data-choice-index="${index}">${choice}</button>`).join('')}
             </div>
-            <div class="dq-feedback"></div>
         `;
-
-        document.querySelectorAll('.dq-choice').forEach(button => {
-            button.addEventListener('click', handleAnswerClick);
+        
+        // 選択肢ボタンにイベントリスナーを設定
+        quizContainer.querySelectorAll('.choice-btn').forEach(button => {
+            button.addEventListener('click', handleAnswer);
         });
     }
 
-    function handleAnswerClick(event) {
+    function handleAnswer(event) {
         const selectedButton = event.target;
-        const selectedAnswer = selectedButton.textContent;
-        userAnswers.push(selectedAnswer);
-
-        const questionData = quizQuestions[currentQuestionIndex];
-        const correctAnswer = questionData.answer;
+        const selectedChoice = selectedButton.textContent;
+        const correctAnswer = questions[currentQuestionIndex].answer;
 
         // 全てのボタンを無効化
-        document.querySelectorAll('.dq-choice').forEach(btn => btn.disabled = true);
+        quizContainer.querySelectorAll('.choice-btn').forEach(btn => btn.disabled = true);
 
-        // 正誤判定
-        if (selectedAnswer === correctAnswer) {
+        if (selectedChoice === correctAnswer) {
+            score++;
             selectedButton.classList.add('correct');
-            document.querySelector('.dq-feedback').innerHTML = '<span class="dq-feedback-correct">○ 正解！</span>';
+            selectedButton.innerHTML += ' <i class="fas fa-check-circle feedback-icon"></i>';
         } else {
             selectedButton.classList.add('incorrect');
-            document.querySelector('.dq-feedback').innerHTML = `<span class="dq-feedback-incorrect">× 不正解... 正解は「${correctAnswer}」</span>`;
+            selectedButton.innerHTML += ' <i class="fas fa-times-circle feedback-icon"></i>';
             // 正解の選択肢をハイライト
-            document.querySelectorAll('.dq-choice').forEach(btn => {
+            quizContainer.querySelectorAll('.choice-btn').forEach(btn => {
                 if (btn.textContent === correctAnswer) {
                     btn.classList.add('correct');
                 }
             });
         }
         
-        // 次の問題へ
-        currentQuestionIndex++;
+        // 1.5秒後に次の問題へ
         setTimeout(() => {
-            if (currentQuestionIndex < quizQuestions.length) {
-                renderQuestion();
-            } else {
-                clearInterval(quizTimer);
-                submitResults();
-            }
-        }, 1500); // 1.5秒待って次へ
+            currentQuestionIndex++;
+            showQuestion();
+        }, 1500);
     }
 
-    async function submitResults() {
-        modalBody.innerHTML = '<p>結果を集計中です...</p>';
-        const submitRes = await fetch('/api/daily_quiz/submit', {
+    function updateTimer() {
+        const elapsed = (Date.now() - startTime) / 1000;
+        document.getElementById('quizTimer').textContent = `${elapsed.toFixed(2)}秒`;
+    }
+
+    // クイズ開始
+    startTime = Date.now();
+    quizTimerInterval = setInterval(updateTimer, 50); // 50msごとにタイマー更新
+    showQuestion();
+}
+
+/**
+ * クイズの結果をサーバーに送信
+ * @param {number} score - 正解数
+ * @param {number} time - かかった時間（ミリ秒）
+ */
+async function submitQuizResult(score, time) {
+    const quizContainer = document.getElementById('dailyQuizContainer');
+    quizContainer.innerHTML = `<div class="text-center"><p>結果を送信中...</p></div>`;
+
+    try {
+        await fetch('/api/daily_quiz/submit', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ answers: userAnswers, time_taken: timeElapsed })
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ score, time }),
         });
-        const resultData = await submitRes.json();
         
-        if (resultData.status === 'success') {
-            displayDailyQuizResults(resultData, modal);
+        // 再度APIを叩いて最新の結果とランキングを取得
+        const response = await fetch('/api/daily_quiz/today');
+        const data = await response.json();
+        if (data.status === 'success' && data.completed) {
+            displayQuizResult(data.user_result, data.ranking, data.user_rank);
         } else {
-            modalBody.innerHTML = `<p>結果の送信に失敗しました: ${resultData.message}</p>`;
+            throw new Error('結果の表示に失敗しました。');
         }
+
+    } catch (error) {
+        quizContainer.innerHTML = `<div class="alert alert-danger">${error.message || '結果の送信に失敗しました。'}</div>`;
     }
 }
 
-// 結果を表示する
-function displayDailyQuizResults(resultData, modalInstance = null) {
-    if (!modalInstance) {
-        modalInstance = createDailyQuizModal();
+/**
+ * 結果とランキングを表示する
+ */
+function displayQuizResult(userResult, ranking, userRank) {
+    const quizContainer = document.getElementById('dailyQuizContainer');
+    let rankingHTML = '<p>まだ誰も挑戦していません。</p>';
+
+    if (ranking && ranking.length > 0) {
+        rankingHTML = `
+            <table class="table ranking-table">
+                <thead><tr><th>順位</th><th>名前</th><th>スコア</th><th>タイム</th></tr></thead>
+                <tbody>
+                    ${ranking.map(r => `
+                        <tr class="${r.rank === userRank.rank ? 'current-user-rank' : ''}">
+                            <td>${r.rank}位</td>
+                            <td>${r.username}</td>
+                            <td>${r.score}/10</td>
+                            <td>${r.time}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `;
     }
-    
-    const modalBody = document.getElementById('dq-modal-body');
-    modalBody.innerHTML = `
-        <div class="dq-result-header">今日の10問 結果</div>
-        <div class="dq-result-grid">
-            <div class="dq-result-item">
-                <span class="dq-result-label">正解数</span>
-                <span class="dq-result-value">${resultData.score} / ${resultData.total_questions}</span>
+
+    quizContainer.innerHTML = `
+        <div class="quiz-result-view">
+            <h4>本日の結果</h4>
+            <div class="result-summary">
+                <p>スコア: <span>${userResult.score} / 10</span></p>
+                <p>タイム: <span>${userResult.time}</span></p>
+                ${userRank ? `<p>現在の順位: <span>${userRank.rank}位</span></p>` : ''}
             </div>
-            <div class="dq-result-item">
-                <span class="dq-result-label">タイム</span>
-                <span class="dq-result-value">${resultData.time_taken}秒</span>
-            </div>
-            <div class="dq-result-item">
-                <span class="dq-result-label">今日の順位</span>
-                <span class="dq-result-value">${resultData.rank}位 / ${resultData.total_challengers}人</span>
-            </div>
-        </div>
-        <div class="dq-result-footer">
-            また明日挑戦してください！
+            <h5>部屋別ランキング</h5>
+            ${rankingHTML}
         </div>
     `;
-    modalInstance.show();
-}
-
-// モーダルを生成する
-function createDailyQuizModal() {
-    const existingModal = document.getElementById('dailyQuizModal');
-    if (existingModal) existingModal.remove();
-
-    const modalHTML = `
-        <div class="modal fade" id="dailyQuizModal" tabindex="-1">
-            <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content">
-                    <div class="modal-body" id="dq-modal-body" style="padding: 2rem;">
-                        <p>読み込み中...</p>
-                    </div>
-                </div>
-            </div>
-        </div>`;
-    document.body.insertAdjacentHTML('beforeend', modalHTML);
-
-    const modalElement = document.getElementById('dailyQuizModal');
-    modalElement.addEventListener('hidden.bs.modal', () => modalElement.remove(), { once: true });
-
-    return new bootstrap.Modal(modalElement);
 }
