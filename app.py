@@ -11551,30 +11551,51 @@ def get_daily_quiz():
                 .order_by(DailyQuizResult.score.desc(), DailyQuizResult.time_taken_ms.asc())
             all_results = all_results_query.all()
             
-            ranking_data = []
+            total_participants = len(all_results)
+            top_5_ranking = []
             current_user_rank_info = None
+
+            # トップ5と自分の順位を特定
             for i, result in enumerate(all_results, 1):
                 if not result.user: continue
-                
+
                 rank_entry = {
                     'rank': i,
                     'username': result.user.username,
                     'score': result.score,
                     'time': f"{(result.time_taken_ms / 1000):.2f}秒"
                 }
-                ranking_data.append(rank_entry)
+                
+                # トップ5のデータを格納
+                if i <= 5:
+                    top_5_ranking.append(rank_entry)
+                
+                # 自分の順位データを格納
                 if result.user_id == user.id:
                     current_user_rank_info = rank_entry
+            
+            # user_result は submit_daily_quiz の時だけ必要なので条件分岐
+            user_result_data = {}
+            if 'new_result' in locals(): # submit_daily_quiz の場合
+                user_result_data = {
+                    'score': new_result.score,
+                    'time': f"{(new_result.time_taken_ms / 1000):.2f}秒"
+                }
+            else: # get_daily_quiz の場合
+                user_result_record = next((r for r in all_results if r.user_id == user.id), None)
+                if user_result_record:
+                    user_result_data = {
+                        'score': user_result_record.score,
+                        'time': f"{(user_result_record.time_taken_ms / 1000):.2f}秒"
+                    }
 
             return jsonify({
                 'status': 'success',
                 'completed': True,
-                'user_result': {
-                    'score': user_result.score,
-                    'time': f"{(user_result.time_taken_ms / 1000):.2f}秒"
-                },
-                'ranking': ranking_data,
-                'user_rank': current_user_rank_info
+                'user_result': user_result_data,
+                'top_5_ranking': top_5_ranking,
+                'user_rank': current_user_rank_info,
+                'total_participants': total_participants
             })
 
     # --- 未回答の場合、新しいクイズを作成または取得 ---
