@@ -11580,7 +11580,18 @@ def get_daily_quiz():
     # --- 未回答の場合、新しいクイズを作成または取得 ---
     if not daily_quiz:
         all_words = load_word_data_for_room(user.room_number)
-        public_words = [w for w in all_words if w.get('enabled')]
+        # 部屋の公開設定を取得
+        room_setting = RoomSetting.query.filter_by(room_number=user.room_number).first()
+        
+        # 部屋設定で公開されている問題のみを抽出
+        public_words = []
+        for word in all_words:
+            # CSVでの有効設定と、部屋での単元公開設定の両方をチェック
+            is_enabled_in_csv = word.get('enabled', False)
+            is_enabled_in_room = is_unit_enabled_by_room_setting(word.get('number'), room_setting)
+            
+            if is_enabled_in_csv and is_enabled_in_room:
+                public_words.append(word)
         
         if len(public_words) < 4:
             return jsonify({'status': 'error', 'message': 'クイズを作成するには問題が4問以上必要です。'})
