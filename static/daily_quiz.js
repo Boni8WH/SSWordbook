@@ -186,9 +186,9 @@ function runQuiz(questions) {
 async function submitQuizResult(score, time) {
     const quizContainer = document.getElementById('dailyQuizContainer');
     quizContainer.innerHTML = `<div class="text-center"><p>結果を送信中...</p></div>`;
+
+    // ページ離脱警告を解除し、閉じるボタンを有効化
     window.removeEventListener('beforeunload', beforeUnloadHandler);
-    
-    // 閉じるボタンを再度有効化
     const modalElement = document.getElementById('dailyQuizModal');
     if (modalElement) {
         modalElement.querySelector('.btn-close').disabled = false;
@@ -196,19 +196,21 @@ async function submitQuizResult(score, time) {
     }
 
     try {
-        await fetch('/api/daily_quiz/submit', {
+        // 結果をPOSTで送信し、そのレスポンスに全て含まれているデータを受け取る
+        const response = await fetch('/api/daily_quiz/submit', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ score, time }),
         });
         
-        // 再度APIを叩いて最新の結果とランキングを取得
-        const response = await fetch('/api/daily_quiz/today');
         const data = await response.json();
+
+        // レスポンスのデータを使って結果を表示
         if (data.status === 'success' && data.completed) {
             displayQuizResult(data.user_result, data.ranking, data.user_rank);
         } else {
-            throw new Error('結果の表示に失敗しました。');
+            // サーバーからのエラーメッセージを表示
+            throw new Error(data.message || '結果の表示に失敗しました。');
         }
 
     } catch (error) {
