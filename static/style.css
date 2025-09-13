@@ -4400,12 +4400,12 @@ a.nav-link.btn.change-username-button:hover,
 /* 4. 苦手問題一覧 (ユーティリティボタン) */
 .btn-weak {
     background-color: #193c5e;
-    color: #495057;
+    color: #ffffff;
     border: 1px solid #193c5e;
 }
 .btn-weak:hover {
     background-color: #1a344e;
-    color: #343a40;
+    color: #ffffff;
 }
 
 /* 5. 論述問題集 (特別コンテンツ) */
