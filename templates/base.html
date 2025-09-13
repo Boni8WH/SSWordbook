@@ -7,7 +7,6 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     
-    <!-- Merriweatherフォントを追加 -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Merriweather:ital,wght@0,300;0,400;0,700;0,900;1,300;1,400;1,700;1,900&display=swap" rel="stylesheet">
@@ -16,7 +15,11 @@
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='NapoleonIcon.png') }}">
     <link rel="shortcut icon" href="{{ url_for('static', filename='NapoleonIcon.png') }}">
     
-    <!-- Merriweatherフォントをヘッダータイトルに適用するスタイル -->
+    <script>
+        // Flaskからのデータをグローバル変数として先に設定
+        window.appInfoFromFlask = {{ app_info_for_js | tojson | safe if app_info_for_js else 'null' }};
+        window.chapterDataFromFlask = {{ chapter_data | tojson | safe if chapter_data else 'null' }};
+    </script>
     <style>
         .navbar-brand {
             font-family: 'Merriweather', serif !important;
@@ -53,7 +56,6 @@
                         {% endif %}
                     </div>
                     <ul class="navbar-nav">
-                        <!-- YouTubeアイコンボタンを追加 -->
                         <li class="nav-item">
                             <a class="nav-link btn btn-danger text-white btn-sm me-2" href="https://www.youtube.com/channel/UCf3wJznXaY9z7K2eAgZI98Q" target="_blank" rel="noopener noreferrer" title="YouTubeチャンネルを開く">
                                 <i class="fab fa-youtube"></i>
@@ -64,7 +66,6 @@
                                 <i class="fas fa-chart-line me-1"></i>進捗確認
                             </a>
                         </li>
-                        <!-- アカウント名変更リンクを追加 -->
                         <li class="nav-item">
                         <a class="nav-link btn btn-outline-warning change-username-button btn-sm me-2" href="{{ url_for('change_username_page') }}">
                         <i class="fas fa-user-edit me-1"></i>アカウント名変更
@@ -124,7 +125,6 @@
     </div>
 
 
-    <!-- フッターセクション -->
     <footer class="footer mt-5 py-4 bg-light border-top">
         <div class="container">
             <div class="row">
@@ -159,10 +159,9 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     
-    <script src="{{ url_for('static', filename='script.js') }}"></script>
+    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script> <script src="{{ url_for('static', filename='script.js') }}"></script>
     <script src="{{ url_for('static', filename='essay_quiz.js') }}"></script>
     <script src="{{ url_for('static', filename='daily_quiz.js') }}"></script>
-    
     {% block scripts %}{% endblock %}
 </body>
 </html>

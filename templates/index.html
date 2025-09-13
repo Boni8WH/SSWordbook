@@ -165,62 +165,6 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
-function debugRoomSetting(roomNumber) {
-    console.log(`🔍 部屋${roomNumber}のデバッグ情報:`);
-    
-    const maxUnitInput = document.getElementById('maxUnit_' + roomNumber);
-    const csvFileSelect = document.getElementById('csvFile_' + roomNumber);
-    const currentCsvDisplay = document.getElementById('current_csv_' + roomNumber);
-    
-    console.log('📋 DOM要素:', {
-        maxUnit: maxUnitInput ? maxUnitInput.value : 'なし',
-        csvFile: csvFileSelect ? csvFileSelect.value : 'なし',
-        currentDisplay: currentCsvDisplay ? currentCsvDisplay.textContent : 'なし'
-    });
-    
-    console.log('🎯 セレクトボックスオプション:');
-    if (csvFileSelect) {
-        Array.from(csvFileSelect.options).forEach((option, index) => {
-            console.log(`  ${index}: ${option.value} (${option.selected ? '選択中' : '未選択'})`);
-        });
-    }
-    
-    // サーバーから最新の設定を取得
-    fetch('/admin/get_room_setting', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ room_number: roomNumber })
-    })
-    .then(response => response.json())
-    .then(data => {
-        console.log('📡 サーバーからの設定:', data);
-        
-        if (data.status === 'success') {
-            // 表示を更新
-            if (currentCsvDisplay) {
-                currentCsvDisplay.textContent = data.csv_filename;
-            }
-            if (csvFileSelect) {
-                csvFileSelect.value = data.csv_filename;
-            }
-        }
-    })
-    .catch(error => {
-        console.error('❌ 設定取得エラー:', error);
-    });
-}
-</script>
-<script>
-    // Flaskからのデータをグローバル変数として設定
-    window.appInfoFromFlask = {{ app_info_for_js | tojson | safe }};
-    window.chapterDataFromFlask = {{ chapter_data | tojson | safe }};
-</script>
-<!-- html2canvas ライブラリの読み込み -->
-<script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
-<!-- メインのJavaScriptファイル -->
-<script src="{{ url_for('static', filename='script.js') }}"></script>
-
 <style>
 /* 苦手問題制限時のレイアウト調整 */
 .weak-problem-warning {
