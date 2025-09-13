@@ -75,7 +75,7 @@ async function initializeDailyQuiz() {
 
         if (data.completed) {
             // 既に回答済みの場合
-            displayQuizResult(data.user_result, data.ranking, data.user_rank);
+            displayQuizResult(data.user_result, data.top_5_ranking, data.user_rank, data.total_participants);
         } else {
             // これから回答する場合
             runQuiz(data.questions);
@@ -201,7 +201,7 @@ async function submitQuizResult(score, time) {
 
         // レスポンスのデータを使って結果を表示
         if (data.status === 'success' && data.completed) {
-            displayQuizResult(data.user_result, data.ranking, data.user_rank);
+            displayQuizResult(data.user_result, data.top_5_ranking, data.user_rank, data.total_participants);
         } else {
             // サーバーからのエラーメッセージを表示
             throw new Error(data.message || '結果の表示に失敗しました。');
@@ -215,25 +215,46 @@ async function submitQuizResult(score, time) {
 /**
  * 結果とランキングを表示する
  */
-function displayQuizResult(userResult, ranking, userRank) {
+function displayQuizResult(userResult, top5Ranking, userRank, totalParticipants) {
     const quizContainer = document.getElementById('dailyQuizContainer');
-    let rankingHTML = '<p>まだ誰も挑戦していません。</p>';
+    let rankingHTML = '<p class="text-muted text-center mt-3">まだ誰も挑戦していません。</p>';
 
-    if (ranking && ranking.length > 0) {
+    if (top5Ranking && top5Ranking.length > 0) {
+        // トップ5のテーブルボディを作成
+        const tableBodyHTML = top5Ranking.map(r => `
+            <tr class="${r.rank === userRank.rank ? 'current-user-rank' : ''}">
+                <td>${r.rank}位</td>
+                <td>${r.username}</td>
+                <td>${r.score}/10</td>
+                <td>${r.time}</td>
+            </tr>
+        `).join('');
+
+        let tableFootHTML = '';
+        // もし自分の順位が5位より下なら、...と自分の順位を追加
+        if (userRank && userRank.rank > 5) {
+            tableFootHTML = `
+                <tfoot>
+                    <tr class="rank-ellipsis"><td colspan="4">...</td></tr>
+                    <tr class="current-user-rank out-of-top5-rank">
+                        <td>${userRank.rank}位</td>
+                        <td>${userRank.username}</td>
+                        <td>${userRank.score}/10</td>
+                        <td>${userRank.time}</td>
+                    </tr>
+                </tfoot>
+            `;
+        }
+
         rankingHTML = `
-            <table class="table ranking-table">
+            <table class="table ranking-table mt-3">
                 <thead><tr><th>順位</th><th>名前</th><th>スコア</th><th>タイム</th></tr></thead>
                 <tbody>
-                    ${ranking.map(r => `
-                        <tr class="${r.rank === userRank.rank ? 'current-user-rank' : ''}">
-                            <td>${r.rank}位</td>
-                            <td>${r.username}</td>
-                            <td>${r.score}/10</td>
-                            <td>${r.time}</td>
-                        </tr>
-                    `).join('')}
+                    ${tableBodyHTML}
                 </tbody>
+                ${tableFootHTML}
             </table>
+            <p class="text-center text-muted mt-2" style="font-size: 0.9em;">参加人数: ${totalParticipants}人</p>
         `;
     }
 
@@ -243,9 +264,9 @@ function displayQuizResult(userResult, ranking, userRank) {
             <div class="result-summary">
                 <p>スコア: <span>${userResult.score} / 10</span></p>
                 <p>タイム: <span>${userResult.time}</span></p>
-                ${userRank ? `<p>現在の順位: <span>${userRank.rank}位</span></p>` : ''}
+                ${userRank ? `<p>現在の順位: <span>${userRank.rank}位</span> / ${totalParticipants}人中</p>` : ''}
             </div>
-            <h5>部屋別ランキング</h5>
+            <h5>部屋別ランキング (トップ5)</h5>
             ${rankingHTML}
         </div>
     `;

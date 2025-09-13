@@ -4417,3 +4417,17 @@ a.nav-link.btn.change-username-button:hover,
     background-color: #070013;
     color: white;
 }
+
+/* =======================================
+   今日の10問 5位以下の自分の順位表示
+   ======================================= */
+.ranking-table tfoot .rank-ellipsis td {
+    border: none;
+    padding: 4px 0;
+    color: #adb5bd;
+    font-size: 1.2em;
+}
+
+.ranking-table .out-of-top5-rank td {
+    border-top: 2px dashed #0d6efd; /* 区切り線 */
+}
