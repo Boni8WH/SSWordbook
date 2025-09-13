@@ -824,6 +824,18 @@
                         </button>
                     </form>
                 </div>
+                <div class="admin-panel" style="background-color: #f8d7da; border-left: 5px solid #dc3545;">
+                    <h4>⚠️ データベース構造の根本修復</h4>
+                    <p>
+                        <strong>（重要）</strong>ユーザーの重複に関する問題を解決するため、データベースの構造を修正します。<br>
+                        このボタンを<strong>一度だけ</strong>クリックしてください。データは消えません。
+                    </p>
+                    <form action="{{ url_for('emergency_fix_user_schema') }}" method="POST" onsubmit="return confirm('Userテーブルの構造を修復します。この操作は安全ですが、実行しますか？');">
+                        <button type="submit" class="btn btn-danger">
+                            <i class="fas fa-database"></i> データベース構造を修復
+                        </button>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
