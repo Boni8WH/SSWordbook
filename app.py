@@ -196,6 +196,7 @@ class User(db.Model):
         }
 
 class AdminUser(db.Model):
+    __tablename__ = 'admin_user'
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     _password_hash = db.Column(db.String(128), nullable=False)
@@ -11561,8 +11562,6 @@ def delete_essay_image(problem_id):
         db.session.rollback()
         app.logger.error(f"画像削除エラー: {str(e)}")
         return jsonify({'status': 'error', 'message': f'削除中にエラーが発生しました: {str(e)}'})
-
-# app.py の既存の get_daily_quiz 関数を、以下のコードで丸ごと置き換え
 
 @app.route('/api/daily_quiz/today')
 def get_daily_quiz():
