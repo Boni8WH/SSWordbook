@@ -11562,9 +11562,11 @@ def delete_essay_image(problem_id):
         app.logger.error(f"画像削除エラー: {str(e)}")
         return jsonify({'status': 'error', 'message': f'削除中にエラーが発生しました: {str(e)}'})
 
+# app.py の既存の get_daily_quiz 関数を、以下のコードで丸ごと置き換え
+
 @app.route('/api/daily_quiz/today')
 def get_daily_quiz():
-    """今日の10問を取得、または結果を表示するためのAPI"""
+    """今日の10問を取得、または結果を表示するためのAPI（選択肢生成を強化）"""
     if 'user_id' not in session:
         return jsonify({'status': 'error', 'message': 'ログインが必要です'}), 401
     
@@ -11579,12 +11581,16 @@ def get_daily_quiz():
         user_result = DailyQuizResult.query.filter_by(user_id=user.id, quiz_id=daily_quiz.id).first()
         if user_result:
             # --- 回答済みの場合、ランキングと結果を返す ---
-            all_results = DailyQuizResult.query.filter_by(quiz_id=daily_quiz.id)\
-                .order_by(DailyQuizResult.score.desc(), DailyQuizResult.time_taken_ms.asc()).all()
+            all_results_query = DailyQuizResult.query.filter_by(quiz_id=daily_quiz.id)\
+                .options(joinedload(DailyQuizResult.user))\
+                .order_by(DailyQuizResult.score.desc(), DailyQuizResult.time_taken_ms.asc())
+            all_results = all_results_query.all()
             
             ranking_data = []
-            current_user_rank = None
+            current_user_rank_info = None
             for i, result in enumerate(all_results, 1):
+                if not result.user: continue # ユーザーが存在しない場合はスキップ
+                
                 rank_entry = {
                     'rank': i,
                     'username': result.user.username,
@@ -11593,7 +11599,7 @@ def get_daily_quiz():
                 }
                 ranking_data.append(rank_entry)
                 if result.user_id == user.id:
-                    current_user_rank = rank_entry
+                    current_user_rank_info = rank_entry
 
             return jsonify({
                 'status': 'success',
@@ -11603,19 +11609,19 @@ def get_daily_quiz():
                     'time': f"{(user_result.time_taken_ms / 1000):.2f}秒"
                 },
                 'ranking': ranking_data,
-                'user_rank': current_user_rank
+                'user_rank': current_user_rank_info
             })
 
     # --- 未回答の場合、新しいクイズを作成または取得 ---
     if not daily_quiz:
-        # 今日の問題がまだ作られていないので作成
         all_words = load_word_data_for_room(user.room_number)
         public_words = [w for w in all_words if w.get('enabled')]
         
-        if len(public_words) < 10:
-            return jsonify({'status': 'error', 'message': 'クイズを作成するための問題が10問未満です。'})
-
-        selected_problems = random.sample(public_words, 10)
+        if len(public_words) < 4: # 4択問題を作るには最低4問必要
+            return jsonify({'status': 'error', 'message': 'クイズを作成するための問題が4問未満です。'})
+        
+        num_to_select = min(10, len(public_words))
+        selected_problems = random.sample(public_words, num_to_select)
         problem_ids = [generate_problem_id(p) for p in selected_problems]
         
         daily_quiz = DailyQuiz(
@@ -11631,20 +11637,36 @@ def get_daily_quiz():
     all_words = load_word_data_for_room(user.room_number)
     quiz_questions = []
 
+    # ★★★ 修正点：不正解の選択肢候補を先に一度だけ作成する ★★★
+    all_answers = list(set(w['answer'] for w in all_words if w.get('answer')))
+
     for problem_id in problem_ids:
         question_word = next((w for w in all_words if generate_problem_id(w) == problem_id), None)
         if question_word:
-            # 不正解の選択肢を他の問題の答えからランダムに3つ選ぶ
-            distractors = random.sample(
-                [w['answer'] for w in all_words if w['answer'] != question_word['answer']], 3
-            )
-            choices = distractors + [question_word['answer']]
+            correct_answer = question_word['answer']
+            
+            # ★★★ 修正点：不正解の選択肢を安全に取得する ★★★
+            distractor_pool = [ans for ans in all_answers if ans != correct_answer]
+            
+            if len(distractor_pool) >= 3:
+                distractors = random.sample(distractor_pool, 3)
+            else:
+                # 候補が足りない場合は、あるものだけで作成し、残りはダミーで埋める
+                distractors = distractor_pool
+                dummy_options = ["ダミー選択肢A", "ダミー選択肢B", "ダミー選択肢C", "ダミー選択肢D"]
+                i = 0
+                while len(distractors) < 3:
+                    if dummy_options[i] not in distractors and dummy_options[i] != correct_answer:
+                        distractors.append(dummy_options[i])
+                    i += 1
+            
+            choices = distractors + [correct_answer]
             random.shuffle(choices)
             
             quiz_questions.append({
                 'question': question_word['question'],
                 'choices': choices,
-                'answer': question_word['answer']
+                'answer': correct_answer
             })
 
     return jsonify({
