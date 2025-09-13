@@ -11660,8 +11660,6 @@ def get_daily_quiz():
         'questions': quiz_questions
     })
 
-# app.py
-
 @app.route('/api/daily_quiz/submit', methods=['POST'])
 def submit_daily_quiz():
     """今日の10問の結果を保存し、その場でランキングを返すAPI"""
@@ -11728,6 +11726,64 @@ def submit_daily_quiz():
         db.session.rollback()
         logger.error(f"日次クイズ結果の保存/集計エラー: {e}")
         return jsonify({'status': 'error', 'message': '結果の保存中にサーバーエラーが発生しました。'}), 500
+
+@app.route('/admin/regenerate_daily_quiz', methods=['POST'])
+@admin_required
+def admin_regenerate_daily_quiz():
+    """管理者用: 特定の部屋の「今日の10問」を再生成する"""
+    room_number = request.json.get('room_number')
+    if not room_number:
+        return jsonify({'status': 'error', 'message': '部屋番号が必要です'}), 400
+
+    today = date.today()
+
+    try:
+        # その部屋の今日のクイズと、それに関連する全ユーザーの結果を探す
+        existing_quiz = DailyQuiz.query.filter_by(date=today, room_number=room_number).first()
+
+        if existing_quiz:
+            print(f"🔧 部屋{room_number}の既存クイズ(ID: {existing_quiz.id})を削除します。")
+            # 既存の解答結果をすべて削除
+            DailyQuizResult.query.filter_by(quiz_id=existing_quiz.id).delete()
+            # クイズ本体を削除
+            db.session.delete(existing_quiz)
+            db.session.commit()
+            print(f"✅ 既存クイズと結果の削除完了。")
+
+        # --- 新しいクイズを生成（get_daily_quiz関数からロジックを抜粋） ---
+        print(f"✨ 部屋{room_number}の新しいクイズを生成します。")
+        all_words = load_word_data_for_room(room_number)
+        room_setting = RoomSetting.query.filter_by(room_number=room_number).first()
+        
+        public_words = []
+        for word in all_words:
+            is_enabled_in_csv = word.get('enabled', False)
+            is_enabled_in_room = is_unit_enabled_by_room_setting(word.get('number'), room_setting)
+            if is_enabled_in_csv and is_enabled_in_room:
+                public_words.append(word)
+
+        if len(public_words) < 10:
+             return jsonify({'status': 'error', 'message': f'公開問題が10問未満({len(public_words)}問)のため、再選考できません。'}), 400
+
+        selected_problems = random.sample(public_words, 10)
+        problem_ids = [generate_problem_id(p) for p in selected_problems]
+        
+        new_quiz = DailyQuiz(
+            date=today,
+            room_number=room_number,
+            problem_ids_json=json.dumps(problem_ids)
+        )
+        db.session.add(new_quiz)
+        db.session.commit()
+        print(f"✅ 新しいクイズ(ID: {new_quiz.id})の生成完了。")
+
+        return jsonify({'status': 'success', 'message': f'部屋{room_number}の「今日の10問」を正常に再選考しました。'})
+
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"日次クイズ再生成エラー: {e}")
+        return jsonify({'status': 'error', 'message': f'エラーが発生しました: {str(e)}'}), 500
+    
 @app.route('/admin/fix_data_types', methods=['POST'])
 @admin_required
 def admin_fix_data_types():
