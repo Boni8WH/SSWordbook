@@ -880,6 +880,51 @@ def generate_problem_id(word):
         number = str(word.get('number', '0')).zfill(3)
         return f"{chapter}-{number}-error"
 
+# app.py のヘルパー関数エリアに追加
+
+def fix_user_data_types():
+    """
+    既存ユーザーの problem_history と incorrect_words が文字列で保存されている場合、
+    正しいPythonオブジェクト（辞書/リスト）に変換して修復する。
+    """
+    users_to_fix = User.query.all()
+    fixed_users_count = 0
+    fixed_history_count = 0
+    fixed_incorrect_count = 0
+
+    for user in users_to_fix:
+        is_fixed = False
+        # problem_history の型をチェック
+        if isinstance(user.problem_history, str):
+            try:
+                user.problem_history = json.loads(user.problem_history)
+                fixed_history_count += 1
+                is_fixed = True
+            except json.JSONDecodeError:
+                user.problem_history = {} # 解析できない場合は空の辞書に
+        
+        # incorrect_words の型をチェック
+        if isinstance(user.incorrect_words, str):
+            try:
+                user.incorrect_words = json.loads(user.incorrect_words)
+                fixed_incorrect_count += 1
+                is_fixed = True
+            except json.JSONDecodeError:
+                user.incorrect_words = [] # 解析できない場合は空のリストに
+
+        if is_fixed:
+            fixed_users_count += 1
+            print(f"🔧 ユーザー '{user.username}' のデータ型を修復しました。")
+
+    if fixed_users_count > 0:
+        db.session.commit()
+        
+    return {
+        "fixed_users": fixed_users_count,
+        "fixed_history": fixed_history_count,
+        "fixed_incorrect": fixed_incorrect_count
+    }
+
 def filter_special_problems(word_data, room_number):
     """Z問題（特別問題）のフィルタリング処理"""
     chapters = {}
@@ -11697,3 +11742,16 @@ def submit_daily_quiz():
     db.session.commit()
 
     return jsonify({'status': 'success', 'message': '結果を保存しました。'})
+
+@app.route('/admin/fix_data_types', methods=['POST'])
+@admin_required
+def admin_fix_data_types():
+    """管理者用：全ユーザーのデータ型を修復するAPI"""
+    try:
+        result = fix_user_data_types()
+        flash(f"データ型の修復が完了しました。{result['fixed_users']}人のユーザーデータを更新しました。", 'success')
+        return redirect(url_for('admin_page'))
+    except Exception as e:
+        db.session.rollback()
+        flash(f"データ修復中にエラーが発生しました: {str(e)}", 'danger')
+        return redirect(url_for('admin_page'))
