@@ -837,7 +837,25 @@ def generate_problem_id(word):
         number = str(word.get('number', '0')).zfill(3)
         return f"{chapter}-{number}-error"
 
-# app.py のヘルパー関数エリアに追加
+def levenshtein_distance(s1, s2):
+    """2つの文字列のレーベンシュタイン距離を計算する"""
+    if len(s1) < len(s2):
+        return levenshtein_distance(s2, s1)
+
+    if len(s2) == 0:
+        return len(s1)
+
+    previous_row = range(len(s2) + 1)
+    for i, c1 in enumerate(s1):
+        current_row = [i + 1]
+        for j, c2 in enumerate(s2):
+            insertions = previous_row[j + 1] + 1
+            deletions = current_row[j] + 1
+            substitutions = previous_row[j] + (c1 != c2)
+            current_row.append(min(insertions, deletions, substitutions))
+        previous_row = current_row
+
+    return previous_row[-1]
 
 def fix_user_data_types():
     """
@@ -11592,14 +11610,23 @@ def get_daily_quiz():
         if question_word:
             correct_answer = question_word['answer']
             
-            # 不正解の選択肢を安全に取得
+            # --- ▼ここから選択肢生成ロジックを変更▼ ---
             distractor_pool = [ans for ans in all_answers if ans != correct_answer]
             
-            if len(distractor_pool) >= 3:
-                distractors = random.sample(distractor_pool, 3)
-            else:
-                # 候補が足りない場合はダミーで補完
-                distractors = distractor_pool
+            # 正解に近い語句を計算
+            distractors_with_distance = []
+            for ans in distractor_pool:
+                distance = levenshtein_distance(correct_answer, ans)
+                distractors_with_distance.append((distance, ans))
+            
+            # 距離が近い順にソート
+            distractors_with_distance.sort(key=lambda x: x[0])
+            
+            # 上位3つを誤答として取得
+            distractors = [ans for distance, ans in distractors_with_distance[:3]]
+            
+            # もし候補が3つ未満だった場合の安全策
+            if len(distractors) < 3:
                 dummy_options = ["誤答A", "誤答B", "誤答C", "誤答D"]
                 i = 0
                 while len(distractors) < 3:
