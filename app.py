@@ -11536,7 +11536,7 @@ def get_daily_quiz():
         return jsonify({'status': 'error', 'message': 'ログインが必要です'}), 401
     
     user = User.query.get(session['user_id'])
-    today = date.today()
+    today = datetime.now(JST).date()
 
     daily_quiz = DailyQuiz.query.filter_by(date=today, room_number=user.room_number).first()
 
@@ -11664,7 +11664,7 @@ def submit_daily_quiz():
         return jsonify({'status': 'error', 'message': 'ログインが必要です'}), 401
 
     user = User.query.get(session['user_id'])
-    today = date.today()
+    today = datetime.now(JST).date()
     data = request.get_json()
 
     daily_quiz = DailyQuiz.query.filter_by(date=today, room_number=user.room_number).first()
