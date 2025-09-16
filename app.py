@@ -174,6 +174,7 @@ class DailyQuiz(db.Model):
     date = db.Column(db.Date, nullable=False)
     room_number = db.Column(db.String(50), nullable=False)
     problem_ids_json = db.Column(db.Text, nullable=False)  # 問題IDのリストをJSON文字列で保存
+    monthly_score_processed = db.Column(db.Boolean, default=False, nullable=True)
 
     __table_args__ = (db.UniqueConstraint('date', 'room_number', name='uq_daily_quiz_date_room'),)
 
@@ -192,6 +193,31 @@ class DailyQuizResult(db.Model):
 
     user = db.relationship('User', backref=db.backref('daily_quiz_results', lazy=True, cascade="all, delete-orphan"))
     quiz = db.relationship('DailyQuiz', backref=db.backref('results', lazy=True, cascade="all, delete-orphan"))
+
+class MonthlyScore(db.Model):
+    """月間の累計スコアを保存するテーブル"""
+    __tablename__ = 'monthly_score'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False)
+    room_number = db.Column(db.String(50), nullable=False, index=True)
+    year = db.Column(db.Integer, nullable=False)
+    month = db.Column(db.Integer, nullable=False)
+    total_score = db.Column(db.Integer, default=0, nullable=False)
+
+    user = db.relationship('User', backref=db.backref('monthly_scores', lazy=True, cascade="all, delete-orphan"))
+    __table_args__ = (db.UniqueConstraint('user_id', 'room_number', 'year', 'month', name='uq_user_room_year_month'),)
+
+class MonthlyResultViewed(db.Model):
+    """ユーザーが前月の結果を見たかを記録するテーブル"""
+    __tablename__ = 'monthly_result_viewed'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False)
+    year = db.Column(db.Integer, nullable=False)  # 結果を見た対象の年（例：9月の結果）
+    month = db.Column(db.Integer, nullable=False) # 結果を見た対象の月（例：9月）
+    viewed_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))
+
+    user = db.relationship('User', backref=db.backref('monthly_views', lazy=True, cascade="all, delete-orphan"))
+    __table_args__ = (db.UniqueConstraint('user_id', 'year', 'month', name='uq_user_viewed_year_month'),)
 
 class RoomSetting(db.Model):
     __table_args__ = {'extend_existing': True}  # ← 重複エラー回避
@@ -763,6 +789,28 @@ def to_jst_filter(dt):
 # ====================================================================
 # ヘルパー関数
 # ====================================================================
+def get_monthly_ranking(room_number, user_id, year, month):
+    """指定された月間のランキングデータを取得する"""
+    all_monthly_scores = MonthlyScore.query.filter_by(room_number=room_number, year=year, month=month)\
+        .join(User)\
+        .order_by(MonthlyScore.total_score.desc(), User.username).all()
+
+    monthly_top_5 = []
+    monthly_user_rank_info = None
+    total_participants = len(all_monthly_scores)
+
+    for i, score_entry in enumerate(all_monthly_scores, 1):
+        rank_data = {
+            'rank': i,
+            'username': score_entry.user.username,
+            'score': score_entry.total_score
+        }
+        if i <= 5:
+            monthly_top_5.append(rank_data)
+        if score_entry.user_id == user_id:
+            monthly_user_rank_info = rank_data
+            
+    return monthly_top_5, monthly_user_rank_info, total_participants
 
 # 部屋ごとの単語データを読み込む関数
 def load_word_data_for_room(room_number):
@@ -856,6 +904,69 @@ def levenshtein_distance(s1, s2):
         previous_row = current_row
 
     return previous_row[-1]
+
+def process_daily_quiz_results_for_scoring(quiz_id):
+    """指定されたクイズIDの結果を集計し、月間スコアに加算する"""
+    try:
+        quiz = DailyQuiz.query.get(quiz_id)
+        if not quiz or quiz.monthly_score_processed:
+            print(f"集計スキップ: クイズID {quiz_id} は存在しないか、処理済みです。")
+            return
+
+        print(f"月間スコア集計開始: クイズID {quiz_id} (日付: {quiz.date})")
+        
+        results = DailyQuizResult.query.filter_by(quiz_id=quiz_id)\
+            .options(joinedload(DailyQuizResult.user))\
+            .order_by(DailyQuizResult.score.desc(), DailyQuizResult.time_taken_ms.asc()).all()
+
+        if not results:
+            print("参加者がいないため集計を終了します。")
+            quiz.monthly_score_processed = True
+            db.session.commit()
+            return
+
+        quiz_year = quiz.date.year
+        quiz_month = quiz.date.month
+        point_mapping = {1: 6, 2: 5, 3: 4, 4: 3, 5: 2}
+
+        for i, result in enumerate(results, 1):
+            user = result.user
+            if not user:
+                continue
+
+            # ポイントを計算
+            points = point_mapping.get(i, 1)  # 1位〜5位は特別点、6位以下は参加点で1点
+
+            # 月間スコアのレコードを検索または作成
+            monthly_score = MonthlyScore.query.filter_by(
+                user_id=user.id,
+                room_number=user.room_number,
+                year=quiz_year,
+                month=quiz_month
+            ).first()
+
+            if not monthly_score:
+                monthly_score = MonthlyScore(
+                    user_id=user.id,
+                    room_number=user.room_number,
+                    year=quiz_year,
+                    month=quiz_month,
+                    total_score=0
+                )
+                db.session.add(monthly_score)
+
+            # スコアを加算
+            monthly_score.total_score += points
+            print(f"  -> {user.username}: {points}点 加算 (合計: {monthly_score.total_score})")
+
+        # クイズを「処理済み」にマーク
+        quiz.monthly_score_processed = True
+        db.session.commit()
+        print(f"月間スコア集計完了: クイズID {quiz_id}")
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"❌ 月間スコア集計エラー: {e}")
 
 def fix_user_data_types():
     """
@@ -985,7 +1096,6 @@ def load_default_word_data():
     
     return word_data
 
-# 単元番号の比較を数値で行うためのヘルパー関数
 def parse_unit_number(unit_str):
     """
     単元文字列を解析して数値に変換するヘルパー関数
@@ -1040,7 +1150,6 @@ def is_unit_enabled_by_room_setting(unit_number, room_setting):
         print(f"⚠️ 単元有効性チェックエラー: {e}")
         return True  # エラー時は安全のため有効とする
 
-# 問題IDを生成するヘルパー関数
 def get_problem_id(word):
     try:
         chapter = str(word.get('chapter', '0')).zfill(3)
@@ -11531,22 +11640,46 @@ def delete_essay_image(problem_id):
 
 @app.route('/api/daily_quiz/today')
 def get_daily_quiz():
-    """今日の10問を取得、または結果を表示するためのAPI"""
+    """今日の10問を取得、または結果を表示するためのAPI (月間ランキング対応版)"""
     if 'user_id' not in session:
         return jsonify({'status': 'error', 'message': 'ログインが必要です'}), 401
     
     user = User.query.get(session['user_id'])
-    today = datetime.now(JST).date()
+    today = (datetime.now(JST) - timedelta(hours=7)).date()
+    yesterday = today - timedelta(days=1)
+
+    # --- ▼▼▼ 月間スコア集計トリガー ▼▼▼ ---
+    # 昨日分のクイズが存在し、かつ「未処理」の場合、スコア集計を実行する
+    try:
+        yesterday_quiz = DailyQuiz.query.filter_by(
+            date=yesterday, 
+            room_number=user.room_number, 
+            monthly_score_processed=False
+        ).first()
+        
+        if yesterday_quiz:
+            process_daily_quiz_results_for_scoring(yesterday_quiz.id)
+            
+    except Exception as score_e:
+        print(f"❌ 集計トリガーエラー: {score_e}")
+    # --- ▲▲▲ 集計トリガーここまで ▲▲▲ ---
 
     daily_quiz = DailyQuiz.query.filter_by(date=today, room_number=user.room_number).first()
+
+    # 月間ランキングデータを取得 (当月分)
+    current_year = today.year
+    current_month = today.month
+    monthly_top_5, monthly_user_rank, monthly_participants = get_monthly_ranking(
+        user.room_number, user.id, current_year, current_month
+    )
 
     if daily_quiz:
         user_result = DailyQuizResult.query.filter_by(user_id=user.id, quiz_id=daily_quiz.id).first()
         if user_result:
-            all_results_query = DailyQuizResult.query.filter_by(quiz_id=daily_quiz.id)\
+            # --- (回答済みの場合) ---
+            all_results = DailyQuizResult.query.filter_by(quiz_id=daily_quiz.id)\
                 .options(joinedload(DailyQuizResult.user))\
-                .order_by(DailyQuizResult.score.desc(), DailyQuizResult.time_taken_ms.asc())
-            all_results = all_results_query.all()
+                .order_by(DailyQuizResult.score.desc(), DailyQuizResult.time_taken_ms.asc()).all()
             
             total_participants = len(all_results)
             top_5_ranking = []
@@ -11554,27 +11687,11 @@ def get_daily_quiz():
 
             for i, result in enumerate(all_results, 1):
                 if not result.user: continue
-                
-                rank_entry = {
-                    'rank': i,
-                    'username': result.user.username,
-                    'score': result.score,
-                    'time': f"{(result.time_taken_ms / 1000):.2f}秒"
-                }
-                
-                if i <= 5:
-                    top_5_ranking.append(rank_entry)
-                
-                if result.user_id == user.id:
-                    current_user_rank_info = rank_entry
+                rank_entry = {'rank': i, 'username': result.user.username, 'score': result.score, 'time': f"{(result.time_taken_ms / 1000):.2f}秒"}
+                if i <= 5: top_5_ranking.append(rank_entry)
+                if result.user_id == user.id: current_user_rank_info = rank_entry
             
-            # --- ▼▼▼ ここが修正箇所です ▼▼▼ ---
-            # 'new_result' in locals() のチェックを削除し、
-            # データベースから取得した user_result を直接使います。
-            user_result_data = {
-                'score': user_result.score,
-                'time': f"{(user_result.time_taken_ms / 1000):.2f}秒"
-            }
+            user_result_data = {'score': user_result.score, 'time': f"{(user_result.time_taken_ms / 1000):.2f}秒"}
 
             return jsonify({
                 'status': 'success',
@@ -11582,89 +11699,69 @@ def get_daily_quiz():
                 'user_result': user_result_data,
                 'top_5_ranking': top_5_ranking,
                 'user_rank': current_user_rank_info,
-                'total_participants': total_participants
+                'total_participants': total_participants,
+                'monthly_top_5': monthly_top_5, # 月間ランキング追加
+                'monthly_user_rank': monthly_user_rank, # 月間ランキング追加
+                'monthly_participants': monthly_participants # 月間ランキング追加
             })
-            # --- ▲▲▲ 修正ここまで ▲▲▲ ---
 
-    # --- 未回答の場合のロジック (変更なし) ---
+    # --- (未回答の場合のクイズ生成ロジック) ---
     if not daily_quiz:
-        # ( ... この部分は変更ありません ... )
         all_words = load_word_data_for_room(user.room_number)
         room_setting = RoomSetting.query.filter_by(room_number=user.room_number).first()
-        
         public_words = []
         for word in all_words:
-            is_enabled_in_csv = word.get('enabled', False)
-            is_enabled_in_room = is_unit_enabled_by_room_setting(word.get('number'), room_setting)
-            if is_enabled_in_csv and is_enabled_in_room:
+            if word.get('enabled', False) and is_unit_enabled_by_room_setting(word.get('number'), room_setting):
                 public_words.append(word)
-
-        if len(public_words) < 4:
-            return jsonify({'status': 'error', 'message': 'クイズを作成するには問題が4問以上必要です。'})
+        if len(public_words) < 10: # 10問未満の場合はエラー
+            return jsonify({'status': 'error', 'message': f'クイズを作成するには公開問題が10問以上必要です (現在 {len(public_words)}問)'})
         
-        num_to_select = min(10, len(public_words))
-        selected_problems = random.sample(public_words, num_to_select)
+        selected_problems = random.sample(public_words, 10)
         problem_ids = [generate_problem_id(p) for p in selected_problems]
-        
-        daily_quiz = DailyQuiz(
-            date=today,
-            room_number=user.room_number,
-            problem_ids_json=json.dumps(problem_ids)
-        )
+        daily_quiz = DailyQuiz(date=today, room_number=user.room_number, problem_ids_json=json.dumps(problem_ids), monthly_score_processed=False)
         db.session.add(daily_quiz)
         db.session.commit()
 
+    # (クイズ問題生成ロジックは変更なし ... )
     problem_ids = daily_quiz.get_problem_ids()
     all_words = load_word_data_for_room(user.room_number)
     quiz_questions = []
-
     all_answers = list(set(w['answer'] for w in all_words if w.get('answer')))
-
     for problem_id in problem_ids:
         question_word = next((w for w in all_words if generate_problem_id(w) == problem_id), None)
         if question_word:
             correct_answer = question_word['answer']
             distractor_pool = [ans for ans in all_answers if ans != correct_answer]
-            
-            distractors_with_distance = []
-            for ans in distractor_pool:
-                distance = levenshtein_distance(correct_answer, ans)
-                distractors_with_distance.append((distance, ans))
-            
+            distractors_with_distance = [(levenshtein_distance(correct_answer, ans), ans) for ans in distractor_pool]
             distractors_with_distance.sort(key=lambda x: x[0])
             distractors = [ans for distance, ans in distractors_with_distance[:3]]
-            
             if len(distractors) < 3:
                 dummy_options = ["誤答A", "誤答B", "誤答C", "誤答D"]
                 i = 0
                 while len(distractors) < 3:
-                    if dummy_options[i] not in distractors and dummy_options[i] != correct_answer:
-                        distractors.append(dummy_options[i])
+                    if dummy_options[i] not in distractors and dummy_options[i] != correct_answer: distractors.append(dummy_options[i])
                     i += 1
-            
             choices = distractors + [correct_answer]
             random.shuffle(choices)
-            
-            quiz_questions.append({
-                'question': question_word['question'],
-                'choices': choices,
-                'answer': correct_answer
-            })
+            quiz_questions.append({'question': question_word['question'], 'choices': choices, 'answer': correct_answer})
 
     return jsonify({
         'status': 'success',
         'completed': False,
-        'questions': quiz_questions
+        'questions': quiz_questions,
+        'monthly_top_5': monthly_top_5, # 未回答時も月間ランクは渡す
+        'monthly_user_rank': monthly_user_rank,
+        'monthly_participants': monthly_participants
     })
 
 @app.route('/api/daily_quiz/submit', methods=['POST'])
 def submit_daily_quiz():
-    """今日の10問の結果を保存し、その場でランキングを返すAPI"""
+    """今日の10問の結果を保存し、その場でランキングを返すAPI (月間ランキング対応版)"""
     if 'user_id' not in session:
         return jsonify({'status': 'error', 'message': 'ログインが必要です'}), 401
 
     user = User.query.get(session['user_id'])
-    today = datetime.now(JST).date()
+    today = (datetime.now(JST) - timedelta(hours=7)).date()
     data = request.get_json()
 
     daily_quiz = DailyQuiz.query.filter_by(date=today, room_number=user.room_number).first()
@@ -11685,10 +11782,10 @@ def submit_daily_quiz():
         db.session.commit()
         db.session.refresh(new_result)
         
-        all_results_query = DailyQuizResult.query.filter_by(quiz_id=daily_quiz.id)\
+        # (日次ランキング計算)
+        all_results = DailyQuizResult.query.filter_by(quiz_id=daily_quiz.id)\
             .options(joinedload(DailyQuizResult.user))\
-            .order_by(DailyQuizResult.score.desc(), DailyQuizResult.time_taken_ms.asc())
-        all_results = all_results_query.all()
+            .order_by(DailyQuizResult.score.desc(), DailyQuizResult.time_taken_ms.asc()).all()
         
         total_participants = len(all_results)
         top_5_ranking = []
@@ -11696,73 +11793,75 @@ def submit_daily_quiz():
 
         for i, result in enumerate(all_results, 1):
             if not result.user: continue
-            
-            rank_entry = {
-                'rank': i,
-                'username': result.user.username,
-                'score': result.score,
-                'time': f"{(result.time_taken_ms / 1000):.2f}秒"
-            }
-            
-            if i <= 5:
-                top_5_ranking.append(rank_entry)
-            
-            if result.user_id == user.id:
-                current_user_rank_info = rank_entry
+            rank_entry = {'rank': i, 'username': result.user.username, 'score': result.score, 'time': f"{(result.time_taken_ms / 1000):.2f}秒"}
+            if i <= 5: top_5_ranking.append(rank_entry)
+            if result.user_id == user.id: current_user_rank_info = rank_entry
         
-        # --- ▼▼▼ この部分をシンプルに修正 ▼▼▼ ---
+        # --- ▼▼▼ 月間ランキングデータを取得 ▼▼▼ ---
+        current_year = today.year
+        current_month = today.month
+        monthly_top_5, monthly_user_rank, monthly_participants = get_monthly_ranking(
+            user.room_number, user.id, current_year, current_month
+        )
+
         return jsonify({
             'status': 'success',
             'message': '結果を保存しました。',
             'completed': True,
-            'user_result': {
-                'score': new_result.score,
-                'time': f"{(new_result.time_taken_ms / 1000):.2f}秒"
-            },
+            'user_result': {'score': new_result.score, 'time': f"{(new_result.time_taken_ms / 1000):.2f}秒"},
             'top_5_ranking': top_5_ranking,
             'user_rank': current_user_rank_info,
-            'total_participants': total_participants
+            'total_participants': total_participants,
+            'monthly_top_5': monthly_top_5, # 月間ランキング追加
+            'monthly_user_rank': monthly_user_rank, # 月間ランキング追加
+            'monthly_participants': monthly_participants # 月間ランキング追加
         })
-        # --- ▲▲▲ 修正ここまで ▲▲▲ ---
 
     except Exception as e:
         db.session.rollback()
         logger.error(f"日次クイズ結果の保存/集計エラー: {e}")
         return jsonify({'status': 'error', 'message': '結果の保存中にサーバーエラーが発生しました。'}), 500
 
+# app.py
+
 @app.route('/admin/regenerate_daily_quiz', methods=['POST'])
 @admin_required
 def admin_regenerate_daily_quiz():
-    """管理者用: 特定の部屋の「今日の10問」を再生成する"""
+    """管理者用: 特定の部屋の「今日の10問」を再生成する (月間スコア集計トリガー付)"""
     room_number = request.json.get('room_number')
     if not room_number:
         return jsonify({'status': 'error', 'message': '部屋番号が必要です'}), 400
 
-    today = date.today()
+    today = (datetime.now(JST) - timedelta(hours=7)).date()
 
     try:
-        # その部屋の今日のクイズと、それに関連する全ユーザーの結果を探す
         existing_quiz = DailyQuiz.query.filter_by(date=today, room_number=room_number).first()
 
         if existing_quiz:
             print(f"🔧 部屋{room_number}の既存クイズ(ID: {existing_quiz.id})を削除します。")
-            # 既存の解答結果をすべて削除
+            
+            # --- ▼▼▼ スコア集計を追加 ▼▼▼ ---
+            # 削除する前に、もし未処理ならスコアを集計する
+            if not existing_quiz.monthly_score_processed:
+                print("スコアが未集計のため、先に集計処理を実行します...")
+                process_daily_quiz_results_for_scoring(existing_quiz.id)
+            else:
+                print("スコアは集計済みです。")
+            # --- ▲▲▲ 追加ここまで ▲▲▲ ---
+
             DailyQuizResult.query.filter_by(quiz_id=existing_quiz.id).delete()
-            # クイズ本体を削除
             db.session.delete(existing_quiz)
             db.session.commit()
             print(f"✅ 既存クイズと結果の削除完了。")
 
-        # --- 新しいクイズを生成（get_daily_quiz関数からロジックを抜粋） ---
+        # ... (以降のクイズ生成ロジックは変更なし) ...
         print(f"✨ 部屋{room_number}の新しいクイズを生成します。")
         all_words = load_word_data_for_room(room_number)
         room_setting = RoomSetting.query.filter_by(room_number=room_number).first()
         
         public_words = []
         for word in all_words:
-            is_enabled_in_csv = word.get('enabled', False)
-            is_enabled_in_room = is_unit_enabled_by_room_setting(word.get('number'), room_setting)
-            if is_enabled_in_csv and is_enabled_in_room:
+            if word.get('enabled', False) and is_unit_enabled_by_room_setting(word.get('number'), room_setting):
                 public_words.append(word)
 
         if len(public_words) < 10:
@@ -11771,11 +11870,7 @@ def admin_regenerate_daily_quiz():
         selected_problems = random.sample(public_words, 10)
         problem_ids = [generate_problem_id(p) for p in selected_problems]
         
-        new_quiz = DailyQuiz(
-            date=today,
-            room_number=room_number,
-            problem_ids_json=json.dumps(problem_ids)
-        )
+        new_quiz = DailyQuiz(date=today, room_number=room_number, problem_ids_json=json.dumps(problem_ids), monthly_score_processed=False)
         db.session.add(new_quiz)
         db.session.commit()
         print(f"✅ 新しいクイズ(ID: {new_quiz.id})の生成完了。")
@@ -11786,6 +11881,79 @@ def admin_regenerate_daily_quiz():
         db.session.rollback()
         app.logger.error(f"日次クイズ再生成エラー: {e}")
         return jsonify({'status': 'error', 'message': f'エラーが発生しました: {str(e)}'}), 500
+
+@app.route('/api/monthly_results/check_unviewed')
+def check_unviewed_monthly_results():
+    """未閲覧の前月のランキング結果があるかチェックする"""
+    if 'user_id' not in session:
+        return jsonify({'status': 'error', 'message': 'ログインが必要です'}), 401
+
+    user = User.query.get(session['user_id'])
+    
+    # 今日の日付（7時更新基準）
+    today = (datetime.now(JST) - timedelta(hours=7)).date()
+    
+    # 前月を計算
+    first_day_of_current_month = today.replace(day=1)
+    last_day_of_previous_month = first_day_of_current_month - timedelta(days=1)
+    prev_year = last_day_of_previous_month.year
+    prev_month = last_day_of_previous_month.month
+
+    # 今月が始まってから、まだ前月の結果を見ていないかチェック
+    already_viewed = MonthlyResultViewed.query.filter_by(
+        user_id=user.id,
+        year=prev_year,
+        month=prev_month
+    ).first()
+
+    if already_viewed:
+        return jsonify({'status': 'success', 'show_results': False})
+
+    # まだ見ていない場合、前月のランキングデータを取得
+    monthly_top_5, monthly_user_rank, total_participants = get_monthly_ranking(
+        user.room_number, user.id, prev_year, prev_month
+    )
+
+    if total_participants == 0:
+        # 誰も参加しなかった月は、自動的に「閲覧済み」にして何も表示しない
+        mark_as_viewed = MonthlyResultViewed(user_id=user.id, year=prev_year, month=prev_month)
+        db.session.add(mark_as_viewed)
+        db.session.commit()
+        return jsonify({'status': 'success', 'show_results': False})
+
+    # 表示すべき結果を返す
+    return jsonify({
+        'status': 'success',
+        'show_results': True,
+        'year': prev_year,
+        'month': prev_month,
+        'monthly_top_5': monthly_top_5,
+        'monthly_user_rank': monthly_user_rank,
+        'total_participants': total_participants
+    })
+
+@app.route('/api/monthly_results/mark_viewed', methods=['POST'])
+def mark_monthly_result_viewed():
+    """月間ランキングを閲覧済みにする"""
+    if 'user_id' not in session:
+        return jsonify({'status': 'error', 'message': 'ログインが必要です'}), 401
+    
+    user = User.query.get(session['user_id'])
+    data = request.get_json()
+    year = data.get('year')
+    month = data.get('month')
+
+    if not year or not month:
+        return jsonify({'status': 'error', 'message': '年と月が必要です'}), 400
+
+    # 既に存在するか確認
+    existing = MonthlyResultViewed.query.filter_by(user_id=user.id, year=year, month=month).first()
+    if not existing:
+        mark_as_viewed = MonthlyResultViewed(user_id=user.id, year=year, month=month)
+        db.session.add(mark_as_viewed)
+        db.session.commit()
+
+    return jsonify({'status': 'success', 'message': '閲覧済みにしました'})
     
 @app.route('/admin/fix_data_types', methods=['POST'])
 @admin_required
