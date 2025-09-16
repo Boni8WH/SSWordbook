@@ -75,7 +75,8 @@ async function initializeDailyQuiz() {
 
         if (data.completed) {
             // 既に回答済みの場合
-            displayQuizResult(data.user_result, data.top_5_ranking, data.user_rank, data.total_participants);
+            displayQuizResult(data.user_result, data.top_5_ranking, data.user_rank, data.total_participants, 
+                  data.monthly_top_5, data.monthly_user_rank, data.monthly_participants);
         } else {
             // これから回答する場合
             runQuiz(data.questions);
@@ -201,7 +202,8 @@ async function submitQuizResult(score, time) {
 
         // レスポンスのデータを使って結果を表示
         if (data.status === 'success' && data.completed) {
-            displayQuizResult(data.user_result, data.top_5_ranking, data.user_rank, data.total_participants);
+            displayQuizResult(data.user_result, data.top_5_ranking, data.user_rank, data.total_participants,
+                  data.monthly_top_5, data.monthly_user_rank, data.monthly_participants);
         } else {
             // サーバーからのエラーメッセージを表示
             throw new Error(data.message || '結果の表示に失敗しました。');
@@ -213,14 +215,14 @@ async function submitQuizResult(score, time) {
 }
 
 /**
- * 結果とランキングを表示する
+ * 結果とランキング（日次・月次）を表示する
  */
-function displayQuizResult(userResult, top5Ranking, userRank, totalParticipants) {
+function displayQuizResult(userResult, top5Ranking, userRank, totalParticipants, monthlyTop5, monthlyUserRank, monthlyParticipants) {
     const quizContainer = document.getElementById('dailyQuizContainer');
-    let rankingHTML = '<p class="text-muted text-center mt-3">まだ誰も挑戦していません。</p>';
-
+    
+    // --- 1. 日次ランキングHTMLの生成 ---
+    let dailyRankingHTML = '<p class="text-muted text-center mt-2">まだ誰も挑戦していません。</p>';
     if (top5Ranking && top5Ranking.length > 0) {
-        // トップ5のテーブルボディを作成
         const tableBodyHTML = top5Ranking.map(r => `
             <tr class="${r.rank === userRank.rank ? 'current-user-rank' : ''}">
                 <td>${r.rank}位</td>
@@ -231,7 +233,6 @@ function displayQuizResult(userResult, top5Ranking, userRank, totalParticipants)
         `).join('');
 
         let tableFootHTML = '';
-        // もし自分の順位が5位より下なら、...と自分の順位を追加
         if (userRank && userRank.rank > 5) {
             tableFootHTML = `
                 <tfoot>
@@ -245,29 +246,69 @@ function displayQuizResult(userResult, top5Ranking, userRank, totalParticipants)
                 </tfoot>
             `;
         }
-
-        rankingHTML = `
-            <table class="table ranking-table mt-3">
+        dailyRankingHTML = `
+            <table class="table ranking-table mt-2">
                 <thead><tr><th>順位</th><th>名前</th><th>スコア</th><th>タイム</th></tr></thead>
-                <tbody>
-                    ${tableBodyHTML}
-                </tbody>
+                <tbody>${tableBodyHTML}</tbody>
                 ${tableFootHTML}
             </table>
-            <p class="text-center text-muted mt-2" style="font-size: 0.9em;">参加人数: ${totalParticipants}人</p>
+            <p class="text-center text-muted participation-count">本日の参加人数: ${totalParticipants}人</p>
         `;
     }
 
+    // --- 2. 月間ランキングHTMLの生成 (新規追加) ---
+    let monthlyRankingHTML = '<p class="text-muted text-center mt-2">今月のスコア獲得者はまだいません。</p>';
+    if (monthlyTop5 && monthlyTop5.length > 0) {
+        const monthlyBodyHTML = monthlyTop5.map(r => `
+            <tr class="${(monthlyUserRank && r.rank === monthlyUserRank.rank) ? 'current-user-rank' : ''}">
+                <td>${r.rank}位</td>
+                <td>${r.username}</td>
+                <td>${r.score} pt</td>
+            </tr>
+        `).join('');
+
+        let monthlyFootHTML = '';
+        if (monthlyUserRank && monthlyUserRank.rank > 5) {
+            monthlyFootHTML = `
+                <tfoot>
+                    <tr class="rank-ellipsis"><td colspan="3">...</td></tr>
+                    <tr class="current-user-rank out-of-top5-rank">
+                        <td>${monthlyUserRank.rank}位</td>
+                        <td>${monthlyUserRank.username}</td>
+                        <td>${monthlyUserRank.score} pt</td>
+                    </tr>
+                </tfoot>
+            `;
+        }
+        monthlyRankingHTML = `
+            <table class="table ranking-table mt-2">
+                <thead><tr><th>順位</th><th>名前</th><th>合計スコア</th></tr></thead>
+                <tbody>${monthlyBodyHTML}</tbody>
+                ${monthlyFootHTML}
+            </table>
+            <p class="text-center text-muted participation-count">今月の参加人数: ${monthlyParticipants}人</p>
+        `;
+    }
+
+    // --- 3. 最終的なHTMLの組み立て ---
     quizContainer.innerHTML = `
         <div class="quiz-result-view">
             <h4>本日の結果</h4>
             <div class="result-summary">
                 <p>スコア: <span>${userResult.score} / 10</span></p>
                 <p>タイム: <span>${userResult.time}</span></p>
-                ${userRank ? `<p>現在の順位: <span>${userRank.rank}位</span> / ${totalParticipants}人中</p>` : ''}
+                ${userRank ? `<p>本日の順位: <span>${userRank.rank}位</span> / ${totalParticipants}人中</p>` : ''}
             </div>
-            <h5>部屋別ランキング (トップ5)</h5>
-            ${rankingHTML}
+
+            <hr class="result-divider">
+
+            <h5><i class="fas fa-medal"></i> 部屋別ランキング (本日 トップ5)</h5>
+            ${dailyRankingHTML}
+
+            <hr class="result-divider">
+
+            <h5><i class="fas fa-trophy"></i> 月間ランキング (今月 トップ5)</h5>
+            ${monthlyRankingHTML}
         </div>
     `;
 }

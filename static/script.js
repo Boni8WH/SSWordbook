@@ -2433,6 +2433,131 @@ function resetRestrictionState() {
     updateIncorrectOnlySelection();
 }
 
+/**
+ * ログイン時、未閲覧の前月のランキング結果があるか確認し、あれば表示する
+ */
+document.addEventListener('DOMContentLoaded', () => {
+    // ログインしているページ（.navbar-nav .nav-link.text-muted があるか）でのみ実行
+    const isLoggedIn = document.querySelector('.navbar-nav .fa-user');
+    if (isLoggedIn) {
+        checkAndShowMonthlyResults();
+    }
+});
+
+async function checkAndShowMonthlyResults() {
+    try {
+        const response = await fetch('/api/monthly_results/check_unviewed');
+        const data = await response.json();
+
+        if (data.status === 'success' && data.show_results) {
+            // 表示すべき結果がある場合、モーダルを表示
+            showMonthlyResultModal(data);
+        } else if (data.status !== 'success') {
+            console.error('未閲覧ランキングのチェックに失敗:', data.message);
+        } else {
+            console.log('表示すべき前月のランキングはありません。');
+        }
+    } catch (error) {
+        console.error('未閲覧ランキングの取得エラー:', error);
+    }
+}
+
+/**
+ * 前月のランキング結果をモーダルで表示する
+ */
+function showMonthlyResultModal(data) {
+    // 既存のモーダルがあれば削除
+    const existingModal = document.getElementById('monthlyResultModal');
+    if (existingModal) existingModal.remove();
+
+    const { year, month, monthly_top_5, monthly_user_rank, total_participants } = data;
+
+    // --- ランキングHTMLの生成 (daily_quiz.jsのロジックとほぼ同じ) ---
+    let rankingHTML = '<p class="text-muted text-center mt-2">参加者はいませんでした。</p>';
+    if (monthly_top_5 && monthly_top_5.length > 0) {
+        const tableBodyHTML = monthly_top_5.map(r => `
+            <tr class="${(monthly_user_rank && r.rank === monthly_user_rank.rank) ? 'current-user-rank' : ''}">
+                <td>${r.rank}位</td>
+                <td>${r.username}</td>
+                <td>${r.score} pt</td>
+            </tr>
+        `).join('');
+
+        let tableFootHTML = '';
+        if (monthly_user_rank && monthly_user_rank.rank > 5) {
+            tableFootHTML = `
+                <tfoot>
+                    <tr class="rank-ellipsis"><td colspan="3">...</td></tr>
+                    <tr class="current-user-rank out-of-top5-rank">
+                        <td>${monthly_user_rank.rank}位</td>
+                        <td>${monthly_user_rank.username}</td>
+                        <td>${monthly_user_rank.score} pt</td>
+                    </tr>
+                </tfoot>
+            `;
+        }
+        rankingHTML = `
+            <table class="table ranking-table mt-2">
+                <thead><tr><th>順位</th><th>名前</th><th>合計スコア</th></tr></thead>
+                <tbody>${tableBodyHTML}</tbody>
+                ${tableFootHTML}
+            </table>
+            <p class="text-center text-muted participation-count">参加人数: ${total_participants}人</p>
+        `;
+    }
+
+    // --- 自分の順位サマリー ---
+    let userSummaryHTML = '<p>あなたは前月のクイズに参加しませんでした。</p>';
+    if (monthly_user_rank) {
+        userSummaryHTML = `
+            <h4>あなたの順位: <span>${monthly_user_rank.rank}位</span></h4>
+            <h5>合計スコア: <span>${monthly_user_rank.score} pt</span></h5>
+        `;
+    }
+
+    // --- モーダルHTML本体 ---
+    const modalHTML = `
+        <div class="modal fade" id="monthlyResultModal" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content monthly-result-modal-content">
+                    <div class="modal-header monthly-result-header">
+                        <h5 class="modal-title"><i class="fas fa-trophy"></i> 先月の月間ランキング</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body text-center">
+                        <h3>${year}年${month}月 の結果</h3>
+                        <div class="user-monthly-summary">
+                            ${userSummaryHTML}
+                        </div>
+                        <hr>
+                        <h5>トップ5 ランキング</h5>
+                        ${rankingHTML}
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-primary" data-bs-dismiss="modal">確認しました</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    const modalElement = document.getElementById('monthlyResultModal');
+    const modalInstance = new bootstrap.Modal(modalElement);
+
+    // モーダルが閉じられたら「閲覧済み」としてサーバーに送信
+    modalElement.addEventListener('hidden.bs.modal', () => {
+        fetch('/api/monthly_results/mark_viewed', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ year: year, month: month })
+        });
+        modalElement.remove(); // DOMから削除
+    }, { once: true });
+
+    modalInstance.show();
+}
+
 // グローバル関数として公開
 window.setRestrictionState = setRestrictionState;
 window.resetRestrictionState = resetRestrictionState;
