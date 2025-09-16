@@ -11649,7 +11649,6 @@ def get_daily_quiz():
     yesterday = today - timedelta(days=1)
 
     # --- ▼▼▼ 月間スコア集計トリガー ▼▼▼ ---
-    # 昨日分のクイズが存在し、かつ「未処理」の場合、スコア集計を実行する
     try:
         yesterday_quiz = DailyQuiz.query.filter_by(
             date=yesterday, 
@@ -11709,12 +11708,18 @@ def get_daily_quiz():
     if not daily_quiz:
         all_words = load_word_data_for_room(user.room_number)
         room_setting = RoomSetting.query.filter_by(room_number=user.room_number).first()
+        
         public_words = []
         for word in all_words:
-            if word.get('enabled', False) and is_unit_enabled_by_room_setting(word.get('number'), room_setting):
+            is_enabled_in_csv = word.get('enabled', False)
+            is_enabled_in_room = is_unit_enabled_by_room_setting(word.get('number'), room_setting)
+            is_not_z_problem = str(word.get('number')).strip().upper() != 'Z' # Z問題(number='Z')を除外
+            
+            if is_enabled_in_csv and is_enabled_in_room and is_not_z_problem: # 条件に is_not_z_problem を追加
                 public_words.append(word)
+
         if len(public_words) < 10: # 10問未満の場合はエラー
-            return jsonify({'status': 'error', 'message': f'クイズを作成するには公開問題が10問以上必要です (現在 {len(public_words)}問)'})
+            return jsonify({'status': 'error', 'message': f'クイズを作成するには公開問題(Z以外)が10問以上必要です (現在 {len(public_words)}問)'})
         
         selected_problems = random.sample(public_words, 10)
         problem_ids = [generate_problem_id(p) for p in selected_problems]
@@ -11722,7 +11727,6 @@ def get_daily_quiz():
         db.session.add(daily_quiz)
         db.session.commit()
 
-    # (クイズ問題生成ロジックは変更なし ... )
     problem_ids = daily_quiz.get_problem_ids()
     all_words = load_word_data_for_room(user.room_number)
     quiz_questions = []
@@ -11822,8 +11826,6 @@ def submit_daily_quiz():
         logger.error(f"日次クイズ結果の保存/集計エラー: {e}")
         return jsonify({'status': 'error', 'message': '結果の保存中にサーバーエラーが発生しました。'}), 500
 
-# app.py
-
 @app.route('/admin/regenerate_daily_quiz', methods=['POST'])
 @admin_required
 def admin_regenerate_daily_quiz():
@@ -11840,32 +11842,32 @@ def admin_regenerate_daily_quiz():
         if existing_quiz:
             print(f"🔧 部屋{room_number}の既存クイズ(ID: {existing_quiz.id})を削除します。")
             
-            # --- ▼▼▼ スコア集計を追加 ▼▼▼ ---
-            # 削除する前に、もし未処理ならスコアを集計する
             if not existing_quiz.monthly_score_processed:
                 print("スコアが未集計のため、先に集計処理を実行します...")
                 process_daily_quiz_results_for_scoring(existing_quiz.id)
             else:
                 print("スコアは集計済みです。")
-            # --- ▲▲▲ 追加ここまで ▲▲▲ ---
 
             DailyQuizResult.query.filter_by(quiz_id=existing_quiz.id).delete()
             db.session.delete(existing_quiz)
             db.session.commit()
             print(f"✅ 既存クイズと結果の削除完了。")
 
-        # ... (以降のクイズ生成ロジックは変更なし) ...
         print(f"✨ 部屋{room_number}の新しいクイズを生成します。")
         all_words = load_word_data_for_room(room_number)
         room_setting = RoomSetting.query.filter_by(room_number=room_number).first()
         
         public_words = []
         for word in all_words:
-            if word.get('enabled', False) and is_unit_enabled_by_room_setting(word.get('number'), room_setting):
+            is_enabled_in_csv = word.get('enabled', False)
+            is_enabled_in_room = is_unit_enabled_by_room_setting(word.get('number'), room_setting)
+            is_not_z_problem = str(word.get('number')).strip().upper() != 'Z' # Z問題を除外
+            
+            if is_enabled_in_csv and is_enabled_in_room and is_not_z_problem:
                 public_words.append(word)
 
         if len(public_words) < 10:
-             return jsonify({'status': 'error', 'message': f'公開問題が10問未満({len(public_words)}問)のため、再選考できません。'}), 400
+             return jsonify({'status': 'error', 'message': f'公開問題(Z以外)が10問未満({len(public_words)}問)のため、再選考できません。'}), 400
 
         selected_problems = random.sample(public_words, 10)
         problem_ids = [generate_problem_id(p) for p in selected_problems]
