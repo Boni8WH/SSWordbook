@@ -11711,11 +11711,10 @@ def get_daily_quiz():
         
         public_words = []
         for word in all_words:
-            is_enabled_in_csv = word.get('enabled', False)
             is_enabled_in_room = is_unit_enabled_by_room_setting(word.get('number'), room_setting)
-            is_not_z_problem = str(word.get('number')).strip().upper() != 'Z' # Z問題(number='Z')を除外
+            is_not_z_problem = str(word.get('number')).strip().upper() != 'Z'
             
-            if is_enabled_in_csv and is_enabled_in_room and is_not_z_problem: # 条件に is_not_z_problem を追加
+            if is_enabled_in_room and is_not_z_problem: # CSVの有効化チェック(is_enabled_in_csv)を削除
                 public_words.append(word)
 
         if len(public_words) < 10: # 10問未満の場合はエラー
@@ -11859,11 +11858,10 @@ def admin_regenerate_daily_quiz():
         
         public_words = []
         for word in all_words:
-            is_enabled_in_csv = word.get('enabled', False)
             is_enabled_in_room = is_unit_enabled_by_room_setting(word.get('number'), room_setting)
-            is_not_z_problem = str(word.get('number')).strip().upper() != 'Z' # Z問題を除外
+            is_not_z_problem = str(word.get('number')).strip().upper() != 'Z'
             
-            if is_enabled_in_csv and is_enabled_in_room and is_not_z_problem:
+            if is_enabled_in_room and is_not_z_problem: # CSVの有効化チェック(is_enabled_in_csv)を削除
                 public_words.append(word)
 
         if len(public_words) < 10:
