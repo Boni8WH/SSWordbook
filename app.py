@@ -2864,10 +2864,19 @@ def index():
         filtered_chapter_unit_status = {}
         for chapter_num, chapter_data in all_chapter_unit_status.items():
             if chapter_data['units']:  # 章に利用可能な単元がある場合のみ含める
+                # 'S' を「歴史総合」に変換
+                chapter_data['name'] = "歴史総合" if chapter_num == "S" else f"第{chapter_num}章"
                 filtered_chapter_unit_status[chapter_num] = chapter_data
 
-        sorted_all_chapter_unit_status = dict(sorted(filtered_chapter_unit_status.items(), 
-                                                    key=lambda item: int(item[0]) if item[0].isdigit() else float('inf')))
+        def sort_key(item):
+            chapter_num = item[0]
+            if chapter_num == 'S':
+                return (0, 0)  # 'S'を最優先
+            if chapter_num.isdigit():
+                return (1, int(chapter_num))  # 次に数字の章
+            return (2, chapter_num)  # それ以外の章
+
+        sorted_all_chapter_unit_status = dict(sorted(filtered_chapter_unit_status.items(), key=sort_key))
 
         # フッター用のコンテキストを取得
         context = get_template_context()
@@ -5395,7 +5404,17 @@ def progress_page():
 
         # データを整理してテンプレートに渡す形式に変換
         sorted_chapter_progress = {}
-        for chapter_num in sorted(chapter_progress_summary.keys(), key=lambda x: int(x) if x.isdigit() else float('inf')):
+
+        # ▼▼▼▼▼ ソート処理を修正 ▼▼▼▼▼
+        def sort_key_progress(chapter_num):
+            if chapter_num == 'S':
+                return (0, 0)
+            if chapter_num.isdigit():
+                return (1, int(chapter_num))
+            return (2, chapter_num)
+
+        for chapter_num in sorted(chapter_progress_summary.keys(), key=sort_key_progress):
+        # ▲▲▲▲▲ ここまで修正 ▲▲▲▲▲
             chapter_data = chapter_progress_summary[chapter_num]
             
             # 単元データをソートして配列に変換
@@ -5411,8 +5430,13 @@ def progress_page():
                     'total_attempts': unit_data['total_attempts']
                 })
             
+            # ▼▼▼▼▼ ここから修正 ▼▼▼▼▼
+            # 'S' を「歴史総合」に変換
+            chapter_name = "歴史総合" if chapter_num == "S" else f"第{chapter_num}章"
+            # ▲▲▲▲▲ ここまで修正 ▲▲▲▲▲
+            
             sorted_chapter_progress[chapter_num] = {
-                'chapter_name': chapter_data['chapter_name'],
+                'chapter_name': chapter_name, # 修正した章名を代入
                 'units': sorted_units,
                 'total_questions': chapter_data['total_questions'],
                 'total_mastered': chapter_data['total_mastered']
