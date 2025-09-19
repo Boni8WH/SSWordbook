@@ -38,7 +38,7 @@
                 {% for chapter_num, chapter in chapter_data.items() %}
                 <div class="chapter-item" data-chapter-num="{{ chapter_num }}">
                     <div class="chapter-header">
-                        <span class="chapter-title">第{{ chapter_num }}章</span>
+                        <span class="chapter-title">{{ chapter.name }}</span>
                         <div class="chapter-options">
                             <button class="select-all-chapter-btn" data-chapter="{{ chapter_num }}" type="button">全て選択</button>
                             <span class="toggle-icon">▶</span>
