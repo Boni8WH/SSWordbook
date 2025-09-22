@@ -391,9 +391,6 @@ function loadWordDataFromServer() {
             } else if (Array.isArray(data)) {
                 word_data = data;
             } else {
-                console.error('❌ 単語データの読み込み失敗:', data);
-                flashMessage('単語データの読み込みに失敗しました。', 'danger');
-                return;
             }
             
             updateUnitCheckboxStates();
