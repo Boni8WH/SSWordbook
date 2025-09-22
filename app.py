@@ -12,7 +12,7 @@ from io import StringIO
 from datetime import datetime, timedelta
 from sqlalchemy import inspect, text, func, case, cast, Integer
 from sqlalchemy.orm import joinedload
-from datetime import date
+from datetime import date, datetime, timedelta
 import random
 import glob
 import pytz
@@ -2928,6 +2928,15 @@ def login_page():
             user = authenticate_user(room_number, room_password, student_id, individual_password)
             
             if user:
+                remember = request.form.get('remember_me')
+                if remember:
+                    # セッションを永続化（有効期限はapp.configで設定済み）
+                    session.permanent = True
+                    # 明示的に有効期限を設定することも可能
+                    app.permanent_session_lifetime = timedelta(days=7)
+                else:
+                    session.permanent = False
+                    
                 session['user_id'] = user.id
                 session['username'] = user.username
                 session['room_number'] = user.room_number
