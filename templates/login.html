@@ -40,6 +40,20 @@
                     </label>
                     <input type="password" id="individual_password" name="individual_password" required placeholder="個人用パスワード">
                 </div>
+                <div class="remember-options">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="remember_me" id="rememberMe" value="true">
+                        <label class="form-check-label" for="rememberMe">
+                            ログイン状態を保持する
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="rememberInfo">
+                        <label class="form-check-label" for="rememberInfo">
+                            部屋番号、入室パスワード、出席番号を記憶する
+                        </label>
+                    </div>
+                </div>
             </div>
 
             <div class="button-group">
@@ -375,51 +389,6 @@
     }
 }
 
-/* ダークモード対応 */
-@media (prefers-color-scheme: dark) {
-    .auth-section {
-        background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
-    }
-    
-    .auth-container {
-        background: rgba(44, 62, 80, 0.95);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-    }
-    
-    .auth-header h2,
-    .admin-section h3 {
-        color: #ecf0f1;
-    }
-    
-    .auth-message {
-        color: #bdc3c7;
-    }
-    
-    .input-group label {
-        color: #ecf0f1;
-    }
-    
-    .input-group input {
-        background: rgba(52, 73, 94, 0.8);
-        border-color: #5d6d7e;
-        color: #ecf0f1;
-    }
-    
-    .input-group input::placeholder {
-        color: #85929e;
-    }
-    
-    .admin-section {
-        background: rgba(52, 73, 94, 0.2);
-        border-color: rgba(255, 255, 255, 0.1);
-    }
-    
-    .divider span {
-        background: rgba(44, 62, 80, 0.95);
-        color: #bdc3c7;
-    }
-}
-
 /* アニメーション */
 @keyframes fadeInUp {
     from {
@@ -443,5 +412,93 @@
     outline: 2px solid #3498db;
     outline-offset: 2px;
 }
+
+/* チェックボックスセクションのスタイル */
+.remember-options {
+    margin: 20px 0;
+    padding: 15px;
+    background: rgba(52, 152, 219, 0.05);
+    border-radius: 8px;
+    border: 1px solid rgba(52, 152, 219, 0.1);
+}
+
+.remember-options .form-check {
+    display: flex;
+    align-items: center;
+    padding-left: 0;
+}
+
+.remember-options .form-check:not(:last-child) {
+    margin-bottom: 12px;
+}
+
+.remember-options .form-check-input {
+    width: 1.2em;
+    height: 1.2em;
+    margin-right: 10px;
+    cursor: pointer;
+}
+
+.remember-options .form-check-label {
+    font-size: 0.9rem;
+    color: #34495e;
+    font-weight: 500;
+    cursor: pointer;
+}
 </style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const rememberInfoCheckbox = document.getElementById('rememberInfo');
+    const loginForm = document.getElementById('loginRegisterForm');
+
+    const roomNumberInput = document.getElementById('room_number');
+    const roomPasswordInput = document.getElementById('room_password');
+    const studentIdInput = document.getElementById('student_id');
+    
+    // 1. ページ読み込み時に記憶された情報を復元する
+    function loadRememberedInfo() {
+        try {
+            const rememberedData = localStorage.getItem('rememberedUserInfo');
+            if (rememberedData) {
+                const info = JSON.parse(rememberedData);
+                roomNumberInput.value = info.room || '';
+                roomPasswordInput.value = info.password || '';
+                studentIdInput.value = info.studentId || '';
+                rememberInfoCheckbox.checked = true;
+            }
+        } catch (e) {
+            console.error('記憶された情報の読み込みに失敗しました:', e);
+            localStorage.removeItem('rememberedUserInfo');
+        }
+    }
+
+    // 2. フォーム送信時に入力情報を記憶または削除する
+    if (loginForm) {
+        loginForm.addEventListener('submit', function() {
+            if (rememberInfoCheckbox.checked) {
+                // チェックボックスがオンなら情報を保存
+                const infoToRemember = {
+                    room: roomNumberInput.value,
+                    password: roomPasswordInput.value,
+                    studentId: studentIdInput.value
+                };
+                try {
+                    localStorage.setItem('rememberedUserInfo', JSON.stringify(infoToRemember));
+                } catch (e) {
+                    console.error('情報の保存に失敗しました:', e);
+                }
+            } else {
+                // チェックボックスがオフなら情報を削除
+                localStorage.removeItem('rememberedUserInfo');
+            }
+        });
+    }
+
+    // 初期読み込みを実行
+    loadRememberedInfo();
+});
+</script>
 {% endblock %}
