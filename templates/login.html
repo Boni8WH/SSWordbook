@@ -50,9 +50,9 @@
                     <div class="form-check">
                         <input class="form-check-input" type="checkbox" id="rememberInfo">
                         <label class="form-check-label" for="rememberInfo">
-                            部屋番号、入室パスワード、出席番号を記憶する
+                            個別パス以外を記憶する
                         </label>
-                    </div>
+                        </div>
                 </div>
             </div>
 
@@ -415,35 +415,29 @@
 
 /* チェックボックスセクションのスタイル */
 .remember-options {
-    margin: 20px 0;
-    padding: 15px;
-    background: rgba(52, 152, 219, 0.05);
-    border-radius: 8px;
-    border: 1px solid rgba(52, 152, 219, 0.1);
+    margin: 20px 0 15px 0; /* 上下のマージンを調整 */
+    text-align: left;     /* 全体を左寄せに */
 }
 
 .remember-options .form-check {
-    display: flex;
-    align-items: center;
-    padding-left: 0;
-}
-
-.remember-options .form-check:not(:last-child) {
+    /* display:flex や padding-left:0 を削除し、Bootstrapの標準的な表示方法を利用します */
     margin-bottom: 12px;
 }
 
 .remember-options .form-check-input {
-    width: 1.2em;
-    height: 1.2em;
-    margin-right: 10px;
+    /* サイズとカーソルを調整 */
+    width: 1.1em;
+    height: 1.1em;
     cursor: pointer;
 }
 
 .remember-options .form-check-label {
+    /* ラベルのスタイルを調整 */
     font-size: 0.9rem;
     color: #34495e;
     font-weight: 500;
     cursor: pointer;
+    padding-left: 8px; /* チェックボックスと文字の間隔を調整 */
 }
 </style>
 {% endblock %}
