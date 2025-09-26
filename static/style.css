@@ -1,6 +1,78 @@
-/* static/style.css - レスポンシブ改善版 */
+/* =======================================
+   1. 基本スタイル & グローバル設定
+   ======================================= */
 
-/* ナビゲーションバーのスタイル */
+html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    font-family: 'Arial', sans-serif;
+    background-color: #f4f7f6;
+    color: #333;
+    box-sizing: border-box !important;
+    overflow-x: hidden !important;
+    max-width: 100vw !important;
+}
+
+body {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+*, *::before, *::after {
+    box-sizing: border-box !important;
+}
+
+/* 共通コンテナ */
+.container {
+    background-color: #ffffff;
+    padding: 15px;
+    border-radius: 12px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+    max-width: 1200px;
+    width: 100%;
+    margin: 20px auto;
+}
+
+/* メインコンテンツエリアがフッターを押し下げるように設定 */
+.container:first-of-type {
+    flex: 1;
+}
+
+/* コンテンツとフッター間の余白を削除 */
+.container,
+.admin-container,
+.progress-section,
+.auth-section {
+    margin-bottom: 0 !important;
+}
+
+hr {
+    border: none;
+    border-top: 1px solid #eee;
+    margin: 25px 0;
+}
+
+/* ユーティリティクラス */
+.hidden {
+    display: none !important;
+}
+
+/* 横スクロール対応ラッパー */
+.table-responsive,
+.table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* =======================================
+   2. UIコンポーネント
+   ======================================= */
+
+/* ----------------
+   ナビゲーションバー
+   ---------------- */
 .navbar {
     margin-bottom: 1.5rem;
     border: 1px solid #e0e0e0;
@@ -15,57 +87,7 @@
     color: #3498db;
 }
 
-.navbar-nav .nav-link {
-    padding: 0.375rem 0.75rem;
-    margin: 0 0.25rem;
-    border-radius: 0.375rem;
-    transition: all 0.2s ease;
-}
-
-.navbar-nav .nav-link.btn {
-    color: #333 !important;
-    text-decoration: none;
-    font-weight: 500;
-    border: 1px solid #dee2e6;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    background-color: #f8f9fa;
-}
-
-.navbar-nav .nav-link.btn:hover {
-    transform: translateY(-1px);
-    text-decoration: none;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
-    color: white !important;
-}
-
-.navbar-nav .nav-link.btn:focus {
-    color: #333 !important;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-/* 各ボタンのホバー時の色を個別設定 */
-.navbar-nav .nav-link.btn.btn-primary:hover {
-    background-color: #0d6efd;
-    border-color: #0d6efd;
-}
-
-.navbar-nav .nav-link.btn.btn-danger:hover {
-    background-color: #dc3545;
-    border-color: #dc3545;
-}
-
-.navbar-nav .nav-link.btn.btn-warning:hover {
-    background-color: #fd7e14;
-    border-color: #fd7e14;
-}
-
-.navbar-nav .nav-item span.nav-link {
-    background: none !important;
-    border: none !important;
-    padding: 0.5rem 0.75rem;
-}
-
-/* ユーザー情報の表示 */
+/* ユーザー情報 */
 .navbar-nav.me-auto .nav-item {
     display: flex;
     align-items: center;
@@ -76,107 +98,135 @@
     white-space: nowrap;
 }
 
-/* コンテナの調整 */
-.container {
-    max-width: 1200px;
+.navbar-nav .nav-item span.nav-link {
+    background: none !important;
+    border: none !important;
+    padding: 0.5rem 0.75rem;
 }
 
-/* レスポンシブ対応 */
-@media (max-width: 991.98px) {
-    .navbar-nav {
-        margin-top: 1rem;
-    }
-    
-    .navbar-nav .nav-link.btn {
-        margin: 0.25rem 0;
-        text-align: center;
-    }
-    
-    .navbar-nav.me-auto {
-        margin-bottom: 1rem;
-    }
+/* ナビゲーションボタン */
+.navbar-nav .nav-link.btn {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    height: 38px !important;
+    min-width: 120px !important;
+    padding: 8px 16px !important;
+    font-size: 0.9rem !important;
+    font-weight: 500 !important;
+    border-radius: 6px !important;
+    text-align: center !important;
+    white-space: nowrap !important;
+    line-height: 1.2 !important;
+    margin: 2px !important;
+    transition: all 0.2s ease;
+    text-decoration: none;
 }
 
-body {
-    font-family: 'Arial', sans-serif;
-    background-color: #f4f7f6;
-    color: #333;
-    margin: 0;
-    padding: 0;
-    min-height: 100vh;
-    box-sizing: border-box;
+.navbar-nav .nav-link.btn i {
+    margin-right: 6px !important;
+    font-size: 0.85rem !important;
 }
 
-.container {
-    background-color: #ffffff;
-    padding: 15px; /* スマホでは小さく */
-    border-radius: 12px;
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
-    max-width: 1200px;
-    width: 100%;
-    box-sizing: border-box;
-    margin-bottom: 20px;
-    margin-top: 20px;
+.navbar-nav .nav-link.btn:hover {
+    transform: translateY(-1px);
+    text-decoration: none;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
 }
 
-header {
-    text-align: center;
-    margin-bottom: 20px; /* スマホでは小さく */
-    border-bottom: 2px solid #eee;
-    padding-bottom: 15px; /* スマホでは小さく */
-    position: relative;
+.navbar-nav .nav-link.btn-primary {
+    background-color: #007bff !important;
+    border-color: #007bff !important;
+    color: #ffffff !important;
 }
 
-header h1 {
-    color: #2c3e50;
-    font-size: 1.8em; /* スマホでは小さく */
-    margin: 0;
-    font-weight: 700;
+.navbar-nav .nav-link.btn-primary:hover {
+    background-color: #0056b3 !important;
+    border-color: #0056b3 !important;
 }
 
-.logged-in-user-info {
-    position: absolute;
-    top: 0;
-    right: 0;
-    font-size: 0.8em; /* スマホでは小さく */
-    color: #555;
-    display: flex;
-    align-items: center;
-    gap: 8px; /* スマホでは小さく */
+.navbar-nav .nav-link.btn-danger {
+    background-color: #dc3545 !important;
+    border-color: #dc3545 !important;
+    color: #ffffff !important;
 }
 
-.logout-button, .progress-button {
-    background-color: #e74c3c;
+.navbar-nav .nav-link.btn-danger:hover {
+    background-color: #c82333 !important;
+    border-color: #c82333 !important;
+}
+
+.navbar-nav .nav-link.btn.change-username-button {
+    background-color: #fbad24 !important;
+    color: #ffffff !important;
+    border: none !important;
+}
+
+.navbar-nav .nav-link.btn.change-username-button:hover {
+    background-color: #dd8c09 !important;
+}
+
+
+/* ----------------
+   ボタン
+   ---------------- */
+.primary-button, .secondary-button, .share-button, .correct-button, .incorrect-button {
     color: white;
     border: none;
-    padding: 4px 8px; /* スマホでは小さく */
-    border-radius: 4px; /* スマホでは小さく */
+    padding: 10px 20px;
+    border-radius: 6px;
     cursor: pointer;
+    font-size: 1em;
+    transition: background-color 0.3s ease, transform 0.2s ease;
     text-decoration: none;
-    font-size: 0.75em; /* スマホでは小さく */
-    transition: background-color 0.3s ease;
+    display: inline-block;
+    text-align: center;
+    min-height: 40px;
+    min-width: 60px;
 }
 
-.progress-button {
+.primary-button, .correct-button {
+    background-color: #2ecc71;
+}
+.primary-button:hover, .correct-button:hover {
+    background-color: #27ae60;
+    transform: translateY(-1px);
+}
+
+.secondary-button {
+    background-color: #95a5a6;
+}
+.secondary-button:hover {
+    background-color: #7f8c8d;
+    transform: translateY(-1px);
+}
+
+.share-button {
     background-color: #3498db;
 }
-
-.logout-button:hover {
-    background-color: #c0392b;
-}
-.progress-button:hover {
+.share-button:hover {
     background-color: #2980b9;
 }
 
+.incorrect-button {
+    background-color: #e74c3c;
+}
+.incorrect-button:hover {
+    background-color: #c0392b;
+}
+
+/* ----------------
+   アラートメッセージ
+   ---------------- */
 .flash-messages {
-    margin-bottom: 15px; /* スマホでは小さく */
+    margin-bottom: 15px;
 }
 
 .alert {
-    padding: 8px 12px; /* スマホでは小さく */
-    margin-bottom: 8px; /* スマホでは小さく */
-    border-radius: 6px; /* スマホでは小さく */
-    font-size: 0.9em; /* スマホでは小さく */
+    padding: 8px 12px;
+    margin-bottom: 8px;
+    border-radius: 6px;
+    font-size: 0.9em;
     text-align: center;
 }
 
@@ -198,136 +248,138 @@ header h1 {
     border: 1px solid #bee5eb;
 }
 
-/* Auth Section (Login/Register/Password Change) */
+/* ----------------
+   バッジ
+   ---------------- */
+.badge {
+    font-size: 0.75em;
+    padding: 0.25em 0.5em;
+    border-radius: 0.25rem;
+}
+
+.bg-primary {
+    background-color: #2196f3 !important;
+    color: white;
+}
+
+.bg-warning {
+    background-color: #ffc107 !important;
+}
+
+.text-dark {
+    color: #212529 !important;
+}
+
+
+/* =======================================
+   3. ページセクション
+   ======================================= */
+
+/* ----------------
+   認証ページ (ログイン / 登録 / パスワード変更)
+   ---------------- */
 .auth-section {
     display: flex;
     justify-content: center;
     align-items: flex-start;
-    padding: 15px; /* スマホでは小さく */
+    padding: 15px;
 }
 
 .auth-container {
     background-color: #ffffff;
-    padding: 20px; /* スマホでは小さく */
-    border-radius: 10px; /* スマホでは小さく */
+    padding: 20px;
+    border-radius: 10px;
     box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
-    max-width: 400px; /* スマホでは小さく */
+    max-width: 400px;
     width: 100%;
-    box-sizing: border-box;
     text-align: center;
 }
 
 .auth-container h2 {
     color: #2c3e50;
-    font-size: 1.6em; /* スマホでは小さく */
-    margin-bottom: 15px; /* スマホでは小さく */
+    font-size: 1.6em;
+    margin-bottom: 15px;
 }
 
 .auth-container h3 {
-    margin-top: 25px; /* スマホでは小さく */
-    margin-bottom: 12px; /* スマホでは小さく */
+    margin-top: 25px;
+    margin-bottom: 12px;
     color: #34495e;
-    font-size: 1.3em; /* スマホでは小さく */
+    font-size: 1.3em;
     border-top: 1px solid #eee;
-    padding-top: 15px; /* スマホでは小さく */
+    padding-top: 15px;
 }
 
 .auth-message {
     color: #666;
-    margin-bottom: 20px; /* スマホでは小さく */
-    font-size: 1em; /* スマホでは小さく */
+    margin-bottom: 20px;
+    font-size: 1em;
 }
 
-.input-group {
-    margin-bottom: 15px; /* スマホでは小さく */
+.auth-container .input-group {
+    margin-bottom: 15px;
     text-align: left;
 }
 
-.input-group label {
+.auth-container .input-group label {
     display: block;
-    margin-bottom: 6px; /* スマホでは小さく */
-    color: #555;
-    font-weight: bold;
-    font-size: 0.9em; /* スマホでは小さく */
+    font-weight: 600;
+    color: #34495e;
+    margin-bottom: 8px;
+    font-size: 0.95rem;
 }
 
-.input-group input[type="text"],
-.input-group input[type="password"] {
-    width: calc(100% - 16px); /* スマホでは小さく */
-    padding: 10px 8px; /* スマホでは小さく */
-    border: 1px solid #ccc;
-    border-radius: 6px; /* スマホでは小さく */
-    font-size: 1em; /* スマホでは小さく */
-    box-sizing: border-box;
-    transition: border-color 0.3s ease;
+/* 入力フォームのスタイルを統合・最適化 */
+.auth-container .input-group input[type="text"],
+.auth-container .input-group input[type="password"],
+.auth-container .input-group input[type="email"] {
+    width: 100% !important;
+    padding: 12px 16px !important;
+    border: 2px solid #e9ecef !important;
+    border-radius: 10px !important;
+    font-size: 1rem !important;
+    box-sizing: border-box !important;
+    transition: all 0.3s ease !important;
+    background-color: #ffffff !important;
+    color: #2c3e50 !important;
+    -webkit-text-fill-color: #2c3e50 !important;
+    appearance: none !important;
 }
 
-.input-group input[type="text"]:focus,
-.input-group input[type="password"]:focus {
-    border-color: #3498db;
-    outline: none;
+.auth-container .input-group input::placeholder {
+    color: #95a5a6 !important;
+    opacity: 1 !important;
+    font-style: italic !important;
+}
+
+.auth-container .input-group input:hover {
+    border-color: #bdc3c7 !important;
+}
+
+.auth-container .input-group input:focus {
+    border-color: #3498db !important;
+    outline: none !important;
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1) !important;
+    transform: translateY(-1px) !important;
+}
+
+.auth-container .input-group input:-webkit-autofill,
+.auth-container .input-group input:-webkit-autofill:hover,
+.auth-container .input-group input:-webkit-autofill:focus {
+    -webkit-box-shadow: 0 0 0 30px #ffffff inset !important;
+    -webkit-text-fill-color: #2c3e50 !important;
 }
 
 .button-group {
-    margin-top: 20px; /* スマホでは小さく */
+    margin-top: 20px;
     display: flex;
     justify-content: center;
-    gap: 12px; /* スマホでは小さく */
-}
-
-.primary-button, .secondary-button, .share-button, .correct-button, .incorrect-button {
-    background-color: #2ecc71;
-    color: white;
-    border: none;
-    padding: 10px 20px; /* スマホでは小さく */
-    border-radius: 6px; /* スマホでは小さく */
-    cursor: pointer;
-    font-size: 1em; /* スマホでは小さく */
-    transition: background-color 0.3s ease, transform 0.2s ease;
-    text-decoration: none;
-    display: inline-block;
-    text-align: center;
-    min-height: 40px; /* タッチしやすい最小サイズ */
-    min-width: 60px; /* タッチしやすい最小サイズ */
-}
-
-.primary-button:hover, .correct-button:hover {
-    background-color: #27ae60;
-    transform: translateY(-1px); /* スマホでは小さく */
-}
-
-.secondary-button {
-    background-color: #95a5a6;
-}
-
-.secondary-button:hover {
-    background-color: #7f8c8d;
-    transform: translateY(-1px); /* スマホでは小さく */
-}
-
-.share-button {
-    background-color: #3498db;
-}
-
-.share-button:hover {
-    background-color: #2980b9;
-}
-
-.correct-button {
-    background-color: #2ecc71;
-}
-
-.incorrect-button {
-    background-color: #e74c3c;
-}
-
-.incorrect-button:hover {
-    background-color: #c0392b;
+    gap: 12px;
 }
 
 .link-group {
-    margin-top: 15px; /* スマホでは小さく */
-    font-size: 0.85em; /* スマホでは小さく */
+    margin-top: 15px;
+    font-size: 0.85em;
 }
 
 .link-group a {
@@ -339,58 +391,48 @@ header h1 {
     text-decoration: underline;
 }
 
-hr {
-    border: none;
-    border-top: 1px solid #eee;
-    margin: 25px 0; /* スマホでは小さく */
-}
 
-/* Selection Area - メインの改善部分 */
+/* ----------------
+   問題選択エリア
+   ---------------- */
 .selection-area {
-    margin-top: 15px; /* スマホでは小さく */
-    max-width: 100%;
+    margin-top: 15px;
 }
 
 .controls-area {
     background-color: #f9f9f9;
-    padding: 15px; /* スマホでは大幅に削減 */
-    border-radius: 8px; /* スマホでは小さく */
-    margin-bottom: 20px; /* スマホでは小さく */
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
     border: 1px solid #eee;
     display: flex;
-    flex-direction: column; /* スマホでは縦並び */
-    gap: 20px; /* スマホでは小さく */
-}
-
-.question-count-and-auth {
-    display: flex;
     flex-direction: column;
-    gap: 15px; /* スマホでは小さく */
+    gap: 20px;
 }
 
 .question-count-selection h3,
-.selection-area h3 {
+.range-selection-area h3 {
     color: #34495e;
-    font-size: 1.2em; /* スマホでは小さく */
-    margin-bottom: 12px; /* スマホでは小さく */
+    font-size: 1.2em;
+    margin-bottom: 12px;
     border-bottom: 1px solid #eee;
-    padding-bottom: 8px; /* スマホでは小さく */
+    padding-bottom: 8px;
 }
 
 .radio-group {
     display: flex;
     flex-direction: column;
-    gap: 10px; /* スマホでは小さく */
-    margin-bottom: 15px; /* スマホでは小さく */
+    gap: 10px;
+    margin-bottom: 15px;
 }
 
 .radio-group label {
     display: flex;
     align-items: center;
     cursor: pointer;
-    font-size: 0.95em; /* スマホでは小さく */
+    font-size: 0.95em;
     color: #555;
-    padding: 8px; /* スマホ用のタッチエリア拡大 */
+    padding: 8px;
     background-color: #fff;
     border: 1px solid #e0e0e0;
     border-radius: 6px;
@@ -403,7 +445,7 @@ hr {
 
 .radio-group input[type="radio"] {
     margin-right: 8px;
-    transform: scale(1.1); /* スマホでは少し小さく */
+    transform: scale(1.1);
 }
 
 .radio-group input[type="radio"]:disabled + label {
@@ -412,101 +454,107 @@ hr {
 }
 
 .auth-message-incorrect-only {
-    font-size: 0.85em; /* スマホでは小さく */
+    font-size: 0.85em;
     color: #777;
-    margin-top: -8px; /* スマホでは小さく */
-    margin-bottom: 15px; /* スマホでは小さく */
+    margin-top: -8px;
+    margin-bottom: 15px;
 }
 
-.range-selection-area {
-    display: flex;
-    flex-direction: column;
-}
-
+/* 章・単元選択アコーディオン */
 .chapters-container {
     border: 1px solid #eee;
-    border-radius: 8px; /* スマホでは小さく */
-    padding: 10px; /* スマホでは小さく */
-    max-height: 350px; /* スマホでは小さく */
+    border-radius: 8px;
+    padding: 10px;
+    max-height: 350px;
     overflow-y: auto;
     background-color: #fff;
 }
 
 .chapter-item {
     border: 1px solid #ddd;
-    border-radius: 6px; /* スマホでは小さく */
-    margin-bottom: 8px; /* スマホでは小さく */
+    border-radius: 6px;
+    margin-bottom: 8px;
     overflow: hidden;
 }
 
 .chapter-header {
     background-color: #ecf0f1;
-    padding: 8px 12px; /* スマホでは大幅に削減 */
+    padding: 6px 10px;
     display: flex;
     justify-content: space-between;
     align-items: center;
     cursor: pointer;
     font-weight: bold;
     color: #34495e;
-    font-size: 0.95em; /* スマホでは小さく */
+    font-size: 0.95em;
     transition: background-color 0.2s ease;
-    min-height: 40px; /* タッチしやすい最小高さ */
+    min-height: 40px;
+    gap: 6px;
 }
 
 .chapter-header:hover {
     background-color: #dde1e2;
 }
 
-.chapter-header .toggle-icon {
-    font-size: 1em; /* スマホでは小さく */
-    transition: transform 0.2s ease;
-    display: inline-block;
-}
-
-.chapter-item.expanded .chapter-header .toggle-icon {
-    transform: rotate(90deg); /* スマホでは90度回転 */
+.chapter-title {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .chapter-options {
     display: flex;
     align-items: center;
-    gap: 6px; /* スマホでは小さく */
+    gap: 6px;
+    flex-shrink: 0;
 }
 
-/* 「全て選択」ボタンのスタイル更新 - スマホ用に大幅改善 */
+.toggle-icon {
+    font-size: 1em;
+    transition: transform 0.2s ease;
+    display: inline-block;
+    width: 16px;
+    text-align: center;
+}
+
+.chapter-item.expanded .toggle-icon {
+    transform: rotate(90deg);
+}
+
 .select-all-chapter-btn {
     background-color: #3498db;
     color: white;
-    border: none;
-    padding: 4px 8px; /* スマホでは大幅に削減 */
-    border-radius: 4px; /* スマホでは小さく */
-    cursor: pointer;
-    font-size: 0.7em; /* スマホでは大幅に削減 */
-    transition: background-color 0.3s ease, border-color 0.3s ease;
     border: 1px solid #2980b9;
-    min-width: 50px; /* スマホでは大幅に削減 */
+    padding: 2px 4px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.6rem;
+    transition: background-color 0.3s ease, border-color 0.3s ease;
+    min-width: 40px;
+    max-width: 50px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    max-width: 60px; /* スマホでの最大幅制限 */
+    line-height: 1.2;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .select-all-chapter-btn:hover {
     opacity: 0.9;
 }
 
-/* 選択解除状態（赤色）のスタイル */
 .select-all-chapter-btn.deselect-mode {
     background-color: #e74c3c !important;
     border-color: #c0392b !important;
 }
 
-.select-all-chapter-btn.deselect-mode:hover {
-    background-color: #c0392b !important;
-}
-
 .unit-list {
-    padding: 10px 15px; /* スマホでは小さく */
+    padding: 10px 15px;
     background-color: #fff;
     display: none;
 }
@@ -516,53 +564,94 @@ hr {
 }
 
 .unit-item {
-    margin-bottom: 8px; /* スマホでは小さく */
+    margin-bottom: 8px;
     display: flex;
     align-items: flex-start;
-    gap: 8px; /* スマホでは小さく */
+    gap: 8px;
 }
 
 .unit-item input[type="checkbox"] {
     margin-top: 2px;
-    transform: scale(1.0); /* スマホでは標準サイズ */
+    transform: scale(1.0);
     flex-shrink: 0;
 }
 
 .unit-item label {
     flex: 1;
-    font-size: 0.9em; /* スマホでは小さく */
+    font-size: 0.9em;
     line-height: 1.3;
     cursor: pointer;
+    word-wrap: break-word;
+    word-break: break-word;
 }
 
-.unit-item input[type="checkbox"]:disabled + label {
-    display: none; /* 完全に非表示にする */
-}
-
-/* または、親要素ごと非表示にする場合 */
 .unit-item:has(input[type="checkbox"]:disabled) {
     display: none;
 }
 
+/* 画面下部コントロールボタン */
 .bottom-controls {
     display: flex;
-    flex-direction: column; /* スマホでは縦並び */
-    gap: 10px; /* スマホでは小さく */
-    margin-top: 20px; /* スマホでは小さく */
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 15px;
+    align-items: stretch;
 }
 
-.bottom-controls button {
-    width: 100%; /* スマホでは幅いっぱい */
-    padding: 12px 20px; /* スマホでは高めに */
-    font-size: 0.95em; /* スマホでは小さく */
+.bottom-controls .btn {
+    width: 100% !important;
+    max-width: none !important;
+    padding: 12px 20px;
+    font-size: 0.95rem;
+    min-height: 40px;
+    font-weight: 600;
+    border: none;
+    transition: all 0.2s ease-in-out;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+.bottom-controls .btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
 }
 
-/* Card Area */
+.btn-start { background-color: #007bff; color: white; }
+.btn-start:hover { background-color: #0056b3; }
+
+.btn-reset { background-color: #afbfce; color: white; }
+.btn-reset:hover { background-color: #7d8a96; }
+
+.btn-daily { background-color: #28a745; color: white; }
+.btn-daily:hover { background-color: #218838; }
+
+.btn-weak { background-color: #193c5e; color: #ffffff; border: 1px solid #193c5e; }
+.btn-weak:hover { background-color: #1a344e; }
+
+.btn-essay { background-color: #2f295b; color: white; }
+.btn-essay:hover { background-color: #070013; }
+
+.warm-up-quiz-section .btn {
+    font-weight: 600;
+    padding: 12px 25px;
+    border-radius: 25px;
+    box-shadow: 0 4px 15px rgba(40, 167, 69, 0.2);
+}
+.warm-up-quiz-section .btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(40, 167, 69, 0.3);
+}
+
+
+/* ----------------
+   カードエリア（クイズ実行画面）
+   ---------------- */
 .card-area {
-    margin-top: 15px; /* スマホでは小さく */
+    margin-top: 15px;
     background-color: #f9f9f9;
-    padding: 15px; /* スマホでは小さく */
-    border-radius: 8px; /* スマホでは小さく */
+    padding: 15px;
+    border-radius: 8px;
     text-align: center;
     border: 1px solid #eee;
 }
@@ -570,10 +659,10 @@ hr {
 .progress-bar-container {
     width: 100%;
     background-color: #e0e0e0;
-    border-radius: 4px; /* スマホでは小さく */
+    border-radius: 4px;
     overflow: hidden;
-    margin-bottom: 15px; /* スマホでは小さく */
-    height: 8px; /* スマホでは小さく */
+    margin-bottom: 15px;
+    height: 8px;
     position: relative;
 }
 
@@ -581,85 +670,83 @@ hr {
     height: 100%;
     width: 0%;
     background-color: #2ecc71;
-    border-radius: 4px; /* スマホでは小さく */
+    border-radius: 4px;
     transition: width 0.3s ease-in-out;
 }
 
 .question-number-display {
     position: absolute;
-    top: -20px; /* スマホでは小さく */
+    top: -20px;
     right: 0;
-    font-size: 0.85em; /* スマホでは小さく */
+    font-size: 0.85em;
     color: #666;
 }
 
 .card {
     background-color: #fff;
     border: 1px solid #ddd;
-    border-radius: 10px; /* スマホでは小さく */
-    padding: 15px; /* スマホでは大幅に削減 */
-    min-height: 200px; /* スマホでは小さく */
+    border-radius: 10px;
+    padding: 10px;
+    min-height: 200px;
     display: flex;
     flex-direction: column;
     justify-content: flex-start;
     align-items: flex-start;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
-    margin-bottom: 20px; /* スマホでは小さく */
+    margin-bottom: 12px;
     position: relative;
 }
 
 .question-content {
     width: 100%;
-    margin-bottom: 20px; /* スマホでは小さく */
+    margin-bottom: 20px;
 }
 
 .question-content p {
-    font-size: 1.2em; /* スマホでは小さく */
+    font-size: 1.1em;
     font-weight: bold;
     color: #2c3e50;
     margin: 0;
     text-align: left;
-    line-height: 1.3; /* スマホでは小さく */
-    width: 100%;
+    line-height: 1.3;
 }
 
 .answer-content {
     width: 100%;
-    margin-top: 15px; /* スマホでは固定位置ではなく相対位置 */
+    margin-top: 15px;
+    position: static;
 }
 
 .answer-content p {
-    font-size: 1.4em; /* スマホでは小さく */
+    font-size: 1.4em;
     color: #dc3545;
     font-weight: 600;
     margin: 0;
     text-align: left;
     word-wrap: break-word;
-    box-sizing: border-box;
-    line-height: 1.3; /* スマホでは小さく */
+    line-height: 1.3;
 }
 
 .card-buttons {
     display: flex;
-    flex-direction: column; /* スマホでは縦並び */
-    gap: 10px; /* スマホでは小さく */
-    margin-top: 15px; /* スマホでは小さく */
-    margin-bottom: 20px; /* スマホでは小さく */
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 15px;
+    margin-bottom: 20px;
     width: 100%;
 }
 
 .card-buttons button {
-    width: 100%; /* スマホでは幅いっぱい */
-    padding: 12px 16px; /* スマホでは適切なサイズ */
-    font-size: 0.95em; /* スマホでは小さく */
+    width: 100%;
+    padding: 12px 16px;
+    font-size: 0.95em;
 }
 
-/* 「選択画面に戻る」ボタンを左下に配置 */
 .card-area .back-to-selection-container {
     display: flex;
     justify-content: flex-start;
-    margin-top: 20px; /* スマホでは小さく */
-    padding-top: 15px; /* スマホでは小さく */
+    margin-top: 20px;
+    padding-top: 15px;
     border-top: 1px dashed #ddd;
 }
 
@@ -667,9 +754,9 @@ hr {
     background-color: #6c757d;
     color: white;
     border: none;
-    padding: 8px 16px; /* スマホでは小さく */
-    border-radius: 5px; /* スマホでは小さく */
-    font-size: 0.85em; /* スマホでは小さく */
+    padding: 8px 16px;
+    border-radius: 5px;
+    font-size: 0.85em;
     transition: background-color 0.3s ease;
 }
 
@@ -677,25 +764,59 @@ hr {
     background-color: #5a6268;
 }
 
-/* Quiz Result Area */
+/* 準備運動クイズのレイアウト安定化 */
+#quizCardContainer {
+    min-height: 220px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+.quiz-answer {
+    min-height: 60px;
+    padding: 10px;
+    background-color: #fff3cd;
+    border-radius: 5px;
+    color: #856404;
+    font-weight: 500;
+}
+.quiz-answer.is-hidden {
+    visibility: hidden;
+}
+.quiz-buttons {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 50px;
+    gap: 10px;
+}
+.quiz-buttons .btn.is-hidden {
+    display: none;
+}
+.quiz-buttons .btn {
+    display: inline-block;
+}
+
+/* ----------------
+   クイズ結果エリア
+   ---------------- */
 .quiz-result-area {
-    margin-top: 15px; /* スマホでは小さく */
+    margin-top: 15px;
     background-color: #f9f9f9;
-    padding: 15px; /* スマホでは小さく */
-    border-radius: 8px; /* スマホでは小さく */
+    padding: 15px;
+    border-radius: 8px;
     text-align: center;
     border: 1px solid #eee;
 }
 
 .quiz-result-area h2 {
     color: #34495e;
-    font-size: 1.5em; /* スマホでは小さく */
-    margin-bottom: 15px; /* スマホでは小さく */
+    font-size: 1.5em;
+    margin-bottom: 15px;
 }
 
 .quiz-result-area p {
-    font-size: 1.1em; /* スマホでは小さく */
-    margin-bottom: 8px; /* スマホでは小さく */
+    font-size: 1.1em;
+    margin-bottom: 8px;
     color: #444;
 }
 
@@ -705,28 +826,28 @@ hr {
 }
 
 .total-in-range {
-    font-size: 0.9em; /* スマホでは小さく */
+    font-size: 0.9em;
     color: #666;
-    margin-top: 12px; /* スマホでは小さく */
+    margin-top: 12px;
     border-top: 1px dashed #eee;
-    padding-top: 8px; /* スマホでは小さく */
+    padding-top: 8px;
 }
 
 .incorrect-word-list {
-    margin-top: 20px; /* スマホでは小さく */
+    margin-top: 20px;
     text-align: left;
     background-color: #fff;
-    padding: 15px; /* スマホでは小さく */
-    border-radius: 8px; /* スマホでは小さく */
+    padding: 15px;
+    border-radius: 8px;
     border: 1px solid #ddd;
 }
 
 .incorrect-word-list h3 {
     color: #e74c3c;
-    font-size: 1.3em; /* スマホでは小さく */
-    margin-bottom: 12px; /* スマホでは小さく */
+    font-size: 1.3em;
+    margin-bottom: 12px;
     border-bottom: 1px solid #f8d7da;
-    padding-bottom: 8px; /* スマホでは小さく */
+    padding-bottom: 8px;
 }
 
 .incorrect-word-list ul {
@@ -737,25 +858,25 @@ hr {
 .incorrect-word-list li {
     background-color: #fcfcfc;
     border: 1px solid #f5f5f5;
-    border-radius: 6px; /* スマホでは小さく */
-    padding: 10px 12px; /* スマホでは小さく */
-    margin-bottom: 8px; /* スマホでは小さく */
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
     display: flex;
-    flex-direction: column; /* スマホでは縦並び */
-    gap: 8px; /* スマホでは小さく */
+    flex-direction: column;
+    gap: 8px;
 }
 
 .incorrect-question {
     font-weight: bold;
     color: #555;
     word-break: break-word;
-    font-size: 0.9em; /* スマホでは小さく */
+    font-size: 0.9em;
 }
 
 .incorrect-answer-container {
     display: flex;
     align-items: center;
-    gap: 8px; /* スマホでは小さく */
+    gap: 8px;
     justify-content: flex-start;
     flex-wrap: wrap;
 }
@@ -763,19 +884,18 @@ hr {
 .incorrect-answer {
     color: #dc3545;
     font-weight: 600;
-    font-style: normal;
     word-break: break-word;
-    font-size: 0.85em; /* スマホでは小さく */
+    font-size: 0.85em;
 }
 
 .show-incorrect-answer-button {
     background-color: #6c757d;
     color: white;
     border: none;
-    padding: 4px 8px; /* スマホでは小さく */
-    border-radius: 4px; /* スマホでは小さく */
+    padding: 4px 8px;
+    border-radius: 4px;
     cursor: pointer;
-    font-size: 0.75em; /* スマホでは小さく */
+    font-size: 0.75em;
     transition: background-color 0.3s ease;
     white-space: nowrap;
 }
@@ -786,38 +906,40 @@ hr {
 
 .result-buttons {
     display: flex;
-    flex-direction: column; /* スマホでは縦並び */
-    gap: 10px; /* スマホでは小さく */
-    margin-top: 20px; /* スマホでは小さく */
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 20px;
 }
 
 .result-buttons button {
-    width: 100%; /* スマホでは幅いっぱい */
-    padding: 12px 16px; /* スマホでは適切なサイズ */
-    font-size: 0.95em; /* スマホでは小さく */
+    width: 100%;
+    padding: 12px 16px;
+    font-size: 0.95em;
 }
 
-/* Weak Words List Section */
+/* ----------------
+   苦手問題一覧エリア
+   ---------------- */
 .weak-words-list-area {
-    margin-top: 15px; /* スマホでは小さく */
+    margin-top: 15px;
     background-color: #f9f9f9;
-    padding: 15px; /* スマホでは小さく */
-    border-radius: 8px; /* スマホでは小さく */
+    padding: 10px;
+    border-radius: 8px;
     text-align: center;
     border: 1px solid #eee;
 }
 
 .weak-words-list-area h2 {
     color: #34495e;
-    font-size: 1.5em; /* スマホでは小さく */
-    margin-bottom: 12px; /* スマホでは小さく */
+    font-size: 1.2rem;
+    margin-bottom: 10px;
 }
 
 .weak-words-list-area p {
     color: #666;
-    font-size: 0.85em; /* スマホでは小さく */
-    margin-bottom: 20px; /* スマホでは小さく */
-    line-height: 1.4; /* スマホでは小さく */
+    font-size: 0.8rem;
+    margin-bottom: 15px;
+    line-height: 1.3;
 }
 
 .weak-words-list-area ul {
@@ -829,1567 +951,371 @@ hr {
 .weak-words-list-area li {
     background-color: #fff;
     border: 1px solid #ddd;
-    border-radius: 6px; /* スマホでは小さく */
-    padding: 12px; /* スマホでは小さく */
-    margin-bottom: 8px; /* スマホでは小さく */
+    border-radius: 6px;
+    padding: 8px;
+    margin-bottom: 6px;
     display: flex;
     flex-direction: column;
-    gap: 6px; /* スマホでは小さく */
+    gap: 6px;
 }
 
 .weak-words-list-area li .question-text {
     font-weight: bold;
     color: #2c3e50;
-    font-size: 0.95em; /* スマホでは小さく */
+    font-size: 0.85rem;
+    word-break: break-word;
+    line-height: 1.2;
 }
 
 .weak-words-list-area li .answer-container {
     display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 8px; /* スマホでは小さく */
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
 }
 
 .weak-words-list-area li .answer-text {
     color: #3498db;
     font-style: italic;
-    flex-shrink: 0;
-    font-size: 0.9em; /* スマホでは小さく */
+    font-size: 0.8rem;
 }
 
 .weak-words-list-area li .show-answer-button {
     background-color: #95a5a6;
     color: white;
     border: none;
-    padding: 4px 8px; /* スマホでは小さく */
-    border-radius: 4px; /* スマホでは小さく */
+    padding: 3px 6px;
+    border-radius: 4px;
     cursor: pointer;
-    font-size: 0.75em; /* スマホでは小さく */
+    font-size: 0.7rem;
     transition: background-color 0.3s ease;
 }
-
 .weak-words-list-area li .show-answer-button:hover {
     background-color: #7f8c8d;
 }
-
-.weak-words-list-area li .accuracy-display {
-    font-size: 0.8em; /* スマホでは小さく */
-    color: #777;
-    margin-top: 5px; /* スマホでは小さく */
-    white-space: nowrap;
+.weak-words-list-area li .show-answer-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background-color: #6c757d;
 }
 
+.weak-words-list-area li .accuracy-display {
+    font-size: 0.75rem;
+    color: #777;
+    margin-top: 4px;
+}
 .weak-words-list-area li .accuracy-display .rate {
     font-weight: bold;
     color: #e74c3c;
 }
 
-/* Info Panel */
-.info-icon {
-    position: fixed;
-    bottom: 15px; /* スマホでは小さく */
-    right: 15px; /* スマホでは小さく */
-    background-color: #f39c12;
-    color: white;
-    border-radius: 50%;
-    width: 40px; /* スマホでは小さく */
-    height: 40px; /* スマホでは小さく */
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    font-size: 1.3em; /* スマホでは小さく */
-    font-weight: bold;
-    cursor: pointer;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
-    z-index: 1000;
-}
 
-.info-icon:hover {
-    background-color: #e67e22;
-}
-
-.info-panel {
-    position: fixed;
-    bottom: 65px; /* スマホでは小さく */
-    right: 15px; /* スマホでは小さく */
-    background-color: #fff;
-    border: 1px solid #ddd;
-    border-radius: 8px; /* スマホでは小さく */
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-    padding: 15px; /* スマホでは小さく */
-    width: calc(100vw - 40px); /* スマホでは画面幅に合わせる */
-    max-width: 280px; /* 最大幅制限 */
-    z-index: 999;
-}
-
-.info-panel h3 {
-    margin-top: 0;
-    color: #34495e;
-    font-size: 1.1em; /* スマホでは小さく */
-}
-
-.info-panel p {
-    font-size: 0.85em; /* スマホでは小さく */
-    line-height: 1.5; /* スマホでは小さく */
-    color: #555;
-}
-
-/* Utility Classes */
-.hidden {
-    display: none !important;
-}
-
-/* Admin Section */
-.admin-section h2 {
-    text-align: center;
-    color: #2c3e50;
-    margin-bottom: 25px; /* スマホでは小さく */
-    font-size: 1.6em; /* スマホでは小さく */
-}
-
-.admin-panel {
-    background-color: #f9f9f9;
-    padding: 15px; /* スマホでは小さく */
-    border-radius: 8px; /* スマホでは小さく */
-    margin-bottom: 20px; /* スマホでは小さく */
-    border: 1px solid #eee;
-}
-
-.admin-panel h3 {
-    color: #34495e;
-    font-size: 1.3em; /* スマホでは小さく */
-    margin-bottom: 15px; /* スマホでは小さく */
-    border-bottom: 1px solid #eee;
-    padding-bottom: 8px; /* スマホでは小さく */
-}
-
-.admin-panel h4 {
-    color: #555;
-    font-size: 1.1em; /* スマホでは小さく */
-    margin-top: 20px; /* スマホでは小さく */
-    margin-bottom: 12px; /* スマホでは小さく */
-}
-
-.add-user-form .input-group {
-    margin-bottom: 12px; /* スマホでは小さく */
-}
-
-.add-user-form button {
-    margin-top: 12px; /* スマホでは小さく */
-    width: 100%; /* スマホでは幅いっぱい */
-    padding: 10px 15px; /* スマホでは適切なサイズ */
-}
-
-.user-list-container {
-    margin-top: 25px; /* スマホでは小さく */
-}
-
-.user-list-container table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 12px; /* スマホでは小さく */
-    background-color: #fff;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-    border-radius: 6px; /* スマホでは小さく */
-    overflow: hidden;
-    font-size: 0.85em; /* スマホでは小さく */
-}
-
-.user-list-container th, .user-list-container td {
-    padding: 8px 6px; /* スマホでは小さく */
-    border-bottom: 1px solid #ddd;
-    text-align: left;
-    word-break: break-word; /* スマホでは改行許可 */
-}
-
-.user-list-container th {
-    background-color: #ecf0f1;
-    color: #34495e;
-    font-weight: bold;
-    font-size: 0.8em; /* スマホでは小さく */
-}
-
-.user-list-container tr:last-child td {
-    border-bottom: none;
-}
-
-.user-list-container tbody tr:hover {
-    background-color: #f5f5f5;
-}
-
-/* Unit Settings in Admin */
-.unit-settings-container {
-    display: flex;
-    flex-direction: column;
-    gap: 15px; /* スマホでは小さく */
-}
-
-.unit-settings-container .chapter-setting {
-    border: 1px solid #ddd;
-    border-radius: 6px; /* スマホでは小さく */
-    padding: 12px; /* スマホでは小さく */
-    background-color: #fff;
-}
-
-.unit-settings-container .chapter-setting h4 {
-    margin-top: 0;
-    margin-bottom: 12px; /* スマホでは小さく */
-    color: #2c3e50;
-    font-size: 1.2em; /* スマホでは小さく */
-    border-bottom: 1px dashed #eee;
-    padding-bottom: 8px; /* スマホでは小さく */
-}
-
-.unit-toggle-group {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px; /* スマボでは小さく */
-}
-
-.unit-toggle-item {
-    background-color: #f0f4f7;
-    border: 1px solid #e0e0e0;
-    border-radius: 4px; /* スマホでは小さく */
-    padding: 8px 12px; /* スマホでは小さく */
-    display: flex;
-    flex-direction: column;
-    gap: 6px; /* スマボでは小さく */
-    min-width: 150px; /* スマホでは小さく */
-    flex: 1;
-}
-
-.unit-toggle-item span {
-    font-weight: bold;
-    color: #444;
-    font-size: 0.9em; /* スマホでは小さく */
-}
-
-.room-specific-toggles {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px; /* スマホでは小さく */
-    margin-top: 4px; /* スマホでは小さく */
-}
-
-.room-specific-toggles label {
-    display: flex;
-    align-items: center;
-    gap: 4px; /* スマホでは小さく */
-    font-size: 0.8em; /* スマホでは小さく */
-    color: #666;
-    cursor: pointer;
-}
-
-.room-specific-toggles input[type="checkbox"] {
-    transform: scale(1.0); /* スマホでは標準サイズ */
-}
-
-/* 進捗ページのスタイル改善 */
+/* ----------------
+   進捗ページ
+   ---------------- */
 .progress-section h2 {
     text-align: center;
     color: #2c3e50;
-    margin-bottom: 30px; /* スマホでは小さく */
-    padding-bottom: 12px; /* スマホでは小さく */
+    margin-bottom: 30px;
+    padding-bottom: 12px;
     border-bottom: 3px solid #3498db;
-    font-size: 1.5em; /* スマホでは小さく */
+    font-size: 1.5em;
 }
 
-/* ランキングセクションと単元別進捗セクションに共通のスタイル */
-.ranking-container, .progress-container {
-    background-color: #f9f9f9;
-    padding: 15px; /* スマホでは小さく */
-    border-radius: 10px; /* スマホでは小さく */
-    margin-bottom: 20px; /* スマホでは小さく */
-    border: 1px solid #e0e0e0;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+/* 個別スコア表示 */
+.current-user-stats {
+   background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%);
+   border: 2px solid #2196f3;
+   border-radius: 12px;
+   padding: 15px;
+   margin-bottom: 20px;
+   box-shadow: 0 4px 12px rgba(33, 150, 243, 0.15);
+}
+.current-user-stats h4 {
+   color: #1565c0;
+   font-size: 1.1em;
+   margin-bottom: 12px;
+   text-align: center;
+   border-bottom: 2px solid #90caf9;
+   padding-bottom: 8px;
+}
+.stats-grid {
+   display: grid;
+   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+   gap: 10px;
+   margin-bottom: 15px;
+}
+.stat-item {
+   background-color: #ffffff;
+   border: 1px solid #e3f2fd;
+   border-radius: 8px;
+   padding: 10px;
+   text-align: center;
+   box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+   transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.stat-item:hover {
+   transform: translateY(-2px);
+   box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+.stat-label {
+   font-size: 0.8em;
+   color: #666;
+   margin-bottom: 5px;
+}
+.stat-value {
+   font-size: 1.3em;
+   font-weight: bold;
+   color: #1976d2;
+}
+.stat-value.main-score {
+   font-size: 1.6em;
+   color: #d32f2f;
+}
+.stat-description {
+   font-size: 0.7em;
+   color: #999;
+}
+.basic-stats {
+   background-color: rgba(255, 255, 255, 0.8);
+   border-radius: 6px;
+   padding: 10px;
+   border-left: 4px solid #4caf50;
+}
+.basic-stats p {
+   margin: 0;
+   font-size: 0.8em;
+   color: #333;
 }
 
-/* ランキングセクション専用スタイル */
+/* ランキング */
 .ranking-container {
     background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    padding: 15px;
+    border-radius: 10px;
+    margin-bottom: 20px;
     border-left: 5px solid #ffc107;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
 }
-
-.ranking-container h3 {
-    color: #495057;
-    font-size: 1.3em; /* スマホでは小さく */
-    margin-bottom: 12px; /* スマホでは小さく */
+.ranking-header {
     display: flex;
+    justify-content: space-between;
     align-items: center;
+    text-align: center;
+    flex-direction: column;
+    margin-bottom: 25px;
+    gap: 20px;
 }
-
-.ranking-container h3::before {
-    content: "🏆";
-    margin-right: 8px; /* スマホでは小さく */
-    font-size: 1.1em; /* スマホでは小さく */
+.ranking-title-section h3 {
+    font-size: 1.3em;
+    color: #495057;
 }
-
-.ranking-container p {
+.ranking-title-section p {
     color: #6c757d;
-    font-size: 0.9em; /* スマホでは小さく */
-    margin-bottom: 15px; /* スマホでは小さく */
+    font-size: 0.9em;
 }
+.user-rank-section h4 {
+    margin-bottom: 12px;
+    font-size: 1.1em;
+    font-weight: 600;
+}
+.rank-display {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 12px 18px;
+    border-radius: 10px;
+    min-width: 110px;
+}
+.rank-display.rank-1 { background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%); color: #333; }
+.rank-display.rank-2 { background: linear-gradient(135deg, #C0C0C0 0%, #808080 100%); color: #333; }
+.rank-display.rank-3 { background: linear-gradient(135deg, #CD7F32 0%, #A0522D 100%); color: white; }
+.rank-number { font-size: 1.8em; font-weight: bold; line-height: 1; }
+.rank-text { font-size: 1em; margin-left: 4px; }
+.rank-total { font-size: 0.85em; opacity: 0.9; margin-top: 4px; }
 
-/* ランキング基準説明のスタイル */
 .ranking-criteria {
     background-color: #e3f2fd;
     border: 1px solid #90caf9;
-    border-radius: 6px; /* スマホでは小さく */
-    padding: 12px; /* スマホでは小さく */
-    margin-bottom: 15px; /* スマホでは小さく */
+    border-radius: 6px;
+    padding: 12px;
+    margin-bottom: 15px;
 }
-
 .ranking-criteria p {
-    margin-bottom: 4px; /* スマボでは小さく */
+    margin-bottom: 4px;
     color: #1565c0;
-    font-size: 0.85em; /* スマホでは小さく */
+    font-size: 0.85em;
 }
-
-.ranking-criteria p:last-child {
-    margin-bottom: 0;
-}
-
 .ranking-criteria small {
     color: #42a5f5;
     font-style: italic;
-    font-size: 0.8em; /* スマホでは小さく */
+    font-size: 0.8em;
 }
-
-/* ランキングテーブルのスタイル */
+.ranking-container .table-responsive {
+    overflow-x: auto;
+}
 .ranking-container table {
     background-color: #ffffff;
-    border-radius: 6px; /* スマホでは小さく */
-    overflow: hidden;
+    border-radius: 6px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    font-size: 0.8em; /* スマホでは小さく */
+    font-size: 0.7rem;
     width: 100%;
-    min-width: 500px; /* スマホではスクロール前提 */
+    min-width: 500px;
+    white-space: nowrap;
 }
-
+.ranking-container table th,
+.ranking-container table td {
+    padding: 3px 2px;
+    text-align: center;
+    border-bottom: 1px solid #e9ecef;
+    font-size: 0.65rem;
+    max-width: 70px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
 .ranking-container table th {
     background-color: #495057;
     color: white;
     font-weight: 600;
-    padding: 8px 4px; /* スマホでは小さく */
-    text-align: center;
-    font-size: 0.75em; /* スマホでは小さく */
+}
+.ranking-container table tr:nth-child(1) td:first-child { background-color: #ffd700; color: #333; }
+.ranking-container table tr:nth-child(2) td:first-child { background-color: #c0c0c0; color: #333; }
+.ranking-container table tr:nth-child(3) td:first-child { background-color: #cd7f32; color: white; }
+.current-user-row {
+   background-color: #fff3e0 !important;
+   border-left: 4px solid #ff9800 !important;
+   font-weight: 600;
 }
 
-.ranking-container table td {
-    padding: 6px 4px; /* スマホでは小さく */
-    text-align: center;
-    border-bottom: 1px solid #e9ecef;
-    font-size: 0.75em; /* スマホでは小さく */
-}
-
-.ranking-container table tr:nth-child(1) td:first-child {
-    background-color: #ffd700;
-    color: #333;
-    font-weight: bold;
-}
-
-.ranking-container table tr:nth-child(2) td:first-child {
-    background-color: #c0c0c0;
-    color: #333;
-    font-weight: bold;
-}
-
-.ranking-container table tr:nth-child(3) td:first-child {
-    background-color: #cd7f32;
-    color: white;
-    font-weight: bold;
-}
-
-/* 単元別進捗セクション専用スタイル */
+/* 単元別進捗 */
 .progress-container {
+    padding: 15px;
+    border-radius: 10px;
+    margin-bottom: 20px;
     border-left: 5px solid #28a745;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
 }
-
 .progress-container h3 {
     color: #495057;
-    font-size: 1.3em; /* スマホでは小さく */
-    margin-bottom: 15px; /* スマボでは小さく */
-    display: flex;
-    align-items: center;
+    font-size: 1.3em;
+    margin-bottom: 15px;
 }
-
 .progress-container h3::before {
     content: "📊";
-    margin-right: 8px; /* スマホでは小さく */
-    font-size: 1.1em; /* スマホでは小さく */
+    margin-right: 8px;
+    font-size: 1.1em;
 }
 
-/* 進捗アイテムのスタイル改善 */
-.progress-item {
-    background-color: #ffffff;
-    border: 1px solid #e0e0e0;
-    border-radius: 8px; /* スマホでは小さく */
-    padding: 15px; /* スマホでは小さく */
-    margin-bottom: 15px; /* スマボでは小さく */
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
+/* 章別アコーディオン進捗 */
+.progress-accordion { display: flex; flex-direction: column; gap: 15px; }
+.chapter-progress-item { background-color: #ffffff; border: 1px solid #e0e0e0; border-radius: 10px; overflow: hidden; }
+.chapter-progress-header { padding: 15px; cursor: pointer; display: flex; flex-direction: column; align-items: flex-start; gap: 10px; user-select: none; }
+.chapter-progress-info { display: flex; align-items: center; gap: 8px; }
+.chapter-toggle-icon { font-size: 1.2em; transition: transform 0.2s ease; }
+.chapter-title { font-size: 1.0em; font-weight: 600; color: #2c3e50; }
+.chapter-summary { display: flex; flex-direction: column; align-items: flex-start; width: 100%; }
+.mastered-count { font-size: 1.0em; font-weight: 600; color: #27ae60; }
+.chapter-percentage { font-size: 0.85em; color: #6c757d; }
+.chapter-progress-bar-container { height: 8px; background-color: #e9ecef; margin: 0 15px 15px; border-radius: 4px; overflow: hidden; }
+.chapter-progress-bar { height: 100%; background: linear-gradient(90deg, #28a745 0%, #20c997 100%); border-radius: 4px; transition: width 0.8s ease-in-out; }
+.unit-details { padding: 0 15px 15px; background-color: #f8f9fa; border-top: 1px solid #e0e0e0; }
+.unit-progress-item { background-color: #ffffff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 12px; margin-bottom: 10px; }
+.unit-progress-item h5 { color: #2c3e50; font-size: 1.0em; margin-bottom: 10px; padding-bottom: 5px; border-bottom: 1px solid #e9ecef; }
+.unit-progress-item p { margin-bottom: 6px; color: #555; font-size: 0.9em; }
+.unit-progress-bar-container { background-color: #e9ecef; border-radius: 6px; height: 8px; margin-top: 10px; overflow: hidden; }
+.unit-progress-bar { background: linear-gradient(90deg, #007bff 0%, #0056b3 100%); height: 100%; border-radius: 6px; transition: width 0.8s ease-in-out; }
 
-.progress-item:hover {
-    transform: translateY(-1px); /* スマホでは小さく */
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-}
 
-.progress-item h4 {
-    color: #2c3e50;
-    font-size: 1.1em; /* スマホでは小さく */
-    margin-bottom: 12px; /* スマホでは小さく */
-    padding-bottom: 6px; /* スマボでは小さく */
-    border-bottom: 2px solid #e9ecef;
+/* ----------------
+   管理者ページ
+   ---------------- */
+.admin-panel {
+    background-color: #f9f9f9;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    border: 1px solid #eee;
 }
-
-.progress-item p {
-    margin-bottom: 8px; /* スマホでは小さく */
+.admin-panel h3 {
+    color: #34495e;
+    font-size: 1.3em;
+    margin-bottom: 15px;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 8px;
+}
+.admin-panel h4 {
     color: #555;
-    font-size: 0.95em; /* スマホでは小さく */
+    font-size: 1.1em;
+    margin-top: 20px;
+    margin-bottom: 12px;
 }
-
-/* 進捗バーコンテナーのスタイル改善 */
-.progress-item .progress-bar-container {
-    background-color: #e9ecef;
-    border-radius: 6px; /* スマホでは小さく */
-    height: 10px; /* スマホでは小さく */
-    margin-top: 12px; /* スマホでは小さく */
+.user-list-container table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 12px;
+    background-color: #fff;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    border-radius: 6px;
     overflow: hidden;
+    font-size: 0.85em;
+    min-width: 900px;
 }
-
-.progress-item .progress-bar {
-    background: linear-gradient(90deg, #28a745 0%, #20c997 100%);
-    height: 100%;
-    border-radius: 6px; /* スマホでは小さく */
-    transition: width 0.8s ease-in-out;
+.user-list-container th, .user-list-container td {
+    padding: 8px 6px;
+    border-bottom: 1px solid #ddd;
+    text-align: left;
+    word-break: break-word;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 120px;
+    vertical-align: middle;
 }
-
-/* セクション間の仕切り線のスタイル */
-.progress-section hr {
-    margin: 30px 0; /* スマホでは小さく */
-    border: none;
-    height: 2px; /* スマホでは小さく */
-    background: linear-gradient(90deg, transparent 0%, #3498db 20%, #3498db 80%, transparent 100%);
-    border-radius: 1px; /* スマホでは小さく */
+.user-list-container th {
+    background-color: #ecf0f1;
+    color: #34495e;
+    font-weight: bold;
+    font-size: 0.8em;
 }
-
-/* テーブルの横スクロール対応 */
-.table-responsive {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    margin: 0 -8px; /* スマホでは小さく */
-    padding: 0 8px; /* スマボでは小さく */
+.user-list-container tbody tr:hover {
+    background-color: #f5f5f5;
 }
+.unit-settings-container { display: flex; flex-direction: column; gap: 15px; }
+.unit-settings-container .chapter-setting { border: 1px solid #ddd; border-radius: 6px; padding: 12px; background-color: #fff; }
+.unit-toggle-group { display: flex; flex-wrap: wrap; gap: 10px; }
+.unit-toggle-item { background-color: #f0f4f7; border: 1px solid #e0e0e0; border-radius: 4px; padding: 8px 12px; min-width: 150px; flex: 1; }
+.room-specific-toggles { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.room-specific-toggles label { display: flex; align-items: center; gap: 4px; font-size: 0.8em; cursor: pointer; }
+.room-selector-container { margin-bottom: 15px; padding: 12px; background-color: #f8f9fa; border-radius: 6px; }
+#admin-ranking-container { min-height: 300px; }
 
-/* ================================
-   タブレット以上の画面での改善
-   ================================ */
-
-@media (min-width: 768px) {
-    .container {
-        padding: 25px;
-    }
-
-    .controls-area {
-        display: grid;
-        grid-template-columns: 1fr 2fr;
-        gap: 25px;
-        align-items: start;
-        padding: 20px;
-    }
-
-    .question-count-selection h3,
-    .selection-area h3 {
-        font-size: 1.4em;
-    }
-
-    .radio-group {
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-    }
-
-    .radio-group label {
-        font-size: 1.05em;
-    }
-
-    .chapter-header {
-        padding: 12px 20px;
-        font-size: 1.1em;
-    }
-
-    .select-all-chapter-btn {
-        padding: 6px 12px;
-        font-size: 0.9em;
-        min-width: 80px;
-        max-width: none;
-    }
-
-    .unit-list {
-        padding: 15px 20px;
-    }
-
-    .unit-item label {
-        font-size: 1em;
-    }
-
-    .bottom-controls {
-        grid-column: 1 / -1;
-        display: flex;
-        flex-direction: row;
-        justify-content: center;
-        gap: 20px;
-    }
-
-    .bottom-controls button {
-        width: auto;
-        padding: 12px 30px;
-        font-size: 1.1em;
-    }
-
-    .card {
-        padding: 25px;
-        min-height: 280px;
-    }
-
-    .question-content p {
-        font-size: 1.6em;
-        line-height: 1.4;
-    }
-
-    .answer-content {
-        position: absolute;
-        top: 120px;
-        left: 25px;
-        right: 25px;
-        margin-top: 0;
-    }
-
-    .answer-content p {
-        font-size: 1.8em;
-        line-height: 1.4;
-    }
-
-    .card-buttons {
-        display: flex;
-        flex-direction: row;
-        gap: 20px;
-    }
-
-    .card-buttons button {
-        flex: 1;
-        max-width: 180px;
-        font-size: 1.1em;
-    }
-
-    .result-buttons {
-        display: flex;
-        flex-direction: row;
-        justify-content: center;
-        gap: 15px;
-        flex-wrap: wrap;
-    }
-
-    .result-buttons button {
-        flex-basis: auto;
-        min-width: 150px;
-        width: auto;
-    }
-
-    .ranking-container, .progress-container {
-        padding: 25px;
-    }
-
-    .ranking-container h3, .progress-container h3 {
-        font-size: 1.6em;
-    }
-
-    .ranking-container table {
-        font-size: 1em;
-        min-width: auto;
-    }
-
-    .ranking-container table th,
-    .ranking-container table td {
-        padding: 12px;
-        font-size: 1em;
-    }
-
-    .info-panel {
-        width: 300px;
-        right: 20px;
-        bottom: 80px;
-    }
-}
-
-/* ================================
-   デスクトップ画面での改善
-   ================================ */
-
-@media (min-width: 1024px) {
-    .container {
-        padding: 30px;
-    }
-
-    .navbar-brand {
-        font-size: 1.5rem;
-    }
-
-    .controls-area {
-        padding: 25px;
-    }
-
-    .chapters-container {
-        max-height: 450px;
-    }
-
-    .card {
-        padding: 30px;
-        min-height: 300px;
-    }
-
-    .user-list-container table {
-        font-size: 1rem;
-    }
-
-    .user-list-container th,
-    .user-list-container td {
-        padding: 12px 15px;
-    }
-}
-
-/* ================================
-   極小画面での緊急対応（480px以下）
-   ================================ */
-
-@media (max-width: 480px) {
-    .container {
-        padding: 8px;
-        margin: 8px auto;
-    }
-
-    .controls-area {
-        padding: 10px;
-    }
-
-    .chapter-header {
-        padding: 6px 8px;
-        font-size: 0.85em;
-    }
-
-    .select-all-chapter-btn {
-        padding: 3px 6px;
-        font-size: 0.65em;
-        min-width: 45px;
-        max-width: 55px;
-    }
-
-    .unit-item label {
-        font-size: 0.85em;
-    }
-
-    .card {
-        padding: 10px;
-    }
-
-    .question-content p {
-        font-size: 1.1em;
-        line-height: 1.2;
-    }
-
-    .answer-content p {
-        font-size: 1.3em;
-        line-height: 1.2;
-    }
-
-    .ranking-container table,
-    .progress-container table {
-        font-size: 0.7em;
-        min-width: 450px;
-    }
-
-    .ranking-container table th,
-    .ranking-container table td {
-        padding: 4px 2px;
-        font-size: 0.65em;
-    }
-
-    .info-panel {
-        width: calc(100vw - 20px);
-        left: 10px;
-        right: 10px;
-    }
-}
-
-/* ================================
-   アクセシビリティ対応
-   ================================ */
-
-@media (prefers-reduced-motion: reduce) {
-    * {
-        animation-duration: 0.01ms !important;
-        animation-iteration-count: 1 !important;
-        transition-duration: 0.01ms !important;
-    }
-    
-    .progress-bar {
-        transition: none;
-    }
-    
-    .toggle-icon {
-        transition: none;
-    }
-}
-
-/* ================================
-   印刷対応
-   ================================ */
-
-@media print {
-    .navbar,
-    .info-icon,
-    .info-panel,
-    .card-buttons,
-    .bottom-controls,
-    .result-buttons {
-        display: none !important;
-    }
-
-    .container {
-        max-width: none;
-        padding: 0;
-        box-shadow: none;
-        margin: 0;
-    }
-
-    .card,
-    .ranking-container,
-    .progress-container {
-        box-shadow: none;
-        border: 1px solid #000;
-        page-break-inside: avoid;
-    }
-
-    .question-content p,
-    .answer-content p {
-        color: #000 !important;
-        font-size: 12pt !important;
-        line-height: 1.4 !important;
-    }
-}
-
-/* ================================
-   iOS Safari対応
-   ================================ */
-
-@supports (-webkit-touch-callout: none) {
-    .input-group input,
-    .input-group select {
-        -webkit-appearance: none;
-        appearance: none;
-        border-radius: 8px;
-    }
-    
-    .primary-button,
-    .secondary-button {
-        -webkit-appearance: none;
-        appearance: none;
-        border-radius: 8px;
-    }
-    
-    .container {
-        min-height: calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
-        min-height: calc(100vh - constant(safe-area-inset-top) - constant(safe-area-inset-bottom));
-    }
-}
 
 /* =======================================
-   スマホ表示緊急修正 - style.cssの末尾に追加
+   4. フローティング要素 & フッター
    ======================================= */
 
-/* 1. 「全て選択」「選択解除」ボタンの修正 */
-@media (max-width: 767px) {
-    .select-all-chapter-btn {
-        padding: 2px 4px !important;
-        font-size: 0.6rem !important;
-        min-width: 40px !important;
-        max-width: 50px !important;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        line-height: 1.2;
-        height: 20px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-}
-
-@media (max-width: 480px) {
-    .select-all-chapter-btn {
-        padding: 1px 3px !important;
-        font-size: 0.55rem !important;
-        min-width: 35px !important;
-        max-width: 45px !important;
-        height: 18px;
-    }
-}
-
-/* 2. 章ヘッダーのレイアウト修正 */
-@media (max-width: 767px) {
-    .chapter-header {
-        padding: 6px 10px !important;
-        display: flex !important;
-        justify-content: space-between !important;
-        align-items: center !important;
-        flex-wrap: nowrap !important;
-        gap: 6px !important;
-        min-height: 36px;
-    }
-    
-    .chapter-title {
-        flex: 1;
-        min-width: 0;
-        font-size: 0.85rem;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
-    
-    .chapter-options {
-        display: flex !important;
-        align-items: center !important;
-        gap: 4px !important;
-        flex-shrink: 0 !important;
-    }
-    
-    .toggle-icon {
-        font-size: 0.8rem !important;
-        width: 16px;
-        text-align: center;
-    }
-}
-
-@media (max-width: 480px) {
-    .chapter-header {
-        padding: 4px 8px !important;
-        gap: 3px !important;
-        min-height: 32px;
-    }
-    
-    .chapter-title {
-        font-size: 0.8rem;
-    }
-    
-    .chapter-options {
-        gap: 2px !important;
-    }
-    
-    .toggle-icon {
-        font-size: 0.75rem !important;
-        width: 14px;
-    }
-}
-
-/* 3. テーブルの横スクロール対応 */
-.table-wrapper {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    margin: 0 -8px;
-    padding: 0 8px;
-}
-
-@media (max-width: 767px) {
-    .ranking-container,
-    .progress-container {
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-    }
-    
-    .ranking-container table,
-    .progress-container table,
-    .user-list-table,
-    .room-setting-table {
-        min-width: 500px;
-        width: 100%;
-        display: table !important;
-        white-space: nowrap;
-        font-size: 0.7rem !important;
-    }
-    
-    .ranking-container table th,
-    .ranking-container table td,
-    .progress-container table th,
-    .progress-container table td {
-        padding: 3px 2px !important;
-        min-width: 35px;
-        max-width: 70px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        font-size: 0.65rem !important;
-    }
-}
-
-@media (max-width: 480px) {
-    .ranking-container table,
-    .progress-container table {
-        min-width: 450px;
-        font-size: 0.6rem !important;
-    }
-    
-    .ranking-container table th,
-    .ranking-container table td,
-    .progress-container table th,
-    .progress-container table td {
-        padding: 2px 1px !important;
-        min-width: 30px;
-        max-width: 60px;
-        font-size: 0.6rem !important;
-    }
-}
-
-/* 4. ボタン群の修正 */
-@media (max-width: 767px) {
-    .bottom-controls {
-        display: flex !important;
-        flex-direction: column !important;
-        gap: 8px !important;
-        margin-top: 15px !important;
-        align-items: stretch !important;
-    }
-    
-    .bottom-controls button {
-        width: 100% !important;
-        max-width: none !important;
-        padding: 10px 16px !important;
-        font-size: 0.9rem !important;
-        white-space: nowrap;
-        min-height: 40px;
-    }
-}
-
-/* 5. コンテナの改善 */
-@media (max-width: 767px) {
-    .container {
-        padding: 8px !important;
-        margin: 5px auto !important;
-    }
-    
-    .controls-area {
-        padding: 10px !important;
-        gap: 12px !important;
-    }
-    
-    .chapters-container {
-        max-height: 250px !important;
-        padding: 6px !important;
-    }
-}
-
-/* 6. ナビゲーションバーの修正 */
-@media (max-width: 767px) {
-    .navbar {
-        padding: 4px 8px !important;
-    }
-    
-    .navbar-brand {
-        font-size: 0.9rem !important;
-    }
-    
-    .navbar-nav .nav-link {
-        font-size: 0.75rem !important;
-        padding: 3px 6px !important;
-    }
-}
-
-/* 7. カードエリアの修正 */
-@media (max-width: 767px) {
-    .card {
-        padding: 10px !important;
-        margin-bottom: 12px !important;
-        min-height: auto !important;
-    }
-    
-    .question-content p {
-        font-size: 1.0rem !important;
-        line-height: 1.2 !important;
-        margin-bottom: 12px !important;
-    }
-    
-    .answer-content {
-        position: static !important;
-        margin-top: 12px !important;
-    }
-    
-    .answer-content p {
-        font-size: 1.2rem !important;
-        line-height: 1.1 !important;
-    }
-    
-    .card-buttons {
-        gap: 8px !important;
-        margin-top: 12px !important;
-    }
-    
-    .card-buttons button {
-        padding: 10px 14px !important;
-        font-size: 0.9rem !important;
-    }
-}
-
-/* 8. 進捗ページの特別対応 */
-@media (max-width: 767px) {
-    .progress-section {
-        overflow-x: hidden;
-    }
-    
-    .progress-section h2 {
-        font-size: 1.1rem !important;
-        line-height: 1.2;
-        word-wrap: break-word;
-        margin-bottom: 20px !important;
-    }
-    
-    .ranking-container h3,
-    .progress-container h3 {
-        font-size: 1.0rem !important;
-        margin-bottom: 10px !important;
-    }
-    
-    .ranking-criteria {
-        padding: 8px !important;
-        margin-bottom: 10px !important;
-    }
-    
-    .ranking-criteria p {
-        font-size: 0.75rem !important;
-        margin-bottom: 2px !important;
-    }
-    
-    .ranking-criteria small {
-        font-size: 0.7rem !important;
-    }
-}
-
-/* 9. テキストの折り返し改善 */
-@media (max-width: 767px) {
-    .unit-item label {
-        word-wrap: break-word !important;
-        word-break: break-word !important;
-        hyphens: auto !important;
-        line-height: 1.2 !important;
-        font-size: 0.85rem !important;
-    }
-    
-    .incorrect-question {
-        font-size: 0.85rem !important;
-        line-height: 1.2 !important;
-        word-break: break-word !important;
-    }
-    
-    .incorrect-answer {
-        font-size: 0.8rem !important;
-        line-height: 1.1 !important;
-    }
-}
-
-/* 10. 重要：全体の横スクロール防止 */
-html, body {
-    overflow-x: hidden !important;
-    max-width: 100vw !important;
-}
-
-* {
-    box-sizing: border-box !important;
-}
-
-.container,
-.ranking-container,
-.progress-container,
-.admin-panel,
-.controls-area,
-.card-area,
-.quiz-result-area {
-    max-width: 100% !important;
-    overflow-x: auto !important;
-}
-
-/* 11. フォーム要素の調整 */
-@media (max-width: 767px) {
-    .input-group {
-        margin-bottom: 8px !important;
-    }
-    
-    .input-group label {
-        font-size: 0.85rem !important;
-        margin-bottom: 3px !important;
-    }
-    
-    .input-group input,
-    .input-group select {
-        padding: 6px !important;
-        font-size: 0.85rem !important;
-        min-height: 36px !important;
-    }
-}
-
-/* 12. 管理者ページの特別対応 */
-@media (max-width: 767px) {
-    .admin-container {
-        padding: 6px !important;
-    }
-    
-    .admin-panel {
-        padding: 10px !important;
-        margin-bottom: 12px !important;
-    }
-    
-    .admin-panel h3 {
-        font-size: 1.0rem !important;
-        margin-bottom: 8px !important;
-    }
-    
-    .admin-panel h4 {
-        font-size: 0.95rem !important;
-        margin-top: 15px !important;
-        margin-bottom: 8px !important;
-    }
-    
-    .user-list-table {
-        font-size: 0.65rem !important;
-    }
-    
-    .user-list-table th,
-    .user-list-table td {
-        padding: 2px 1px !important;
-        word-break: break-all !important;
-        min-width: 40px !important;
-        max-width: 80px !important;
-    }
-}
-
-/* 13. 苦手問題一覧の改善 */
-@media (max-width: 767px) {
-    .weak-words-list-area {
-        padding: 10px !important;
-    }
-    
-    .weak-words-list-area h2 {
-        font-size: 1.2rem !important;
-        margin-bottom: 10px !important;
-    }
-    
-    .weak-words-list-area p {
-        font-size: 0.8rem !important;
-        margin-bottom: 15px !important;
-        line-height: 1.3 !important;
-    }
-    
-    .weak-words-list-area li {
-        padding: 8px !important;
-        margin-bottom: 6px !important;
-        gap: 6px !important;
-    }
-    
-    .weak-words-list-area li .question-text {
-        font-size: 0.85rem !important;
-        line-height: 1.2 !important;
-        word-break: break-word !important;
-    }
-    
-    .weak-words-list-area li .answer-container {
-        flex-direction: column !important;
-        align-items: flex-start !important;
-        gap: 6px !important;
-    }
-    
-    .weak-words-list-area li .answer-text {
-        font-size: 0.8rem !important;
-    }
-    
-    .weak-words-list-area li .show-answer-button {
-        font-size: 0.7rem !important;
-        padding: 3px 6px !important;
-    }
-    
-    .weak-words-list-area li .accuracy-display {
-        font-size: 0.75rem !important;
-        margin-left: 0 !important;
-        margin-top: 4px !important;
-    }
-}
-
-/* 14. 情報パネルの調整 */
-@media (max-width: 767px) {
-    .info-icon {
-        width: 35px !important;
-        height: 35px !important;
-        font-size: 1.1rem !important;
-        bottom: 12px !important;
-        right: 12px !important;
-    }
-    
-    .info-panel {
-        width: calc(100vw - 24px) !important;
-        max-width: 250px !important;
-        right: 12px !important;
-        bottom: 55px !important;
-        padding: 10px !important;
-        font-size: 0.8rem !important;
-    }
-    
-    .info-panel h3 {
-        font-size: 1.0rem !important;
-        margin-bottom: 6px !important;
-    }
-    
-    .info-panel p {
-        font-size: 0.75rem !important;
-        line-height: 1.3 !important;
-        margin-bottom: 4px !important;
-    }
-}
-
-/* 15. 極小画面での緊急対応 */
-@media (max-width: 320px) {
-    .navbar-brand {
-        font-size: 0.8rem !important;
-    }
-    
-    .select-all-chapter-btn {
-        font-size: 0.5rem !important;
-        padding: 1px 2px !important;
-        min-width: 30px !important;
-        max-width: 35px !important;
-        height: 16px !important;
-    }
-    
-    .primary-button,
-    .secondary-button {
-        font-size: 0.8rem !important;
-        padding: 6px 10px !important;
-    }
-    
-    .radio-group label {
-        font-size: 0.8rem !important;
-        padding: 4px !important;
-    }
-    
-    .unit-item label {
-        font-size: 0.75rem !important;
-    }
-    
-    .chapter-title {
-        font-size: 0.75rem !important;
-    }
-    
-    .toggle-icon {
-        font-size: 0.7rem !important;
-        width: 12px !important;
-    }
-}
-
-/* 16. タッチデバイス専用の改善 */
-@media (hover: none) and (pointer: coarse) {
-    .unit-item label {
-        padding: 6px !important;
-        margin: 2px 0 !important;
-        border-radius: 4px !important;
-        background-color: rgba(0,0,0,0.02) !important;
-        transition: background-color 0.2s !important;
-        min-height: 32px !important;
-        display: flex !important;
-        align-items: center !important;
-    }
-    
-    .unit-item label:active {
-        background-color: rgba(0,0,0,0.1) !important;
-    }
-    
-    .radio-group label {
-        min-height: 36px !important;
-    }
-    
-    .select-all-chapter-btn {
-        min-height: 24px !important;
-        touch-action: manipulation !important;
-    }
-    
-    .chapter-header {
-        min-height: 40px !important;
-        touch-action: manipulation !important;
-    }
-}
-
-/* 17. スクロールバーの改善 */
-@media (max-width: 767px) {
-    .chapters-container,
-    .ranking-container,
-    .progress-container {
-        -webkit-overflow-scrolling: touch !important;
-        scrollbar-width: thin !important;
-    }
-    
-    .chapters-container::-webkit-scrollbar,
-    .ranking-container::-webkit-scrollbar,
-    .progress-container::-webkit-scrollbar {
-        width: 4px !important;
-        height: 4px !important;
-    }
-    
-    .chapters-container::-webkit-scrollbar-track,
-    .ranking-container::-webkit-scrollbar-track,
-    .progress-container::-webkit-scrollbar-track {
-        background: #f1f1f1 !important;
-    }
-    
-    .chapters-container::-webkit-scrollbar-thumb,
-    .ranking-container::-webkit-scrollbar-thumb,
-    .progress-container::-webkit-scrollbar-thumb {
-        background: #888 !important;
-        border-radius: 2px !important;
-    }
-}
-
-/* 18. 横向きモバイル対応 */
-@media screen and (max-width: 767px) and (orientation: landscape) {
-    .chapters-container {
-        max-height: 150px !important;
-    }
-    
-    .card {
-        padding: 8px !important;
-        min-height: auto !important;
-    }
-    
-    .question-content p {
-        font-size: 0.95rem !important;
-        line-height: 1.1 !important;
-    }
-    
-    .answer-content p {
-        font-size: 1.1rem !important;
-        line-height: 1.0 !important;
-    }
-    
-    .chapter-header {
-        padding: 4px 6px !important;
-        min-height: 28px !important;
-    }
-    
-    .controls-area {
-        padding: 6px !important;
-        gap: 8px !important;
-    }
-}
-
-/* style.cssの末尾に追加するフッタースタイル */
-
-/* style.cssのフッタースタイルを以下に置き換え */
-
-/* =======================================
-   コンパクトフッタースタイル
-   ======================================= */
-
-.footer {
-    margin-top: auto;
-    background-color: #f8f9fa;
-    border-top: 1px solid #e0e0e0;
-    font-size: 0.85rem;
-    padding: 1rem 0 !important; /* 縦幅を狭く */
-}
-
-.footer-text {
-    color: #6c757d;
-    margin: 0;
-    line-height: 1.2;
-}
-
-.contact-info {
-    color: #6c757d;
-    margin-bottom: 0.25rem;
-    line-height: 1.2;
-}
-
-.contact-info a {
-    color: #495057;
-    transition: color 0.2s ease;
-}
-
-.contact-info a:hover {
-    color: #007bff;
-}
-
-.app-version {
-    color: #adb5bd;
-    font-size: 0.75rem;
-    line-height: 1.2;
-    margin-top: 0.25rem;
-}
-
-/* レスポンシブ対応 */
-@media (max-width: 767px) {
-    .footer {
-        text-align: center;
-        font-size: 0.75rem;
-        padding: 0.75rem 0 !important; /* スマホでさらに狭く */
-    }
-    
-    .footer .col-md-6:first-child {
-        margin-bottom: 0.5rem;
-    }
-    
-    .footer .text-md-end {
-        text-align: center !important;
-    }
-    
-    .contact-info {
-        margin-bottom: 0.25rem;
-    }
-    
-    .app-version {
-        font-size: 0.7rem;
-    }
-}
-
-/* ページ全体のレイアウト調整（フッターを下に固定） */
-html, body {
-    height: 100%;
-}
-
-body {
+/* ----------------
+   情報パネル
+   ---------------- */
+.info-icon {
+    position: fixed;
+    bottom: 15px;
+    right: 15px;
+    background-color: #f39c12;
+    color: white;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
     display: flex;
-    flex-direction: column;
-    min-height: 100vh;
+    justify-content: center;
+    align-items: center;
+    font-size: 1.3em;
+    cursor: pointer;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+    z-index: 1000;
 }
-
-.container:first-of-type {
-    flex: 1;
+.info-icon:hover {
+    background-color: #e67e22;
 }
-
-/* 印刷時はフッターを隠す */
-@media print {
-    .footer {
-        display: none !important;
-    }
-}
-
-/* style.css の末尾に追加または既存のフッタースタイルを置き換え */
-
-/* =======================================
-   フッタースペース調整
-   ======================================= */
-
-.footer {
-    margin-top: 2rem !important; /* 広すぎたmargin-topを縮小 */
-    background-color: #f8f9fa;
-    border-top: 1px solid #e0e0e0;
-    font-size: 0.85rem;
-    padding: 0.75rem 0 !important; /* 縦パディングを縮小 */
-}
-
-/* コンテナとフッター間のスペースを調整 */
-.container:last-of-type {
-    margin-bottom: 1rem !important; /* 下マージンを縮小 */
-}
-
-/* 管理者ページなどの特定ページでのスペース調整 */
-.admin-container {
-    margin-bottom: 1rem !important;
-}
-
-/* レスポンシブ対応 */
-@media (max-width: 767px) {
-    .footer {
-        margin-top: 1rem !important; /* スマホではさらに縮小 */
-        padding: 0.5rem 0 !important;
-    }
-    
-    .container:last-of-type {
-        margin-bottom: 0.5rem !important;
-    }
-}
-
-/* 印刷時はフッターを隠す */
-@media print {
-    .footer {
-        display: none !important;
-    }
-}
-
-/* style.css に追加 - コンテンツとフッター間の余白を削除 */
-
-/* =======================================
-   コンテンツとフッター間の余白削除
-   ======================================= */
-
-/* フッターの上マージンを削除 */
-.footer {
-    margin-top: 0 !important; /* 余白を完全に削除 */
-    background-color: #f8f9fa;
-    border-top: 1px solid #e0e0e0;
-    font-size: 0.85rem;
-    padding: 0.75rem 0 !important;
-}
-
-/* 全てのコンテナの下マージンを削除 */
-.container,
-.admin-container,
-.progress-section,
-.auth-section {
-    margin-bottom: 0 !important;
-}
-
-/* 特に進捗ページなどのセクションの下マージンを削除 */
-section:last-child,
-.progress-container:last-child,
-.ranking-container:last-child {
-    margin-bottom: 0 !important;
-}
-
-/* ページ全体のレイアウト調整 */
-body {
-    display: flex;
-    flex-direction: column;
-    min-height: 100vh;
-    margin: 0;
-    padding: 0;
-}
-
-/* メインコンテンツ部分 */
-.container:first-of-type {
-    flex: 1; /* 利用可能なスペースを占有 */
-    margin-bottom: 0 !important;
-}
-
-/* フッターを下に固定しつつ、コンテンツとの余白を削除 */
-.footer {
-    margin-top: auto; /* flexboxでフッターを下に押し下げ */
-}
-
-/* レスポンシブ対応 */
-@media (max-width: 767px) {
-    .container,
-    .admin-container {
-        padding-bottom: 0 !important;
-        margin-bottom: 0 !important;
-    }
-}
-
-/* 印刷時はフッターを隠す */
-@media print {
-    .footer {
-        display: none !important;
-    }
-}
-
-/* style.css の情報パネル部分を修正または追加 */
-
-/* =======================================
-   情報パネルのテキストサイズ統一
-   ======================================= */
-
 .info-panel {
     position: fixed;
     bottom: 65px;
@@ -2403,95 +1329,16 @@ body {
     max-width: 280px;
     z-index: 999;
 }
-
-/* タイトル（世界史単語帳）のサイズを統一 */
-.info-panel h3 {
-    margin-top: 0;
-    margin-bottom: 8px; /* 余白も調整 */
-    color: #34495e;
-    font-size: 0.9rem !important; /* 他のテキストに合わせて小さく */
-    font-weight: 600; /* 少し太くして視認性を保つ */
-    line-height: 1.3;
+.info-panel h3, .info-panel h4, .info-panel p {
+    font-size: 0.8rem !important;
 }
+.info-panel h3 { font-weight: 600; }
+.info-panel p { line-height: 1.4; }
 
-/* 更新内容の見出し */
-.info-panel h4 {
-    margin-top: 12px;
-    margin-bottom: 6px;
-    color: #34495e;
-    font-size: 0.85rem !important; /* h3より少し小さく */
-    font-weight: 600;
-    line-height: 1.3;
-}
 
-/* 本文テキスト */
-.info-panel p {
-    font-size: 0.8rem !important; /* 統一サイズ */
-    line-height: 1.4;
-    color: #555;
-    margin-bottom: 6px;
-}
-
-/* 連絡先セクション */
-.info-panel #contactSection {
-    margin-top: 10px;
-    padding-top: 8px;
-    border-top: 1px solid #eee;
-}
-
-.info-panel #contactSection h5 {
-    font-size: 0.8rem !important; /* 統一サイズ */
-    margin-bottom: 4px;
-    color: #555;
-    font-weight: 600;
-}
-
-.info-panel #contactSection p {
-    font-size: 0.75rem !important; /* 連絡先は少し小さく */
-    margin-bottom: 0;
-}
-
-/* スマホ対応 */
-@media (max-width: 767px) {
-    .info-panel {
-        width: calc(100vw - 24px);
-        max-width: 250px;
-        right: 12px;
-        bottom: 55px;
-        padding: 12px;
-        font-size: 0.75rem;
-    }
-    
-    .info-panel h3 {
-        font-size: 0.85rem !important;
-        margin-bottom: 6px;
-    }
-    
-    .info-panel h4 {
-        font-size: 0.8rem !important;
-        margin-bottom: 4px;
-    }
-    
-    .info-panel p {
-        font-size: 0.75rem !important;
-        line-height: 1.3;
-        margin-bottom: 4px;
-    }
-    
-    .info-panel #contactSection h5 {
-        font-size: 0.75rem !important;
-    }
-    
-    .info-panel #contactSection p {
-        font-size: 0.7rem !important;
-    }
-}
-/* style.css のフッタースタイルを以下に置き換え */
-
-/* =======================================
-   フッター右寄せ + iボタン干渉回避
-   ======================================= */
-
+/* ----------------
+   フッター
+   ---------------- */
 .footer {
     margin-top: auto;
     background-color: #f8f9fa;
@@ -2499,2012 +1346,149 @@ body {
     font-size: 0.85rem;
     padding: 0.75rem 0 !important;
 }
-
-/* フッター内のコンテナ */
 .footer .container {
     max-width: 1200px;
     margin: 0 auto;
     padding: 0 15px;
-    /* iボタン分の右余白を確保 */
-    padding-right: 70px;
+    padding-right: 70px; /* iボタンとの干渉回避 */
 }
-
-/* 左側：コピーライト（デフォルトの左寄せを明示） */
-.footer .col-md-6:first-child {
-    text-align: left;
-}
-
-/* 右側：連絡先・バージョン */
-.footer .col-md-6:last-child {
-    /* 右寄せを維持 */
-    text-align: right;
-}
-
 .footer-text {
     color: #6c757d;
     margin: 0;
     line-height: 1.2;
 }
-
 .contact-info {
     color: #6c757d;
     margin-bottom: 0.25rem;
-    line-height: 1.2;
 }
-
 .contact-info a {
     color: #495057;
-    transition: color 0.2s ease;
     text-decoration: none;
+    transition: color 0.2s ease;
 }
-
 .contact-info a:hover {
     color: #007bff;
 }
-
 .app-version {
     color: #adb5bd;
     font-size: 0.75rem;
-    line-height: 1.2;
-    margin-top: 0.25rem;
 }
 
-/* レスポンシブ対応 */
-@media (max-width: 767px) {
-    .footer {
-        text-align: center !important; /* スマホでは中央寄せ */
-        font-size: 0.75rem;
-        padding: 0.75rem 0 !important;
-    }
-    
-    .footer .container {
-        /* スマホではiボタン用余白を調整 */
-        padding-right: 60px;
-    }
-    
-    .footer .col-md-6:first-child {
-        margin-bottom: 0.5rem;
-        text-align: center;
-    }
-    
-    .footer .col-md-6:last-child {
-        text-align: center !important; /* スマホでは中央寄せ */
-    }
-    
-    .contact-info {
-        margin-bottom: 0.25rem;
-    }
-    
-    .app-version {
-        font-size: 0.7rem;
-    }
+
+/* =======================================
+   5. モーダル
+   ======================================= */
+.daily-quiz-modal .modal-dialog { max-width: 600px; }
+.daily-quiz-modal .modal-header { background-color: #27ae60; color: white; }
+.daily-quiz-modal .btn-close { filter: invert(1) grayscale(100%) brightness(200%); }
+#dailyQuizContainer { text-align: center; padding: 10px; }
+.quiz-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; font-size: 1.1em; }
+.quiz-progress-text { font-weight: bold; background-color: #f0f0f0; padding: 5px 10px; border-radius: 15px; }
+.quiz-timer { font-weight: bold; color: #e74c3c; background-color: #fdd; padding: 5px 10px; border-radius: 15px; }
+.quiz-question-text { font-size: 1.4em; font-weight: 600; margin-bottom: 25px; min-height: 80px; display: flex; align-items: center; justify-content: center; }
+.quiz-choices { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+.choice-btn { padding: 15px; font-size: 1.1em; border: 2px solid #bdc3c7; background-color: white; border-radius: 8px; cursor: pointer; transition: all 0.2s ease; }
+.choice-btn:hover:not(:disabled) { background-color: #ecf0f1; border-color: #3498db; }
+.choice-btn.correct { background-color: #d4edda; border-color: #28a745; color: #155724; }
+.choice-btn.incorrect { background-color: #f8d7da; border-color: #dc3545; color: #721c24; }
+.quiz-result-view h4 { color: #27ae60; }
+.ranking-table { width: 100%; margin-top: 20px; border-collapse: collapse; }
+.ranking-table th, .ranking-table td { padding: 8px; border-bottom: 1px solid #ddd; }
+.ranking-table th { background-color: #27ae60; color: white; }
+.current-user-rank { background-color: #e8f4fd !important; color: #1565c0; border-left: 4px solid #3498db; border-right: 4px solid #3498db; }
+.ranking-table tfoot .rank-ellipsis td { border: none; padding: 4px 0; color: #adb5bd; }
+.ranking-table .out-of-top5-rank td { border-top: 2px dashed #0d6efd; }
+.monthly-result-header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+
+
+/* =======================================
+   6. レスポンシブ & 特殊メディア対応
+   ======================================= */
+
+/* ----------------
+   タブレット以上 (min-width: 768px)
+   ---------------- */
+@media (min-width: 768px) {
+    .container { padding: 25px; }
+    .controls-area { grid-template-columns: 1fr 2fr; align-items: start; padding: 20px; }
+    .bottom-controls { flex-direction: row; justify-content: center; gap: 20px; }
+    .bottom-controls button { width: auto; padding: 12px 30px; }
+    .card { padding: 25px; min-height: 280px; }
+    .question-content p { font-size: 1.6em; }
+    .answer-content { position: absolute; top: 120px; left: 25px; right: 25px; margin-top: 0; }
+    .answer-content p { font-size: 1.8em; }
+    .card-buttons { flex-direction: row; gap: 20px; }
+    .result-buttons { flex-direction: row; justify-content: center; gap: 15px; }
+    .result-buttons button { width: auto; }
+    .ranking-container table { font-size: 1em; min-width: auto; }
+    .ranking-container table th, .ranking-container table td { padding: 12px; font-size: 1em; }
 }
 
-/* 非常に小さい画面での調整 */
+/* ----------------
+   デスクトップ (min-width: 1024px)
+   ---------------- */
+@media (min-width: 1024px) {
+    .container { padding: 30px; }
+    .chapters-container { max-height: 450px; }
+    .card { padding: 30px; min-height: 300px; }
+    .user-list-container table { font-size: 1rem; }
+    .user-list-container th, .user-list-container td { padding: 12px 15px; }
+}
+
+/* ----------------
+   スマホ (max-width: 767px)
+   ---------------- */
+@media (max-width: 767.98px) {
+    .container { padding: 8px !important; margin: 5px auto !important; }
+    .navbar-brand { font-size: 0.9rem !important; }
+    .navbar-nav .nav-link { font-size: 0.75rem !important; }
+    .navbar-nav { margin-top: 1rem; }
+    .controls-area { padding: 10px !important; gap: 12px !important; }
+    .chapters-container { max-height: 250px !important; padding: 6px !important; }
+    .unit-item label { font-size: 0.85rem !important; }
+    .footer { text-align: center !important; font-size: 0.75rem; }
+    .footer .container { padding-right: 60px; }
+    .footer .col-md-6:first-child, .footer .col-md-6:last-child { text-align: center !important; }
+    .info-panel { max-width: 250px; right: 12px; bottom: 55px; }
+}
+
+/* ----------------
+   極小画面 (max-width: 480px)
+   ---------------- */
 @media (max-width: 480px) {
-    .footer .container {
-        padding-right: 55px; /* より小さいiボタン分 */
-    }
-    
-    .footer {
-        font-size: 0.7rem;
-    }
+    .chapter-header { padding: 4px 8px !important; }
+    .select-all-chapter-btn { padding: 1px 3px !important; font-size: 0.55rem !important; min-width: 35px !important; max-width: 45px !important; }
+    .card { padding: 10px; }
+    .question-content p { font-size: 1.1em; }
+    .answer-content p { font-size: 1.3em; }
+    .ranking-container table { min-width: 450px; }
+    .ranking-container table th, .ranking-container table td { padding: 2px 1px !important; font-size: 0.6rem !important; }
+    .footer .container { padding-right: 55px; }
+    .info-panel { width: calc(100vw - 20px); left: 10px; right: 10px; }
 }
 
-/* 印刷時はフッターを隠す */
+/* ----------------
+   アクセシビリティ (prefers-reduced-motion)
+   ---------------- */
+@media (prefers-reduced-motion: reduce) {
+    * { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+    .progress-bar, .toggle-icon { transition: none; }
+}
+
+/* ----------------
+   印刷 (print)
+   ---------------- */
 @media print {
-    .footer {
-        display: none !important;
-    }
+    .navbar, .info-icon, .info-panel, .card-buttons, .bottom-controls, .result-buttons, .footer { display: none !important; }
+    .container { max-width: none; padding: 0; box-shadow: none; margin: 0; }
+    .card, .ranking-container, .progress-container { box-shadow: none; border: 1px solid #000; page-break-inside: avoid; }
+    .current-user-stats { background: #f5f5f5 !important; border: 1px solid #000 !important; }
 }
 
-/* ログインページとパスワード再発行ページの入力フィールド視認性改善 */
-
-/* より強力なセレクターで基本的な入力フィールドのスタイル修正 */
-.auth-section .auth-container .input-group input[type="text"],
-.auth-section .auth-container .input-group input[type="password"],
-.auth-section .auth-container .input-group input[type="email"],
-body .auth-container .input-group input[type="text"],
-body .auth-container .input-group input[type="password"],
-body .auth-container .input-group input[type="email"],
-html .auth-container .input-group input {
-    width: 100% !important;
-    padding: 12px 16px !important;
-    border: 2px solid #e9ecef !important;
-    border-radius: 10px !important;
-    font-size: 1rem !important;
-    box-sizing: border-box !important;
-    transition: all 0.3s ease !important;
-    
-    /* 最重要: 背景色とテキスト色を強制的に指定 */
-    background: #ffffff !important;
-    background-color: #ffffff !important;
-    color: #2c3e50 !important;
-    
-    /* WebKit系ブラウザ対応 */
-    -webkit-text-fill-color: #2c3e50 !important;
-    -webkit-background-color: #ffffff !important;
-    
-    /* その他のブラウザ固有プロパティ */
-    -moz-appearance: textfield !important;
-    -webkit-appearance: none !important;
-    appearance: none !important;
-}
-
-/* プレースホルダーのスタイル - より強力なセレクター */
-.auth-section .auth-container .input-group input::placeholder,
-body .auth-container .input-group input::placeholder,
-html .auth-container .input-group input::placeholder,
-.auth-container .input-group input::-webkit-input-placeholder,
-.auth-container .input-group input::-moz-placeholder,
-.auth-container .input-group input:-ms-input-placeholder {
-    color: #95a5a6 !important;
-    opacity: 1 !important;
-    font-style: italic !important;
-    -webkit-text-fill-color: #95a5a6 !important;
-}
-
-/* フォーカス時のスタイル - より強力なセレクター */
-.auth-section .auth-container .input-group input:focus,
-body .auth-container .input-group input:focus,
-html .auth-container .input-group input:focus {
-    border-color: #3498db !important;
-    background: #ffffff !important;
-    background-color: #ffffff !important;
-    color: #2c3e50 !important;
-    outline: none !important;
-    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1) !important;
-    transform: translateY(-1px) !important;
-    -webkit-text-fill-color: #2c3e50 !important;
-}
-
-/* ホバー時のスタイル */
-.auth-section .auth-container .input-group input:hover,
-body .auth-container .input-group input:hover {
-    border-color: #bdc3c7 !important;
-    background: #ffffff !important;
-    background-color: #ffffff !important;
-    color: #2c3e50 !important;
-    -webkit-text-fill-color: #2c3e50 !important;
-}
-
-/* オートフィル時のスタイル（ブラウザによる自動入力） */
-.auth-container .input-group input:-webkit-autofill,
-.auth-container .input-group input:-webkit-autofill:hover,
-.auth-container .input-group input:-webkit-autofill:focus {
-    -webkit-box-shadow: 0 0 0 30px #ffffff inset !important;
-    -webkit-text-fill-color: #2c3e50 !important;
-    background-color: #ffffff !important;
-    color: #2c3e50 !important;
-}
-
-/* Firefox対応 */
-.auth-container .input-group input:-moz-autofill {
-    background-color: #ffffff !important;
-    color: #2c3e50 !important;
-}
-
-/* 無効化された入力フィールド */
-.auth-container .input-group input:disabled {
-    background-color: #f8f9fa !important;
-    color: #6c757d !important;
-    border-color: #dee2e6;
-    cursor: not-allowed;
-}
-
-/* レスポンシブ対応 */
-@media (max-width: 767px) {
-    .auth-container .input-group input[type="text"],
-    .auth-container .input-group input[type="password"],
-    .auth-container .input-group input[type="email"] {
-        padding: 10px 14px;
-        font-size: 16px; /* iOS Safariでのズーム防止 */
-        background-color: #ffffff !important;
-        color: #2c3e50 !important;
-    }
-}
-
-/* iOS Safari特有の問題対応 */
+/* ----------------
+   iOS Safari 対応
+   ---------------- */
 @supports (-webkit-touch-callout: none) {
-    .auth-container .input-group input[type="text"],
-    .auth-container .input-group input[type="password"],
-    .auth-container .input-group input[type="email"] {
-        -webkit-appearance: none;
-        appearance: none;
-        background-color: #ffffff !important;
-        color: #2c3e50 !important;
-        -webkit-text-fill-color: #2c3e50 !important;
-    }
-}
-
-/* ラベルの視認性も改善 */
-.auth-container .input-group label {
-    display: block;
-    font-weight: 600;
-    color: #34495e;
-    margin-bottom: 8px;
-    font-size: 0.95rem;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.auth-container .input-group label i {
-    color: #3498db;
-    width: 16px;
-    text-align: center;
-    font-size: 0.9rem;
-}
-
-/* 追加: 特定のブラウザでの問題対応 */
-.auth-container .input-group input {
-    /* Edge/Chrome系での透明化防止 */
-    -webkit-background-clip: text;
-    background-clip: text;
-}
-
-/* 特に重要: すべての状態での強制的なテキスト色指定 */
-.auth-container input,
-.auth-container input[type="text"],
-.auth-container input[type="password"], 
-.auth-container input[type="email"],
-.auth-section input,
-.auth-section input[type="text"],
-.auth-section input[type="password"],
-.auth-section input[type="email"] {
-    color: #2c3e50 !important;
-    background: #ffffff !important;
-    background-color: #ffffff !important;
-    -webkit-text-fill-color: #2c3e50 !important;
-    -moz-text-fill-color: #2c3e50 !important;
-}
-
-/* 入力中のテキスト色を強制 */
-.auth-container input:not(:placeholder-shown),
-.auth-section input:not(:placeholder-shown) {
-    color: #2c3e50 !important;
-    -webkit-text-fill-color: #2c3e50 !important;
-}
-
-/* CSS変数を使用した最終手段 */
-:root {
-    --auth-input-text-color: #2c3e50;
-    --auth-input-bg-color: #ffffff;
-}
-
-.auth-container .input-group input {
-    color: var(--auth-input-text-color) !important;
-    background-color: var(--auth-input-bg-color) !important;
-    -webkit-text-fill-color: var(--auth-input-text-color) !important;
-}
-
-.badge {
-    font-size: 0.75em;
-    padding: 0.25em 0.5em;
-    border-radius: 0.25rem;
-}
-
-.bg-warning {
-    background-color: #ffc107 !important;
-}
-
-.text-dark {
-    color: #212529 !important;
-}
-
-.user-list-table th,
-.user-list-table td {
-    padding: 8px 6px;
-    font-size: 0.85em;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 120px;
-    vertical-align: middle;
-}
-
-.user-list-table th:first-child,
-.user-list-table td:first-child {
-    max-width: 40px;
-}
-
-.user-list-table th:last-child,
-.user-list-table td:last-child {
-    max-width: 80px;
-}
-
-/* レスポンシブ対応 */
-@media (max-width: 767px) {
-    .user-list-table {
-        min-width: 900px; /* 幅を少し広げる */
-    }
-    
-    .user-list-table th,
-    .user-list-table td {
-        padding: 4px 2px;
-        font-size: 0.7em;
-        max-width: 100px;
-    }
-    
-    .badge {
-        font-size: 0.65em;
-        padding: 0.2em 0.4em;
-    }
-}
-
-/* ナビゲーションボタンの統一スタイル */
-.navbar-nav .nav-link.btn {
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    height: 38px !important;           /* 高さを統一 */
-    min-width: 120px !important;       /* 最小幅を統一 */
-    padding: 8px 16px !important;      /* パディングを統一 */
-    font-size: 0.9rem !important;      /* フォントサイズを統一 */
-    font-weight: 500 !important;       /* フォントの太さを統一 */
-    border-radius: 6px !important;     /* 角の丸みを統一 */
-    text-align: center !important;
-    white-space: nowrap !important;
-    line-height: 1.2 !important;
-    margin: 2px !important;            /* 上下の余白を統一 */
-}
-
-/* アイコンと文字の間隔を統一 */
-.navbar-nav .nav-link.btn i {
-    margin-right: 6px !important;
-    font-size: 0.85rem !important;
-}
-
-/* 各ボタンの個別色設定 */
-.navbar-nav .nav-link.btn-primary {
-    background-color: #007bff !important;
-    border-color: #007bff !important;
-    color: #ffffff !important;
-}
-
-.navbar-nav .nav-link.btn-primary:hover {
-    background-color: #0056b3 !important;
-    border-color: #0056b3 !important;
-    color: #ffffff !important;
-}
-
-.navbar-nav .nav-link.btn-danger {
-    background-color: #dc3545 !important;
-    border-color: #dc3545 !important;
-    color: #ffffff !important;
-}
-
-.navbar-nav .nav-link.btn-danger:hover {
-    background-color: #c82333 !important;
-    border-color: #c82333 !important;
-    color: #ffffff !important;
-}
-
-/* アカウント名変更ボタン */
-.change-username-button {
-    background-color: #fbad24 !important;
-    color: #ffffff !important;
-    border: none
-}
-
-.change-username-button:hover {
-    background-color: #dd8c09 !important;
-    border-color: #dd8c09 !important;
-    color: #ffffff !important;
-}
-
-/* アカウント名変更ボタン - より強力なセレクター */
-.navbar-nav .nav-link.btn.change-username-button,
-a.nav-link.btn.change-username-button,
-.change-username-button {
-    background-color: #fbad24 !important;
-    color: #ffffff !important;
-    border: none !important;
-    -webkit-text-fill-color: #ffffff !important;  /* Safari対応 */
-}
-
-.navbar-nav .nav-link.btn.change-username-button:hover,
-a.nav-link.btn.change-username-button:hover,
-.change-username-button:hover {
-    background-color: #dd8c09 !important;
-    border-color: #dd8c09 !important;
-    color: #ffffff !important;
-    -webkit-text-fill-color: #ffffff !important;  /* Safari対応 */
-}
-
-/* 追加：リンクの文字色を強制的に白に */
-.change-username-button,
-.change-username-button:link,
-.change-username-button:visited,
-.change-username-button:active {
-    color: #ffffff !important;
-    text-decoration: none !important;
-}
-
-.favicon-fallback {
-    background-image: url("/static/NapoleonIcon.png");
-    background-size: 16px 16px;
-}
-
-/* =======================================
-   章別アコーディオン進捗のスタイル
-   ======================================= */
-
-.progress-accordion {
-    display: flex;
-    flex-direction: column;
-    gap: 15px;
-}
-
-.chapter-progress-item {
-    background-color: #ffffff;
-    border: 1px solid #e0e0e0;
-    border-radius: 10px;
-    overflow: hidden;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-    transition: box-shadow 0.2s ease;
-}
-
-.chapter-progress-item:hover {
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-}
-
-.chapter-progress-header {
-    padding: 20px;
-    cursor: pointer;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-    border-bottom: 1px solid #e0e0e0;
-    transition: background-color 0.2s ease;
-    user-select: none;
-}
-
-.chapter-progress-header:hover {
-    background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%);
-}
-
-.chapter-progress-info {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-
-.chapter-toggle-icon {
-    font-size: 1.2em;
-    color: #495057;
-    transition: transform 0.2s ease;
-    width: 20px;
-    text-align: center;
-}
-
-.chapter-title {
-    font-size: 1.2em;
-    font-weight: 600;
-    color: #2c3e50;
-}
-
-.chapter-summary {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 4px;
-}
-
-.mastered-count {
-    font-size: 1.1em;
-    font-weight: 600;
-    color: #27ae60;
-}
-
-.chapter-percentage {
-    font-size: 0.9em;
-    color: #6c757d;
-}
-
-/* 章の進捗バー */
-.chapter-progress-bar-container {
-    height: 8px;
-    background-color: #e9ecef;
-    margin: 0 20px 20px 20px;
-    border-radius: 4px;
-    overflow: hidden;
-}
-
-.chapter-progress-bar {
-    height: 100%;
-    background: linear-gradient(90deg, #28a745 0%, #20c997 100%);
-    border-radius: 4px;
-    transition: width 0.8s ease-in-out;
-}
-
-/* 単元詳細エリア */
-.unit-details {
-    padding: 0 20px 20px 20px;
-    background-color: #f8f9fa;
-    border-top: 1px solid #e0e0e0;
-}
-
-.unit-progress-item {
-    background-color: #ffffff;
-    border: 1px solid #e0e0e0;
-    border-radius: 8px;
-    padding: 15px;
-    margin-bottom: 10px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-}
-
-.unit-progress-item:last-child {
-    margin-bottom: 0;
-}
-
-.unit-progress-item h5 {
-    color: #2c3e50;
-    font-size: 1.1em;
-    margin-bottom: 10px;
-    padding-bottom: 5px;
-    border-bottom: 1px solid #e9ecef;
-}
-
-.unit-progress-item p {
-    margin-bottom: 6px;
-    color: #555;
-    font-size: 0.95em;
-}
-
-/* 単元の進捗バー */
-.unit-progress-bar-container {
-    background-color: #e9ecef;
-    border-radius: 6px;
-    height: 8px;
-    margin-top: 10px;
-    overflow: hidden;
-}
-
-.unit-progress-bar {
-    background: linear-gradient(90deg, #007bff 0%, #0056b3 100%);
-    height: 100%;
-    border-radius: 6px;
-    transition: width 0.8s ease-in-out;
-}
-
-/* レスポンシブ対応 */
-@media (max-width: 767px) {
-    .chapter-progress-header {
-        padding: 15px;
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 10px;
-    }
-    
-    .chapter-progress-info {
-        gap: 8px;
-    }
-    
-    .chapter-title {
-        font-size: 1.0em;
-        line-height: 1.3;
-    }
-    
-    .chapter-summary {
-        align-items: flex-start;
-        width: 100%;
-    }
-    
-    .mastered-count {
-        font-size: 1.0em;
-    }
-    
-    .chapter-percentage {
-        font-size: 0.85em;
-    }
-    
-    .chapter-progress-bar-container {
-        margin: 0 15px 15px 15px;
-    }
-    
-    .unit-details {
-        padding: 0 15px 15px 15px;
-    }
-    
-    .unit-progress-item {
-        padding: 12px;
-    }
-    
-    .unit-progress-item h5 {
-        font-size: 1.0em;
-        line-height: 1.3;
-    }
-    
-    .unit-progress-item p {
-        font-size: 0.9em;
-    }
-}
-
-@media (max-width: 480px) {
-    .chapter-progress-header {
-        padding: 12px;
-    }
-    
-    .chapter-title {
-        font-size: 0.95em;
-    }
-    
-    .mastered-count {
-        font-size: 0.95em;
-    }
-    
-    .chapter-percentage {
-        font-size: 0.8em;
-    }
-    
-    .unit-progress-item {
-        padding: 10px;
-    }
-    
-    .unit-progress-item h5 {
-        font-size: 0.95em;
-    }
-    
-    .unit-progress-item p {
-        font-size: 0.85em;
-    }
-}
-
-/* style.css の末尾に以下を追加 */
-
-/* =======================================
-  個別スコア表示のスタイル
-  ======================================= */
-
-.current-user-stats {
-   background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%);
-   border: 2px solid #2196f3;
-   border-radius: 12px;
-   padding: 20px;
-   margin-bottom: 25px;
-   box-shadow: 0 4px 12px rgba(33, 150, 243, 0.15);
-}
-
-.current-user-stats h4 {
-   color: #1565c0;
-   font-size: 1.2em;
-   margin-bottom: 15px;
-   text-align: center;
-   border-bottom: 2px solid #90caf9;
-   padding-bottom: 8px;
-}
-
-.stats-grid {
-   display: grid;
-   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-   gap: 15px;
-   margin-bottom: 20px;
-}
-
-.stat-item {
-   background-color: #ffffff;
-   border: 1px solid #e3f2fd;
-   border-radius: 8px;
-   padding: 15px;
-   text-align: center;
-   box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-   transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.stat-item:hover {
-   transform: translateY(-2px);
-   box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-}
-
-.stat-label {
-   display: block;
-   font-size: 0.9em;
-   color: #666;
-   margin-bottom: 5px;
-   font-weight: 500;
-}
-
-.stat-value {
-   display: block;
-   font-size: 1.6em;
-   font-weight: bold;
-   color: #1976d2;
-   margin-bottom: 3px;
-}
-
-.stat-value.main-score {
-   font-size: 2em;
-   color: #d32f2f;
-   text-shadow: 1px 1px 2px rgba(211, 47, 47, 0.2);
-}
-
-.stat-description {
-   display: block;
-   font-size: 0.75em;
-   color: #999;
-   font-style: italic;
-   line-height: 1.2;
-}
-
-.basic-stats {
-   background-color: rgba(255, 255, 255, 0.8);
-   border-radius: 6px;
-   padding: 12px;
-   margin-top: 15px;
-   border-left: 4px solid #4caf50;
-}
-
-.basic-stats p {
-   margin: 0;
-   font-size: 0.9em;
-   color: #333;
-   line-height: 1.4;
-}
-
-/* ランキングテーブルで現在のユーザー行をハイライト */
-.current-user-row {
-   background-color: #fff3e0 !important;
-   border-left: 4px solid #ff9800 !important;
-   font-weight: 600;
-}
-
-.current-user-row:hover {
-   background-color: #ffe0b2 !important;
-}
-
-/* バッジスタイル */
-.badge.bg-primary {
-   background-color: #2196f3 !important;
-   color: white;
-   font-size: 0.7em;
-   padding: 0.2em 0.5em;
-   border-radius: 0.25rem;
-   margin-left: 5px;
-}
-
-/* レスポンシブ対応 */
-@media (max-width: 767px) {
-   .current-user-stats {
-       padding: 15px;
-       margin-bottom: 20px;
-   }
-   
-   .current-user-stats h4 {
-       font-size: 1.1em;
-       margin-bottom: 12px;
-   }
-   
-   .stats-grid {
-       grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-       gap: 10px;
-       margin-bottom: 15px;
-   }
-   
-   .stat-item {
-       padding: 10px;
-   }
-   
-   .stat-label {
-       font-size: 0.8em;
-   }
-   
-   .stat-value {
-       font-size: 1.3em;
-   }
-   
-   .stat-value.main-score {
-       font-size: 1.6em;
-   }
-   
-   .stat-description {
-       font-size: 0.7em;
-   }
-   
-   .basic-stats {
-       padding: 10px;
-   }
-   
-   .basic-stats p {
-       font-size: 0.8em;
-   }
-}
-
-@media (max-width: 480px) {
-   .stats-grid {
-       grid-template-columns: 1fr;
-       gap: 8px;
-   }
-   
-   .stat-item {
-       padding: 8px;
-   }
-   
-   .stat-value {
-       font-size: 1.2em;
-   }
-   
-   .stat-value.main-score {
-       font-size: 1.4em;
-   }
-   
-   /* 基本統計を縦並びに */
-   .basic-stats p {
-       font-size: 0.75em;
-       line-height: 1.6;
-   }
-}
-
-/* 印刷時は個別スコアも表示 */
-@media print {
-   .current-user-stats {
-       background: #f5f5f5 !important;
-       border: 1px solid #000 !important;
-       box-shadow: none !important;
-       page-break-inside: avoid;
-   }
-   
-   .stat-value,
-   .stat-value.main-score {
-       color: #000 !important;
-       text-shadow: none !important;
-   }
-}
-
-/* base.html または progress.html の <style> セクションに追加してください */
-
-.stats-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 20px;
-    flex-wrap: wrap;
-}
-
-.stats-title-section {
-    flex: 1;
-    min-width: 200px;
-}
-
-.rank-section {
-    flex: 0 0 auto;
-    text-align: center;
-    min-width: 150px;
-    margin-left: 20px;
-}
-
-.rank-section h4 {
-    margin-bottom: 10px;
-    color: #2c3e50;
-}
-
-.rank-display {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    padding: 15px 20px;
-    border-radius: 12px;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-    display: inline-block;
-    min-width: 120px;
-}
-
-.rank-number {
-    font-size: 2.2em;
-    font-weight: bold;
-    display: block;
-    line-height: 1;
-}
-
-.rank-text {
-    font-size: 1.1em;
-    font-weight: 600;
-    margin-left: 5px;
-}
-
-.rank-total {
-    font-size: 0.9em;
-    opacity: 0.9;
-    display: block;
-    margin-top: 5px;
-}
-
-/* 特別な順位のスタイル */
-.rank-display.rank-1 {
-    background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
-    color: #333;
-}
-
-.rank-display.rank-2 {
-    background: linear-gradient(135deg, #C0C0C0 0%, #808080 100%);
-    color: #333;
-}
-
-.rank-display.rank-3 {
-    background: linear-gradient(135deg, #CD7F32 0%, #A0522D 100%);
-    color: white;
-}
-
-/* レスポンシブ対応 */
-@media (max-width: 768px) {
-    .stats-header {
-        flex-direction: column;
-        align-items: center;
-    }
-    
-    .rank-section {
-        margin-left: 0;
-        margin-top: 15px;
-    }
-}
-
-/* base.html または progress.html の <style> セクションに追加してください */
-
-/* ランキングヘッダーのレイアウト */
-.ranking-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 25px;
-    gap: 30px;
-    flex-wrap: wrap;
-}
-
-.ranking-title-section {
-    flex: 1;
-    min-width: 300px;
-}
-
-.ranking-title-section h3 {
-    margin-bottom: 8px;
-    color: #2c3e50;
-    font-size: 1.4em;
-}
-
-.ranking-title-section p {
-    margin-bottom: 0;
-    color: #6c757d;
-    font-size: 0.95em;
-}
-
-.user-rank-section {
-    flex: 0 0 auto;
-    text-align: center;
-    min-width: 140px;
-}
-
-.user-rank-section h4 {
-    margin-bottom: 12px;
-    color: #2c3e50;
-    font-size: 1.1em;
-    font-weight: 600;
-}
-
-.rank-display {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    padding: 12px 18px;
-    border-radius: 10px;
-    box-shadow: 0 3px 6px rgba(0,0,0,0.1);
-    display: inline-block;
-    min-width: 110px;
-    transition: transform 0.2s ease;
-}
-
-.rank-display:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 5px 12px rgba(0,0,0,0.15);
-}
-
-.rank-number {
-    font-size: 1.8em;
-    font-weight: bold;
-    display: block;
-    line-height: 1;
-}
-
-.rank-text {
-    font-size: 1em;
-    font-weight: 600;
-    margin-left: 4px;
-}
-
-.rank-total {
-    font-size: 0.85em;
-    opacity: 0.9;
-    display: block;
-    margin-top: 4px;
-}
-
-.rank-icon {
-    font-size: 1.1em;
-    display: block;
-    margin-bottom: 4px;
-}
-
-/* 特別な順位のスタイル */
-.rank-display.rank-1 {
-    background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
-    color: #333;
-    border: 2px solid #FFD700;
-}
-
-.rank-display.rank-2 {
-    background: linear-gradient(135deg, #C0C0C0 0%, #808080 100%);
-    color: #333;
-    border: 2px solid #C0C0C0;
-}
-
-.rank-display.rank-3 {
-    background: linear-gradient(135deg, #CD7F32 0%, #A0522D 100%);
-    color: white;
-    border: 2px solid #CD7F32;
-}
-
-/* レスポンシブ対応 */
-@media (max-width: 992px) {
-    .ranking-header {
-        flex-direction: column;
-        align-items: center;
-        text-align: center;
-        gap: 20px;
-    }
-    
-    .ranking-title-section {
-        min-width: auto;
-    }
-    
-    .user-rank-section {
-        min-width: auto;
-    }
-}
-
-@media (max-width: 576px) {
-    .ranking-header {
-        gap: 15px;
-    }
-    
-    .rank-display {
-        min-width: 100px;
-        padding: 10px 15px;
-    }
-    
-    .rank-number {
-        font-size: 1.6em;
-    }
-}
-
-/* admin.html に追加する管理者ランキング専用CSS（最適化版） */
-
-/* 管理者ランキングセクション全体 */
-.admin-panel {
-    background-color: #f9f9f9;
-    padding: 20px;
-    border-radius: 8px;
-    margin-bottom: 20px;
-    border: 1px solid #eee;
-}
-
-.room-selector-container h4 {
-    font-size: 1.1rem;
-    margin-bottom: 12px;
-    color: #495057;
-}
-
-/* ランキング表示エリア */
-#admin-ranking-container {
-    min-height: 300px;
-}
-
-/* 初期メッセージ */
-#admin-ranking-initial {
-    text-align: center;
-    padding: 40px 20px;
-    color: #6c757d;
-}
-
-#admin-ranking-initial .fa-trophy {
-    color: #ffc107;
-    margin-bottom: 15px;
-}
-
-/* ローディング表示 */
-#admin-ranking-loading {
-    text-align: center;
-    padding: 40px 20px;
-}
-
-.spinner-border {
-    width: 2.5rem;
-    height: 2.5rem;
-}
-
-/* 統計サマリー */
-.ranking-summary {
-    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-    padding: 20px;
-    border-radius: 8px;
-    margin-bottom: 20px;
-    border: 1px solid #dee2e6;
-}
-
-.summary-card {
-    text-align: center;
-    padding: 15px;
-    background-color: white;
-    border-radius: 6px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.08);
-    border: 1px solid #e9ecef;
-    transition: transform 0.2s ease;
-}
-
-.summary-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0,0,0,0.12);
-}
-
-.summary-card h5 {
-    font-size: 0.9rem;
-    color: #6c757d;
-    margin-bottom: 8px;
-    font-weight: 500;
-}
-
-.summary-value {
-    font-size: 1.6rem;
-    font-weight: bold;
-    color: #2c3e50;
-    display: block;
-    line-height: 1.2;
-}
-
-/* ランキングテーブル */
-.table-responsive {
-    border-radius: 8px;
-    overflow: hidden;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-}
-
-.table {
-    margin-bottom: 0;
-    font-size: 0.9rem;
-}
-
-.table th {
-    border-top: none;
-    font-weight: 600;
-    font-size: 0.85rem;
-    background-color: #343a40;
-    color: white;
-    text-align: center;
-    vertical-align: middle;
-    padding: 12px 8px;
-}
-
-.table td {
-    vertical-align: middle;
-    text-align: center;
-    padding: 10px 8px;
-    border-bottom: 1px solid #dee2e6;
-}
-
-.table-hover tbody tr:hover {
-    background-color: rgba(0,0,0,0.04);
-}
-
-/* 順位表示のアイコン */
-.fas.fa-crown,
-.fas.fa-medal {
-    font-size: 0.8rem;
-}
-
-.text-warning {
-    color: #ffc107 !important;
-}
-
-.text-secondary {
-    color: #6c757d !important;
-}
-
-.text-info {
-    color: #17a2b8 !important;
-}
-
-.text-primary {
-    color: #007bff !important;
-}
-
-/* 操作ボタンセクション */
-.admin-ranking-actions {
-    padding: 15px;
-    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-    border-radius: 8px;
-    text-align: center;
-    border: 1px solid #dee2e6;
-    margin-top: 20px;
-}
-
-.admin-ranking-actions button {
-    margin: 0 5px 5px 0;
-    font-size: 0.85rem;
-    padding: 8px 16px;
-}
-
-/* エラー表示 */
-#admin-ranking-error {
-    text-align: center;
-    margin: 20px 0;
-    border-radius: 8px;
-}
-
-/* レスポンシブ対応 */
-@media (max-width: 768px) {        
-    .ranking-summary {
-        padding: 15px;
-    }
-    
-    .summary-card {
-        margin-bottom: 10px;
-        padding: 12px;
-    }
-    
-    .summary-value {
-        font-size: 1.4rem;
-    }
-    
-    .table {
-        font-size: 0.8rem;
-    }
-    
-    .table th,
-    .table td {
-        padding: 8px 4px;
-    }
-    
-    .admin-ranking-actions {
-        padding: 12px;
-    }
-    
-    .admin-ranking-actions button {
-        margin: 2px;
-        font-size: 0.8rem;
-        padding: 6px 12px;
-    }
-}
-
-@media (max-width: 480px) {    
-    .summary-value {
-        font-size: 1.2rem;
-    }
-    
-    .table {
-        font-size: 0.7rem;
-    }
-    
-    .table th,
-    .table td {
-        padding: 6px 2px;
-    }
-    
-    /* スマホでは横スクロール可能にする */
-    .table-responsive {
-        font-size: 0.7rem;
-    }
-    
-    .admin-ranking-actions button {
-        display: block;
-        width: 100%;
-        margin: 5px 0;
-    }
-}
-
-/* アニメーション効果 */
-.admin-ranking-actions {
-    animation: slideUp 0.3s ease-out;
-}
-
-#admin-ranking-table-container {
-    animation: fadeIn 0.5s ease-in;
-}
-
-.summary-card {
-    animation: cardPop 0.4s ease-out;
-}
-
-@keyframes slideUp {
-    from {
-        opacity: 0;
-        transform: translateY(20px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-}
-
-@keyframes cardPop {
-    0% {
-        opacity: 0;
-        transform: scale(0.9);
-    }
-    50% {
-        opacity: 0.8;
-        transform: scale(1.02);
-    }
-    100% {
-        opacity: 1;
-        transform: scale(1);
-    }
-}
-
-/* admin.html に追加するコンパクト部屋選択のCSS */
-
-/* 部屋選択セクション（コンパクト化） */
-.room-selector-container {
-    margin-bottom: 15px;
-    padding: 15px;
-    background-color: #f8f9fa;
-    border-radius: 6px;
-    border: 1px solid #dee2e6;
-}
-
-.room-selector-container h4 {
-    font-size: 1rem;
-    margin-bottom: 10px;
-    color: #495057;
-}
-
-/* ドロップダウン形式 */
-.room-selector-dropdown {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
-}
-
-.room-selector-dropdown select {
-    flex: 1;
-    min-width: 200px;
-    font-size: 0.9rem;
-}
-
-.room-selector-dropdown button {
-    font-size: 0.85rem;
-    padding: 6px 12px;
-    white-space: nowrap;
-}
-
-/* コンパクトボタン形式 */
-.room-buttons-compact {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-    gap: 8px;
-    max-height: 120px;
-    overflow-y: auto;
-    padding: 8px;
-    border: 1px solid #e9ecef;
-    border-radius: 4px;
-    background-color: white;
-}
-
-.room-button-compact {
-    padding: 6px 8px;
-    border-radius: 4px;
-    transition: all 0.2s ease;
-    font-size: 0.8rem;
-    text-align: center;
-    min-height: 50px;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    gap: 2px;
-}
-
-.room-button-compact:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.room-button-compact.btn-primary {
-    background-color: #007bff;
-    border-color: #007bff;
-    color: white;
-    box-shadow: 0 2px 6px rgba(0,123,255,0.3);
-}
-
-.room-button-compact .room-text {
-    font-weight: 600;
-    font-size: 0.85rem;
-}
-
-.room-button-compact .user-count {
-    opacity: 0.8;
-    font-size: 0.7rem;
-}
-
-/* 表示切り替えボタン */
-.view-toggle {
-    text-align: center;
-}
-
-.view-toggle button {
-    font-size: 0.75rem;
-    padding: 4px 8px;
-}
-
-/* 選択中の部屋表示（バッジ形式） */
-.selected-room-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    background: linear-gradient(135deg, #007bff, #0056b3);
-    color: white;
-    padding: 8px 12px;
-    border-radius: 20px;
-    font-size: 0.85rem;
-    margin-bottom: 15px;
-    box-shadow: 0 2px 6px rgba(0,123,255,0.3);
-}
-
-.selected-room-badge i {
-    font-size: 0.9rem;
-}
-
-.selected-room-badge button {
-    font-size: 0.7rem;
-    padding: 2px 6px;
-    border-radius: 12px;
-}
-
-/* スクロールバーのスタイリング */
-.room-buttons-compact::-webkit-scrollbar {
-    width: 4px;
-}
-
-.room-buttons-compact::-webkit-scrollbar-track {
-    background: #f1f1f1;
-    border-radius: 2px;
-}
-
-.room-buttons-compact::-webkit-scrollbar-thumb {
-    background: #c1c1c1;
-    border-radius: 2px;
-}
-
-.room-buttons-compact::-webkit-scrollbar-thumb:hover {
-    background: #a8a8a8;
-}
-
-/* レスポンシブ対応 */
-@media (max-width: 768px) {
-    .room-selector-container {
-        padding: 12px;
-        margin-bottom: 12px;
-    }
-    
-    .room-selector-dropdown {
-        flex-direction: column;
-        align-items: stretch;
-        gap: 8px;
-    }
-    
-    .room-selector-dropdown select {
-        min-width: auto;
-    }
-    
-    .room-buttons-compact {
-        grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-        max-height: 100px;
-        gap: 6px;
-    }
-    
-    .room-button-compact {
-        min-height: 45px;
-        padding: 4px 6px;
-        font-size: 0.75rem;
-    }
-    
-    .room-button-compact .room-text {
-        font-size: 0.8rem;
-    }
-    
-    .room-button-compact .user-count {
-        font-size: 0.65rem;
-    }
-    
-    .selected-room-badge {
-        padding: 6px 10px;
-        font-size: 0.8rem;
-    }
-}
-
-@media (max-width: 480px) {
-    .room-selector-container h4 {
-        font-size: 0.95rem;
-        margin-bottom: 8px;
-    }
-    
-    .room-buttons-compact {
-        grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
-        max-height: 80px;
-    }
-    
-    .room-button-compact {
-        min-height: 40px;
-        font-size: 0.7rem;
-    }
-    
-    .room-button-compact .room-text {
-        font-size: 0.75rem;
-    }
-    
-    .room-button-compact .user-count {
-        font-size: 0.6rem;
-    }
-    
-    .selected-room-badge {
-        padding: 5px 8px;
-        font-size: 0.75rem;
-        gap: 6px;
-    }
-    
-    .selected-room-badge button {
-        font-size: 0.65rem;
-        padding: 1px 4px;
-    }
-}
-
-/* アニメーション効果 */
-.selected-room-badge {
-    animation: badgeSlideIn 0.3s ease-out;
-}
-
-@keyframes badgeSlideIn {
-    from {
-        opacity: 0;
-        transform: translateX(-20px);
-    }
-    to {
-        opacity: 1;
-        transform: translateX(0);
-    }
-}
-
-/* 答えを見るボタンの無効化スタイル */
-.show-answer-button:disabled {
-    opacity: 0.5 !important;
-    cursor: not-allowed !important;
-    pointer-events: none !important;
-    background-color: #6c757d !important;
-}
-
-.show-answer-button:disabled:hover {
-    background-color: #6c757d !important;
-    transform: none !important;
-}
-
-/* pointer-events無効化の確実な適用 */
-.show-answer-button[style*="pointer-events: none"] {
-    pointer-events: none !important;
-}
-
-.recommended-essay-link {
-    display: block;
-    text-decoration: none;
-    color: #34495e;
-    padding: 10px;
-    border-radius: 6px;
-    transition: background-color 0.2s ease;
-}
-
-.recommended-essay-link:hover {
-    background-color: #ecf0f1;
-}
-
-.recommended-essay-link strong {
-    color: #2980b9;
-    font-size: 0.9em;
-}
-
-.recommended-essay-link p {
-    font-size: 0.85em;
-    margin: 5px 0 0 0;
-    color: #555;
-    line-height: 1.4;
-}
-
-.no-recommendation {
-    padding: 15px;
-    text-align: center;
-    color: #6c757d;
-    font-size: 0.9em;
-    list-style-type: none;
-}
-
-.warm-up-quiz-section {
-    text-align: center;
-    margin: 25px 0;
-}
-.warm-up-quiz-section .btn {
-    font-weight: 600;
-    padding: 12px 25px;
-    border-radius: 25px;
-    box-shadow: 0 4px 15px rgba(40, 167, 69, 0.2);
-    transition: all 0.3s ease;
-}
-.warm-up-quiz-section .btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(40, 167, 69, 0.3);
-}
-
-/* 準備運動クイズ用のスタイル */
-.quiz-answer {
-    /* 解答欄に最低限の高さを設定し、場所を確保する */
-    min-height: 60px;
-    padding: 10px;
-    background-color: #fff3cd;
-    border-radius: 5px;
-    color: #856404;
-    font-weight: 500;
-}
-
-/* 解答欄はガタつき防止のため、高さを維持する visibility: hidden を使う */
-.quiz-answer.is-hidden {
-    visibility: hidden;
-}
-
-/* ボタンはレイアウトから完全に消すため、display: none を使う */
-.quiz-buttons .btn.is-hidden {
-    display: none;
-}
-
-/* ボタンの表示形式を inline-block に統一 */
-.quiz-buttons .btn {
-    display: inline-block;
-}
-
-/* 準備運動クイズのレイアウト安定化 */
-#quizCardContainer {
-    min-height: 220px; /* スマホ画面でも十分な高さを確保 */
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-}
-
-/* 準備運動クイズのボタンレイアウト修正 */
-.quiz-buttons {
-    display: flex;
-    justify-content: center; /* ボタンを中央揃え */
-    align-items: center;
-    min-height: 50px; /* ボタンエリアの高さを確保 */
-    gap: 10px; /* ボタン間の隙間 */
-}
-
-/* static/style.css の一番下に追加 */
-
-/* =======================================
-   今日の10問 クイズモーダル用スタイル
-   ======================================= */
-
-.daily-quiz-modal .modal-dialog {
-    max-width: 600px;
-}
-
-.daily-quiz-modal .modal-header {
-    background-color: #27ae60;
-    color: white;
-}
-
-.daily-quiz-modal .modal-title i {
-    margin-right: 8px;
-}
-
-.daily-quiz-modal .btn-close {
-    filter: invert(1) grayscale(100%) brightness(200%);
-}
-
-#dailyQuizContainer {
-    text-align: center;
-    padding: 10px;
-}
-
-.quiz-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
-    font-size: 1.1em;
-}
-
-.quiz-progress-text {
-    font-weight: bold;
-    background-color: #f0f0f0;
-    padding: 5px 10px;
-    border-radius: 15px;
-}
-
-.quiz-timer {
-    font-weight: bold;
-    color: #e74c3c;
-    background-color: #fdd;
-    padding: 5px 10px;
-    border-radius: 15px;
-}
-
-.quiz-question-text {
-    font-size: 1.4em;
-    font-weight: 600;
-    margin-bottom: 25px;
-    min-height: 80px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.quiz-choices {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 15px;
-}
-
-.choice-btn {
-    padding: 15px;
-    font-size: 1.1em;
-    border: 2px solid #bdc3c7;
-    background-color: white;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.choice-btn:hover:not(:disabled) {
-    background-color: #ecf0f1;
-    border-color: #3498db;
-}
-
-.choice-btn:disabled {
-    cursor: not-allowed;
-}
-
-.choice-btn.correct {
-    background-color: #d4edda;
-    border-color: #28a745;
-    color: #155724;
-    font-weight: bold;
-}
-
-.choice-btn.incorrect {
-    background-color: #f8d7da;
-    border-color: #dc3545;
-    color: #721c24;
-}
-
-.feedback-icon {
-    font-size: 2em;
-    margin-left: 10px;
-}
-
-/* クイズ結果画面 */
-.quiz-result-view h4 {
-    color: #27ae60;
-    font-size: 1.8em;
-    margin-bottom: 15px;
-}
-
-.result-summary {
-    font-size: 1.2em;
-    margin-bottom: 20px;
-}
-.result-summary span {
-    font-weight: bold;
-}
-
-.ranking-table {
-    width: 100%;
-    margin-top: 20px;
-    border-collapse: collapse;
-}
-
-.ranking-table th, .ranking-table td {
-    padding: 8px;
-    border-bottom: 1px solid #ddd;
-}
-
-.ranking-table th {
-    background-color: #f2f2f2;
-}
-
-.current-user-rank {
-    background-color: #fff3cd;
-    font-weight: bold;
-}
-
-/* ランキング表の見出しを見やすく */
-.daily-quiz-modal .ranking-table th {
-    background-color: #27ae60; /* ヘッダーと同じ緑色 */
-    color: white;
-    font-weight: 600;
-}
-
-/* 自分の順位をハイライト（より分かりやすい色に） */
-.daily-quiz-modal .current-user-rank {
-    background-color: #e8f4fd !important; /* 明るい青色 */
-    color: #1565c0;
-    font-weight: bold;
-    border-left: 4px solid #3498db;
-    border-right: 4px solid #3498db;
-}
-
-/* 全体のテキストを少し濃く */
-.daily-quiz-modal .result-summary p,
-.daily-quiz-modal .ranking-table td {
-    color: #34495e;
-}
-
-/* =======================================
-   メイン画面コントロールボタンの配色
-   ======================================= */
-.bottom-controls .btn {
-    font-weight: 600;
-    border: none;
-    transition: all 0.2s ease-in-out;
-    padding: 12px 20px;
-    font-size: 0.95rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px; /* アイコンとテキストの間隔 */
-}
-
-.bottom-controls .btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-}
-
-/* 1. 学習開始 (メインボタン) */
-.btn-start {
-    background-color: #007bff; /* プライマリーブルー */
-    color: white;
-}
-.btn-start:hover {
-    background-color: #0056b3;
-    color: white;
-}
-
-/* 2. 選択リセット (ユーティリティボタン) */
-.btn-reset {
-    background-color: #afbfce;
-    color: white;
-}
-.btn-reset:hover {
-    background-color: #7d8a96;
-    color: white;
-}
-
-/* 3. 今日の10問 (特別コンテンツ) */
-.btn-daily {
-    background-color: #28a745;
-    color: white;
-}
-.btn-daily:hover {
-    background-color: #218838;
-    color: white;
-}
-
-/* 4. 苦手問題一覧 (ユーティリティボタン) */
-.btn-weak {
-    background-color: #193c5e;
-    color: #ffffff;
-    border: 1px solid #193c5e;
-}
-.btn-weak:hover {
-    background-color: #1a344e;
-    color: #ffffff;
-}
-
-/* 5. 論述問題集 (特別コンテンツ) */
-.btn-essay {
-    background-color: #2f295b;
-    color: white;
-}
-.btn-essay:hover {
-    background-color: #070013;
-    color: white;
-}
-
-/* =======================================
-   今日の10問 5位以下の自分の順位表示
-   ======================================= */
-.ranking-table tfoot .rank-ellipsis td {
-    border: none;
-    padding: 4px 0;
-    color: #adb5bd;
-    font-size: 1.2em;
-}
-
-.ranking-table .out-of-top5-rank td {
-    border-top: 2px dashed #0d6efd; /* 区切り線 */
-}
-
-/* =======================================
-   月間ランキング表示 (モーダル内)
-   ======================================= */
-.quiz-result-view .result-divider {
-    margin: 25px 0;
-    border-top: 1px dashed #ced4da;
-}
-
-.quiz-result-view h5 {
-    font-weight: 600;
-    color: #495057;
-    margin-bottom: 10px;
-    text-align: center;
-}
-
-.quiz-result-view h5 i {
-    margin-right: 8px;
-    color: #ffc107; /* アイコンを金色に */
-}
-
-.quiz-result-view h5 .fa-medal {
-    color: #0d6efd; /* 日次アイコンを青色に */
-}
-
-.participation-count {
-    font-size: 0.9em;
-    font-style: italic;
-}
-
-/* =======================================
-   月初の月間結果ポップアップ
-   ======================================= */
-.monthly-result-header {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    border-bottom: none;
-}
-
-.monthly-result-header .modal-title {
-    font-weight: 600;
-}
-
-.monthly-result-header .btn-close {
-    filter: invert(1) grayscale(100%) brightness(200%);
-}
-
-.monthly-result-modal-content .modal-body h3 {
-    font-weight: bold;
-    color: #667eea;
-}
-
-.user-monthly-summary {
-    background: #f8f9fa;
-    border-radius: 8px;
-    padding: 20px;
-    margin: 20px 0;
-    border: 1px solid #e9ecef;
-}
-
-.user-monthly-summary h4 {
-    font-weight: 700;
-    color: #495057;
-}
-.user-monthly-summary h4 span {
-    color: #dc3545; /* 順位を赤色で強調 */
-    font-size: 1.4em;
-}
-
-.user-monthly-summary h5 {
-    color: #6c757d;
-    font-weight: 600;
-}
-.user-monthly-summary h5 span {
-    color: #0d6efd;
-    font-size: 1.2em;
+    input, select, button { -webkit-appearance: none; appearance: none; border-radius: 8px; }
+    .auth-container .input-group input { font-size: 16px; /* ズーム防止 */ }
 }
