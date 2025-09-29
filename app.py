@@ -102,13 +102,11 @@ class JSONEncodedDict(TypeDecorator):
             return None
         return json.loads(value)
 
-# app.py の既存の class User(db.Model): ... を丸ごとこちらに置き換え
-
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     room_number = db.Column(db.String(50), nullable=False)
-    student_id = db.Column(db.String(50), nullable=False) # unique=True を削除
-    username = db.Column(db.String(80), nullable=False)   # unique=True を削除
+    student_id = db.Column(db.String(50), nullable=False)
+    username = db.Column(db.String(80), nullable=False)
     
     _room_password_hash = db.Column(db.String(255), nullable=False)
     _individual_password_hash = db.Column(db.String(255), nullable=False)
@@ -220,7 +218,7 @@ class MonthlyResultViewed(db.Model):
     __table_args__ = (db.UniqueConstraint('user_id', 'year', 'month', name='uq_user_viewed_year_month'),)
 
 class RoomSetting(db.Model):
-    __table_args__ = {'extend_existing': True}  # ← 重複エラー回避
+    __table_args__ = {'extend_existing': True}
     
     id = db.Column(db.Integer, primary_key=True)
     room_number = db.Column(db.String(50), unique=True, nullable=False)
@@ -1303,8 +1301,6 @@ def admin_fix_all_data():
         flash(f'データ修正エラー: {str(e)}', 'danger')
     
     return redirect(url_for('admin_page'))
-
-# app.py のルーティングエリアに追加
 
 @app.route('/admin/emergency_fix_user_schema', methods=['POST'])
 @admin_required
@@ -3662,9 +3658,6 @@ def admin_ranking_page():
         flash('ランキングページの読み込み中にエラーが発生しました。', 'danger')
         return redirect(url_for('admin_page'))
 
-# ====================================================================
-# 管理者用ランキング API エンドポイント
-# ====================================================================
 @app.route('/admin/get_available_units/<room_number>')
 def admin_get_available_units(room_number):
     """指定部屋で利用可能な単元一覧を取得（管理者用・フィルタリングなし）"""
@@ -4014,6 +4007,88 @@ def admin_fallback_ranking_calculation(room_number, start_time):
         traceback.print_exc()
         return jsonify(status='error', message=f'ランキング計算エラー: {str(e)}'), 500
 
+@app.route('/api/admin/daily_quiz_info/<room_number>')
+@admin_required
+def api_admin_daily_quiz_info(room_number):
+    """管理者用: 指定部屋の「今日の10問」ランキングと月間取り組み回数を取得"""
+    try:
+        # 今日の日付 (JSTの午前7時を日付の区切りとする)
+        today = (datetime.now(JST) - timedelta(hours=7)).date()
+        
+        # 1. 今日のランキングを取得
+        daily_quiz = DailyQuiz.query.filter_by(date=today, room_number=room_number).first()
+        
+        daily_ranking = []
+        total_participants_today = 0
+        average_score_today = 0
+        
+        if daily_quiz:
+            results = DailyQuizResult.query.filter_by(quiz_id=daily_quiz.id)\
+                .join(User)\
+                .order_by(DailyQuizResult.score.desc(), DailyQuizResult.time_taken_ms.asc()).all()
+            
+            total_participants_today = len(results)
+            if total_participants_today > 0:
+                total_score = sum(r.score for r in results)
+                average_score_today = round(total_score / total_participants_today, 2)
+            
+            for i, result in enumerate(results, 1):
+                daily_ranking.append({
+                    'rank': i,
+                    'username': result.user.username,
+                    'student_id': result.user.student_id,
+                    'score': result.score,
+                    'time': f"{(result.time_taken_ms / 1000):.2f}秒"
+                })
+
+        # 2. 今月の取り組み回数を取得
+        current_year = today.year
+        current_month = today.month
+        
+        first_day_of_month = date(current_year, current_month, 1)
+        # 次の月の初日を取得し、1日引くことで今月の最終日を計算
+        if current_month == 12:
+            last_day_of_month = date(current_year + 1, 1, 1) - timedelta(days=1)
+        else:
+            last_day_of_month = date(current_year, current_month + 1, 1) - timedelta(days=1)
+
+        monthly_attempts = db.session.query(
+            User.username,
+            User.student_id,
+            func.count(DailyQuizResult.id).label('attempts_count')
+        ).join(
+            DailyQuizResult, User.id == DailyQuizResult.user_id
+        ).join(
+            DailyQuiz, DailyQuizResult.quiz_id == DailyQuiz.id
+        ).filter(
+            User.room_number == room_number,
+            DailyQuiz.date >= first_day_of_month,
+            DailyQuiz.date <= last_day_of_month
+        ).group_by(
+            User.id, User.username, User.student_id
+        ).order_by(
+            func.count(DailyQuizResult.id).desc(), User.username
+        ).all()
+        
+        monthly_attempts_data = [
+            {'username': row.username, 'student_id': row.student_id, 'attempts_count': row.attempts_count}
+            for row in monthly_attempts
+        ]
+
+        return jsonify({
+            'status': 'success',
+            'daily_ranking': daily_ranking,
+            'monthly_attempts': monthly_attempts_data,
+            'stats': {
+                'total_participants_today': total_participants_today,
+                'average_score_today': average_score_today
+            }
+        })
+
+    except Exception as e:
+        app.logger.error(f"管理者用「今日の10問」情報取得エラー: {e}")
+        return jsonify(status='error', message=str(e)), 500
+    
 # ====================================================================
 # 管理者用ランキング操作 API
 # ====================================================================
