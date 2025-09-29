@@ -1001,6 +1001,16 @@ function updateDailyRankingTable(rankingData) {
 
     rankingData.forEach(user => {
         const row = document.createElement('tr');
+        
+        // 順位に応じてスタイルを適用
+        if (user.rank === 1) {
+            row.classList.add('table-warning'); // 1位
+        } else if (user.rank === 2) {
+            row.classList.add('table-secondary'); // 2位
+        } else if (user.rank === 3) {
+            row.classList.add('table-info'); // 3位
+        }
+
         row.innerHTML = `
             <td>${user.rank}位</td>
             <td><strong>${user.username}</strong></td>
@@ -1027,8 +1037,19 @@ function updateMonthlyAttemptsTable(attemptsData) {
 
     attemptsData.forEach((user, index) => {
         const row = document.createElement('tr');
+        const rank = index + 1;
+
+        // 順位に応じてスタイルを適用
+        if (rank === 1) {
+            row.classList.add('table-warning'); // 1位
+        } else if (rank === 2) {
+            row.classList.add('table-secondary'); // 2位
+        } else if (rank === 3) {
+            row.classList.add('table-info'); // 3位
+        }
+
         row.innerHTML = `
-            <td>${index + 1}位</td>
+            <td>${rank}位</td>
             <td><strong>${user.username}</strong></td>
             <td>${user.student_id}</td>
             <td><span class="badge bg-primary">${user.attempts_count}回</span></td>
@@ -2171,6 +2192,27 @@ html {
 .ranking-table tbody tr td:first-child,
 .ranking-table tbody tr td:nth-child(2) {
     background-color: white !important;
+}
+
+/* admin_ranking.html の <style> タグの末尾に追加 */
+
+/* ========================================
+   12. 「今日の10問」ランキング表示の修正
+   ======================================== */
+
+/* ランキング上位の行のテキスト色を強制的に黒系統に設定 */
+.table-secondary td,
+.table-info td {
+    color: #212529 !important; /* !importantで確実に上書き */
+}
+
+/* スマホ表示でのヘッダー文字切れ対策 */
+@media (max-width: 768px) {
+    #daily-quiz-content .ranking-table th {
+        white-space: normal; /* テキストの折り返しを許可 */
+        vertical-align: middle; /* 垂直方向の中央揃え */
+        font-size: 0.75rem; /* フォントサイズを少し調整 */
+    }
 }
 </style>
 
