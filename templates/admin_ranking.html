@@ -3,7 +3,6 @@
 
 {% block content %}
 <div class="ranking-container">
-    <!-- ヘッダー -->
     <div class="ranking-header d-flex justify-content-between align-items-center mb-4">
         <div class="d-flex align-items-center">
             <a href="{{ url_for('admin_page') }}" class="btn btn-outline-secondary me-3">
@@ -18,7 +17,6 @@
         </div>
     </div>
 
-    <!-- 部屋選択セクション -->
     <div class="room-selection-section">
         <div class="card">
             <div class="card-header">
@@ -27,7 +25,6 @@
                 </h5>
             </div>
             <div class="card-body">
-                <!-- 表示モード切り替え -->
                 <div class="view-toggle-section mb-3">
                     <div class="btn-group" role="group">
                         <input type="radio" class="btn-check" name="viewMode" id="dropdownMode" checked>
@@ -47,7 +44,6 @@
                     </div>
                 </div>
 
-                <!-- ドロップダウン選択 -->
                 <div id="dropdown-selector" class="room-selector">
                     <div class="row align-items-end">
                         <div class="col-md-8">
@@ -64,21 +60,16 @@
                     </div>
                 </div>
 
-                <!-- グリッド表示 -->
                 <div id="grid-selector" class="room-selector" style="display: none;">
                     <div class="rooms-grid" id="rooms-grid">
-                        <!-- JavaScript で動的生成 -->
-                    </div>
+                        </div>
                 </div>
 
-                <!-- コンパクト表示 -->
                 <div id="compact-selector" class="room-selector" style="display: none;">
                     <div class="rooms-compact" id="rooms-compact">
-                        <!-- JavaScript で動的生成 -->
-                    </div>
+                        </div>
                 </div>
 
-                <!-- 選択中の部屋情報 -->
                 <div id="selected-room-info" class="selected-room-info mt-3" style="display: none;">
                     <div class="alert alert-info d-flex justify-content-between align-items-center">
                         <div>
@@ -95,9 +86,7 @@
         </div>
     </div>
 
-    <!-- ランキング表示エリア -->
     <div class="ranking-display-section mt-4">
-        <!-- 初期メッセージ -->
         <div id="ranking-initial" class="text-center py-5">
             <div class="empty-state">
                 <i class="fas fa-trophy fa-4x text-muted mb-3"></i>
@@ -106,7 +95,6 @@
             </div>
         </div>
 
-        <!-- ローディング表示 -->
         <div id="ranking-loading" class="text-center py-5" style="display: none;">
             <div class="loading-state">
                 <div class="spinner-border text-primary mb-3" role="status" style="width: 3rem; height: 3rem;">
@@ -117,13 +105,12 @@
             </div>
         </div>
 
-        <!-- ランキングテーブル -->
         <div id="ranking-table-section" style="display: none;">
             <div class="card">
                 <div class="card-header">
                     <div class="d-flex justify-content-between align-items-center">
                         <h5 class="card-title mb-0">
-                            <i class="fas fa-trophy"></i> ランキング結果　
+                            <i class="fas fa-trophy"></i> ランキング結果
                         </h5>
                         <div class="ranking-actions">
                             <button class="btn btn-success btn-sm" onclick="exportRankingData()">
@@ -136,98 +123,165 @@
                     </div>
                 </div>
                 
-                <!-- 統計サマリー -->
                 <div class="card-body">
-                    <div class="ranking-summary mb-4">
-                        <div class="row g-2">
-                            <div class="col-md-4">
-                                <div class="summary-card">
-                                    <div class="summary-icon">
-                                        <i class="fas fa-users"></i>
-                                    </div>
-                                    <div class="summary-content">
-                                        <h6>総参加者数</h6>
-                                        <span class="summary-value" id="total-users">0</span>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-4">
-                                <div class="summary-card">
-                                    <div class="summary-icon">
-                                        <i class="fas fa-chart-line"></i>
-                                    </div>
-                                    <div class="summary-content">
-                                        <h6>平均スコア</h6>
-                                        <span class="summary-value" id="average-score">0.0</span>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-4">
-                                <div class="summary-card">
-                                    <div class="summary-icon">
-                                        <i class="fas fa-crown"></i>
-                                    </div>
-                                    <div class="summary-content">
-                                        <h6>最高スコア</h6>
-                                        <span class="summary-value" id="max-score">0.0</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                    <ul class="nav nav-tabs mb-3" id="rankingTab" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="overall-ranking-tab" data-bs-toggle="tab" data-bs-target="#overall-ranking-content" type="button" role="tab" aria-controls="overall-ranking-content" aria-selected="true">
+                                <i class="fas fa-chart-line"></i> 総合ランキング
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="daily-quiz-tab" data-bs-toggle="tab" data-bs-target="#daily-quiz-content" type="button" role="tab" aria-controls="daily-quiz-content" aria-selected="false">
+                                <i class="fas fa-stopwatch"></i> 今日の10問
+                            </button>
+                        </li>
+                    </ul>
 
-                    <!-- テーブル制御 -->
-                    <div class="table-controls mb-3">
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="input-group">
-                                    <span class="input-group-text">
-                                        <i class="fas fa-search"></i>
-                                    </span>
-                                    <input type="text" id="ranking-search" class="form-control" placeholder="ユーザー名で検索...">
+                    <div class="tab-content" id="rankingTabContent">
+                        <div class="tab-pane fade show active" id="overall-ranking-content" role="tabpanel" aria-labelledby="overall-ranking-tab">
+                            <div class="ranking-summary mb-4">
+                                <div class="row g-2">
+                                    <div class="col-md-4">
+                                        <div class="summary-card">
+                                            <div class="summary-icon"><i class="fas fa-users"></i></div>
+                                            <div class="summary-content">
+                                                <h6>総参加者数</h6>
+                                                <span class="summary-value" id="total-users">0</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="summary-card">
+                                            <div class="summary-icon"><i class="fas fa-chart-line"></i></div>
+                                            <div class="summary-content">
+                                                <h6>平均スコア</h6>
+                                                <span class="summary-value" id="average-score">0.0</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="summary-card">
+                                            <div class="summary-icon"><i class="fas fa-crown"></i></div>
+                                            <div class="summary-content">
+                                                <h6>最高スコア</h6>
+                                                <span class="summary-value" id="max-score">0.0</span>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
-                            <div class="col-md-6">
-                                <div class="d-flex gap-2">
-                                    <select id="ranking-sort" class="form-select">
-                                        <option value="score" selected>スコア順</option>
-                                        <option value="accuracy">正答率順</option>
-                                        <option value="attempts">回答数順</option>
-                                    </select>
-                                    <button class="btn btn-outline-secondary" onclick="toggleSortOrder()">
-                                        <i class="fas fa-sort-amount-down" id="sort-icon"></i>
-                                    </button>
+
+                            <div class="table-controls mb-3">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="input-group">
+                                            <span class="input-group-text"><i class="fas fa-search"></i></span>
+                                            <input type="text" id="ranking-search" class="form-control" placeholder="ユーザー名で検索...">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="d-flex gap-2">
+                                            <select id="ranking-sort" class="form-select">
+                                                <option value="score" selected>スコア順</option>
+                                                <option value="accuracy">正答率順</option>
+                                                <option value="attempts">回答数順</option>
+                                            </select>
+                                            <button class="btn btn-outline-secondary" onclick="toggleSortOrder()">
+                                                <i class="fas fa-sort-amount-down" id="sort-icon"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="table-container">
+                                <div class="table-responsive">
+                                    <table class="table table-striped table-hover ranking-table">
+                                        <thead class="table-dark">
+                                            <tr>
+                                                <th class="sticky-col-1">順位</th>
+                                                <th class="sticky-col-2">名前</th>
+                                                <th>回答数</th>
+                                                <th>正解数</th>
+                                                <th>正答率</th>
+                                                <th>マスター数</th>
+                                                <th>総合スコア</th>
+                                                <th>網羅率</th>
+                                                <th>苦手問題</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="ranking-table-body">
+                                            </tbody>
+                                    </table>
                                 </div>
                             </div>
                         </div>
-                    </div>  
-                <!-- ランキングテーブル -->
-                <div class="table-container">
-                    <div class="table-responsive">
-                        <table class="table table-striped table-hover ranking-table">
-                            <thead class="table-dark">
-                                <tr>
-                                    <th class="sticky-col-1">順位</th>
-                                    <th class="sticky-col-2">名前</th>
-                                    <th>回答数</th>
-                                    <th>正解数</th>
-                                    <th>正答率</th>
-                                    <th>マスター数</th>
-                                    <th>総合スコア</th>
-                                    <th>網羅率</th>
-                                    <th>苦手問題</th>
-                                </tr>
-                            </thead>
-                            <tbody id="ranking-table-body">
-                                <!-- JavaScript で動的挿入 -->
-                            </tbody>
-                        </table>
+
+                        <div class="tab-pane fade" id="daily-quiz-content" role="tabpanel" aria-labelledby="daily-quiz-tab">
+                            <div class="ranking-summary mb-4">
+                                <div class="row g-2">
+                                    <div class="col-md-6">
+                                        <div class="summary-card">
+                                            <div class="summary-icon"><i class="fas fa-users"></i></div>
+                                            <div class="summary-content">
+                                                <h6>本日の参加者数</h6>
+                                                <span class="summary-value" id="daily-quiz-participants">0</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="summary-card">
+                                            <div class="summary-icon"><i class="fas fa-star-half-alt"></i></div>
+                                            <div class="summary-content">
+                                                <h6>本日の平均スコア</h6>
+                                                <span class="summary-value" id="daily-quiz-avg-score">0.0</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <h5 class="mt-4"><i class="fas fa-medal"></i> 本日のランキング</h5>
+                            <div class="table-container">
+                                <div class="table-responsive">
+                                    <table class="table table-striped table-hover ranking-table">
+                                        <thead class="table-dark">
+                                            <tr>
+                                                <th>順位</th>
+                                                <th>名前</th>
+                                                <th>出席番号</th>
+                                                <th>スコア</th>
+                                                <th>タイム</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="daily-ranking-table-body">
+                                            </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <h5 class="mt-4"><i class="fas fa-calendar-alt"></i> 今月の取り組み回数</h5>
+                            <div class="table-container">
+                                <div class="table-responsive">
+                                    <table class="table table-striped table-hover ranking-table">
+                                        <thead class="table-dark">
+                                            <tr>
+                                                <th>順位</th>
+                                                <th>名前</th>
+                                                <th>出席番号</th>
+                                                <th>取り組み回数</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="monthly-attempts-table-body">
+                                            </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- エラー表示 -->
         <div id="ranking-error" class="alert alert-danger" style="display: none;">
             <div class="d-flex align-items-center">
                 <i class="fas fa-exclamation-triangle fa-2x me-3"></i>
@@ -344,7 +398,7 @@ function updateDropdownSelector(rooms) {
         select.removeChild(select.lastChild);
     }
     
-    // 部屋オプションを追加
+    // 部屋オプション
     rooms.forEach(room => {
         const option = document.createElement('option');
         option.value = room.room_number;
@@ -443,8 +497,9 @@ function selectRoom(roomNumber, userCount = 0) {
     // 選択中の部屋情報を表示
     showSelectedRoom(roomNumber, userCount);
     
-    // ランキングを取得
+    // 総合ランキングと「今日の10問」情報の両方を読み込む
     loadRankingForRoom(roomNumber);
+    loadDailyQuizInfo(roomNumber);
 }
 
 function resetAllSelections() {
@@ -655,7 +710,7 @@ function updateRankingTable(rankingData) {
     });
 }
 
-// ★新規追加：固定列強制適用関数
+//固定列強制適用関数
 function forceApplyStickyColumns() {
     const table = document.querySelector('.ranking-table');
     if (!table) return;
@@ -828,6 +883,7 @@ function refreshAllData() {
     if (selectedRoom) {
         setTimeout(() => {
             loadRankingForRoom(selectedRoom);
+            loadDailyQuizInfo(selectedRoom); // ★ 今日の10問情報も更新
         }, 500);
     }
 }
@@ -886,6 +942,101 @@ function exportRankingData() {
     }
 }
 
+/**
+ * 指定された部屋の「今日の10問」情報を取得して表示する
+ * @param {string} roomNumber - 部屋番号
+ */
+async function loadDailyQuizInfo(roomNumber) {
+    console.log(`⏱️ 部屋${roomNumber}の「今日の10問」情報取得開始...`);
+    
+    // 表示をリセット
+    document.getElementById('daily-quiz-participants').textContent = '...';
+    document.getElementById('daily-quiz-avg-score').textContent = '...';
+    document.getElementById('daily-ranking-table-body').innerHTML = '<tr><td colspan="5" class="text-center">読み込み中...</td></tr>';
+    document.getElementById('monthly-attempts-table-body').innerHTML = '<tr><td colspan="4" class="text-center">読み込み中...</td></tr>';
+
+    try {
+        const response = await fetch(`/api/admin/daily_quiz_info/${roomNumber}`);
+        if (!response.ok) {
+            throw new Error(`サーバーエラー: ${response.status}`);
+        }
+        const data = await response.json();
+
+        if (data.status === 'success') {
+            console.log(`✅ 「今日の10問」情報取得成功`);
+            
+            // 統計サマリーを更新
+            document.getElementById('daily-quiz-participants').textContent = data.stats.total_participants_today;
+            document.getElementById('daily-quiz-avg-score').textContent = data.stats.average_score_today.toFixed(2);
+
+            // 今日のランキングテーブルを更新
+            updateDailyRankingTable(data.daily_ranking);
+
+            // 月間取り組み回数テーブルを更新
+            updateMonthlyAttemptsTable(data.monthly_attempts);
+
+        } else {
+            throw new Error(data.message || '情報の取得に失敗しました');
+        }
+    } catch (error) {
+        console.error('❌ 「今日の10問」情報取得エラー:', error);
+        const errorMessage = `<tr><td colspan="5" class="text-center text-danger">エラー: ${error.message}</td></tr>`;
+        document.getElementById('daily-ranking-table-body').innerHTML = errorMessage;
+        document.getElementById('monthly-attempts-table-body').innerHTML = `<tr><td colspan="4" class="text-center text-danger">エラー: ${error.message}</td></tr>`;
+    }
+}
+
+/**
+ * 今日のランキングテーブルを更新する
+ * @param {Array} rankingData - ランキングデータの配列
+ */
+function updateDailyRankingTable(rankingData) {
+    const tbody = document.getElementById('daily-ranking-table-body');
+    tbody.innerHTML = '';
+
+    if (!rankingData || rankingData.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">本日の挑戦者はまだいません。</td></tr>';
+        return;
+    }
+
+    rankingData.forEach(user => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${user.rank}位</td>
+            <td><strong>${user.username}</strong></td>
+            <td>${user.student_id}</td>
+            <td><span class="badge bg-success">${user.score} / 10</span></td>
+            <td>${user.time}</td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+/**
+ * 月間取り組み回数テーブルを更新する
+ * @param {Array} attemptsData - 取り組み回数データの配列
+ */
+function updateMonthlyAttemptsTable(attemptsData) {
+    const tbody = document.getElementById('monthly-attempts-table-body');
+    tbody.innerHTML = '';
+
+    if (!attemptsData || attemptsData.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">今月の挑戦者はまだいません。</td></tr>';
+        return;
+    }
+
+    attemptsData.forEach((user, index) => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${index + 1}位</td>
+            <td><strong>${user.username}</strong></td>
+            <td>${user.student_id}</td>
+            <td><span class="badge bg-primary">${user.attempts_count}回</span></td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
 console.log('🎉 全員ランキングページスクリプト読み込み完了');
 </script>
 
@@ -906,7 +1057,7 @@ html {
     max-width: 1400px;
     margin: 0 auto;
     padding: 20px;
-    overflow-x: hidden; /* 追加：ページ全体の横スクロールを防ぐ */
+    overflow-x: hidden;
 }
 
 .ranking-header {
@@ -1893,8 +2044,6 @@ html {
         break-inside: avoid;
     }
 }
-
-/* 追加CSS - 既存のstyleタグ内の最後に追加してください */
 
 /* 強制的に固定列を設定 */
 .ranking-table {
