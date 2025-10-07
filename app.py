@@ -701,7 +701,7 @@ UPLOAD_FOLDER = 'uploads'
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
+app.config['MAX_CONTENT_LENGTH'] = 1 * 1024 * 1024  # 1MB
 
 # 部屋ごとのCSVファイルを保存するフォルダ
 ROOM_CSV_FOLDER = 'room_csv'
@@ -10563,6 +10563,11 @@ def debug_image_upload():
         print(f"全般エラー: {e}")
         return f"❌ エラー: {e}"
     
+@app.errorhandler(413)
+def request_entity_too_large(error):
+    flash('アップロードされたファイルが大きすぎます。1MB以下のファイルを選択してください。', 'danger')
+    return redirect(request.url)
+
 @app.errorhandler(500)
 def internal_error(error):
     print(f"500 Error: {error}")

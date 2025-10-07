@@ -34,10 +34,11 @@
         <nav class="navbar navbar-expand-lg navbar-light bg-light shadow-sm rounded mb-4">
             <div class="container-fluid">
                 <a class="navbar-brand fw-bold text-primary" href="{{ url_for('index') }}">
+                    <i class="fas fa-book-open me-2"></i>
                     {% if app_info and app_info.logo_type == 'image' and app_info.logo_image_filename %}
-                        <img src="{{ url_for('static', filename='uploads/logos/' + app_info.logo_image_filename) }}" alt="{{ app_info.app_name }} Logo" style="max-height: 40px;">
+                        <img src="{{ url_for('static', filename='uploads/logos/' + app_info.logo_image_filename) }}" alt="{{ app_info.app_name }} Logo" style="max-height: 24px; vertical-align: middle;">
                     {% else %}
-                        <i class="fas fa-book-open me-2"></i>{{ app_name }}
+                        {{ app_name }}
                     {% endif %}
                 </a>
                 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
