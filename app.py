@@ -267,6 +267,8 @@ class AppInfo(db.Model):
     footer_text = db.Column(db.String(200), default="", nullable=True)
     contact_email = db.Column(db.String(100), default="", nullable=True)
     school_name = db.Column(db.String(100), default="朋優学院", nullable=False)
+    logo_type = db.Column(db.String(10), default="text", nullable=False)
+    logo_image_filename = db.Column(db.String(100), nullable=True)
     app_settings = db.Column(JSONEncodedDict, default={})
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(JST), onupdate=lambda: datetime.now(JST))
@@ -1547,6 +1549,21 @@ def migrate_database():
                         conn.commit()
                     print("✅ school_nameカラムを追加しました。")
                 
+                # logo_typeとlogo_image_filenameカラムの追加
+                if 'logo_type' not in columns:
+                    print("🔧 logo_typeカラムを追加します...")
+                    with db.engine.connect() as conn:
+                        conn.execute(text('ALTER TABLE app_info ADD COLUMN logo_type VARCHAR(10) DEFAULT \'text\' NOT NULL'))
+                        conn.commit()
+                    print("✅ logo_typeカラムを追加しました。")
+
+                if 'logo_image_filename' not in columns:
+                    print("🔧 logo_image_filenameカラムを追加します...")
+                    with db.engine.connect() as conn:
+                        conn.execute(text('ALTER TABLE app_info ADD COLUMN logo_image_filename VARCHAR(100)'))
+                        conn.commit()
+                    print("✅ logo_image_filenameカラムを追加しました。")
+
                 # 他の不足カラムもチェック
                 required_columns = {
                     'app_settings': 'TEXT DEFAULT \'{}\'',
@@ -6285,65 +6302,55 @@ def admin_app_info():
             flash('管理者権限がありません。', 'danger')
             return redirect(url_for('login_page'))
 
-        print("=== admin_app_info デバッグ開始 ===")
-        
-        # データベース接続テスト
-        try:
-            app_info = AppInfo.query.first()
-            print(f"app_info取得結果: {app_info}")
-            
-            if not app_info:
-                print("app_info が存在しません。新規作成します。")
-                app_info = AppInfo()
-                db.session.add(app_info)
-                db.session.commit()
-                print("新しいapp_infoを作成しました。")
-                
-        except Exception as db_error:
-            print(f"データベースエラー: {db_error}")
-            # フェイルセーフ：デフォルト値でapp_infoオブジェクトを作成
-            class MockAppInfo:
-                def __init__(self):
-                    self.app_name = "世界史単語帳"
-                    self.version = "1.0.0"
-                    self.last_updated_date = "2025年6月15日"
-                    self.update_content = "アプリケーションが開始されました。"
-                    self.footer_text = ""
-                    self.contact_email = ""
-                    self.updated_by = "system"
-                    self.updated_at = datetime.now(JST)
-                    
-            app_info = MockAppInfo()
-            print("MockAppInfoを使用します。")
-        
+        app_info = AppInfo.get_current_info()
+
         if request.method == 'POST':
-            print("POST リクエストを処理中...")
+            # 通常のフォームフィールドを更新
+            app_info.app_name = request.form.get('app_name', '世界史単語帳').strip()
+            app_info.version = request.form.get('version', '1.0.0').strip()
+            app_info.last_updated_date = request.form.get('last_updated_date', '').strip()
+            app_info.update_content = request.form.get('update_content', '').strip()
+            app_info.footer_text = request.form.get('footer_text', '').strip()
+            app_info.contact_email = request.form.get('contact_email', '').strip()
+            app_info.school_name = request.form.get('school_name', '朋優学院').strip()
+            app_info.logo_type = request.form.get('logo_type', 'text')
+            app_info.updated_by = session.get('username', 'admin')
+            app_info.updated_at = datetime.now(JST)
+
+            # ロゴ画像の処理
+            if app_info.logo_type == 'image':
+                if 'logo_image' in request.files:
+                    file = request.files['logo_image']
+                    if file and file.filename:
+                        # 古いロゴを削除
+                        if app_info.logo_image_filename:
+                            old_logo_path = os.path.join(app.config['UPLOAD_FOLDER'], 'logos', app_info.logo_image_filename)
+                            if os.path.exists(old_logo_path):
+                                os.remove(old_logo_path)
+
+                        # 新しいロゴを保存
+                        filename = secure_filename(file.filename)
+                        logo_dir = os.path.join(app.config['UPLOAD_FOLDER'], 'logos')
+                        os.makedirs(logo_dir, exist_ok=True)
+                        file.save(os.path.join(logo_dir, filename))
+                        app_info.logo_image_filename = filename
+            else:
+                # テキストロゴが選択された場合、既存のロゴファイルを削除
+                if app_info.logo_image_filename:
+                    old_logo_path = os.path.join(app.config['UPLOAD_FOLDER'], 'logos', app_info.logo_image_filename)
+                    if os.path.exists(old_logo_path):
+                        os.remove(old_logo_path)
+                    app_info.logo_image_filename = None
+
             try:
-                app_info.app_name = request.form.get('app_name', '世界史単語帳').strip()
-                app_info.version = request.form.get('version', '1.0.0').strip()
-                app_info.last_updated_date = request.form.get('last_updated_date', '').strip()
-                app_info.update_content = request.form.get('update_content', '').strip()
-                app_info.footer_text = request.form.get('footer_text', '').strip()
-                app_info.contact_email = request.form.get('contact_email', '').strip()
-                app_info.school_name = request.form.get('school_name', '朋優学院').strip()
-                
-                if hasattr(app_info, 'updated_by'):
-                    app_info.updated_by = session.get('username', 'admin')
-                    app_info.updated_at = datetime.now(JST)
-                    
-                    db.session.commit()
-                    flash('アプリ情報を更新しました。', 'success')
-                else:
-                    flash('テストモードのため、実際の保存は行われませんでした。', 'warning')
-                    
-                return redirect(url_for('admin_app_info'))
-                
-            except Exception as post_error:
-                print(f"POST処理エラー: {post_error}")
+                db.session.commit()
+                flash('アプリ情報を更新しました。', 'success')
+            except Exception as e:
                 db.session.rollback()
-                flash(f'更新エラー: {str(post_error)}', 'danger')
-        
-        print("テンプレートをレンダリング中...")
+                flash(f'更新エラー: {str(e)}', 'danger')
+
+            return redirect(url_for('admin_app_info'))
+
         return render_template('admin_app_info.html', app_info=app_info)
         
     except Exception as e:
