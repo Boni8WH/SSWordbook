@@ -701,7 +701,7 @@ UPLOAD_FOLDER = 'uploads'
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-app.config['MAX_CONTENT_LENGTH'] = 1 * 1024 * 1024  # 1MB
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 
 # 部屋ごとのCSVファイルを保存するフォルダ
 ROOM_CSV_FOLDER = 'room_csv'
@@ -6296,70 +6296,96 @@ def admin_page():
         return f"Admin Error: {e}", 500
 
 @app.route('/admin/app_info', methods=['GET', 'POST'])
+@admin_required
 def admin_app_info():
     try:
-        if not session.get('admin_logged_in'):
-            flash('管理者権限がありません。', 'danger')
-            return redirect(url_for('login_page'))
-
         app_info = AppInfo.get_current_info()
 
         if request.method == 'POST':
-            # 通常のフォームフィールドを更新
-            app_info.app_name = request.form.get('app_name', '世界史単語帳').strip()
-            app_info.version = request.form.get('version', '1.0.0').strip()
-            app_info.last_updated_date = request.form.get('last_updated_date', '').strip()
-            app_info.update_content = request.form.get('update_content', '').strip()
-            app_info.footer_text = request.form.get('footer_text', '').strip()
-            app_info.contact_email = request.form.get('contact_email', '').strip()
-            app_info.school_name = request.form.get('school_name', '朋優学院').strip()
-            app_info.logo_type = request.form.get('logo_type', 'text')
+            # Update general info
+            app_info.version = request.form.get('version', app_info.version).strip()
+            app_info.last_updated_date = request.form.get('last_updated_date', app_info.last_updated_date).strip()
+            app_info.update_content = request.form.get('update_content', app_info.update_content).strip()
+            app_info.footer_text = request.form.get('footer_text', app_info.footer_text or '').strip()
+            app_info.contact_email = request.form.get('contact_email', app_info.contact_email or '').strip()
+            app_info.school_name = request.form.get('school_name', app_info.school_name).strip()
             app_info.updated_by = session.get('username', 'admin')
             app_info.updated_at = datetime.now(JST)
 
-            # ロゴ画像の処理
-            if app_info.logo_type == 'image':
-                if 'logo_image' in request.files:
-                    file = request.files['logo_image']
-                    if file and file.filename:
-                        # 古いロゴを削除
-                        if app_info.logo_image_filename:
-                            old_logo_path = os.path.join(app.config['UPLOAD_FOLDER'], 'logos', app_info.logo_image_filename)
-                            if os.path.exists(old_logo_path):
-                                os.remove(old_logo_path)
+            logo_type = request.form.get('logo_type')
+            app_info.logo_type = logo_type
 
-                        # 新しいロゴを保存
-                        filename = secure_filename(file.filename)
-                        logo_dir = os.path.join(app.config['UPLOAD_FOLDER'], 'logos')
-                        os.makedirs(logo_dir, exist_ok=True)
-                        file.save(os.path.join(logo_dir, filename))
-                        app_info.logo_image_filename = filename
-            else:
-                # テキストロゴが選択された場合、既存のロゴファイルを削除
+            logo_folder = os.path.join('static', 'uploads', 'logos')
+            os.makedirs(logo_folder, exist_ok=True)
+
+            if logo_type == 'text':
+                app_info.app_name = request.form.get('app_name', app_info.app_name).strip()
+
+                # If there was an image logo, delete it
                 if app_info.logo_image_filename:
-                    old_logo_path = os.path.join(app.config['UPLOAD_FOLDER'], 'logos', app_info.logo_image_filename)
-                    if os.path.exists(old_logo_path):
-                        os.remove(old_logo_path)
-                    app_info.logo_image_filename = None
+                    old_filepath = os.path.join(logo_folder, app_info.logo_image_filename)
+                    if os.path.exists(old_filepath):
+                        try:
+                            os.remove(old_filepath)
+                            logger.info(f"Deleted old logo: {old_filepath}")
+                        except Exception as e:
+                            logger.error(f"Error deleting old logo {old_filepath}: {e}")
 
-            try:
-                db.session.commit()
-                flash('アプリ情報を更新しました。', 'success')
-            except Exception as e:
-                db.session.rollback()
-                flash(f'更新エラー: {str(e)}', 'danger')
+                app_info.logo_image_filename = None
 
+            elif logo_type == 'image':
+                file = request.files.get('logo_image')
+
+                if file and file.filename:
+                    # Check file size (1MB limit)
+                    file.seek(0, os.SEEK_END)
+                    file_size = file.tell()
+                    file.seek(0) # Reset file pointer
+                    if file_size > 1 * 1024 * 1024:
+                        flash('ロゴ画像のファイルサイズは1MB以下にしてください。', 'danger')
+                        return redirect(url_for('admin_app_info'))
+
+                    # Delete old logo file before saving new one
+                    if app_info.logo_image_filename:
+                        old_filepath = os.path.join(logo_folder, app_info.logo_image_filename)
+                        if os.path.exists(old_filepath):
+                           try:
+                               os.remove(old_filepath)
+                               logger.info(f"Deleted old logo: {old_filepath}")
+                           except Exception as e:
+                               logger.error(f"Error deleting old logo {old_filepath}: {e}")
+
+                    # Save new logo
+                    filename = secure_filename(file.filename)
+                    random_hex = secrets.token_hex(8)
+                    _, f_ext = os.path.splitext(filename)
+                    unique_filename = random_hex + f_ext
+
+                    save_path = os.path.join(logo_folder, unique_filename)
+                    file.save(save_path)
+                    logger.info(f"Saved new logo: {save_path}")
+
+                    # Update db record
+                    app_info.logo_image_filename = unique_filename
+
+                # When image is selected, app_name field is hidden.
+                # We should not update it from a potentially empty form field.
+                # Let's keep the existing app_name.
+                # If it's empty, we can set a default.
+                if not app_info.app_name:
+                    app_info.app_name = "App" # Or some default
+
+            db.session.commit()
+            flash('アプリ情報を更新しました。', 'success')
             return redirect(url_for('admin_app_info'))
 
         return render_template('admin_app_info.html', app_info=app_info)
-        
+
     except Exception as e:
-        print(f"=== 致命的エラー ===")
-        print(f"エラー: {e}")
+        app.logger.error(f"アプリ情報管理ページエラー: {e}")
         import traceback
         traceback.print_exc()
-        
-        flash('アプリ情報管理ページでエラーが発生しました。管理者ページに戻ります。', 'danger')
+        flash(f'アプリ情報管理ページでエラーが発生しました: {str(e)}', 'danger')
         return redirect(url_for('admin_page'))
 
 @app.route('/admin/app_info/reset', methods=['POST'])
@@ -10563,11 +10589,6 @@ def debug_image_upload():
         print(f"全般エラー: {e}")
         return f"❌ エラー: {e}"
     
-@app.errorhandler(413)
-def request_entity_too_large(error):
-    flash('アップロードされたファイルが大きすぎます。1MB以下のファイルを選択してください。', 'danger')
-    return redirect(request.url)
-
 @app.errorhandler(500)
 def internal_error(error):
     print(f"500 Error: {error}")
