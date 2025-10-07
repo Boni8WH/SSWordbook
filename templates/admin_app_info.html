@@ -308,35 +308,27 @@ document.addEventListener('DOMContentLoaded', function() {
             cropper.destroy();
         }
         cropper = new Cropper(imageToCrop, {
-            aspectRatio: 16 / 9,
             viewMode: 1,
         });
     });
 
     cropButton.addEventListener('click', function() {
         if (cropper) {
-            const cropData = cropper.getData(true); // Get rounded data
+            const cropData = cropper.getData(true);
+            const cropDataInput = document.getElementById('crop_data');
 
-            // Find the hidden input inside the main form
-            const cropDataInput = form.querySelector('#crop_data');
-            if (cropDataInput) {
-                cropDataInput.value = JSON.stringify({
-                    x: cropData.x,
-                    y: cropData.y,
-                    width: cropData.width,
-                    height: cropData.height
-                });
-            } else {
-                console.error("Crop data input field not found in the form!");
-                alert("エラー: フォームの送信に失敗しました。");
-                cropModal.hide();
-                return;
-            }
+            // Set the crop data to the hidden input
+            cropDataInput.value = JSON.stringify({
+                x: cropData.x,
+                y: cropData.y,
+                width: cropData.width,
+                height: cropData.height
+            });
 
-            // The file is already selected, so we just submit the form.
+            // Hide the modal and submit the main form
+            cropModal.hide();
             form.submit();
         }
-        cropModal.hide();
     });
 
     form.addEventListener('submit', function(e) {
