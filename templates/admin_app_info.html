@@ -43,9 +43,31 @@
     <div class="row mb-4">
         <div class="col-md-12">
             <h3>✏️ アプリ情報編集</h3>
-            <form action="{{ url_for('admin_app_info') }}" method="POST" class="app-info-form">
+            <form action="{{ url_for('admin_app_info') }}" method="POST" class="app-info-form" enctype="multipart/form-data">
+
+                <!-- Logo Settings -->
                 <div class="row">
-                    <div class="col-md-6">
+                    <div class="col-md-12">
+                        <div class="mb-3">
+                            <label class="form-label">ロゴ設定:</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="logo_type" id="logo_type_text" value="text" {% if app_info.logo_type == 'text' or not app_info.logo_type %}checked{% endif %}>
+                                <label class="form-check-label" for="logo_type_text">
+                                    アプリ名（テキスト）
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="logo_type" id="logo_type_image" value="image" {% if app_info.logo_type == 'image' %}checked{% endif %}>
+                                <label class="form-check-label" for="logo_type_image">
+                                    ロゴ画像
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6" id="app_name_field">
                         <div class="mb-3">
                             <label for="app_name" class="form-label">アプリ名:</label>
                             <input type="text" 
@@ -57,6 +79,22 @@
                                    maxlength="100"
                                    placeholder="例: 世界史単語帳">
                             <div class="form-text">アプリのタイトルとして表示されます</div>
+                        </div>
+                    </div>
+                    <div class="col-md-6" id="logo_image_field" style="display: none;">
+                        <div class="mb-3">
+                            <label for="logo_image" class="form-label">ロゴ画像:</label>
+                            <input type="file"
+                                   id="logo_image"
+                                   name="logo_image"
+                                   class="form-control">
+                            <div class="form-text">推奨サイズ: 120x40ピクセル</div>
+                            {% if app_info.logo_image_filename %}
+                            <div class="mt-2">
+                                <img src="{{ url_for('static', filename='uploads/logos/' + app_info.logo_image_filename) }}" alt="現在のロゴ" style="max-height: 40px; background-color: #f8f9fa; padding: 5px; border-radius: 5px;">
+                                <small class="ms-2">現在のロゴ: {{ app_info.logo_image_filename }}</small>
+                            </div>
+                            {% endif %}
                         </div>
                     </div>
                     <div class="col-md-6">
@@ -196,30 +234,28 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // リアルタイムプレビュー機能
-    const form = document.querySelector('.app-info-form');
-    const inputs = form.querySelectorAll('input, textarea');
-    
-    inputs.forEach(input => {
-        input.addEventListener('input', updatePreview);
-    });
-    
-    function updatePreview() {
-        const appName = document.getElementById('app_name').value;
-        const version = document.getElementById('version').value;
-        const lastUpdatedDate = document.getElementById('last_updated_date').value;
-        const updateContent = document.getElementById('update_content').value;
-        const footerText = document.getElementById('footer_text').value;
-        
-        // プレビューを更新
-        document.getElementById('preview-app-name').textContent = appName || '世界史単語帳';
-        document.getElementById('preview-version').textContent = version || '1.0.0';
-        document.getElementById('preview-date').textContent = lastUpdatedDate || '2025年6月15日';
-        document.getElementById('preview-content').textContent = updateContent || 'アプリケーションが開始されました。';
-        document.getElementById('preview-footer').textContent = footerText || '';
+    const logoTypeText = document.getElementById('logo_type_text');
+    const logoTypeImage = document.getElementById('logo_type_image');
+    const appNameField = document.getElementById('app_name_field');
+    const logoImageField = document.getElementById('logo_image_field');
+
+    function toggleLogoFields() {
+        if (logoTypeImage.checked) {
+            appNameField.style.display = 'none';
+            logoImageField.style.display = 'block';
+        } else {
+            appNameField.style.display = 'block';
+            logoImageField.style.display = 'none';
+        }
     }
-    
-    // フォーム送信時の確認
+
+    logoTypeText.addEventListener('change', toggleLogoFields);
+    logoTypeImage.addEventListener('change', toggleLogoFields);
+
+    // Initial check
+    toggleLogoFields();
+
+    const form = document.querySelector('.app-info-form');
     form.addEventListener('submit', function(e) {
         if (!confirm('アプリ情報を更新しますか？\n\n変更内容は即座にユーザーに反映されます。')) {
             e.preventDefault();
@@ -227,7 +263,6 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
-// デフォルトリセット確認
 function confirmReset() {
     if (confirm('アプリ情報をデフォルト値にリセットしますか？\n\n⚠️ この操作は元に戻せません。')) {
         document.getElementById('resetForm').submit();
