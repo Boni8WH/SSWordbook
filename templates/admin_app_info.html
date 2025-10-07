@@ -1,6 +1,10 @@
 {% extends "base.html" %}
 {% block title %}アプリ情報管理 - {{ app_name }}{% endblock %}
 
+{% block head_extra %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.css">
+{% endblock %}
+
 {% block content %}
 <div class="container">
     <h2>📱 アプリ情報管理</h2>
@@ -229,6 +233,30 @@
     </div>
 </div>
 
+<!-- Crop Modal -->
+<div class="modal fade" id="cropModal" tabindex="-1" aria-labelledby="cropModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="cropModalLabel">ロゴを切り抜き</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div>
+                    <img id="imageToCrop" src="" style="max-width: 100%;">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+                <button type="button" class="btn btn-primary" id="cropButton">切り抜いて保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Hidden input for crop data -->
+<input type="hidden" name="crop_data" id="crop_data">
+
 <!-- リセット確認フォーム（非表示） -->
 <form id="resetForm" action="{{ url_for('admin_app_info_reset') }}" method="POST" style="display: none;">
 </form>
@@ -239,6 +267,15 @@ document.addEventListener('DOMContentLoaded', function() {
     const logoTypeImage = document.getElementById('logo_type_image');
     const appNameField = document.getElementById('app_name_field');
     const logoImageField = document.getElementById('logo_image_field');
+    const logoImageInput = document.getElementById('logo_image');
+
+    const form = document.querySelector('.app-info-form');
+    const cropModalElement = document.getElementById('cropModal');
+    const cropModal = new bootstrap.Modal(cropModalElement);
+    const imageToCrop = document.getElementById('imageToCrop');
+    const cropButton = document.getElementById('cropButton');
+
+    let cropper;
 
     function toggleLogoFields() {
         if (logoTypeImage.checked) {
@@ -252,14 +289,62 @@ document.addEventListener('DOMContentLoaded', function() {
 
     logoTypeText.addEventListener('change', toggleLogoFields);
     logoTypeImage.addEventListener('change', toggleLogoFields);
-
-    // Initial check
     toggleLogoFields();
 
-    const form = document.querySelector('.app-info-form');
+    logoImageInput.addEventListener('change', function(e) {
+        const files = e.target.files;
+        if (files && files.length > 0) {
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                imageToCrop.src = event.target.result;
+                cropModal.show();
+            };
+            reader.readAsDataURL(files[0]);
+        }
+    });
+
+    cropModalElement.addEventListener('shown.bs.modal', function () {
+        if (cropper) {
+            cropper.destroy();
+        }
+        cropper = new Cropper(imageToCrop, {
+            aspectRatio: 16 / 9,
+            viewMode: 1,
+        });
+    });
+
+    cropButton.addEventListener('click', function() {
+        if (cropper) {
+            const cropData = cropper.getData(true); // Get rounded data
+
+            // Find the hidden input inside the main form
+            const cropDataInput = form.querySelector('#crop_data');
+            if (cropDataInput) {
+                cropDataInput.value = JSON.stringify({
+                    x: cropData.x,
+                    y: cropData.y,
+                    width: cropData.width,
+                    height: cropData.height
+                });
+            } else {
+                console.error("Crop data input field not found in the form!");
+                alert("エラー: フォームの送信に失敗しました。");
+                cropModal.hide();
+                return;
+            }
+
+            // The file is already selected, so we just submit the form.
+            form.submit();
+        }
+        cropModal.hide();
+    });
+
     form.addEventListener('submit', function(e) {
-        if (!confirm('アプリ情報を更新しますか？\n\n変更内容は即座にユーザーに反映されます。')) {
-            e.preventDefault();
+        // Confirmation is now only for text submissions, as cropping has its own flow.
+        if (logoTypeText.checked) {
+            if (!confirm('アプリ情報を更新しますか？\n\n変更内容は即座にユーザーに反映されます。')) {
+                e.preventDefault();
+            }
         }
     });
 });
@@ -270,4 +355,8 @@ function confirmReset() {
     }
 }
 </script>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.js"></script>
 {% endblock %}
