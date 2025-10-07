@@ -613,6 +613,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from sqlalchemy import inspect, text, func
 from functools import wraps
+from PIL import Image
 
 def admin_required(f):
     @wraps(f)
@@ -6295,6 +6296,90 @@ def admin_page():
         traceback.print_exc()
         return f"Admin Error: {e}", 500
 
+def _update_app_info_general(app_info, form):
+    """Update general application information from the form."""
+    app_info.version = form.get('version', app_info.version).strip()
+    app_info.last_updated_date = form.get('last_updated_date', app_info.last_updated_date).strip()
+    app_info.update_content = form.get('update_content', app_info.update_content).strip()
+    app_info.footer_text = form.get('footer_text', app_info.footer_text or '').strip()
+    app_info.contact_email = form.get('contact_email', app_info.contact_email or '').strip()
+    app_info.school_name = form.get('school_name', app_info.school_name).strip()
+    app_info.updated_by = session.get('username', 'admin')
+    app_info.updated_at = datetime.now(JST)
+
+def _handle_text_logo(app_info, form):
+    """Handle the logic for 'text' logo type."""
+    logo_folder = os.path.join('static', 'uploads', 'logos')
+    app_info.app_name = form.get('app_name', app_info.app_name).strip()
+    if app_info.logo_image_filename:
+        old_filepath = os.path.join(logo_folder, app_info.logo_image_filename)
+        if os.path.exists(old_filepath):
+            try:
+                os.remove(old_filepath)
+                logger.info(f"Deleted old logo: {old_filepath}")
+            except Exception as e:
+                logger.error(f"Error deleting old logo {old_filepath}: {e}")
+    app_info.logo_image_filename = None
+
+def _crop_and_save_image(img, crop_data_json, save_path):
+    """Crop and save the image based on crop_data."""
+    try:
+        crop_data = json.loads(crop_data_json)
+        x = int(crop_data['x'])
+        y = int(crop_data['y'])
+        width = int(crop_data['width'])
+        height = int(crop_data['height'])
+
+        cropped_img = img.crop((x, y, x + width, y + height))
+        cropped_img.save(save_path)
+        logger.info(f"Saved cropped logo: {save_path}")
+    except (json.JSONDecodeError, KeyError, ValueError) as e:
+        logger.error(f"Error processing crop data: {e}. Saving original image.")
+        img.save(save_path)
+
+def _handle_image_logo(app_info, request):
+    """Handle the logic for 'image' logo type."""
+    file = request.files.get('logo_image')
+    crop_data_json = request.form.get('crop_data')
+    logo_folder = os.path.join('static', 'uploads', 'logos')
+
+    if file and file.filename:
+        file.seek(0, os.SEEK_END)
+        file_size = file.tell()
+        file.seek(0)
+        if file_size > 1 * 1024 * 1024: # 1MB limit
+            flash('ロゴ画像のファイルサイズは1MB以下にしてください。', 'danger')
+            return False
+
+        if app_info.logo_image_filename:
+            old_filepath = os.path.join(logo_folder, app_info.logo_image_filename)
+            if os.path.exists(old_filepath):
+                try:
+                    os.remove(old_filepath)
+                    logger.info(f"Deleted old logo: {old_filepath}")
+                except Exception as e:
+                    logger.error(f"Error deleting old logo {old_filepath}: {e}")
+
+        filename = secure_filename(file.filename)
+        random_hex = secrets.token_hex(8)
+        _, f_ext = os.path.splitext(filename)
+        unique_filename = random_hex + f_ext
+        save_path = os.path.join(logo_folder, unique_filename)
+
+        img = Image.open(file.stream)
+
+        if crop_data_json:
+            _crop_and_save_image(img, crop_data_json, save_path)
+        else:
+            img.save(save_path)
+            logger.info(f"Saved original logo (no crop data): {save_path}")
+
+        app_info.logo_image_filename = unique_filename
+
+    if not app_info.app_name:
+        app_info.app_name = "App" # Provide a default if empty
+    return True
+
 @app.route('/admin/app_info', methods=['GET', 'POST'])
 @admin_required
 def admin_app_info():
@@ -6302,15 +6387,7 @@ def admin_app_info():
         app_info = AppInfo.get_current_info()
 
         if request.method == 'POST':
-            # Update general info
-            app_info.version = request.form.get('version', app_info.version).strip()
-            app_info.last_updated_date = request.form.get('last_updated_date', app_info.last_updated_date).strip()
-            app_info.update_content = request.form.get('update_content', app_info.update_content).strip()
-            app_info.footer_text = request.form.get('footer_text', app_info.footer_text or '').strip()
-            app_info.contact_email = request.form.get('contact_email', app_info.contact_email or '').strip()
-            app_info.school_name = request.form.get('school_name', app_info.school_name).strip()
-            app_info.updated_by = session.get('username', 'admin')
-            app_info.updated_at = datetime.now(JST)
+            _update_app_info_general(app_info, request.form)
 
             logo_type = request.form.get('logo_type')
             app_info.logo_type = logo_type
@@ -6319,61 +6396,10 @@ def admin_app_info():
             os.makedirs(logo_folder, exist_ok=True)
 
             if logo_type == 'text':
-                app_info.app_name = request.form.get('app_name', app_info.app_name).strip()
-
-                # If there was an image logo, delete it
-                if app_info.logo_image_filename:
-                    old_filepath = os.path.join(logo_folder, app_info.logo_image_filename)
-                    if os.path.exists(old_filepath):
-                        try:
-                            os.remove(old_filepath)
-                            logger.info(f"Deleted old logo: {old_filepath}")
-                        except Exception as e:
-                            logger.error(f"Error deleting old logo {old_filepath}: {e}")
-
-                app_info.logo_image_filename = None
-
+                _handle_text_logo(app_info, request.form)
             elif logo_type == 'image':
-                file = request.files.get('logo_image')
-
-                if file and file.filename:
-                    # Check file size (1MB limit)
-                    file.seek(0, os.SEEK_END)
-                    file_size = file.tell()
-                    file.seek(0) # Reset file pointer
-                    if file_size > 1 * 1024 * 1024:
-                        flash('ロゴ画像のファイルサイズは1MB以下にしてください。', 'danger')
-                        return redirect(url_for('admin_app_info'))
-
-                    # Delete old logo file before saving new one
-                    if app_info.logo_image_filename:
-                        old_filepath = os.path.join(logo_folder, app_info.logo_image_filename)
-                        if os.path.exists(old_filepath):
-                           try:
-                               os.remove(old_filepath)
-                               logger.info(f"Deleted old logo: {old_filepath}")
-                           except Exception as e:
-                               logger.error(f"Error deleting old logo {old_filepath}: {e}")
-
-                    # Save new logo
-                    filename = secure_filename(file.filename)
-                    random_hex = secrets.token_hex(8)
-                    _, f_ext = os.path.splitext(filename)
-                    unique_filename = random_hex + f_ext
-
-                    save_path = os.path.join(logo_folder, unique_filename)
-                    file.save(save_path)
-                    logger.info(f"Saved new logo: {save_path}")
-
-                    # Update db record
-                    app_info.logo_image_filename = unique_filename
-
-                # When image is selected, app_name field is hidden.
-                # We should not update it from a potentially empty form field.
-                # Let's keep the existing app_name.
-                # If it's empty, we can set a default.
-                if not app_info.app_name:
-                    app_info.app_name = "App" # Or some default
+                if not _handle_image_logo(app_info, request):
+                    return redirect(url_for('admin_app_info'))
 
             db.session.commit()
             flash('アプリ情報を更新しました。', 'success')
