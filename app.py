@@ -6571,6 +6571,36 @@ def admin_delete_user(user_id):
         flash(f'ユーザー削除中にエラーが発生しました: {str(e)}', 'danger')
         return redirect(url_for('admin_page'))
 
+@app.route('/admin/bulk_delete_users', methods=['POST'])
+def admin_bulk_delete_users():
+    if not session.get('admin_logged_in'):
+        return jsonify({'status': 'error', 'message': '管理者権限がありません。'}), 403
+
+    data = request.get_json()
+    user_ids = data.get('user_ids')
+
+    if not user_ids:
+        return jsonify({'status': 'error', 'message': '削除するユーザーが選択されていません。'}), 400
+
+    try:
+        # 関連するデータを先に削除
+        PasswordResetToken.query.filter(PasswordResetToken.user_id.in_(user_ids)).delete(synchronize_session=False)
+        DailyQuizResult.query.filter(DailyQuizResult.user_id.in_(user_ids)).delete(synchronize_session=False)
+        MonthlyScore.query.filter(MonthlyScore.user_id.in_(user_ids)).delete(synchronize_session=False)
+        MonthlyResultViewed.query.filter(MonthlyResultViewed.user_id.in_(user_ids)).delete(synchronize_session=False)
+        UserStats.query.filter(UserStats.user_id.in_(user_ids)).delete(synchronize_session=False)
+        EssayProgress.query.filter(EssayProgress.user_id.in_(user_ids)).delete(synchronize_session=False)
+
+        # ユーザーを削除
+        num_deleted = User.query.filter(User.id.in_(user_ids)).delete(synchronize_session=False)
+        db.session.commit()
+
+        return jsonify({'status': 'success', 'message': f'{num_deleted}人のユーザーを削除しました。'})
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"一括削除エラー: {str(e)}")
+        return jsonify({'status': 'error', 'message': f'一括削除中にエラーが発生しました: {str(e)}'}), 500
+
 # 部屋設定管理
 @app.route('/admin/get_room_setting', methods=['POST'])
 @admin_required # <- 追加

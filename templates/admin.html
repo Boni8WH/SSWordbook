@@ -155,11 +155,17 @@
                 </div>
 
                 <!-- ユーザー一覧テーブル -->
+                <div class="table-controls mb-2">
+                    <button id="bulkDeleteBtn" class="btn btn-danger" disabled>
+                        <i class="fas fa-trash-alt"></i> 選択したユーザーを削除 (<span id="selectedUserCount">0</span>)
+                    </button>
+                </div>
                 <div class="scrollable-table-container">
                     <div class="table-responsive">
                         <table class="table table-striped" id="userTable">
                             <thead class="table-dark sticky-header">
                                 <tr>
+                                    <th><input type="checkbox" id="selectAllUsers" title="表示中のユーザーを全て選択"></th>
                                     <th>ID</th>
                                     <th style="cursor: pointer;" data-column="room">
                                         部屋番号 <i class="fas fa-sort sort-icon" data-column="room"></i>
@@ -174,9 +180,10 @@
                             <tbody id="userTableBody">
                                 {% for user in users %}
                                 {% if user.room_number != 'ADMIN' %}
-                                <tr data-room="{{ user.room_number }}" 
-                                    data-name="{{ user.username.lower() }}" 
+                                <tr data-room="{{ user.room_number }}"
+                                    data-name="{{ user.username.lower() }}"
                                     data-student="{{ user.student_id }}">
+                                    <td><input type="checkbox" class="user-checkbox" value="{{ user.id }}"></td>
                                     <td>{{ user.id }}</td>
                                     <td>
                                         <span class="badge bg-primary">{{ user.room_number }}</span>
@@ -189,8 +196,8 @@
                                     <td><code>{{ user.student_id }}</code></td>
                                     <td><strong>{{ user.username }}</strong></td>
                                     <td>
-                                        <button class="btn btn-danger btn-sm delete-user-btn" 
-                                                data-user-id="{{ user.id }}" 
+                                        <button class="btn btn-danger btn-sm delete-user-btn"
+                                                data-user-id="{{ user.id }}"
                                                 data-username="{{ user.username }}">
                                             <i class="fas fa-trash"></i> 削除
                                         </button>
@@ -1255,7 +1262,71 @@ window.filterUsers = filterUsers;
 // 3. DOMContentLoaded イベントリスナー
 // ========================================
 document.addEventListener('DOMContentLoaded', function() {
-    
+    // ========================================
+    // 0. 一括削除機能
+    // ========================================
+    const selectAllCheckbox = document.getElementById('selectAllUsers');
+    const userCheckboxes = document.querySelectorAll('.user-checkbox');
+    const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
+    const selectedUserCountSpan = document.getElementById('selectedUserCount');
+
+    function updateBulkDeleteButton() {
+        const selectedCheckboxes = document.querySelectorAll('.user-checkbox:checked');
+        const count = selectedCheckboxes.length;
+        selectedUserCountSpan.textContent = count;
+        bulkDeleteBtn.disabled = count === 0;
+    }
+
+    selectAllCheckbox.addEventListener('change', function() {
+        const isChecked = this.checked;
+        // 現在表示されている（display != 'none'）行のチェックボックスのみを対象
+        document.querySelectorAll('#userTableBody tr').forEach(row => {
+            if (row.style.display !== 'none') {
+                const checkbox = row.querySelector('.user-checkbox');
+                if (checkbox) {
+                    checkbox.checked = isChecked;
+                }
+            }
+        });
+        updateBulkDeleteButton();
+    });
+
+    userCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', updateBulkDeleteButton);
+    });
+
+    bulkDeleteBtn.addEventListener('click', function() {
+        const selectedIds = Array.from(document.querySelectorAll('.user-checkbox:checked')).map(cb => cb.value);
+
+        if (selectedIds.length === 0) {
+            alert('削除するユーザーが選択されていません。');
+            return;
+        }
+
+        if (confirm(`${selectedIds.length}人のユーザーを本当に削除しますか？\n\n⚠️ この操作は元に戻せません。`)) {
+            fetch('/admin/bulk_delete_users', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ user_ids: selectedIds }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    alert(data.message);
+                    window.location.reload();
+                } else {
+                    alert('エラー: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('一括削除エラー:', error);
+                alert('一括削除中にエラーが発生しました。');
+            });
+        }
+    });
+
     // ========================================
     // 1. 基本機能の初期化（最優先）
     // ========================================
