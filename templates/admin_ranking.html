@@ -240,7 +240,29 @@
                                 </div>
                             </div>
 
-                            <h5 class="mt-4"><i class="fas fa-medal"></i> 本日のランキング</h5>
+                            <h5 class="mt-4"><i class="fas fa-chart-bar"></i> 今月の累計スコアランキング</h5>
+                            <div class="table-container">
+                                <div class="table-responsive">
+                                    <table class="table table-striped table-hover ranking-table">
+                                        <thead class="table-dark">
+                                            <tr>
+                                                <th>順位</th>
+                                                <th>名前</th>
+                                                <th>出席番号</th>
+                                                <th>累計スコア</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="monthly-cumulative-ranking-table-body">
+                                            </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <h5 class="mt-4"><i class="fas fa-calendar-day"></i> 指定日のランキング</h5>
+                            <div class="mb-3">
+                                <label for="daily-ranking-date" class="form-label">日付を選択</label>
+                                <input type="date" id="daily-ranking-date" class="form-control" style="max-width: 200px;">
+                            </div>
                             <div class="table-container">
                                 <div class="table-responsive">
                                     <table class="table table-striped table-hover ranking-table">
@@ -321,6 +343,17 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 部屋一覧を取得
     loadRoomList();
+
+    // 日付ピッカーの初期化
+    const datePicker = document.getElementById('daily-ranking-date');
+    if (datePicker) {
+        datePicker.valueAsDate = new Date();
+        datePicker.addEventListener('change', () => {
+            if (selectedRoom) {
+                loadDailyRankingForDate(selectedRoom, datePicker.value);
+            }
+        });
+    }
 });
 
 // ========================================
@@ -710,6 +743,36 @@ function updateRankingTable(rankingData) {
     });
 }
 
+function updateMonthlyCumulativeRankingTable(rankingData) {
+    const tbody = document.getElementById('monthly-cumulative-ranking-table-body');
+    tbody.innerHTML = '';
+
+    if (!rankingData || rankingData.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">今月の累計スコアデータはまだありません。</td></tr>';
+        return;
+    }
+
+    rankingData.forEach(user => {
+        const row = document.createElement('tr');
+
+        if (user.rank === 1) {
+            row.classList.add('table-warning');
+        } else if (user.rank === 2) {
+            row.classList.add('table-secondary');
+        } else if (user.rank === 3) {
+            row.classList.add('table-info');
+        }
+
+        row.innerHTML = `
+            <td>${user.rank}位</td>
+            <td><strong>${user.username}</strong></td>
+            <td>${user.student_id}</td>
+            <td><span class="badge bg-info">${user.total_score}</span></td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
 //固定列強制適用関数
 function forceApplyStickyColumns() {
     const table = document.querySelector('.ranking-table');
@@ -954,6 +1017,7 @@ async function loadDailyQuizInfo(roomNumber) {
     document.getElementById('daily-quiz-avg-score').textContent = '...';
     document.getElementById('daily-ranking-table-body').innerHTML = '<tr><td colspan="5" class="text-center">読み込み中...</td></tr>';
     document.getElementById('monthly-attempts-table-body').innerHTML = '<tr><td colspan="4" class="text-center">読み込み中...</td></tr>';
+    document.getElementById('monthly-cumulative-ranking-table-body').innerHTML = '<tr><td colspan="4" class="text-center">読み込み中...</td></tr>';
 
     try {
         const response = await fetch(`/api/admin/daily_quiz_info/${roomNumber}`);
@@ -983,6 +1047,59 @@ async function loadDailyQuizInfo(roomNumber) {
         const errorMessage = `<tr><td colspan="5" class="text-center text-danger">エラー: ${error.message}</td></tr>`;
         document.getElementById('daily-ranking-table-body').innerHTML = errorMessage;
         document.getElementById('monthly-attempts-table-body').innerHTML = `<tr><td colspan="4" class="text-center text-danger">エラー: ${error.message}</td></tr>`;
+    }
+
+    // 月間累計スコアランキングを読み込み
+    const today = new Date();
+    loadMonthlyCumulativeRanking(roomNumber, today.getFullYear(), today.getMonth() + 1);
+}
+
+async function loadMonthlyCumulativeRanking(roomNumber, year, month) {
+    console.log(`📊 部屋${roomNumber}の月間累計スコアランキング取得開始 (${year}/${month})...`);
+    const tbody = document.getElementById('monthly-cumulative-ranking-table-body');
+    tbody.innerHTML = '<tr><td colspan="4" class="text-center">読み込み中...</td></tr>';
+
+    try {
+        const response = await fetch(`/api/admin/monthly_cumulative_ranking/${roomNumber}/${year}/${month}`);
+        if (!response.ok) {
+            throw new Error(`サーバーエラー: ${response.status}`);
+        }
+        const data = await response.json();
+
+        if (data.status === 'success') {
+            console.log(`✅ 月間累計スコアランキング取得成功`);
+            updateMonthlyCumulativeRankingTable(data.ranking);
+        } else {
+            throw new Error(data.message || '情報の取得に失敗しました');
+        }
+    } catch (error) {
+        console.error('❌ 月間累計スコアランキング取得エラー:', error);
+        tbody.innerHTML = `<tr><td colspan="4" class="text-center text-danger">エラー: ${error.message}</td></tr>`;
+    }
+}
+
+async function loadDailyRankingForDate(roomNumber, dateString) {
+    console.log(`📅 部屋${roomNumber}の指定日ランキング取得開始 (${dateString})...`);
+    const tbody = document.getElementById('daily-ranking-table-body');
+    tbody.innerHTML = '<tr><td colspan="5" class="text-center">読み込み中...</td></tr>';
+
+    try {
+        const [year, month, day] = dateString.split('-');
+        const response = await fetch(`/api/admin/daily_ranking/${roomNumber}/${year}/${month}/${day}`);
+        if (!response.ok) {
+            throw new Error(`サーバーエラー: ${response.status}`);
+        }
+        const data = await response.json();
+
+        if (data.status === 'success') {
+            console.log(`✅ 指定日ランキング取得成功`);
+            updateDailyRankingTable(data.ranking);
+        } else {
+            throw new Error(data.message || '情報の取得に失敗しました');
+        }
+    } catch (error) {
+        console.error('❌ 指定日ランキング取得エラー:', error);
+        tbody.innerHTML = `<tr><td colspan="5" class="text-center text-danger">エラー: ${error.message}</td></tr>`;
     }
 }
 
