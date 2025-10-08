@@ -4106,6 +4106,73 @@ def api_admin_daily_quiz_info(room_number):
     except Exception as e:
         app.logger.error(f"管理者用「今日の10問」情報取得エラー: {e}")
         return jsonify(status='error', message=str(e)), 500
+
+@app.route('/api/admin/monthly_cumulative_ranking/<room_number>/<int:year>/<int:month>')
+@admin_required
+def api_admin_monthly_cumulative_ranking(room_number, year, month):
+    """管理者用: 指定部屋の月間累計スコアランキングを取得"""
+    try:
+        monthly_scores = db.session.query(
+            User.username,
+            User.student_id,
+            MonthlyScore.total_score
+        ).join(
+            MonthlyScore, User.id == MonthlyScore.user_id
+        ).filter(
+            MonthlyScore.room_number == room_number,
+            MonthlyScore.year == year,
+            MonthlyScore.month == month
+        ).order_by(
+            MonthlyScore.total_score.desc(),
+            User.username
+        ).all()
+
+        ranking_data = [
+            {'rank': i + 1, 'username': row.username, 'student_id': row.student_id, 'total_score': row.total_score}
+            for i, row in enumerate(monthly_scores)
+        ]
+
+        return jsonify({
+            'status': 'success',
+            'ranking': ranking_data
+        })
+
+    except Exception as e:
+        app.logger.error(f"月間累計スコアランキング取得エラー: {e}")
+        return jsonify(status='error', message=str(e)), 500
+
+@app.route('/api/admin/daily_ranking/<room_number>/<int:year>/<int:month>/<int:day>')
+@admin_required
+def api_admin_daily_ranking(room_number, year, month, day):
+    """管理者用: 指定日の「今日の10問」ランキングを取得"""
+    try:
+        target_date = date(year, month, day)
+
+        daily_quiz = DailyQuiz.query.filter_by(date=target_date, room_number=room_number).first()
+
+        daily_ranking = []
+        if daily_quiz:
+            results = DailyQuizResult.query.filter_by(quiz_id=daily_quiz.id)\
+                .join(User)\
+                .order_by(DailyQuizResult.score.desc(), DailyQuizResult.time_taken_ms.asc()).all()
+
+            for i, result in enumerate(results, 1):
+                daily_ranking.append({
+                    'rank': i,
+                    'username': result.user.username,
+                    'student_id': result.user.student_id,
+                    'score': result.score,
+                    'time': f"{(result.time_taken_ms / 1000):.2f}秒"
+                })
+
+        return jsonify({
+            'status': 'success',
+            'ranking': daily_ranking
+        })
+
+    except Exception as e:
+        app.logger.error(f"指定日の日次ランキング取得エラー: {e}")
+        return jsonify(status='error', message=str(e)), 500
     
 # ====================================================================
 # 管理者用ランキング操作 API
@@ -11531,11 +11598,11 @@ def find_related_essays():
     return jsonify({'essays': recommended_essays})
 
 # ===== メイン起動処理の修正 =====
+# データベース初期化
+create_tables_and_admin_user()
+
 if __name__ == '__main__':
     try:
-        # データベース初期化
-        create_tables_and_admin_user()
-        
         # サーバー起動
         port = int(os.environ.get('PORT', 5001))
         debug_mode = os.environ.get('RENDER') != 'true'
