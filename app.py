@@ -11123,6 +11123,91 @@ def score_details():
     context = get_template_context()
     return render_template('score_details.html', **context)
 
+@app.route('/weak_problems')
+def weak_problems():
+    """苦手問題一覧ページ"""
+    if 'user_id' not in session:
+        flash('苦手問題を確認するにはログインしてください。', 'info')
+        return redirect(url_for('login_page'))
+
+    current_user = User.query.get(session['user_id'])
+    if not current_user:
+        flash('ユーザーが見つかりません。', 'danger')
+        return redirect(url_for('logout'))
+
+    word_data = load_word_data_for_room(current_user.room_number)
+    user_history = current_user.get_problem_history()
+
+    # 自分の苦手問題
+    my_weak_problems = []
+    for problem_id, history in user_history.items():
+        correct = history.get('correct_attempts', 0)
+        incorrect = history.get('incorrect_attempts', 0)
+        total = correct + incorrect
+
+        if total > 0 and incorrect > 0:
+            accuracy = correct / total
+            if accuracy < 0.8:
+                problem_info = next((word for word in word_data if get_problem_id(word) == problem_id), None)
+                if problem_info:
+                    my_weak_problems.append({
+                        'question': problem_info['question'],
+                        'answer': problem_info['answer'],
+                        'correct': correct,
+                        'incorrect': incorrect,
+                        'total': total,
+                        'accuracy': accuracy * 100
+                    })
+
+    my_weak_problems.sort(key=lambda x: x['accuracy'])
+
+    # みんなの苦手問題
+    all_users_in_room = User.query.filter_by(room_number=current_user.room_number).all()
+    all_problem_stats = {}
+
+    for user in all_users_in_room:
+        history = user.get_problem_history()
+        for problem_id, data in history.items():
+            if problem_id not in all_problem_stats:
+                all_problem_stats[problem_id] = {'correct': 0, 'incorrect': 0}
+            all_problem_stats[problem_id]['correct'] += data.get('correct_attempts', 0)
+            all_problem_stats[problem_id]['incorrect'] += data.get('incorrect_attempts', 0)
+
+    everyone_weak_problems = []
+    for problem_id, stats in all_problem_stats.items():
+        correct = stats['correct']
+        incorrect = stats['incorrect']
+        total = correct + incorrect
+        if total >= 5:  # 信頼性のため、5回以上解答された問題のみを対象
+            accuracy = correct / total
+            problem_info = next((word for word in word_data if get_problem_id(word) == problem_id), None)
+            if problem_info:
+                # 自分の正答率を取得
+                user_problem_history = user_history.get(problem_id, {})
+                my_correct = user_problem_history.get('correct_attempts', 0)
+                my_incorrect = user_problem_history.get('incorrect_attempts', 0)
+                my_total = my_correct + my_incorrect
+                my_accuracy = (my_correct / my_total * 100) if my_total > 0 else None
+
+                everyone_weak_problems.append({
+                    'question': problem_info['question'],
+                    'answer': problem_info['answer'],
+                    'total': total,
+                    'accuracy': accuracy * 100,
+                    'my_accuracy': my_accuracy
+                })
+
+    everyone_weak_problems.sort(key=lambda x: x['accuracy'])
+    top_20_everyone_weak = everyone_weak_problems[:20]
+
+    context = get_template_context()
+    context.update({
+        'my_weak_problems': my_weak_problems,
+        'everyone_weak_problems': top_20_everyone_weak
+    })
+    return render_template('weak_problems.html', **context)
+
+
 # 起動時ログを改善
 def enhanced_startup_check():
     """起動時の詳細チェック（修正版）"""
