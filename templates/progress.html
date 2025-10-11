@@ -97,6 +97,7 @@
     <!-- セクション間の仕切り -->
     <hr style="margin: 40px 0; border: none; border-top: 2px solid #e0e0e0; border-radius: 1px;">
 
+
     <!-- 苦手問題セクション -->
     <div class="weak-problems-section">
         <h3><i class="fas fa-exclamation-triangle text-danger"></i> 苦手問題一覧</h3>
@@ -126,7 +127,7 @@
                             <thead class="table-dark">
                                 <tr>
                                     <th scope="col" style="text-align: left;">問題</th>
-                                    <th scope="col" style="text-align: left;">答え</th>
+                                    <th scope="col" style="text-align: left;">答え <button class="btn btn-xs btn-outline-light ms-2" id="toggle-all-my-answers">表示/非表示</button></th>
                                     <th scope="col" class="text-center">あなたの回答</th>
                                     <th scope="col" class="text-center" style="min-width: 120px;">あなたの正答率</th>
                                 </tr>
@@ -136,8 +137,7 @@
                                     <tr>
                                         <td style="text-align: left;">{{ problem.question }}</td>
                                         <td style="text-align: left;">
-                                            <button class="btn btn-sm btn-outline-secondary toggle-answer-btn">表示する</button>
-                                            <span class="answer-text" style="display: none;">{{ problem.answer }}</span>
+                                            <span class="answer-text">{{ problem.answer }}</span>
                                         </td>
                                         <td class="text-center">
                                             <span class="text-success">{{ problem.correct }}</span> / <span class="text-danger">{{ problem.incorrect }}</span>
@@ -172,7 +172,7 @@
                                 <tr>
                                     <th scope="col" class="text-center">順位</th>
                                     <th scope="col" style="text-align: left;">問題</th>
-                                    <th scope="col" style="text-align: left;">答え</th>
+                                    <th scope="col" style="text-align: left;">答え <button class="btn btn-xs btn-outline-light ms-2" id="toggle-all-everyone-answers">表示/非表示</button></th>
                                     <th scope="col" class="text-center" style="min-width: 120px;">全体の正答率</th>
                                     <th scope="col" class="text-center" style="min-width: 120px;">あなたの正答率</th>
                                 </tr>
@@ -183,8 +183,7 @@
                                         <td class="text-center"><strong>{{ loop.index }}</strong></td>
                                         <td style="text-align: left;">{{ problem.question }}</td>
                                         <td style="text-align: left;">
-                                            <button class="btn btn-sm btn-outline-secondary toggle-answer-btn">表示する</button>
-                                            <span class="answer-text" style="display: none;">{{ problem.answer }}</span>
+                                            <span class="answer-text">{{ problem.answer }}</span>
                                         </td>
                                         <td class="text-center">
                                             <div class="progress" style="height: 20px;">
@@ -248,26 +247,30 @@
 
                 <!-- 単元詳細（初期状態は非表示） -->
                 <div class="unit-details" id="units-{{ chapter_num }}" style="display: none;">
-                    {% for unit_data in chapter_data.units %}
-                    <div class="unit-progress-item">
-                        <h5>{{ unit_data.unit_num }}. {{ unit_data.category_name }}</h5>
-                        {% set total_attempts = unit_data.total_attempts %}
-                        {% set mastered_count = unit_data.mastered_problems|length %}
-                        {% set total_questions = unit_data.total_questions_in_unit %}
-                        
-                        <p>問題を解いた数: {{ total_attempts }}回</p>
-                        <p>
-                            マスターした問題数: {{ mastered_count }} / {{ total_questions }}
-                            （{% if total_questions > 0 %}{{ (mastered_count / total_questions * 100)|round(1) }}%{% else %}0%{% endif %}）
-                        </p>
-                        <div class="unit-progress-bar-container">
-                            <div class="unit-progress-bar" 
-                                data-mastered-count="{{ mastered_count }}"
-                                data-total-questions="{{ total_questions }}"
-                                style="width: 0%;"></div>
+                    {% if chapter_data.units %}
+                        {% for unit_data in chapter_data.units %}
+                        <div class="unit-progress-item">
+                            <h5>{{ unit_data.unit_num }}. {{ unit_data.category_name }}</h5>
+                            {% set total_attempts = unit_data.total_attempts %}
+                            {% set mastered_count = unit_data.mastered_problems|length %}
+                            {% set total_questions = unit_data.total_questions_in_unit %}
+
+                            <p>問題を解いた数: {{ total_attempts }}回</p>
+                            <p>
+                                マスターした問題数: {{ mastered_count }} / {{ total_questions }}
+                                （{% if total_questions > 0 %}{{ (mastered_count / total_questions * 100)|round(1) }}%{% else %}0%{% endif %}）
+                            </p>
+                            <div class="unit-progress-bar-container">
+                                <div class="unit-progress-bar"
+                                    data-mastered-count="{{ mastered_count }}"
+                                    data-total-questions="{{ total_questions }}"
+                                    style="width: 0%;"></div>
+                            </div>
                         </div>
-                    </div>
-                    {% endfor %}
+                        {% endfor %}
+                    {% else %}
+                        <p class="text-muted p-3">この章には利用可能な単元がありません。</p>
+                    {% endif %}
                 </div>
             </div>
             {% endfor %}
@@ -478,6 +481,30 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('🔄 ランキングデータ読み込み開始...');
         loadRankingData();
     }, 100); // 100ms後に開始（画面描画完了を待つ）
+
+    // 苦手問題の答え表示/非表示機能
+    function setupAnswerToggle(buttonId, tableId) {
+        const toggleButton = document.getElementById(buttonId);
+        const table = document.querySelector(tableId);
+        if (toggleButton && table) {
+            let answersVisible = false;
+            const answerCells = table.querySelectorAll('.answer-text');
+
+            // 初期状態は非表示
+            answerCells.forEach(cell => cell.style.display = 'none');
+
+            toggleButton.addEventListener('click', () => {
+                answersVisible = !answersVisible;
+                answerCells.forEach(cell => {
+                    cell.style.display = answersVisible ? 'inline' : 'none';
+                });
+                toggleButton.textContent = answersVisible ? '非表示' : '表示';
+            });
+        }
+    }
+
+    setupAnswerToggle('toggle-all-my-answers', '#my-weak');
+    setupAnswerToggle('toggle-all-everyone-answers', '#everyone-weak');
 });
 </script>
 

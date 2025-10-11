@@ -2630,4 +2630,26 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
     });
+
+    function setupAnswerToggle(buttonId, tableId) {
+        const toggleButton = document.getElementById(buttonId);
+        const table = document.getElementById(tableId);
+        if (toggleButton && table) {
+            let answersVisible = false;
+            const answerCells = table.querySelectorAll('.answer-text');
+
+            // 初期状態は非表示
+            answerCells.forEach(cell => cell.style.display = 'none');
+
+            toggleButton.addEventListener('click', () => {
+                answersVisible = !answersVisible;
+                answerCells.forEach(cell => {
+                    cell.style.display = answersVisible ? 'inline' : 'none';
+                });
+            });
+        }
+    }
+
+    setupAnswerToggle('toggle-all-my-answers', 'my-weak');
+    setupAnswerToggle('toggle-all-everyone-answers', 'everyone-weak');
 });
