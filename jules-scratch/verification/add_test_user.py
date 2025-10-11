@@ -3,7 +3,7 @@ import os
 # Add the root directory to the Python path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-from app import app, db, User, RoomSetting, get_problem_id
+from app import app, db, User, RoomSetting, get_problem_id, load_word_data_for_room
 
 with app.app_context():
     # --- Create/Update Test User ---
@@ -29,9 +29,15 @@ with app.app_context():
         print(f"Found existing user: {username}")
 
     # --- Create realistic problem history ---
-    problem1 = {'chapter': '1', 'number': '0', 'question': '化石人類のうち、直立二足歩行をしていたと推定される、最古の人類を何と呼ぶか。', 'answer': '猿人'}
-    problem2 = {'chapter': '1', 'number': '0', 'question': '約240万年前に出現した、初歩的な打製石器やハンドアックスを用いたとされる化石人類を何と呼ぶか。', 'answer': '原人'}
-    problem3 = {'chapter': '1', 'number': '2', 'question': 'シュメール人が粘土板に刻んだ文字は何か。', 'answer': '楔形文字'}
+    word_data = load_word_data_for_room(room_number)
+
+    problem1 = next((word for word in word_data if word['question'] == '化石人類のうち、直立二足歩行をしていたと推定される、最古の人類を何と呼ぶか。'), None)
+    problem2 = next((word for word in word_data if word['question'] == '約240万年前に出現した、初歩的な打製石器やハンドアックスを用いたとされる化石人類を何と呼ぶか。'), None)
+    problem3 = next((word for word in word_data if word['question'] == 'シュメール人が粘土板に刻んだ文字は何か。'), None)
+
+    if not all([problem1, problem2, problem3]):
+        print("Error: Could not find all test problems in word_data.")
+        sys.exit(1)
 
     problem_id1 = get_problem_id(problem1)
     problem_id2 = get_problem_id(problem2)
