@@ -7,6 +7,7 @@ pytz==2024.1
 SQLAlchemy==2.0.25
 
 # PostgreSQL対応
+psycopg2-binary
 
 # その他
 cryptography==41.0.7
