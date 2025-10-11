@@ -879,6 +879,7 @@ def generate_problem_id(word):
         answer_clean = re.sub(r'[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]', '', answer[:10])
         
         problem_id = f"{chapter}-{number}-{question_clean}-{answer_clean}"
+        print(f"Generated problem_id: {problem_id} for question: {question[:10]}...")
         return problem_id
         
     except Exception as e:
@@ -1155,8 +1156,8 @@ def get_problem_id(word):
     try:
         chapter = str(word.get('chapter', '0')).zfill(3)
         number = str(word.get('number', '0')).zfill(3)
-        question = str(word.get('question', ''))
-        answer = str(word.get('answer', ''))
+        question = str(word.get('question', '')).strip()
+        answer = str(word.get('answer', '')).strip()
         
         question_clean = re.sub(r'[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]', '', question[:15])
         answer_clean = re.sub(r'[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]', '', answer[:10])
@@ -4025,121 +4026,6 @@ def admin_fallback_ranking_calculation(room_number, start_time):
         traceback.print_exc()
         return jsonify(status='error', message=f'ランキング計算エラー: {str(e)}'), 500
 
-@app.route('/api/my_weak_problems')
-def api_my_weak_problems():
-    """ユーザー自身の苦手問題トップ20を返すAPI"""
-    if 'user_id' not in session:
-        return jsonify(status='error', message='ログインが必要です'), 401
-
-    try:
-        logger.info("--- api_my_weak_problems START ---")
-        current_user = User.query.get(session['user_id'])
-        if not current_user:
-            logger.error("User not found in session.")
-            return jsonify(status='error', message='ユーザーが見つかりません'), 404
-
-        user_problem_history = current_user.get_problem_history()
-        logger.info(f"Loaded user history for {current_user.username}. Type: {type(user_problem_history)}. Count: {len(user_problem_history)}")
-
-        word_data = load_word_data_for_room(current_user.room_number)
-        logger.info(f"Loaded {len(word_data)} words for room {current_user.room_number}")
-
-        my_weak_problems = []
-        if user_problem_history:
-            word_data_ids = {get_problem_id(word): word for word in word_data}
-            logger.info(f"Generated {len(word_data_ids)} problem IDs from word_data.")
-
-            for problem_id, history in user_problem_history.items():
-                correct = history.get('correct_attempts', 0)
-                incorrect = history.get('incorrect_attempts', 0)
-                total = correct + incorrect
-
-                if total > 0 and incorrect > 0:
-                    accuracy = correct / total
-                    if accuracy < 0.8:
-                        problem_info = word_data_ids.get(problem_id)
-                        if problem_info:
-                            logger.info(f"MATCH FOUND: {problem_id}")
-                            my_weak_problems.append({
-                                'question': problem_info['question'],
-                                'answer': problem_info['answer'],
-                                'correct': correct,
-                                'incorrect': incorrect,
-                                'accuracy': accuracy * 100
-                            })
-
-        my_weak_problems.sort(key=lambda x: x['accuracy'])
-        top_20_my_weak = my_weak_problems[:20]
-
-        return jsonify(status='success', problems=top_20_my_weak)
-
-    except Exception as e:
-        logger.error(f"苦手問題取得APIエラー (自分): {e}")
-        return jsonify(status='error', message='データの取得中にエラーが発生しました'), 500
-
-@app.route('/api/everyone_weak_problems')
-def api_everyone_weak_problems():
-    """部屋のみんなの苦手問題トップ20を返すAPI"""
-    if 'user_id' not in session:
-        return jsonify(status='error', message='ログインが必要です'), 401
-
-    try:
-        current_user = User.query.get(session['user_id'])
-        if not current_user:
-            return jsonify(status='error', message='ユーザーが見つかりません'), 404
-
-        all_users_in_room = User.query.filter_by(room_number=current_user.room_number).all()
-        word_data = load_word_data_for_room(current_user.room_number)
-        user_problem_history = current_user.get_problem_history()
-
-        all_problem_stats = {}
-        for user in all_users_in_room:
-            history_dict = user.get_problem_history()
-            if not isinstance(history_dict, dict):
-                continue
-            for problem_id, data in history_dict.items():
-                problem_info = next((word for word in word_data if get_problem_id(word) == problem_id), None)
-                if problem_info and str(problem_info.get('number')).strip().upper() != 'Z':
-                    if problem_id not in all_problem_stats:
-                        all_problem_stats[problem_id] = {'correct': 0, 'incorrect': 0, 'participants': set()}
-
-                    correct_attempts = data.get('correct_attempts', 0)
-                    incorrect_attempts = data.get('incorrect_attempts', 0)
-
-                    if correct_attempts + incorrect_attempts > 0:
-                        all_problem_stats[problem_id]['correct'] += correct_attempts
-                        all_problem_stats[problem_id]['incorrect'] += incorrect_attempts
-                        all_problem_stats[problem_id]['participants'].add(user.id)
-
-        everyone_weak_problems = []
-        for problem_id, stats in all_problem_stats.items():
-            total = stats['correct'] + stats['incorrect']
-            num_participants = len(stats['participants'])
-            if total >= 5 and num_participants >= 3:
-                accuracy = stats['correct'] / total
-                problem_info = next((word for word in word_data if get_problem_id(word) == problem_id), None)
-                if problem_info:
-                    my_stats = user_problem_history.get(problem_id, {})
-                    my_correct = my_stats.get('correct_attempts', 0)
-                    my_incorrect = my_stats.get('incorrect_attempts', 0)
-                    my_total = my_correct + my_incorrect
-                    my_accuracy = (my_correct / my_total * 100) if my_total > 0 else None
-
-                    everyone_weak_problems.append({
-                        'question': problem_info['question'],
-                        'answer': problem_info['answer'],
-                        'accuracy': accuracy * 100,
-                        'my_accuracy': my_accuracy
-                    })
-
-        everyone_weak_problems.sort(key=lambda x: x['accuracy'])
-        top_20_everyone_weak = everyone_weak_problems[:20]
-
-        return jsonify(status='success', problems=top_20_everyone_weak)
-
-    except Exception as e:
-        logger.error(f"苦手問題取得APIエラー (みんな): {e}")
-        return jsonify(status='error', message='データの取得中にエラーが発生しました'), 500
 
 @app.route('/api/admin/daily_quiz_info/<room_number>')
 @admin_required
@@ -5626,81 +5512,6 @@ def progress_page():
             # ページは表示するが、データは空にする
             word_data = []
         
-        # --- 自分の苦手問題の計算 ---
-        my_weak_problems = []
-        if user_problem_history: # 履歴がある場合のみ計算
-            for problem_id, history in user_problem_history.items():
-                correct = history.get('correct_attempts', 0)
-                incorrect = history.get('incorrect_attempts', 0)
-                total = correct + incorrect
-                if total > 0 and incorrect > 0:
-                    accuracy = correct / total
-                    if accuracy < 0.8: # 正答率80%未満
-                        problem_info = next((word for word in word_data if get_problem_id(word) == problem_id), None)
-                        if problem_info:
-                            my_weak_problems.append({
-                                'question': problem_info['question'],
-                                'answer': problem_info['answer'],
-                                'correct': correct,
-                                'incorrect': incorrect,
-                                'accuracy': accuracy * 100
-                            })
-        my_weak_problems.sort(key=lambda x: x['accuracy'])
-
-        # --- みんなの苦手問題の計算 ---
-        all_users_in_room = User.query.filter_by(room_number=current_user.room_number).all()
-        all_problem_stats = {}
-
-        for user in all_users_in_room:
-            # ★★★ BUG FIX: user.problem_history ではなく user.get_problem_history() を使う
-            history_dict = user.get_problem_history()
-            if not isinstance(history_dict, dict): # 安全策
-                continue
-
-            for problem_id, data in history_dict.items():
-                # Z問題は集計から除外
-                problem_info = next((word for word in word_data if get_problem_id(word) == problem_id), None)
-                if problem_info and str(problem_info.get('number')).strip().upper() != 'Z':
-                    if problem_id not in all_problem_stats:
-                        all_problem_stats[problem_id] = {'correct': 0, 'incorrect': 0, 'participants': 0}
-
-                    correct_attempts = data.get('correct_attempts', 0)
-                    incorrect_attempts = data.get('incorrect_attempts', 0)
-
-                    if correct_attempts + incorrect_attempts > 0:
-                        all_problem_stats[problem_id]['correct'] += correct_attempts
-                        all_problem_stats[problem_id]['incorrect'] += incorrect_attempts
-                        all_problem_stats[problem_id]['participants'] += 1
-
-
-        everyone_weak_problems = []
-        for problem_id, stats in all_problem_stats.items():
-            total = stats['correct'] + stats['incorrect']
-            # 信頼性のため、部屋の回答者3人以上、かつ総回答回数5回以上を対象
-            if total >= 5 and stats['participants'] >= 3:
-                accuracy = stats['correct'] / total
-                problem_info = next((word for word in word_data if get_problem_id(word) == problem_id), None)
-                if problem_info:
-                    # 自分の正答率を計算
-                    my_stats = user_problem_history.get(problem_id, {})
-                    my_correct = my_stats.get('correct_attempts', 0)
-                    my_incorrect = my_stats.get('incorrect_attempts', 0)
-                    my_total = my_correct + my_incorrect
-                    my_accuracy = (my_correct / my_total * 100) if my_total > 0 else None
-
-                    everyone_weak_problems.append({
-                        'question': problem_info['question'],
-                        'answer': problem_info['answer'],
-                        'accuracy': accuracy * 100,
-                        'my_accuracy': my_accuracy,
-                        'total_answers': total,
-                        'participants': stats['participants']
-                    })
-
-        # 全体の正答率が低い順にソートして上位20件を取得
-        everyone_weak_problems.sort(key=lambda x: x['accuracy'])
-        top_20_everyone_weak = everyone_weak_problems[:20]
-
         # --- 章別進捗サマリー（ここは変更なし） ---
         room_setting = RoomSetting.query.filter_by(room_number=current_user.room_number).first()
         chapter_progress_summary = {}
@@ -5734,8 +5545,6 @@ def progress_page():
         return render_template('progress.html',
                                current_user=current_user,
                                user_progress_by_chapter=sorted_chapter_progress,
-                               my_weak_problems=my_weak_problems,
-                               everyone_weak_problems=top_20_everyone_weak,
                                async_loading=True, # ランキングは非同期
                                **context)
     
