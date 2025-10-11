@@ -2611,3 +2611,23 @@ window.checkWeakProblemsStatus = function() {
 // グローバル関数として関数を公開（onclickから呼び出せるように）
 window.toggleIncorrectAnswer = toggleIncorrectAnswer;
 window.toggleWeakAnswer = toggleWeakAnswer;
+
+document.addEventListener('DOMContentLoaded', function() {
+    // This is a more robust way to handle events on dynamically added content
+    document.body.addEventListener('click', function(event) {
+        if (event.target.classList.contains('toggle-answer-btn')) {
+            const button = event.target;
+            const answerSpan = button.nextElementSibling;
+
+            if (answerSpan && answerSpan.classList.contains('answer-text')) {
+                if (answerSpan.style.display === 'none' || answerSpan.style.display === '') {
+                    answerSpan.style.display = 'inline';
+                    button.textContent = '隠す';
+                } else {
+                    answerSpan.style.display = 'none';
+                    button.textContent = '表示する';
+                }
+            }
+        }
+    });
+});
