@@ -5467,7 +5467,7 @@ def admin_analyze_invalid_history_detailed():
 # ====================================================================
 @app.route('/progress')
 def progress_page():
-    """個人進捗のみを高速表示（ランキングは非同期）"""
+    """個人進捗とみんなの苦手問題を表示"""
     try:
         if 'user_id' not in session:
             flash('進捗を確認するにはログインしてください。', 'info')
@@ -5478,236 +5478,146 @@ def progress_page():
             flash('ユーザーが見つかりません。', 'danger')
             return redirect(url_for('logout'))
 
-        print(f"\n=== 進捗ページ（高速版）処理開始 ===")
+        print(f"\n=== 進捗ページ処理開始 ===")
         print(f"ユーザー: {current_user.username} (部屋: {current_user.room_number})")
 
+        # ユーザーの学習履歴を取得 (get_problem_history は自動的に辞書を返す)
         user_problem_history = current_user.get_problem_history()
-        if isinstance(user_problem_history, str):
-            try:
-                user_problem_history = json.loads(user_problem_history)
-            except json.JSONDecodeError:
-                print(f"⚠️ JSONデコードエラー: ユーザー {current_user.username} の学習履歴が不正です。")
-                user_problem_history = {}
-        print(f"学習履歴数: {len(user_problem_history)}")
         
-        # 部屋ごとの単語データを取得
+        # 部屋の単語データを取得
         word_data = load_word_data_for_room(current_user.room_number)
-        print(f"部屋の単語データ数: {len(word_data)}")
+        if not word_data:
+            flash('単語データの読み込みに失敗しました。', 'danger')
+            # ページは表示するが、データは空にする
+            word_data = []
         
-        room_setting = RoomSetting.query.filter_by(room_number=current_user.room_number).first()
-        max_enabled_unit_num_str = room_setting.max_enabled_unit_number if room_setting else "9999"
-        parsed_max_enabled_unit_num = parse_unit_number(max_enabled_unit_num_str)
-        print(f"最大単元番号: {max_enabled_unit_num_str}")
-
-        # 章ごとに進捗をまとめる（個人のみ、高速化）
-        chapter_progress_summary = {}
-
-        # 有効な単語データで単元進捗を初期化
-        for word in word_data:
-            chapter_num = word['chapter']
-            unit_num = word['number']
-            category_name = word.get('category', '未分類')
-            
-            is_word_enabled_in_csv = word['enabled']
-            is_unit_enabled_by_room = is_unit_enabled_by_room_setting(unit_num, room_setting)  # ←変数名を変更
-
-            if is_word_enabled_in_csv and is_unit_enabled_by_room:
-                # 章の初期化
-                if chapter_num not in chapter_progress_summary:
-                    chapter_progress_summary[chapter_num] = {
-                        'chapter_name': f'第{chapter_num}章',
-                        'units': {},
-                        'total_questions': 0,
-                        'total_mastered': 0
-                    }
-                
-                # 単元の初期化
-                if unit_num not in chapter_progress_summary[chapter_num]['units']:
-                    chapter_progress_summary[chapter_num]['units'][unit_num] = {
-                        'categoryName': category_name,
-                        'attempted_problems': set(),
-                        'mastered_problems': set(),
-                        'total_questions_in_unit': 0,
-                        'total_attempts': 0
-                    }
-                
-                chapter_progress_summary[chapter_num]['units'][unit_num]['total_questions_in_unit'] += 1
-                chapter_progress_summary[chapter_num]['total_questions'] += 1
-
-        # 学習履歴を処理（個人のみ）
-        matched_problems = 0
-        unmatched_problems = 0
-        
-        for problem_id, history in user_problem_history.items():
-            # 問題IDに対応する単語を検索
-            matched_word = None
-            for word in word_data:
-                generated_id = get_problem_id(word)
-                if generated_id == problem_id:
-                    matched_word = word
-                    break
-
-            if matched_word:
-                matched_problems += 1
-                chapter_number = matched_word['chapter']
-                unit_number = matched_word['number']
-                
-                is_word_enabled_in_csv = matched_word['enabled']
-                is_unit_enabled_by_room = parse_unit_number(unit_number) <= parsed_max_enabled_unit_num
-
-                if (is_word_enabled_in_csv and is_unit_enabled_by_room_setting and 
-                    chapter_number in chapter_progress_summary and
-                    unit_number in chapter_progress_summary[chapter_number]['units']):
-                    
-                    correct_attempts = history.get('correct_attempts', 0)
-                    incorrect_attempts = history.get('incorrect_attempts', 0)
-                    total_problem_attempts = correct_attempts + incorrect_attempts
-                    
-                    unit_data = chapter_progress_summary[chapter_number]['units'][unit_number]
-                    unit_data['total_attempts'] += total_problem_attempts
-                    
-                    if total_problem_attempts > 0:
-                        unit_data['attempted_problems'].add(problem_id)
-                        
-                        # マスター判定：正答率80%以上
-                        accuracy_rate = (correct_attempts / total_problem_attempts) * 100
-                        if accuracy_rate >= 80.0:
-                            unit_data['mastered_problems'].add(problem_id)
-                            chapter_progress_summary[chapter_number]['total_mastered'] += 1
-            else:
-                unmatched_problems += 1
-
-        # データを整理してテンプレートに渡す形式に変換
-        sorted_chapter_progress = {}
-
-        # ▼▼▼▼▼ ソート処理を修正 ▼▼▼▼▼
-        def sort_key_progress(chapter_num):
-            if chapter_num == 'S':
-                return (0, 0)
-            if chapter_num.isdigit():
-                return (1, int(chapter_num))
-            return (2, chapter_num)
-
-        for chapter_num in sorted(chapter_progress_summary.keys(), key=sort_key_progress):
-        # ▲▲▲▲▲ ここまで修正 ▲▲▲▲▲
-            chapter_data = chapter_progress_summary[chapter_num]
-            
-            # 単元データをソートして配列に変換
-            sorted_units = []
-            for unit_num in sorted(chapter_data['units'].keys(), key=lambda x: parse_unit_number(x)):
-                unit_data = chapter_data['units'][unit_num]
-                sorted_units.append({
-                    'unit_num': unit_num,
-                    'category_name': unit_data['categoryName'],
-                    'attempted_problems': list(unit_data['attempted_problems']),
-                    'mastered_problems': list(unit_data['mastered_problems']),
-                    'total_questions_in_unit': unit_data['total_questions_in_unit'],
-                    'total_attempts': unit_data['total_attempts']
-                })
-            
-            # ▼▼▼▼▼ ここから修正 ▼▼▼▼▼
-            # 'S' を「歴史総合」に変換
-            chapter_name = "歴史総合" if chapter_num == "S" else f"第{chapter_num}章"
-            # ▲▲▲▲▲ ここまで修正 ▲▲▲▲▲
-            
-            sorted_chapter_progress[chapter_num] = {
-                'chapter_name': chapter_name, # 修正した章名を代入
-                'units': sorted_units,
-                'total_questions': chapter_data['total_questions'],
-                'total_mastered': chapter_data['total_mastered']
-            }
-
-        print(f"章別進捗: {len(sorted_chapter_progress)}章")
-        print("=== 進捗ページ（高速版）処理完了 ===\n")
-
-        context = get_template_context()
-        
-        # ★重要：ランキングデータは空で渡す（Ajax で後から取得）
-        # 自分の苦手問題
+        # --- 自分の苦手問題の計算 ---
         my_weak_problems = []
-        user_history_dict = json.loads(user_problem_history) if isinstance(user_problem_history, str) else user_problem_history
-        for problem_id, history in user_history_dict.items():
-            correct = history.get('correct_attempts', 0)
-            incorrect = history.get('incorrect_attempts', 0)
-            total = correct + incorrect
-
-            if total > 0 and incorrect > 0:
-                accuracy = correct / total
-                if accuracy < 0.8:
-                    problem_info = next((word for word in word_data if get_problem_id(word) == problem_id), None)
-                    if problem_info:
-                        my_weak_problems.append({
-                            'question': problem_info['question'],
-                            'answer': problem_info['answer'],
-                            'correct': correct,
-                            'incorrect': incorrect,
-                            'total': total,
-                            'accuracy': accuracy * 100
-                        })
-
+        if user_problem_history: # 履歴がある場合のみ計算
+            for problem_id, history in user_problem_history.items():
+                correct = history.get('correct_attempts', 0)
+                incorrect = history.get('incorrect_attempts', 0)
+                total = correct + incorrect
+                if total > 0 and incorrect > 0:
+                    accuracy = correct / total
+                    if accuracy < 0.8: # 正答率80%未満
+                        problem_info = next((word for word in word_data if get_problem_id(word) == problem_id), None)
+                        if problem_info:
+                            my_weak_problems.append({
+                                'question': problem_info['question'],
+                                'answer': problem_info['answer'],
+                                'correct': correct,
+                                'incorrect': incorrect,
+                                'accuracy': accuracy * 100
+                            })
         my_weak_problems.sort(key=lambda x: x['accuracy'])
 
-        # みんなの苦手問題
+        # --- みんなの苦手問題の計算 ---
         all_users_in_room = User.query.filter_by(room_number=current_user.room_number).all()
         all_problem_stats = {}
 
         for user in all_users_in_room:
-            history_str = user.get_problem_history()
-            history = json.loads(history_str) if isinstance(history_str, str) else history_str
-            for problem_id, data in history.items():
+            # ★★★ BUG FIX: user.problem_history ではなく user.get_problem_history() を使う
+            history_dict = user.get_problem_history()
+            if not isinstance(history_dict, dict): # 安全策
+                continue
+
+            for problem_id, data in history_dict.items():
+                # Z問題は集計から除外
                 problem_info = next((word for word in word_data if get_problem_id(word) == problem_id), None)
-                if problem_info and problem_info.get('chapter', '').upper() != 'Z':
+                if problem_info and str(problem_info.get('number')).strip().upper() != 'Z':
                     if problem_id not in all_problem_stats:
-                        all_problem_stats[problem_id] = {'correct': 0, 'incorrect': 0}
-                    all_problem_stats[problem_id]['correct'] += data.get('correct_attempts', 0)
-                    all_problem_stats[problem_id]['incorrect'] += data.get('incorrect_attempts', 0)
+                        all_problem_stats[problem_id] = {'correct': 0, 'incorrect': 0, 'participants': 0}
+
+                    correct_attempts = data.get('correct_attempts', 0)
+                    incorrect_attempts = data.get('incorrect_attempts', 0)
+
+                    if correct_attempts + incorrect_attempts > 0:
+                        all_problem_stats[problem_id]['correct'] += correct_attempts
+                        all_problem_stats[problem_id]['incorrect'] += incorrect_attempts
+                        all_problem_stats[problem_id]['participants'] += 1
+
 
         everyone_weak_problems = []
         for problem_id, stats in all_problem_stats.items():
-            correct = stats['correct']
-            incorrect = stats['incorrect']
-            total = correct + incorrect
-            if total >= 5:  # 信頼性のため、5回以上解答された問題のみを対象
-                accuracy = correct / total
+            total = stats['correct'] + stats['incorrect']
+            # 信頼性のため、部屋の回答者3人以上、かつ総回答回数5回以上を対象
+            if total >= 5 and stats['participants'] >= 3:
+                accuracy = stats['correct'] / total
                 problem_info = next((word for word in word_data if get_problem_id(word) == problem_id), None)
                 if problem_info:
-                    user_problem_history = user_problem_history.get(problem_id, {})
-                    my_correct = user_problem_history.get('correct_attempts', 0)
-                    my_incorrect = user_problem_history.get('incorrect_attempts', 0)
+                    # 自分の正答率を計算
+                    my_stats = user_problem_history.get(problem_id, {})
+                    my_correct = my_stats.get('correct_attempts', 0)
+                    my_incorrect = my_stats.get('incorrect_attempts', 0)
                     my_total = my_correct + my_incorrect
                     my_accuracy = (my_correct / my_total * 100) if my_total > 0 else None
 
                     everyone_weak_problems.append({
                         'question': problem_info['question'],
                         'answer': problem_info['answer'],
-                        'total': total,
                         'accuracy': accuracy * 100,
-                        'my_accuracy': my_accuracy
+                        'my_accuracy': my_accuracy,
+                        'total_answers': total,
+                        'participants': stats['participants']
                     })
 
+        # 全体の正答率が低い順にソートして上位20件を取得
         everyone_weak_problems.sort(key=lambda x: x['accuracy'])
         top_20_everyone_weak = everyone_weak_problems[:20]
 
+        # --- 章別進捗サマリー（ここは変更なし） ---
+        room_setting = RoomSetting.query.filter_by(room_number=current_user.room_number).first()
+        chapter_progress_summary = {}
+        for word in word_data:
+            if word['enabled'] and is_unit_enabled_by_room_setting(word.get('number'), room_setting):
+                chapter_num = word['chapter']
+                if chapter_num not in chapter_progress_summary:
+                    chapter_progress_summary[chapter_num] = {'total_questions': 0, 'total_mastered': 0, 'chapter_name': f"第{chapter_num}章" if chapter_num != 'S' else "歴史総合", 'units': {}}
+                chapter_progress_summary[chapter_num]['total_questions'] += 1
+
+        if user_problem_history:
+            for problem_id, history in user_problem_history.items():
+                matched_word = next((w for w in word_data if get_problem_id(w) == problem_id), None)
+                if matched_word and matched_word['enabled'] and is_unit_enabled_by_room_setting(matched_word.get('number'), room_setting):
+                    correct = history.get('correct_attempts', 0)
+                    incorrect = history.get('incorrect_attempts', 0)
+                    if (correct + incorrect) > 0 and (correct / (correct + incorrect)) >= 0.8:
+                        chapter_num = matched_word['chapter']
+                        if chapter_num in chapter_progress_summary:
+                            chapter_progress_summary[chapter_num]['total_mastered'] += 1
+
+        def sort_key_progress(item):
+            chapter_num = item[0]
+            if chapter_num == 'S': return (0, 0)
+            if chapter_num.isdigit(): return (1, int(chapter_num))
+            return (2, chapter_num)
+        sorted_chapter_progress = dict(sorted(chapter_progress_summary.items(), key=sort_key_progress))
+
+
+        context = get_template_context()
         return render_template('progress.html',
                                current_user=current_user,
                                user_progress_by_chapter=sorted_chapter_progress,
                                my_weak_problems=my_weak_problems,
                                everyone_weak_problems=top_20_everyone_weak,
-                               # ランキング関連は空・None で初期化
-                               top_5_ranking=[],  
-                               current_user_stats=None,
-                               current_user_rank=None,
-                               total_users_in_room=0,
-                               ranking_display_count=5,
-                               # 非同期ローディング用フラグ
-                               async_loading=True,
+                               async_loading=True, # ランキングは非同期
                                **context)
     
     except Exception as e:
         print(f"Error in progress_page: {e}")
         import traceback
         traceback.print_exc()
-        return f"Progress Error: {e}", 500
+        # エラーが発生した場合もページを表示できるよう、空のデータを渡す
+        context = get_template_context()
+        flash('進捗データの読み込み中にエラーが発生しました。', 'danger')
+        return render_template('progress.html',
+                               current_user=current_user,
+                               user_progress_by_chapter={},
+                               my_weak_problems=[],
+                               everyone_weak_problems=[],
+                               async_loading=True,
+                               **context)
 
 @app.route('/api/ranking_data')
 def api_ranking_data():
