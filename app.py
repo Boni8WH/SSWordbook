@@ -1477,15 +1477,21 @@ def migrate_database():
                     print("✅ username_changed_atカラムを追加しました。")
                 
                 # パスワードハッシュフィールドの文字数制限を拡張
-                print("🔧 パスワードハッシュフィールドの文字数制限を拡張します...")
-                with db.engine.connect() as conn:
-                    try:
-                        conn.execute(text('ALTER TABLE "user" ALTER COLUMN _room_password_hash TYPE VARCHAR(255)'))
-                        conn.execute(text('ALTER TABLE "user" ALTER COLUMN _individual_password_hash TYPE VARCHAR(255)'))
-                        conn.commit()
-                        print("✅ パスワードハッシュフィールドを255文字に拡張しました。")
-                    except Exception as alter_error:
-                        print(f"⚠️ カラム変更エラー: {alter_error}")
+                # This migration is PostgreSQL-specific and causes errors on SQLite.
+                # It's better to ensure the model definition in models.py is correct
+                # and let SQLAlchemy handle the column types.
+                # print("🔧 パスワードハッシュフィールドの文字数制限を拡張します...")
+                # with db.engine.connect() as conn:
+                #     try:
+                #         if is_postgres:
+                #             conn.execute(text('ALTER TABLE "user" ALTER COLUMN _room_password_hash TYPE VARCHAR(255)'))
+                #             conn.execute(text('ALTER TABLE "user" ALTER COLUMN _individual_password_hash TYPE VARCHAR(255)'))
+                #             conn.commit()
+                #             print("✅ パスワードハッシュフィールドを255文字に拡張しました。")
+                #         else:
+                #             print("⚠️ SQLiteではカラムの型変更は限定的です。モデル定義を確認してください。")
+                #     except Exception as alter_error:
+                #         print(f"⚠️ カラム変更エラー: {alter_error}")
                 
                 # last_loginカラムの確認・追加
                 if 'last_login' not in columns:
@@ -1846,14 +1852,9 @@ def create_user_stats_table_simple():
         
         # 手動でテーブル作成も試行
         with db.engine.connect() as conn:
-            # テーブル存在確認
-            result = conn.execute(text("""
-                SELECT EXISTS (
-                    SELECT FROM information_schema.tables 
-                    WHERE table_name = 'user_stats'
-                )
-            """))
-            table_exists = result.fetchone()[0]
+            # テーブル存在確認 (SQLite/PostgreSQL互換)
+            inspector = inspect(conn)
+            table_exists = inspector.has_table('user_stats')
             
             if not table_exists:
                 print("🔧 SQLで直接テーブル作成...")
@@ -2943,27 +2944,21 @@ def login_page():
             user = authenticate_user(room_number, room_password, student_id, individual_password)
             
             if user:
-                remember = request.form.get('remember_me')
-                if remember:
-                    # セッションを永続化（有効期限はapp.configで設定済み）
-                    session.permanent = True
-                    # 明示的に有効期限を設定することも可能
-                    app.permanent_session_lifetime = timedelta(days=7)
-                else:
-                    session.permanent = False
-                    
+                session.permanent = True
+                app.permanent_session_lifetime = timedelta(days=7)
+
                 session['user_id'] = user.id
                 session['username'] = user.username
                 session['room_number'] = user.room_number
                 user.last_login = datetime.now(JST)
                 db.session.commit()
-                
+
                 if hasattr(user, 'is_first_login') and user.is_first_login:
                     flash('初回ログインです。パスワードを変更してください。', 'info')
                     return redirect(url_for('first_time_password_change'))
-                else:
-                    flash(f'ようこそ、{user.username}さん！', 'success')
-                    return redirect(url_for('index'))
+
+                flash(f'ようこそ、{user.username}さん！', 'success')
+                return redirect(url_for('index'))
             else:
                 flash('ログイン情報が間違っています。', 'danger')
     
@@ -4025,6 +4020,7 @@ def admin_fallback_ranking_calculation(room_number, start_time):
         import traceback
         traceback.print_exc()
         return jsonify(status='error', message=f'ランキング計算エラー: {str(e)}'), 500
+
 
 
 @app.route('/api/admin/daily_quiz_info/<room_number>')
