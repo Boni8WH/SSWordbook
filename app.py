@@ -5478,6 +5478,80 @@ def weak_problems_page():
     context = get_template_context()
     return render_template('weak_problems.html', **context)
 
+@app.route('/api/room_weak_problems')
+def api_room_weak_problems():
+    """部屋全体の苦手問題（正答率が低い問題）トップ20を返す"""
+    if 'user_id' not in session:
+        return jsonify(status='error', message='ログインが必要です'), 401
+
+    current_user = User.query.get(session['user_id'])
+    if not current_user or not current_user.room_number:
+        return jsonify(status='error', message='ユーザー情報または部屋情報が見つかりません'), 404
+
+    try:
+        # 同じ部屋の全ユーザーを取得
+        users_in_room = User.query.filter_by(room_number=current_user.room_number).all()
+
+        # 部屋全体の学習履歴を集計
+        room_problem_stats = {}
+        for user in users_in_room:
+            user_history = user.get_problem_history()
+            if isinstance(user_history, str):
+                try:
+                    user_history = json.loads(user_history)
+                except json.JSONDecodeError:
+                    continue # パースできないデータはスキップ
+
+            if isinstance(user_history, dict):
+                for problem_id, history in user_history.items():
+                    if problem_id not in room_problem_stats:
+                        room_problem_stats[problem_id] = {'correct': 0, 'incorrect': 0}
+
+                    room_problem_stats[problem_id]['correct'] += history.get('correct_attempts', 0)
+                    room_problem_stats[problem_id]['incorrect'] += history.get('incorrect_attempts', 0)
+
+        # 正答率を計算
+        problems_with_accuracy = []
+        for problem_id, stats in room_problem_stats.items():
+            total_attempts = stats['correct'] + stats['incorrect']
+            if total_attempts > 0:
+                accuracy = (stats['correct'] / total_attempts) * 100
+                problems_with_accuracy.append({
+                    'problem_id': problem_id,
+                    'accuracyRate': accuracy,
+                    'total_attempts': total_attempts
+                })
+
+        # 正答率が低い順、同じ場合は試行回数が多い順でソート
+        problems_with_accuracy.sort(key=lambda x: (x['accuracyRate'], -x['total_attempts']))
+
+        # 上位20件を取得
+        top_20_weakest = problems_with_accuracy[:20]
+
+        # 完全な問題情報を付与
+        word_data = load_word_data_for_room(current_user.room_number)
+        word_map = {get_problem_id(word): word for word in word_data}
+
+        result_problems = []
+        for weak_problem in top_20_weakest:
+            problem_id = weak_problem['problem_id']
+            if problem_id in word_map:
+                original_word = word_map[problem_id]
+                result_problems.append({
+                    'problemId': problem_id,
+                    'question': original_word['question'],
+                    'answer': original_word['answer'],
+                    'accuracyRate': weak_problem['accuracyRate']
+                })
+
+        return jsonify(status='success', weak_problems=result_problems)
+
+    except Exception as e:
+        app.logger.error(f"部屋全体の苦手問題取得エラー: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify(status='error', message='サーバーエラーが発生しました。'), 500
+
 
 # ====================================================================
 # 進捗ページ
