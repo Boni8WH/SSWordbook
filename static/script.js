@@ -89,46 +89,48 @@ async function initializeWeakProblemsPage() {
 
     try {
         // Fetch all necessary data concurrently
-        const [userData, roomData, wordData] = await Promise.all([
-            fetch('/api/load_quiz_progress').then(res => res.json()),
-            fetch('/api/room_weak_problems').then(res => res.json()),
-            fetch('/api/word_data').then(res => res.json())
+        const [personalData, roomData] = await Promise.all([
+            fetch('/api/personal_weak_problems').then(res => res.json()),
+            fetch('/api/room_weak_problems').then(res => res.json())
         ]);
-
-        // Process user data
-        if (userData.status === 'success') {
-            problemHistory = userData.problemHistory || {};
-            incorrectWords = userData.incorrectWords || [];
-        } else {
-            console.error("Failed to load personal weak problems.");
-        }
-
-        // Process room data
-        if (roomData.status === 'success') {
-            roomWeakProblems = roomData.weak_problems || [];
-        } else {
-            console.error("Failed to load room weak problems.");
-        }
-
-        // Process word data
-        if (Array.isArray(wordData)) {
-            window.word_data = wordData;
-        } else {
-             console.error("Failed to load word data.");
-        }
 
         // Hide spinner and show content
         mainSpinner.classList.add('d-none');
         tabContent.classList.remove('d-none');
 
-        // Render both lists
-        renderPersonalWeakWords();
-        renderRoomWeakWords();
+        // Log received data for debugging
+        console.log("Personal weak problems data:", JSON.stringify(personalData, null, 2));
+        console.log("Room weak problems data:", JSON.stringify(roomData, null, 2));
+
+        // Render Personal Weak Problems
+        if (personalData && personalData.status === 'success') {
+            renderPersonalWeakWords(personalData.weak_problems || []);
+        } else {
+            console.error("Failed to load personal weak problems:", personalData ? personalData.message : 'No personal data');
+            document.getElementById('personalWeakWordsContainer').innerHTML = `<li class="text-danger">個人の苦手問題の読み込みに失敗しました: ${personalData ? personalData.message : 'N/A'}</li>`;
+        }
+
+        // Render Room Weak Problems
+        if (roomData && roomData.status === 'success') {
+            renderRoomWeakWords(roomData.weak_problems || []);
+        } else {
+            console.error("Failed to load room weak problems:", roomData ? roomData.message : 'No room data');
+            document.getElementById('roomWeakWordsContainer').innerHTML = `<li class="text-danger">みんなの苦手問題の読み込みに失敗しました: ${roomData ? roomData.message : 'N/A'}</li>`;
+        }
+
         setupWeakProblemPageListeners();
 
     } catch (error) {
-        console.error("Error initializing weak problems page:", error);
-        mainSpinner.innerHTML = '<p class="text-danger">データの読み込みに失敗しました。ページをリロードしてください。</p>';
+        console.error("FATAL: Error initializing weak problems page:", error);
+        // Display a more informative error message to the user
+        mainSpinner.classList.remove('d-none'); // Ensure the area is visible
+        mainSpinner.innerHTML = `
+            <div class="alert alert-danger">
+                <h4><i class="fas fa-exclamation-triangle"></i> エラーが発生しました</h4>
+                <p>データの読み込み中に予期せぬエラーが発生しました。開発者コンソールで詳細を確認してください。</p>
+                <p><strong>エラー:</strong> ${error.message}</p>
+            </div>`;
+        tabContent.classList.add('d-none'); // Keep content hidden on fatal error
     }
 }
 
@@ -174,39 +176,25 @@ function loadWordDataFromServer() {
 // =========================================================
 // 苦手問題リスト表示 (リファクタリング版)
 // =========================================================
-function renderPersonalWeakWords() {
+function renderPersonalWeakWords(personalWeakProblems) {
     const container = document.getElementById('personalWeakWordsContainer');
     const noDataMessage = document.getElementById('noPersonalWeakWordsMessage');
     if (!container || !noDataMessage) return;
 
     container.innerHTML = '';
 
-    const personalWeakProblems = word_data.filter(word => incorrectWords.includes(generateProblemId(word)));
-
     if (personalWeakProblems.length === 0) {
         noDataMessage.classList.remove('d-none');
     } else {
         noDataMessage.classList.add('d-none');
         personalWeakProblems.forEach((problem, index) => {
-            const history = problemHistory[generateProblemId(problem)] || {};
-            const correctAttempts = history.correct_attempts || 0;
-            const incorrectAttempts = history.incorrect_attempts || 0;
-            const totalAttempts = correctAttempts + incorrectAttempts;
-            const accuracyRate = totalAttempts > 0 ? (correctAttempts / totalAttempts) * 100 : 0;
-
-            const problemWithStats = {
-                ...problem,
-                accuracyRate,
-                correctAttempts,
-                incorrectAttempts,
-            };
-            const li = createProblemListItem(problemWithStats, index, 'personal');
+            const li = createProblemListItem(problem, index, 'personal');
             container.appendChild(li);
         });
     }
 }
 
-function renderRoomWeakWords() {
+function renderRoomWeakWords(roomWeakProblems) {
     const container = document.getElementById('roomWeakWordsContainer');
     const noDataMessage = document.getElementById('noRoomWeakWordsMessage');
     if (!container || !noDataMessage) return;

@@ -5478,6 +5478,72 @@ def weak_problems_page():
     context = get_template_context()
     return render_template('weak_problems.html', **context)
 
+@app.route('/api/personal_weak_problems')
+def api_personal_weak_problems():
+    """個人の苦手問題（正答率が低い問題）トップ20を返す"""
+    if 'user_id' not in session:
+        return jsonify(status='error', message='ログインが必要です'), 401
+
+    current_user = User.query.get(session['user_id'])
+    if not current_user:
+        return jsonify(status='error', message='ユーザーが見つかりません'), 404
+
+    try:
+        user_history = current_user.get_problem_history()
+        if not isinstance(user_history, dict) or not user_history:
+            return jsonify(status='success', weak_problems=[])
+
+        # 正答率を計算
+        problems_with_accuracy = []
+        for problem_id, history in user_history.items():
+            correct_attempts = history.get('correct_attempts', 0)
+            incorrect_attempts = history.get('incorrect_attempts', 0)
+            total_attempts = correct_attempts + incorrect_attempts
+
+            if total_attempts > 0:
+                accuracy = (correct_attempts / total_attempts) * 100
+                # 正答率が100%未満の問題のみを対象とする
+                if accuracy < 100:
+                    problems_with_accuracy.append({
+                        'problem_id': problem_id,
+                        'accuracyRate': accuracy,
+                        'correct_attempts': correct_attempts,
+                        'incorrect_attempts': incorrect_attempts,
+                        'total_attempts': total_attempts
+                    })
+
+        # 正答率が低い順、同じ場合は試行回数が多い順でソート
+        problems_with_accuracy.sort(key=lambda x: (x['accuracyRate'], -x['total_attempts']))
+
+        # 上位20件を取得
+        top_20_weakest = problems_with_accuracy[:20]
+
+        # 完全な問題情報を付与
+        word_data = load_word_data_for_room(current_user.room_number)
+        word_map = {get_problem_id(word): word for word in word_data}
+
+        result_problems = []
+        for weak_problem in top_20_weakest:
+            problem_id = weak_problem['problem_id']
+            if problem_id in word_map:
+                original_word = word_map[problem_id]
+                result_problems.append({
+                    'problemId': problem_id,
+                    'question': original_word['question'],
+                    'answer': original_word['answer'],
+                    'accuracyRate': weak_problem['accuracyRate'],
+                    'correct_attempts': weak_problem['correct_attempts'],
+                    'incorrect_attempts': weak_problem['incorrect_attempts']
+                })
+
+        return jsonify(status='success', weak_problems=result_problems)
+
+    except Exception as e:
+        app.logger.error(f"個人の苦手問題取得エラー: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify(status='error', message='サーバーエラーが発生しました。'), 500
+
 @app.route('/api/room_weak_problems')
 def api_room_weak_problems():
     """部屋全体の苦手問題（正答率が低い問題）トップ20を返す"""
@@ -5525,24 +5591,30 @@ def api_room_weak_problems():
         # 正答率が低い順、同じ場合は試行回数が多い順でソート
         problems_with_accuracy.sort(key=lambda x: (x['accuracyRate'], -x['total_attempts']))
 
-        # 上位20件を取得
-        top_20_weakest = problems_with_accuracy[:20]
-
         # 完全な問題情報を付与
         word_data = load_word_data_for_room(current_user.room_number)
-        word_map = {get_problem_id(word): word for word in word_data}
+        # Chapter 'Z' を除外
+        word_map = {get_problem_id(word): word for word in word_data if word.get('chapter', '').upper() != 'Z'}
+
+        # 上位20件を取得（Chapter Zを除外した上で）
+        top_20_weakest = []
+        for weak_problem in problems_with_accuracy:
+            if len(top_20_weakest) >= 20:
+                break
+            if weak_problem['problem_id'] in word_map:
+                top_20_weakest.append(weak_problem)
 
         result_problems = []
         for weak_problem in top_20_weakest:
             problem_id = weak_problem['problem_id']
-            if problem_id in word_map:
-                original_word = word_map[problem_id]
-                result_problems.append({
-                    'problemId': problem_id,
-                    'question': original_word['question'],
-                    'answer': original_word['answer'],
-                    'accuracyRate': weak_problem['accuracyRate']
-                })
+            # word_map には既にZ以外の問題しかないので、ここでのチェックは不要
+            original_word = word_map[problem_id]
+            result_problems.append({
+                'problemId': problem_id,
+                'question': original_word['question'],
+                'answer': original_word['answer'],
+                'accuracyRate': weak_problem['accuracyRate']
+            })
 
         return jsonify(status='success', weak_problems=result_problems)
 
