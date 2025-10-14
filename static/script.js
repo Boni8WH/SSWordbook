@@ -243,8 +243,8 @@ function generateProblemId(word) {
     try {
         const chapter = String(word.chapter || '0').padStart(3, '0');
         const number = String(word.number || '0').padStart(3, '0');
-        const question = String(word.question || '');
-        const answer = String(word.answer || '');
+        const question = String(word.question || '').trim();
+        const answer = String(word.answer || '').trim();
         
         // 問題文と答えから英数字と日本語文字のみ抽出（Python側と同じ処理）
         const questionClean = question.substring(0, 15).replace(/[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/g, '');
@@ -304,6 +304,27 @@ document.addEventListener('DOMContentLoaded', () => {
         if (noWeakWordsMessage) {
             noWeakWordsMessage.classList.add('hidden');
         }
+
+        // If on the weak_problems page, load the data.
+        if (window.location.pathname === '/weak_problems') {
+            // Wait for user and word data to be loaded before showing the list
+            Promise.all([
+                fetch('/api/load_quiz_progress').then(res => res.json()),
+                fetch('/api/word_data').then(res => res.json())
+            ]).then(([userData, wordData]) => {
+                if (userData.status === 'success') {
+                    problemHistory = userData.problemHistory || {};
+                    incorrectWords = userData.incorrectWords || [];
+                }
+                if (Array.isArray(wordData)) {
+                    window.word_data = wordData;
+                }
+                showWeakWordsList();
+            }).catch(error => {
+                console.error("Error fetching data for weak problems page:", error);
+            });
+        }
+
     } catch (error) {
         console.error('❌ 初期化エラー:', error);
     }

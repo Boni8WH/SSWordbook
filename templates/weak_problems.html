@@ -2,315 +2,68 @@
 {% block title %}苦手問題一覧 - {{ app_name }}{% endblock %}
 
 {% block content %}
-<section class="weak-problems-page">
-    <div class="page-header">
-        <h2><i class="fas fa-exclamation-triangle text-danger"></i> 苦手問題一覧</h2>
-        <p>あなたの苦手な問題と、部屋のみんなが苦手としている問題を確認して、効率的に学習を進めましょう。</p>
+<section id="weakWordsListSection" class="container mt-4">
+    <div class="page-header mb-4">
+        <h2>苦手問題一覧</h2>
+        <p>過去の学習で正答率が低い問題です。効率的に復習しましょう。</p>
     </div>
 
-    <!-- タブナビゲーション -->
-    <ul class="nav nav-tabs" id="weakProblemTabs" role="tablist">
-        <li class="nav-item" role="presentation">
-            <button class="nav-link active" id="my-weak-tab" data-bs-toggle="tab" data-bs-target="#my-weak-content" type="button" role="tab" aria-controls="my-weak-content" aria-selected="true">
-                <i class="fas fa-user-graduate"></i> あなたの苦手問題 Top 20
-            </button>
-        </li>
-        <li class="nav-item" role="presentation">
-            <button class="nav-link" id="everyone-weak-tab" data-bs-toggle="tab" data-bs-target="#everyone-weak-content" type="button" role="tab" aria-controls="everyone-weak-content" aria-selected="false">
-                <i class="fas fa-users"></i> みんなの苦手問題 Top 20
-            </button>
-        </li>
+    <div id="noWeakWordsMessage" class="alert alert-info hidden">
+        苦手な問題はありません。素晴らしい！
+    </div>
+
+    <ul id="weakWordsContainer" class="list-unstyled">
+        <!-- JavaScriptによってここに苦手問題リストが挿入されます -->
     </ul>
 
-    <!-- タブコンテンツ -->
-    <div class="tab-content" id="weakProblemTabsContent">
-        <!-- あなたの苦手問題 -->
-        <div class="tab-pane fade show active" id="my-weak-content" role="tabpanel" aria-labelledby="my-weak-tab">
-            <div id="my-weak-loading" class="text-center py-5">
-                <div class="spinner-border text-primary" role="status">
-                    <span class="visually-hidden">Loading...</span>
-                </div>
-                <p class="mt-2 text-muted">あなたの苦手問題を取得中...</p>
-            </div>
-            <div id="my-weak-problems-container" class="row g-3 mt-3" style="display: none;">
-                <!-- JavaScriptでカードを挿入 -->
-            </div>
-            <div id="my-weak-empty" class="alert alert-success mt-3" style="display: none;">
-                <h4 class="alert-heading"><i class="fas fa-check-circle"></i> 素晴らしい！</h4>
-                <p>現在、あなたの苦手な問題はありません。この調子で学習を続けましょう！</p>
-            </div>
-        </div>
-
-        <!-- みんなの苦手問題 -->
-        <div class="tab-pane fade" id="everyone-weak-content" role="tabpanel" aria-labelledby="everyone-weak-tab">
-            <div id="everyone-weak-loading" class="text-center py-5">
-                <div class="spinner-border text-info" role="status">
-                    <span class="visually-hidden">Loading...</span>
-                </div>
-                <p class="mt-2 text-muted">みんなの苦手問題を取得中...</p>
-            </div>
-            <div id="everyone-weak-problems-container" class="row g-3 mt-3" style="display: none;">
-                <!-- JavaScriptでカードを挿入 -->
-            </div>
-             <div id="everyone-weak-empty" class="alert alert-info mt-3" style="display: none;">
-                <h4 class="alert-heading"><i class="fas fa-info-circle"></i> データ不足</h4>
-                <p>まだ十分な解答データが蓄積されていないため、「みんなの苦手問題」を表示できません。</p>
-            </div>
-        </div>
+    <div class="mt-4">
+        <a href="{{ url_for('index') }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> 範囲選択に戻る
+        </a>
     </div>
 </section>
 
 <style>
-.weak-problems-page {
-    max-width: 1200px;
-    margin: 0 auto;
-}
-
-.page-header {
-    margin-bottom: 2rem;
-    padding-bottom: 1rem;
-    border-bottom: 2px solid #dee2e6;
-}
-
-.problem-card {
-    border: 1px solid #dee2e6;
-    border-radius: 0.5rem;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-    background-color: #fff;
-    transition: box-shadow 0.2s ease-in-out;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-}
-
-.problem-card:hover {
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-}
-
-.card-header {
-    background-color: #f8f9fa;
-    border-bottom: 1px solid #dee2e6;
-    font-weight: bold;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.75rem 1rem;
-}
-
-.card-body {
-    padding: 1rem;
-    flex-grow: 1;
-}
-
-.card-question {
-    font-size: 1.1em;
-    margin-bottom: 1rem;
-    line-height: 1.5;
-}
-
-.card-answer {
-    background-color: #f1f3f5;
-    border-radius: 0.25rem;
-    padding: 0.75rem;
-    font-size: 1.1em;
-    font-weight: 500;
-    color: #212529;
-}
-
-.card-footer {
-    background-color: #f8f9fa;
-    border-top: 1px solid #dee2e6;
-    padding: 0.75rem 1rem;
-    font-size: 0.9em;
-}
-
-.stat-label {
-    font-weight: 600;
-    color: #495057;
-}
-
-.accuracy-bar-container {
-    height: 20px;
-    background-color: #e9ecef;
-    border-radius: 0.25rem;
-    overflow: hidden;
-}
-
-.accuracy-bar {
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    font-weight: bold;
-    font-size: 0.8em;
-    transition: width 0.5s ease-in-out;
-}
+    /* 既存のスタイルは style.css にあると仮定し、
+       このページ固有の微調整のみ記述 */
+    .page-header {
+        border-bottom: 2px solid #dee2e6;
+        padding-bottom: 1rem;
+    }
+    #weakWordsContainer li {
+        background-color: #fff;
+        border: 1px solid #dee2e6;
+        border-radius: .5rem;
+        padding: 1rem 1.5rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    .question-text {
+        font-weight: 600;
+        font-size: 1.1em;
+        margin-bottom: .75rem;
+    }
+    .answer-container {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+    .answer-text {
+        background-color: #f8f9fa;
+        padding: .5rem 1rem;
+        border-radius: .25rem;
+        font-weight: 500;
+    }
+    .show-answer-button {
+        background-color: #6c757d;
+        color: white;
+    }
+    .accuracy-display {
+        font-size: 0.9em;
+        color: #6c757d;
+        margin-left: auto;
+        white-space: nowrap;
+    }
 </style>
-
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    // タブが切り替わったときにもデータをロードするようにイベントリスナーを設定
-    const myWeakTab = document.getElementById('my-weak-tab');
-    const everyoneWeakTab = document.getElementById('everyone-weak-tab');
-
-    myWeakTab.addEventListener('shown.bs.tab', () => loadMyWeakProblems());
-    everyoneWeakTab.addEventListener('shown.bs.tab', () => loadEveryoneWeakProblems());
-
-    // 初期表示
-    loadMyWeakProblems();
-
-    async function loadMyWeakProblems() {
-        const container = document.getElementById('my-weak-problems-container');
-        const loading = document.getElementById('my-weak-loading');
-        const emptyMessage = document.getElementById('my-weak-empty');
-
-        // すでにデータがあれば再読み込みしない
-        if (container.innerHTML.trim() !== '') {
-            loading.style.display = 'none';
-            return;
-        }
-
-        loading.style.display = 'block';
-        container.style.display = 'none';
-        emptyMessage.style.display = 'none';
-
-        try {
-            const response = await fetch('/api/my_weak_problems');
-            if (!response.ok) throw new Error('Network response was not ok');
-            const data = await response.json();
-
-            if (data.status === 'success' && data.problems.length > 0) {
-                renderProblemCards(container, data.problems, 'my');
-                container.style.display = 'flex';
-            } else {
-                emptyMessage.style.display = 'block';
-            }
-        } catch (error) {
-            console.error('Error fetching my weak problems:', error);
-            container.innerHTML = '<div class="alert alert-danger">データの読み込みに失敗しました。</div>';
-            container.style.display = 'flex';
-        } finally {
-            loading.style.display = 'none';
-        }
-    }
-
-    async function loadEveryoneWeakProblems() {
-        const container = document.getElementById('everyone-weak-problems-container');
-        const loading = document.getElementById('everyone-weak-loading');
-        const emptyMessage = document.getElementById('everyone-weak-empty');
-
-        // すでにデータがあれば再読み込みしない
-        if (container.innerHTML.trim() !== '') {
-            loading.style.display = 'none';
-            return;
-        }
-
-        loading.style.display = 'block';
-        container.style.display = 'none';
-        emptyMessage.style.display = 'none';
-
-        try {
-            const response = await fetch('/api/everyone_weak_problems');
-            if (!response.ok) throw new Error('Network response was not ok');
-            const data = await response.json();
-
-            if (data.status === 'success' && data.problems.length > 0) {
-                renderProblemCards(container, data.problems, 'everyone');
-                container.style.display = 'flex';
-            } else {
-                emptyMessage.style.display = 'block';
-            }
-        } catch (error) {
-            console.error('Error fetching everyone\'s weak problems:', error);
-            container.innerHTML = '<div class="alert alert-danger">データの読み込みに失敗しました。</div>';
-            container.style.display = 'flex';
-        } finally {
-            loading.style.display = 'none';
-        }
-    }
-
-    function renderProblemCards(container, problems, type) {
-        container.innerHTML = '';
-        problems.forEach((problem, index) => {
-            const col = document.createElement('div');
-            col.className = 'col-lg-4 col-md-6 col-sm-12';
-
-            let footerHtml = '';
-            if (type === 'my') {
-                footerHtml = `
-                    <div class="d-flex justify-content-between">
-                        <div><span class="stat-label">あなたの回答:</span> <span class="text-success">${problem.correct}</span> / <span class="text-danger">${problem.incorrect}</span> (正/誤)</div>
-                        <div>
-                            <span class="stat-label">正答率:</span>
-                            <div class="progress" style="height: 20px; min-width: 100px;">
-                                <div class="progress-bar bg-danger" role="progressbar" style="width: ${problem.accuracy}%;" aria-valuenow="${problem.accuracy}" aria-valuemin="0" aria-valuemax="100">
-                                    ${problem.accuracy.toFixed(1)}%
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            } else { // everyone
-                footerHtml = `
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <span class="stat-label">全体の正答率:</span>
-                            <div class="progress" style="height: 20px; min-width: 100px;">
-                                <div class="progress-bar bg-info" role="progressbar" style="width: ${problem.accuracy}%;" aria-valuenow="${problem.accuracy}" aria-valuemin="0" aria-valuemax="100">
-                                    ${problem.accuracy.toFixed(1)}%
-                                </div>
-                            </div>
-                        </div>
-                        <div>
-                            <span class="stat-label">あなたの正答率:</span>
-                            ${problem.my_accuracy !== null ? `
-                                <div class="progress" style="height: 20px; min-width: 100px;">
-                                    <div class="progress-bar ${getAccuracyColor(problem.my_accuracy)}" role="progressbar" style="width: ${problem.my_accuracy}%;" aria-valuenow="${problem.my_accuracy}" aria-valuemin="0" aria-valuemax="100">
-                                        ${problem.my_accuracy.toFixed(1)}%
-                                    </div>
-                                </div>
-                            ` : '<span class="text-muted">未回答</span>'}
-                        </div>
-                    </div>
-                `;
-            }
-
-            col.innerHTML = `
-                <div class="problem-card">
-                    <div class="card-header">
-                        <span>${type === 'my' ? '' : `<strong>${index + 1}.</strong> `}問題</span>
-                        <button class="btn btn-sm btn-outline-secondary toggle-answer-btn">答えを見る</button>
-                    </div>
-                    <div class="card-body">
-                        <p class="card-question">${problem.question}</p>
-                        <div class="card-answer" style="display: none;">${problem.answer}</div>
-                    </div>
-                    <div class="card-footer">
-                        ${footerHtml}
-                    </div>
-                </div>
-            `;
-            container.appendChild(col);
-        });
-
-        // Add event listeners for the new buttons
-        container.querySelectorAll('.toggle-answer-btn').forEach(button => {
-            button.addEventListener('click', (e) => {
-                const cardBody = e.target.closest('.problem-card').querySelector('.card-body');
-                const answer = cardBody.querySelector('.card-answer');
-                const isHidden = answer.style.display === 'none';
-                answer.style.display = isHidden ? 'block' : 'none';
-                e.target.textContent = isHidden ? '答えを隠す' : '答えを見る';
-            });
-        });
-    }
-
-    function getAccuracyColor(accuracy) {
-        if (accuracy >= 80) return 'bg-success';
-        if (accuracy >= 50) return 'bg-warning';
-        return 'bg-danger';
-    }
-});
-</script>
 {% endblock %}
