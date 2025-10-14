@@ -11595,11 +11595,11 @@ def find_related_essays():
     return jsonify({'essays': recommended_essays})
 
 # ===== メイン起動処理の修正 =====
-# データベース初期化
-create_tables_and_admin_user()
-
 if __name__ == '__main__':
     try:
+        # データベース初期化 (直接実行時のみ)
+        create_tables_and_admin_user()
+
         # サーバー起動
         port = int(os.environ.get('PORT', 5001))
         debug_mode = os.environ.get('RENDER') != 'true'
