@@ -1805,126 +1805,170 @@ function resetSelections() {
 }
 
 // =========================================================
-// 苦手問題リスト表示
+// 苦手問題リスト表示 (リファクタリング版)
 // =========================================================
+function showPersonalWeakWordsList() {
+    const container = document.getElementById('personalWeakWordsContainer');
+    const noDataMessage = document.getElementById('noPersonalWeakWordsMessage');
+    if (!container || !noDataMessage) return;
 
-function showWeakWordsList() {
-    if (selectionArea) selectionArea.classList.add('hidden');
-    if (cardArea) cardArea.classList.add('hidden');
-    if (quizResultArea) quizResultArea.classList.add('hidden');
-    if (weakWordsListSection) weakWordsListSection.classList.remove('hidden');
-
-    const weakWordsContainer = document.getElementById('weakWordsContainer');
-    if (weakWordsContainer) weakWordsContainer.innerHTML = '';
+    container.innerHTML = '';
 
     const allProblemsWithStats = [];
-    
-    // 全ての学習履歴から正答率を計算
     for (const [problemId, history] of Object.entries(problemHistory)) {
         const correctAttempts = history.correct_attempts || 0;
         const incorrectAttempts = history.incorrect_attempts || 0;
         const totalAttempts = correctAttempts + incorrectAttempts;
-        
-        // 解答したことがある問題のみを対象とする
+
         if (totalAttempts > 0) {
             const accuracyRate = (correctAttempts / totalAttempts * 100);
-            
-            // 元の問題データを探す
-            const originalWord = word_data.find(word => {
-                const generatedIdentifier = generateProblemId(word);
-                return generatedIdentifier === problemId;
-            });
-            
+            const originalWord = word_data.find(word => generateProblemId(word) === problemId);
             if (originalWord) {
-                const isCurrentlyWeak = incorrectWords.includes(problemId);
-                
                 allProblemsWithStats.push({
-                    problemId: problemId,
-                    question: originalWord.question,
-                    answer: originalWord.answer,
-                    correctAttempts: correctAttempts,
-                    incorrectAttempts: incorrectAttempts,
-                    totalAttempts: totalAttempts,
-                    accuracyRate: accuracyRate,
-                    isCurrentlyWeak: isCurrentlyWeak,
-                    correctStreak: history.correct_streak || 0
+                    ...originalWord,
+                    problemId,
+                    correctAttempts,
+                    incorrectAttempts,
+                    totalAttempts,
+                    accuracyRate,
                 });
             }
         }
     }
-    
-    // 正答率の低い順でソートし、Top20を取得
-    allProblemsWithStats.sort((a, b) => {
-        // 正答率が低い順、同じ正答率なら総回答数が多い順
-        if (a.accuracyRate !== b.accuracyRate) {
-            return a.accuracyRate - b.accuracyRate;
-        }
-        return b.totalAttempts - a.totalAttempts;
-    });
-    
+
+    allProblemsWithStats.sort((a, b) => a.accuracyRate - b.accuracyRate || b.totalAttempts - a.totalAttempts);
     const top20WeakProblems = allProblemsWithStats.slice(0, 20);
 
-    // タイトルを更新
-    const sectionTitle = document.querySelector('#weakWordsListSection h2');
-    if (sectionTitle) {
-        sectionTitle.textContent = `苦手問題一覧（正答率の低い問題 Top${top20WeakProblems.length}）`;
-    }
-
-    // 説明文を更新
-    const sectionDescription = document.querySelector('#weakWordsListSection p');
-    if (sectionDescription) {
-        sectionDescription.innerHTML = '過去の学習で正答率が低い問題の上位20問です。<br>※現在の苦手問題モードは、1回以上間違え、まだ2回連続正解していない問題から出題されます。';
-    }
-
     if (top20WeakProblems.length === 0) {
-        if (noWeakWordsMessage) {
-            noWeakWordsMessage.textContent = 'まだ問題を解いていません。';
-            noWeakWordsMessage.classList.remove('hidden');
-        }
+        noDataMessage.classList.remove('d-none');
     } else {
-        if (noWeakWordsMessage) noWeakWordsMessage.classList.add('hidden');
-        
-        top20WeakProblems.forEach((problemData, index) => {
-            const li = document.createElement('li');
-            const rankBadge = `<span style="background-color: #3498db; color: white; padding: 2px 6px; border-radius: 3px; font-size: 0.8em; margin-right: 8px;">${index + 1}位</span>`;
-            
-            const statusBadge = problemData.isCurrentlyWeak ? 
-                '<span style="background-color: #e74c3c; color: white; padding: 2px 6px; border-radius: 3px; font-size: 0.8em; margin-left: 10px;">苦手</span>' : 
-                '';
-            
-            li.innerHTML = `
-                <div class="question-text">${rankBadge}${problemData.question}${statusBadge}</div>
-                <div class="answer-container">
-                    <span class="answer-text hidden" id="weak-answer-${index}">${problemData.answer}</span>
-                    <button class="show-answer-button" onclick="toggleWeakAnswer(${index})">答えを見る</button>
-                    <div class="accuracy-display">
-                        正答率: <span class="rate" style="color: ${problemData.accuracyRate >= 80 ? '#27ae60' : '#e74c3c'}; font-weight: bold;">${problemData.accuracyRate.toFixed(1)}%</span>
-                        (正解: ${problemData.correctAttempts}回 / 不正解: ${problemData.incorrectAttempts}回 / 計: ${problemData.totalAttempts}回)
-                    </div>
-                </div>
-            `;
-            if (weakWordsContainer) weakWordsContainer.appendChild(li);
+        noDataMessage.classList.add('d-none');
+        top20WeakProblems.forEach((problem, index) => {
+            const li = createProblemListItem(problem, index, 'personal');
+            container.appendChild(li);
         });
     }
 }
 
-// 苦手問題の答え表示切り替え
-function toggleWeakAnswer(index) {
-    const answerElement = document.getElementById(`weak-answer-${index}`);
-    const button = answerElement ? answerElement.nextElementSibling : null;
-    
-    if (answerElement && button) {
-        if (answerElement.classList.contains('hidden')) {
-            answerElement.classList.remove('hidden');
-            button.textContent = '答えを隠す';
-            button.style.backgroundColor = '#95a5a6';
+async function showRoomWeakWordsList() {
+    const container = document.getElementById('roomWeakWordsContainer');
+    const noDataMessage = document.getElementById('noRoomWeakWordsMessage');
+    const spinner = document.getElementById('loadingSpinner');
+    if (!container || !noDataMessage || !spinner) return;
+
+    spinner.classList.remove('d-none');
+    container.innerHTML = '';
+    noDataMessage.classList.add('d-none');
+
+    try {
+        const response = await fetch('/api/room_weak_problems');
+        if (!response.ok) throw new Error(`Server error: ${response.status}`);
+        const data = await response.json();
+
+        if (data.status === 'success' && data.weak_problems.length > 0) {
+            data.weak_problems.forEach((problem, index) => {
+                const li = createProblemListItem(problem, index, 'room');
+                container.appendChild(li);
+            });
         } else {
-            answerElement.classList.add('hidden');
-            button.textContent = '答えを見る';
-            button.style.backgroundColor = '#95a5a6';
+            noDataMessage.classList.remove('d-none');
         }
+    } catch (error) {
+        console.error('Error fetching room weak problems:', error);
+        noDataMessage.textContent = 'データの取得に失敗しました。';
+        noDataMessage.classList.remove('d-none');
+    } finally {
+        spinner.classList.add('d-none');
     }
 }
+
+function createProblemListItem(problemData, index, type) {
+    const li = document.createElement('li');
+    const problemId = `${type}-problem-${index}`;
+    const accuracyColor = problemData.accuracyRate >= 80 ? '#27ae60' : '#e74c3c';
+
+    let accuracyHtml = `
+        正答率: <span class="rate" style="color: ${accuracyColor}; font-weight: bold;">${problemData.accuracyRate.toFixed(1)}%</span>
+    `;
+    if (type === 'personal') {
+        accuracyHtml += ` (正解: ${problemData.correctAttempts} / 不正解: ${problemData.incorrectAttempts})`;
+    } else {
+        accuracyHtml += ` (部屋全体)`;
+    }
+
+    li.innerHTML = `
+        <div class="question-text">
+            <span class="rank-badge">${index + 1}位</span>
+            ${problemData.question}
+        </div>
+        <div class="answer-container">
+            <button class="btn btn-sm btn-outline-secondary show-answer-btn" data-target="${problemId}-answer">答えを見る</button>
+            <span class="answer-text d-none" id="${problemId}-answer">${problemData.answer}</span>
+            <div class="accuracy-display">${accuracyHtml}</div>
+        </div>
+    `;
+    return li;
+}
+
+function setupWeakProblemPageListeners() {
+    const tabContent = document.getElementById('weakProblemsTabContent');
+    if (tabContent) {
+        tabContent.addEventListener('click', event => {
+            const target = event.target;
+            // "答えを見る" button clicked
+            if (target.classList.contains('show-answer-btn')) {
+                const answerId = target.dataset.target;
+                const answerEl = document.getElementById(answerId);
+                if (answerEl) {
+                    answerEl.classList.remove('d-none');
+                    target.classList.add('d-none');
+                }
+            }
+            // Answer text clicked
+            if (target.classList.contains('answer-text')) {
+                const button = tabContent.querySelector(`button[data-target="${target.id}"]`);
+                if (button) {
+                    target.classList.add('d-none');
+                    button.classList.remove('d-none');
+                }
+            }
+        });
+    }
+
+    const roomTab = document.getElementById('room-tab');
+    if (roomTab) {
+        roomTab.addEventListener('show.bs.tab', () => {
+            const container = document.getElementById('roomWeakWordsContainer');
+            // Fetch only if the container is empty (i.e., not loaded yet)
+            if (container && container.innerHTML.trim() === '') {
+                showRoomWeakWordsList();
+            }
+        }, { once: false }); // `once: false` is default, but good to be explicit
+    }
+}
+
+// 既存のDOMContentLoadedイベントリスナー内で呼び出す
+document.addEventListener('DOMContentLoaded', () => {
+    // ... (既存のコード)
+    if (window.location.pathname === '/weak_problems') {
+        Promise.all([
+            fetch('/api/load_quiz_progress').then(res => res.json()),
+            fetch('/api/word_data').then(res => res.json())
+        ]).then(([userData, wordData]) => {
+            if (userData.status === 'success') {
+                problemHistory = typeof userData.problemHistory === 'string' ? JSON.parse(userData.problemHistory) : userData.problemHistory || {};
+            }
+            if (Array.isArray(wordData)) {
+                window.word_data = wordData;
+            }
+            showPersonalWeakWordsList(); // Load personal problems first
+            setupWeakProblemPageListeners(); // Setup all listeners for the page
+        }).catch(error => {
+            console.error("Error fetching data for weak problems page:", error);
+        });
+    }
+    // ... (既存のコード)
+});
 
 
 // =========================================================
