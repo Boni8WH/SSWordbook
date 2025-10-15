@@ -814,7 +814,8 @@ def get_monthly_ranking(room_number, user_id, year, month):
     return monthly_top_5, monthly_user_rank_info, total_participants
 
 # 部屋ごとの単語データを読み込む関数
-def load_word_data_for_room(room_number):
+def load_word_data_for_room(room_number, user=None):
+    """部屋ごとの単語データを読み込む関数（ユーザー情報を引数に追加）"""
     try:
         room_setting = RoomSetting.query.filter_by(room_number=room_number).first()
         
@@ -837,8 +838,7 @@ def load_word_data_for_room(room_number):
                 print(f"❌ デフォルトファイルが見つかりません: words.csv")
                 return []
         else:
-            # ★重要：データベースからカスタムCSVの内容を取得
-            csv_file = CsvFileContent.query.filter_by(filename=csv_filename).first()  # この行が抜けていました
+            csv_file = CsvFileContent.query.filter_by(filename=csv_filename).first()
             if csv_file:
                 try:
                     content = csv_file.content
@@ -854,9 +854,11 @@ def load_word_data_for_room(room_number):
                     return []
             else:
                 print(f"❌ データベースにCSVが見つかりません: {csv_filename}")
-                return load_word_data_for_room("default")
+                # ユーザー情報を引き継いで再帰呼び出し
+                return load_word_data_for_room("default", user=user)
         
-        filtered_word_data = filter_special_problems(word_data, room_number)  # 関数名変更
+        # Z問題のフィルタリングにユーザー情報を渡す
+        filtered_word_data = filter_special_problems(word_data, room_number, user)
         
         return filtered_word_data
         
@@ -1013,8 +1015,8 @@ def fix_user_data_types():
         "fixed_incorrect": fixed_incorrect_count
     }
 
-def filter_special_problems(word_data, room_number):
-    """Z問題（特別問題）のフィルタリング処理"""
+def filter_special_problems(word_data, room_number, user=None):
+    """Z問題（特別問題）のフィルタリング処理（ユーザー情報に基づいて表示）"""
     chapters = {}
     for word in word_data:
         chapter = word['chapter']
@@ -1028,52 +1030,49 @@ def filter_special_problems(word_data, room_number):
         else:
             chapters[chapter]['regular'].append(word)
     
-    users = User.query.filter_by(room_number=room_number).all()
     filtered_data = []
     
     for chapter, problems in chapters.items():
         filtered_data.extend(problems['regular'])
         
         if problems['special']:
-            special_unlocked = check_special_unlock_status(chapter, problems['regular'], users)
+            # ユーザー個人の達成状況で判定
+            special_unlocked = check_special_unlock_status_for_user(chapter, problems['regular'], user)
             
             if special_unlocked:
                 for special_word in problems['special']:
                     special_word['enabled'] = True
                     filtered_data.append(special_word)
-                print(f"🔓 第{chapter}章のZ問題を解放しました")
+                if user:
+                    print(f"🔓 第{chapter}章のZ問題を解放しました (ユーザー: {user.username})")
             else:
-                print(f"🔒 第{chapter}章のZ問題は条件未達成のため非表示")
+                if user:
+                    print(f"🔒 第{chapter}章のZ問題は条件未達成のため非表示 (ユーザー: {user.username})")
     
     return filtered_data
 
-def check_special_unlock_status(chapter, regular_problems, users):
-    """特定の章のZ問題が解放されるかチェック"""
-    if not regular_problems:
+def check_special_unlock_status_for_user(chapter, regular_problems, user):
+    """特定の章のZ問題がユーザー個人で解放されるかチェック"""
+    if not regular_problems or not user or user.username == 'admin':
         return False
     
+    user_history = user.get_problem_history()
+
     for word in regular_problems:
         problem_id = get_problem_id(word)
         
-        is_mastered_by_anyone = False
-        for user in users:
-            if user.username == 'admin':
-                continue
-            
-            user_history = user.get_problem_history()
-            if problem_id in user_history:
-                history = user_history[problem_id]
-                correct = history.get('correct_attempts', 0)
-                incorrect = history.get('incorrect_attempts', 0)
-                total = correct + incorrect
-                
-                if total > 0 and (correct / total) >= 0.8:
-                    is_mastered_by_anyone = True
-                    break
+        if problem_id not in user_history:
+            return False # 1問でも未回答なら解放しない
+
+        history = user_history[problem_id]
+        correct = history.get('correct_attempts', 0)
+        incorrect = history.get('incorrect_attempts', 0)
+        total = correct + incorrect
         
-        if not is_mastered_by_anyone:
+        # 1問でもマスター（正答率80%未満）していなければ解放しない
+        if total == 0 or (correct / total) < 0.8:
             return False
-    
+
     return True
 
 # 管理者用：全体のデフォルト単語データを読み込む関数
@@ -2849,7 +2848,7 @@ def index():
             room_number=session.get('room_number')
         )
         
-        word_data = load_word_data_for_room(current_user.room_number)
+        word_data = load_word_data_for_room(current_user.room_number, user=current_user)
         
         room_setting = RoomSetting.query.filter_by(room_number=current_user.room_number).first()
         max_enabled_unit_num_str = room_setting.max_enabled_unit_number if room_setting else "9999"
@@ -3855,7 +3854,7 @@ def admin_fallback_ranking_calculation(room_number, start_time):
         print("🔄 管理者用従来方式でランキング計算中...")
         
         # 部屋の単語データと設定を取得
-        word_data = load_word_data_for_room(room_number)
+        word_data = load_word_data_for_room(room_number, user=None)
         room_setting = RoomSetting.query.filter_by(room_number=room_number).first()
         max_enabled_unit_num_str = room_setting.max_enabled_unit_number if room_setting else "9999"
         parsed_max_enabled_unit_num = parse_unit_number(max_enabled_unit_num_str)
@@ -4336,7 +4335,7 @@ def update_user_stats():
         try:
             user_stats = UserStats.get_or_create(current_user.id)
             if user_stats:
-                word_data = load_word_data_for_room(current_user.room_number)
+                word_data = load_word_data_for_room(current_user.room_number, user=current_user)
                 user_stats.update_stats(word_data)
                 db.session.commit()
         except Exception as stats_error:
@@ -4360,7 +4359,7 @@ def api_word_data():
         if not current_user:
             return jsonify(status='error', message='ユーザーが見つかりません。'), 404
 
-        word_data = load_word_data_for_room(current_user.room_number)
+        word_data = load_word_data_for_room(current_user.room_number, user=current_user)
         
         room_setting = RoomSetting.query.filter_by(room_number=current_user.room_number).first()
 
@@ -4564,7 +4563,7 @@ def debug_trace_answer_flow():
     if not current_user:
         return jsonify(error='ユーザーが見つかりません'), 404
     
-    word_data = load_word_data_for_room(current_user.room_number)
+    word_data = load_word_data_for_room(current_user.room_number, user=current_user)
     user_history = current_user.get_problem_history()
     
     # 最近の5問の詳細分析
@@ -4633,7 +4632,7 @@ def debug_manual_test_save():
     if not current_user:
         return jsonify(error='ユーザーが見つかりません'), 404
     
-    word_data = load_word_data_for_room(current_user.room_number)
+    word_data = load_word_data_for_room(current_user.room_number, user=current_user)
     if not word_data:
         return jsonify(error='単語データが見つかりません'), 404
     
@@ -5519,7 +5518,7 @@ def api_personal_weak_problems():
         top_20_weakest = problems_with_accuracy[:20]
 
         # 完全な問題情報を付与
-        word_data = load_word_data_for_room(current_user.room_number)
+        word_data = load_word_data_for_room(current_user.room_number, user=current_user)
         word_map = {get_problem_id(word): word for word in word_data}
 
         result_problems = []
@@ -5594,7 +5593,7 @@ def api_room_weak_problems():
         problems_with_accuracy.sort(key=lambda x: (x['accuracyRate'], -x['total_attempts']))
 
         # 完全な問題情報を付与
-        word_data = load_word_data_for_room(current_user.room_number)
+        word_data = load_word_data_for_room(current_user.room_number, user=current_user)
         # Chapter 'Z' を除外
         word_map = {get_problem_id(word): word for word in word_data if word.get('chapter', '').upper() != 'Z'}
 
@@ -5652,7 +5651,7 @@ def progress_page():
         user_problem_history = current_user.get_problem_history()
         
         # 部屋の単語データを取得
-        word_data = load_word_data_for_room(current_user.room_number)
+        word_data = load_word_data_for_room(current_user.room_number, user=current_user)
         if not word_data:
             flash('単語データの読み込みに失敗しました。', 'danger')
             # ページは表示するが、データは空にする
@@ -5842,7 +5841,7 @@ def fallback_ranking_calculation(current_user, start_time):
         current_room_number = current_user.room_number
         
         # 部屋の単語データと設定を取得
-        word_data = load_word_data_for_room(current_room_number)
+        word_data = load_word_data_for_room(current_room_number, user=current_user)
         room_setting = RoomSetting.query.filter_by(room_number=current_room_number).first()
         max_enabled_unit_num_str = room_setting.max_enabled_unit_number if room_setting else "9999"
         parsed_max_enabled_unit_num = parse_unit_number(max_enabled_unit_num_str)
@@ -10810,7 +10809,7 @@ def debug_user_data():
     user_incorrect_words = current_user.get_incorrect_words()
     
     # 部屋ごとの単語データを取得
-    word_data = load_word_data_for_room(current_user.room_number)
+    word_data = load_word_data_for_room(current_user.room_number, user=current_user)
     
     # 問題IDのマッピングをチェック
     id_mapping = {}
@@ -10879,7 +10878,7 @@ def debug_fix_problem_ids():
         number_str = str(word['number'])
         return f"{chapter_str}-{number_str}-{cleaned_question}"
     
-    word_data = load_word_data_for_room(current_user.room_number)
+    word_data = load_word_data_for_room(current_user.room_number, user=current_user)
     user_problem_history = current_user.get_problem_history()
     user_incorrect_words = current_user.get_incorrect_words()
     
@@ -10946,7 +10945,7 @@ def debug_smart_id_fix():
         return jsonify({'error': 'ユーザーが見つかりません'}), 404
     
     try:
-        word_data = load_word_data_for_room(current_user.room_number)
+        word_data = load_word_data_for_room(current_user.room_number, user=current_user)
         old_history = current_user.get_problem_history()
         old_incorrect = current_user.get_incorrect_words()
         
@@ -12043,7 +12042,7 @@ def get_daily_quiz():
 
     # --- (未回答の場合のクイズ生成ロジック) ---
     if not daily_quiz:
-        all_words = load_word_data_for_room(user.room_number)
+        all_words = load_word_data_for_room(user.room_number, user=user)
         room_setting = RoomSetting.query.filter_by(room_number=user.room_number).first()
         
         public_words = []
@@ -12064,7 +12063,7 @@ def get_daily_quiz():
         db.session.commit()
 
     problem_ids = daily_quiz.get_problem_ids()
-    all_words = load_word_data_for_room(user.room_number)
+    all_words = load_word_data_for_room(user.room_number, user=user)
     quiz_questions = []
     all_answers = list(set(w['answer'] for w in all_words if w.get('answer')))
     for problem_id in problem_ids:
@@ -12190,7 +12189,7 @@ def admin_regenerate_daily_quiz():
             print(f"✅ 既存クイズと結果の削除完了。")
 
         print(f"✨ 部屋{room_number}の新しいクイズを生成します。")
-        all_words = load_word_data_for_room(room_number)
+        all_words = load_word_data_for_room(room_number, user=None)
         room_setting = RoomSetting.query.filter_by(room_number=room_number).first()
         
         public_words = []
