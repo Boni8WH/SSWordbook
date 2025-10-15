@@ -4505,3 +4505,28 @@ a.nav-link.btn.change-username-button:hover,
     color: #0d6efd;
     font-size: 1.2em;
 }
+
+/* Accordion Styles */
+.chapters-container .chapter-item .unit-list {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease-out, padding-top 0.3s ease-out, visibility 0.3s ease-out;
+    padding-left: 20px;
+    visibility: hidden;
+}
+
+.chapters-container .chapter-item.expanded .unit-list {
+    visibility: visible;
+    max-height: 1000px; /* A large enough value to show all content */
+    padding-top: 10px;
+    transition: max-height 0.5s ease-in, padding-top 0.5s ease-in, visibility 0s;
+}
+
+.chapters-container .chapter-item .toggle-icon {
+    transition: transform 0.3s ease-out;
+    display: inline-block;
+}
+
+.chapters-container .chapter-item.expanded .toggle-icon {
+    transform: rotate(90deg);
+}
