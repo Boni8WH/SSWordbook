@@ -5585,6 +5585,8 @@ def api_room_weak_problems():
                 problems_with_accuracy.append({
                     'problem_id': problem_id,
                     'accuracyRate': accuracy,
+                    'correct_attempts': stats['correct'],
+                    'incorrect_attempts': stats['incorrect'],
                     'total_attempts': total_attempts
                 })
 
@@ -5613,7 +5615,9 @@ def api_room_weak_problems():
                 'problemId': problem_id,
                 'question': original_word['question'],
                 'answer': original_word['answer'],
-                'accuracyRate': weak_problem['accuracyRate']
+                'accuracyRate': weak_problem['accuracyRate'],
+                'correct_attempts': weak_problem['correct_attempts'],
+                'incorrect_attempts': weak_problem['incorrect_attempts']
             })
 
         return jsonify(status='success', weak_problems=result_problems)

@@ -220,8 +220,10 @@ function createProblemListItem(problemData, index, type) {
     let accuracyHtml = `
         正答率: <span class="rate" style="color: ${accuracyColor}; font-weight: bold;">${problemData.accuracyRate.toFixed(1)}%</span>
     `;
-    if (type === 'personal') {
-        accuracyHtml += ` (正解: ${problemData.correctAttempts} / 不正解: ${problemData.incorrectAttempts})`;
+    if (type === 'personal' || (problemData.correct_attempts !== undefined && problemData.incorrect_attempts !== undefined)) {
+        const correct = problemData.correct_attempts || problemData.correctAttempts;
+        const incorrect = problemData.incorrect_attempts || problemData.incorrectAttempts;
+        accuracyHtml += ` (正解: ${correct} / 不正解: ${incorrect})`;
     } else {
         accuracyHtml += ` (部屋全体)`;
     }
@@ -404,6 +406,14 @@ function setupEventListeners() {
     if (questionCountRadios) questionCountRadios.forEach(radio => radio.addEventListener('change', updateIncorrectOnlySelection));
     if (chaptersContainer) {
         chaptersContainer.addEventListener('click', (event) => {
+            const chapterHeader = event.target.closest('.chapter-header');
+            if (chapterHeader && !event.target.classList.contains('select-all-chapter-btn')) {
+                const chapterItem = chapterHeader.closest('.chapter-item');
+                if (chapterItem) {
+                    chapterItem.classList.toggle('expanded');
+                }
+            }
+
             if (event.target.classList.contains('select-all-chapter-btn')) {
                 const selectAllBtn = event.target;
                 const chapterNum = selectAllBtn.dataset.chapter;
