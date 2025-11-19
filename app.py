@@ -56,7 +56,7 @@ else:
     print("⚠️ S3設定不完全：ローカル保存を使用")
     s3_client = None
 
-def upload_image_to_s3(file, filename):
+def upload_image_to_s3(file, filename, folder='essay_images', content_type='image/jpeg'):
     """画像をS3にアップロード（boto3利用可能時のみ）"""
     if not S3_AVAILABLE:
         print("⚠️ S3アップロード不可：boto3がインストールされていません")
@@ -66,10 +66,10 @@ def upload_image_to_s3(file, filename):
         s3_client.upload_fileobj(
             file,
             S3_BUCKET,
-            f"essay_images/{filename}",
-            ExtraArgs={'ContentType': 'image/jpeg'}
+            f"{folder}/{filename}",
+            ExtraArgs={'ContentType': content_type}
         )
-        return f"https://{S3_BUCKET}.s3.{S3_REGION}.amazonaws.com/essay_images/{filename}"
+        return f"https://{S3_BUCKET}.s3.{S3_REGION}.amazonaws.com/{folder}/{filename}"
     except NoCredentialsError:
         print("AWS認証情報が見つかりません")
         return None
@@ -606,7 +606,7 @@ class EssayCsvFile(db.Model):
     problem_count = db.Column(db.Integer, default=0, nullable=False)
     upload_date = db.Column(db.DateTime, default=lambda: datetime.now(JST))
 
-from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, Response, abort
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, Response, abort, make_response
 from flask_sqlalchemy import SQLAlchemy
 from flask_mail import Mail, Message
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -710,6 +710,20 @@ ROOM_CSV_FOLDER = 'room_csv'
 # ====================================================================
 # アプリ情報を取得するヘルパー関数
 # ====================================================================
+def get_logo_url(filename):
+    """ロゴ画像のURLを取得（S3またはローカル）"""
+    if not filename:
+        return None
+        
+    if S3_AVAILABLE:
+        return f"https://{S3_BUCKET}.s3.{S3_REGION}.amazonaws.com/logos/{filename}"
+    else:
+        return url_for('static', filename=f'uploads/logos/{filename}')
+
+@app.context_processor
+def inject_logo_url():
+    return dict(get_logo_url=get_logo_url)
+
 def get_app_info_dict(user_id=None, username=None, room_number=None):
     try:
         app_info = AppInfo.get_current_info()
@@ -6419,27 +6433,64 @@ def _handle_image_logo(app_info, request):
             return False
 
         if app_info.logo_image_filename:
-            old_filepath = os.path.join(logo_folder, app_info.logo_image_filename)
-            if os.path.exists(old_filepath):
+            # Delete old logo
+            if S3_AVAILABLE:
                 try:
-                    os.remove(old_filepath)
-                    logger.info(f"Deleted old logo: {old_filepath}")
+                    s3_client.delete_object(Bucket=S3_BUCKET, Key=f"logos/{app_info.logo_image_filename}")
+                    logger.info(f"Deleted old logo from S3: logos/{app_info.logo_image_filename}")
                 except Exception as e:
-                    logger.error(f"Error deleting old logo {old_filepath}: {e}")
+                    logger.error(f"Error deleting old logo from S3: {e}")
+            else:
+                old_filepath = os.path.join(logo_folder, app_info.logo_image_filename)
+                if os.path.exists(old_filepath):
+                    try:
+                        os.remove(old_filepath)
+                        logger.info(f"Deleted old logo: {old_filepath}")
+                    except Exception as e:
+                        logger.error(f"Error deleting old logo {old_filepath}: {e}")
 
         filename = secure_filename(file.filename)
         random_hex = secrets.token_hex(8)
         _, f_ext = os.path.splitext(filename)
         unique_filename = random_hex + f_ext
-        save_path = os.path.join(logo_folder, unique_filename)
-
+        
+        # 画像処理
         img = Image.open(file.stream)
-
+        
+        # クロップ処理
         if crop_data_json:
-            _crop_and_save_image(img, crop_data_json, save_path)
+            try:
+                crop_data = json.loads(crop_data_json)
+                x = int(crop_data['x'])
+                y = int(crop_data['y'])
+                width = int(crop_data['width'])
+                height = int(crop_data['height'])
+                img = img.crop((x, y, x + width, y + height))
+            except Exception as e:
+                logger.error(f"Crop error: {e}")
+
+        # 保存処理
+        if S3_AVAILABLE:
+            try:
+                # BytesIOに保存してS3にアップロード
+                img_byte_arr = StringIO() if False else __import__('io').BytesIO()
+                img_format = img.format if img.format else 'PNG'
+                img.save(img_byte_arr, format=img_format)
+                img_byte_arr.seek(0)
+                
+                content_type = f'image/{img_format.lower()}'
+                upload_image_to_s3(img_byte_arr, unique_filename, folder='logos', content_type=content_type)
+                logger.info(f"Uploaded logo to S3: logos/{unique_filename}")
+            except Exception as e:
+                logger.error(f"S3 upload error for logo: {e}")
+                flash('S3へのアップロードに失敗しました。', 'danger')
+                return False
         else:
+            # ローカル保存
+            os.makedirs(logo_folder, exist_ok=True)
+            save_path = os.path.join(logo_folder, unique_filename)
             img.save(save_path)
-            logger.info(f"Saved original logo (no crop data): {save_path}")
+            logger.info(f"Saved logo locally: {save_path}")
 
         app_info.logo_image_filename = unique_filename
 
@@ -9398,7 +9449,7 @@ def admin_essay_download_csv():
         problems.sort(key=sort_key)
         
         # CSV作成
-        si = io.StringIO()
+        si = StringIO()
         # BOMを付与してExcelで文字化けしないようにする
         si.write('\ufeff')
         
