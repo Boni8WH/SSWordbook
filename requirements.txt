@@ -1,15 +1,17 @@
-# requirements.txt を修正
 Flask==3.0.3
 Flask-SQLAlchemy==3.0.5
+Flask-Migrate==4.0.7
 Flask-Mail==0.9.1
 Werkzeug==3.0.4
 pytz==2024.1
 SQLAlchemy==2.0.25
+boto3>=1.26.0
+botocore>=1.29.0
 
 # PostgreSQL対応
-psycopg2-binary
+psycopg2-binary==2.9.7
+gunicorn==21.2.0
 
 # その他
 cryptography==41.0.7
-Pillow==10.1.0
-gunicorn==21.2.0
+openpyxl==3.1.2

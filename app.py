@@ -267,8 +267,6 @@ class AppInfo(db.Model):
     footer_text = db.Column(db.String(200), default="", nullable=True)
     contact_email = db.Column(db.String(100), default="", nullable=True)
     school_name = db.Column(db.String(100), default="朋優学院", nullable=False)
-    logo_type = db.Column(db.String(10), default="text", nullable=False)
-    logo_image_filename = db.Column(db.String(100), nullable=True)
     app_settings = db.Column(JSONEncodedDict, default={})
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(JST), onupdate=lambda: datetime.now(JST))
@@ -613,7 +611,6 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from sqlalchemy import inspect, text, func
 from functools import wraps
-from PIL import Image
 
 def admin_required(f):
     @wraps(f)
@@ -814,8 +811,7 @@ def get_monthly_ranking(room_number, user_id, year, month):
     return monthly_top_5, monthly_user_rank_info, total_participants
 
 # 部屋ごとの単語データを読み込む関数
-def load_word_data_for_room(room_number, user=None):
-    """部屋ごとの単語データを読み込む関数（ユーザー情報を引数に追加）"""
+def load_word_data_for_room(room_number):
     try:
         room_setting = RoomSetting.query.filter_by(room_number=room_number).first()
         
@@ -838,7 +834,8 @@ def load_word_data_for_room(room_number, user=None):
                 print(f"❌ デフォルトファイルが見つかりません: words.csv")
                 return []
         else:
-            csv_file = CsvFileContent.query.filter_by(filename=csv_filename).first()
+            # ★重要：データベースからカスタムCSVの内容を取得
+            csv_file = CsvFileContent.query.filter_by(filename=csv_filename).first()  # この行が抜けていました
             if csv_file:
                 try:
                     content = csv_file.content
@@ -854,11 +851,9 @@ def load_word_data_for_room(room_number, user=None):
                     return []
             else:
                 print(f"❌ データベースにCSVが見つかりません: {csv_filename}")
-                # ユーザー情報を引き継いで再帰呼び出し
-                return load_word_data_for_room("default", user=user)
+                return load_word_data_for_room("default")
         
-        # Z問題のフィルタリングにユーザー情報を渡す
-        filtered_word_data = filter_special_problems(word_data, room_number, user)
+        filtered_word_data = filter_special_problems(word_data, room_number)  # 関数名変更
         
         return filtered_word_data
         
@@ -881,7 +876,6 @@ def generate_problem_id(word):
         answer_clean = re.sub(r'[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]', '', answer[:10])
         
         problem_id = f"{chapter}-{number}-{question_clean}-{answer_clean}"
-        print(f"Generated problem_id: {problem_id} for question: {question[:10]}...")
         return problem_id
         
     except Exception as e:
@@ -1015,8 +1009,8 @@ def fix_user_data_types():
         "fixed_incorrect": fixed_incorrect_count
     }
 
-def filter_special_problems(word_data, room_number, user=None):
-    """Z問題（特別問題）のフィルタリング処理（ユーザー情報に基づいて表示）"""
+def filter_special_problems(word_data, room_number):
+    """Z問題（特別問題）のフィルタリング処理"""
     chapters = {}
     for word in word_data:
         chapter = word['chapter']
@@ -1030,49 +1024,52 @@ def filter_special_problems(word_data, room_number, user=None):
         else:
             chapters[chapter]['regular'].append(word)
     
+    users = User.query.filter_by(room_number=room_number).all()
     filtered_data = []
     
     for chapter, problems in chapters.items():
         filtered_data.extend(problems['regular'])
         
         if problems['special']:
-            # ユーザー個人の達成状況で判定
-            special_unlocked = check_special_unlock_status_for_user(chapter, problems['regular'], user)
+            special_unlocked = check_special_unlock_status(chapter, problems['regular'], users)
             
             if special_unlocked:
                 for special_word in problems['special']:
                     special_word['enabled'] = True
                     filtered_data.append(special_word)
-                if user:
-                    print(f"🔓 第{chapter}章のZ問題を解放しました (ユーザー: {user.username})")
+                print(f"🔓 第{chapter}章のZ問題を解放しました")
             else:
-                if user:
-                    print(f"🔒 第{chapter}章のZ問題は条件未達成のため非表示 (ユーザー: {user.username})")
+                print(f"🔒 第{chapter}章のZ問題は条件未達成のため非表示")
     
     return filtered_data
 
-def check_special_unlock_status_for_user(chapter, regular_problems, user):
-    """特定の章のZ問題がユーザー個人で解放されるかチェック"""
-    if not regular_problems or not user or user.username == 'admin':
+def check_special_unlock_status(chapter, regular_problems, users):
+    """特定の章のZ問題が解放されるかチェック"""
+    if not regular_problems:
         return False
     
-    user_history = user.get_problem_history()
-
     for word in regular_problems:
         problem_id = get_problem_id(word)
         
-        if problem_id not in user_history:
-            return False # 1問でも未回答なら解放しない
-
-        history = user_history[problem_id]
-        correct = history.get('correct_attempts', 0)
-        incorrect = history.get('incorrect_attempts', 0)
-        total = correct + incorrect
+        is_mastered_by_anyone = False
+        for user in users:
+            if user.username == 'admin':
+                continue
+            
+            user_history = user.get_problem_history()
+            if problem_id in user_history:
+                history = user_history[problem_id]
+                correct = history.get('correct_attempts', 0)
+                incorrect = history.get('incorrect_attempts', 0)
+                total = correct + incorrect
+                
+                if total > 0 and (correct / total) >= 0.8:
+                    is_mastered_by_anyone = True
+                    break
         
-        # 1問でもマスター（正答率80%未満）していなければ解放しない
-        if total == 0 or (correct / total) < 0.8:
+        if not is_mastered_by_anyone:
             return False
-
+    
     return True
 
 # 管理者用：全体のデフォルト単語データを読み込む関数
@@ -1155,8 +1152,8 @@ def get_problem_id(word):
     try:
         chapter = str(word.get('chapter', '0')).zfill(3)
         number = str(word.get('number', '0')).zfill(3)
-        question = str(word.get('question', '')).strip()
-        answer = str(word.get('answer', '')).strip()
+        question = str(word.get('question', ''))
+        answer = str(word.get('answer', ''))
         
         question_clean = re.sub(r'[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]', '', question[:15])
         answer_clean = re.sub(r'[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]', '', answer[:10])
@@ -1476,21 +1473,15 @@ def migrate_database():
                     print("✅ username_changed_atカラムを追加しました。")
                 
                 # パスワードハッシュフィールドの文字数制限を拡張
-                # This migration is PostgreSQL-specific and causes errors on SQLite.
-                # It's better to ensure the model definition in models.py is correct
-                # and let SQLAlchemy handle the column types.
-                # print("🔧 パスワードハッシュフィールドの文字数制限を拡張します...")
-                # with db.engine.connect() as conn:
-                #     try:
-                #         if is_postgres:
-                #             conn.execute(text('ALTER TABLE "user" ALTER COLUMN _room_password_hash TYPE VARCHAR(255)'))
-                #             conn.execute(text('ALTER TABLE "user" ALTER COLUMN _individual_password_hash TYPE VARCHAR(255)'))
-                #             conn.commit()
-                #             print("✅ パスワードハッシュフィールドを255文字に拡張しました。")
-                #         else:
-                #             print("⚠️ SQLiteではカラムの型変更は限定的です。モデル定義を確認してください。")
-                #     except Exception as alter_error:
-                #         print(f"⚠️ カラム変更エラー: {alter_error}")
+                print("🔧 パスワードハッシュフィールドの文字数制限を拡張します...")
+                with db.engine.connect() as conn:
+                    try:
+                        conn.execute(text('ALTER TABLE "user" ALTER COLUMN _room_password_hash TYPE VARCHAR(255)'))
+                        conn.execute(text('ALTER TABLE "user" ALTER COLUMN _individual_password_hash TYPE VARCHAR(255)'))
+                        conn.commit()
+                        print("✅ パスワードハッシュフィールドを255文字に拡張しました。")
+                    except Exception as alter_error:
+                        print(f"⚠️ カラム変更エラー: {alter_error}")
                 
                 # last_loginカラムの確認・追加
                 if 'last_login' not in columns:
@@ -1556,21 +1547,6 @@ def migrate_database():
                         conn.commit()
                     print("✅ school_nameカラムを追加しました。")
                 
-                # logo_typeとlogo_image_filenameカラムの追加
-                if 'logo_type' not in columns:
-                    print("🔧 logo_typeカラムを追加します...")
-                    with db.engine.connect() as conn:
-                        conn.execute(text('ALTER TABLE app_info ADD COLUMN logo_type VARCHAR(10) DEFAULT \'text\' NOT NULL'))
-                        conn.commit()
-                    print("✅ logo_typeカラムを追加しました。")
-
-                if 'logo_image_filename' not in columns:
-                    print("🔧 logo_image_filenameカラムを追加します...")
-                    with db.engine.connect() as conn:
-                        conn.execute(text('ALTER TABLE app_info ADD COLUMN logo_image_filename VARCHAR(100)'))
-                        conn.commit()
-                    print("✅ logo_image_filenameカラムを追加しました。")
-
                 # 他の不足カラムもチェック
                 required_columns = {
                     'app_settings': 'TEXT DEFAULT \'{}\'',
@@ -1851,9 +1827,14 @@ def create_user_stats_table_simple():
         
         # 手動でテーブル作成も試行
         with db.engine.connect() as conn:
-            # テーブル存在確認 (SQLite/PostgreSQL互換)
-            inspector = inspect(conn)
-            table_exists = inspector.has_table('user_stats')
+            # テーブル存在確認
+            result = conn.execute(text("""
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables 
+                    WHERE table_name = 'user_stats'
+                )
+            """))
+            table_exists = result.fetchone()[0]
             
             if not table_exists:
                 print("🔧 SQLで直接テーブル作成...")
@@ -2848,7 +2829,7 @@ def index():
             room_number=session.get('room_number')
         )
         
-        word_data = load_word_data_for_room(current_user.room_number, user=current_user)
+        word_data = load_word_data_for_room(current_user.room_number)
         
         room_setting = RoomSetting.query.filter_by(room_number=current_user.room_number).first()
         max_enabled_unit_num_str = room_setting.max_enabled_unit_number if room_setting else "9999"
@@ -2943,21 +2924,27 @@ def login_page():
             user = authenticate_user(room_number, room_password, student_id, individual_password)
             
             if user:
-                session.permanent = True
-                app.permanent_session_lifetime = timedelta(days=7)
-
+                remember = request.form.get('remember_me')
+                if remember:
+                    # セッションを永続化（有効期限はapp.configで設定済み）
+                    session.permanent = True
+                    # 明示的に有効期限を設定することも可能
+                    app.permanent_session_lifetime = timedelta(days=7)
+                else:
+                    session.permanent = False
+                    
                 session['user_id'] = user.id
                 session['username'] = user.username
                 session['room_number'] = user.room_number
                 user.last_login = datetime.now(JST)
                 db.session.commit()
-
+                
                 if hasattr(user, 'is_first_login') and user.is_first_login:
                     flash('初回ログインです。パスワードを変更してください。', 'info')
                     return redirect(url_for('first_time_password_change'))
-
-                flash(f'ようこそ、{user.username}さん！', 'success')
-                return redirect(url_for('index'))
+                else:
+                    flash(f'ようこそ、{user.username}さん！', 'success')
+                    return redirect(url_for('index'))
             else:
                 flash('ログイン情報が間違っています。', 'danger')
     
@@ -3854,7 +3841,7 @@ def admin_fallback_ranking_calculation(room_number, start_time):
         print("🔄 管理者用従来方式でランキング計算中...")
         
         # 部屋の単語データと設定を取得
-        word_data = load_word_data_for_room(room_number, user=None)
+        word_data = load_word_data_for_room(room_number)
         room_setting = RoomSetting.query.filter_by(room_number=room_number).first()
         max_enabled_unit_num_str = room_setting.max_enabled_unit_number if room_setting else "9999"
         parsed_max_enabled_unit_num = parse_unit_number(max_enabled_unit_num_str)
@@ -4020,8 +4007,6 @@ def admin_fallback_ranking_calculation(room_number, start_time):
         traceback.print_exc()
         return jsonify(status='error', message=f'ランキング計算エラー: {str(e)}'), 500
 
-
-
 @app.route('/api/admin/daily_quiz_info/<room_number>')
 @admin_required
 def api_admin_daily_quiz_info(room_number):
@@ -4102,73 +4087,6 @@ def api_admin_daily_quiz_info(room_number):
 
     except Exception as e:
         app.logger.error(f"管理者用「今日の10問」情報取得エラー: {e}")
-        return jsonify(status='error', message=str(e)), 500
-
-@app.route('/api/admin/monthly_cumulative_ranking/<room_number>/<int:year>/<int:month>')
-@admin_required
-def api_admin_monthly_cumulative_ranking(room_number, year, month):
-    """管理者用: 指定部屋の月間累計スコアランキングを取得"""
-    try:
-        monthly_scores = db.session.query(
-            User.username,
-            User.student_id,
-            MonthlyScore.total_score
-        ).join(
-            MonthlyScore, User.id == MonthlyScore.user_id
-        ).filter(
-            MonthlyScore.room_number == room_number,
-            MonthlyScore.year == year,
-            MonthlyScore.month == month
-        ).order_by(
-            MonthlyScore.total_score.desc(),
-            User.username
-        ).all()
-
-        ranking_data = [
-            {'rank': i + 1, 'username': row.username, 'student_id': row.student_id, 'total_score': row.total_score}
-            for i, row in enumerate(monthly_scores)
-        ]
-
-        return jsonify({
-            'status': 'success',
-            'ranking': ranking_data
-        })
-
-    except Exception as e:
-        app.logger.error(f"月間累計スコアランキング取得エラー: {e}")
-        return jsonify(status='error', message=str(e)), 500
-
-@app.route('/api/admin/daily_ranking/<room_number>/<int:year>/<int:month>/<int:day>')
-@admin_required
-def api_admin_daily_ranking(room_number, year, month, day):
-    """管理者用: 指定日の「今日の10問」ランキングを取得"""
-    try:
-        target_date = date(year, month, day)
-
-        daily_quiz = DailyQuiz.query.filter_by(date=target_date, room_number=room_number).first()
-
-        daily_ranking = []
-        if daily_quiz:
-            results = DailyQuizResult.query.filter_by(quiz_id=daily_quiz.id)\
-                .join(User)\
-                .order_by(DailyQuizResult.score.desc(), DailyQuizResult.time_taken_ms.asc()).all()
-
-            for i, result in enumerate(results, 1):
-                daily_ranking.append({
-                    'rank': i,
-                    'username': result.user.username,
-                    'student_id': result.user.student_id,
-                    'score': result.score,
-                    'time': f"{(result.time_taken_ms / 1000):.2f}秒"
-                })
-
-        return jsonify({
-            'status': 'success',
-            'ranking': daily_ranking
-        })
-
-    except Exception as e:
-        app.logger.error(f"指定日の日次ランキング取得エラー: {e}")
         return jsonify(status='error', message=str(e)), 500
     
 # ====================================================================
@@ -4335,7 +4253,7 @@ def update_user_stats():
         try:
             user_stats = UserStats.get_or_create(current_user.id)
             if user_stats:
-                word_data = load_word_data_for_room(current_user.room_number, user=current_user)
+                word_data = load_word_data_for_room(current_user.room_number)
                 user_stats.update_stats(word_data)
                 db.session.commit()
         except Exception as stats_error:
@@ -4359,7 +4277,7 @@ def api_word_data():
         if not current_user:
             return jsonify(status='error', message='ユーザーが見つかりません。'), 404
 
-        word_data = load_word_data_for_room(current_user.room_number, user=current_user)
+        word_data = load_word_data_for_room(current_user.room_number)
         
         room_setting = RoomSetting.query.filter_by(room_number=current_user.room_number).first()
 
@@ -4563,7 +4481,7 @@ def debug_trace_answer_flow():
     if not current_user:
         return jsonify(error='ユーザーが見つかりません'), 404
     
-    word_data = load_word_data_for_room(current_user.room_number, user=current_user)
+    word_data = load_word_data_for_room(current_user.room_number)
     user_history = current_user.get_problem_history()
     
     # 最近の5問の詳細分析
@@ -4632,7 +4550,7 @@ def debug_manual_test_save():
     if not current_user:
         return jsonify(error='ユーザーが見つかりません'), 404
     
-    word_data = load_word_data_for_room(current_user.room_number, user=current_user)
+    word_data = load_word_data_for_room(current_user.room_number)
     if not word_data:
         return jsonify(error='単語データが見つかりません'), 404
     
@@ -5460,180 +5378,11 @@ def admin_analyze_invalid_history_detailed():
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 # ====================================================================
-# 苦手問題一覧ページ
-# ====================================================================
-@app.route('/weak_problems')
-def weak_problems_page():
-    """苦手問題一覧ページ（データはAPIで非同期取得）"""
-    if 'user_id' not in session:
-        flash('ログインが必要です。', 'info')
-        return redirect(url_for('login_page'))
-
-    current_user = User.query.get(session['user_id'])
-    if not current_user:
-        flash('ユーザーが見つかりません。', 'danger')
-        return redirect(url_for('logout'))
-
-    context = get_template_context()
-    return render_template('weak_problems.html', **context)
-
-@app.route('/api/personal_weak_problems')
-def api_personal_weak_problems():
-    """個人の苦手問題（正答率が低い問題）トップ20を返す"""
-    if 'user_id' not in session:
-        return jsonify(status='error', message='ログインが必要です'), 401
-
-    current_user = User.query.get(session['user_id'])
-    if not current_user:
-        return jsonify(status='error', message='ユーザーが見つかりません'), 404
-
-    try:
-        user_history = current_user.get_problem_history()
-        if not isinstance(user_history, dict) or not user_history:
-            return jsonify(status='success', weak_problems=[])
-
-        # 正答率を計算
-        problems_with_accuracy = []
-        for problem_id, history in user_history.items():
-            correct_attempts = history.get('correct_attempts', 0)
-            incorrect_attempts = history.get('incorrect_attempts', 0)
-            total_attempts = correct_attempts + incorrect_attempts
-
-            if total_attempts > 0:
-                accuracy = (correct_attempts / total_attempts) * 100
-                # 正答率が100%未満の問題のみを対象とする
-                if accuracy < 100:
-                    problems_with_accuracy.append({
-                        'problem_id': problem_id,
-                        'accuracyRate': accuracy,
-                        'correct_attempts': correct_attempts,
-                        'incorrect_attempts': incorrect_attempts,
-                        'total_attempts': total_attempts
-                    })
-
-        # 正答率が低い順、同じ場合は試行回数が多い順でソート
-        problems_with_accuracy.sort(key=lambda x: (x['accuracyRate'], -x['total_attempts']))
-
-        # 上位20件を取得
-        top_20_weakest = problems_with_accuracy[:20]
-
-        # 完全な問題情報を付与
-        word_data = load_word_data_for_room(current_user.room_number, user=current_user)
-        word_map = {get_problem_id(word): word for word in word_data}
-
-        result_problems = []
-        for weak_problem in top_20_weakest:
-            problem_id = weak_problem['problem_id']
-            if problem_id in word_map:
-                original_word = word_map[problem_id]
-                result_problems.append({
-                    'problemId': problem_id,
-                    'question': original_word['question'],
-                    'answer': original_word['answer'],
-                    'accuracyRate': weak_problem['accuracyRate'],
-                    'correct_attempts': weak_problem['correct_attempts'],
-                    'incorrect_attempts': weak_problem['incorrect_attempts']
-                })
-
-        return jsonify(status='success', weak_problems=result_problems)
-
-    except Exception as e:
-        app.logger.error(f"個人の苦手問題取得エラー: {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify(status='error', message='サーバーエラーが発生しました。'), 500
-
-@app.route('/api/room_weak_problems')
-def api_room_weak_problems():
-    """部屋全体の苦手問題（正答率が低い問題）トップ20を返す"""
-    if 'user_id' not in session:
-        return jsonify(status='error', message='ログインが必要です'), 401
-
-    current_user = User.query.get(session['user_id'])
-    if not current_user or not current_user.room_number:
-        return jsonify(status='error', message='ユーザー情報または部屋情報が見つかりません'), 404
-
-    try:
-        # 同じ部屋の全ユーザーを取得
-        users_in_room = User.query.filter_by(room_number=current_user.room_number).all()
-
-        # 部屋全体の学習履歴を集計
-        room_problem_stats = {}
-        for user in users_in_room:
-            user_history = user.get_problem_history()
-            if isinstance(user_history, str):
-                try:
-                    user_history = json.loads(user_history)
-                except json.JSONDecodeError:
-                    continue # パースできないデータはスキップ
-
-            if isinstance(user_history, dict):
-                for problem_id, history in user_history.items():
-                    if problem_id not in room_problem_stats:
-                        room_problem_stats[problem_id] = {'correct': 0, 'incorrect': 0}
-
-                    room_problem_stats[problem_id]['correct'] += history.get('correct_attempts', 0)
-                    room_problem_stats[problem_id]['incorrect'] += history.get('incorrect_attempts', 0)
-
-        # 正答率を計算
-        problems_with_accuracy = []
-        for problem_id, stats in room_problem_stats.items():
-            total_attempts = stats['correct'] + stats['incorrect']
-            if total_attempts > 0:
-                accuracy = (stats['correct'] / total_attempts) * 100
-                problems_with_accuracy.append({
-                    'problem_id': problem_id,
-                    'accuracyRate': accuracy,
-                    'correct_attempts': stats['correct'],
-                    'incorrect_attempts': stats['incorrect'],
-                    'total_attempts': total_attempts
-                })
-
-        # 正答率が低い順、同じ場合は試行回数が多い順でソート
-        problems_with_accuracy.sort(key=lambda x: (x['accuracyRate'], -x['total_attempts']))
-
-        # 完全な問題情報を付与
-        word_data = load_word_data_for_room(current_user.room_number, user=current_user)
-        # Chapter 'Z' を除外
-        word_map = {get_problem_id(word): word for word in word_data if word.get('chapter', '').upper() != 'Z'}
-
-        # 上位20件を取得（Chapter Zを除外した上で）
-        top_20_weakest = []
-        for weak_problem in problems_with_accuracy:
-            if len(top_20_weakest) >= 20:
-                break
-            if weak_problem['problem_id'] in word_map:
-                top_20_weakest.append(weak_problem)
-
-        result_problems = []
-        for weak_problem in top_20_weakest:
-            problem_id = weak_problem['problem_id']
-            # word_map には既にZ以外の問題しかないので、ここでのチェックは不要
-            original_word = word_map[problem_id]
-            result_problems.append({
-                'problemId': problem_id,
-                'question': original_word['question'],
-                'answer': original_word['answer'],
-                'accuracyRate': weak_problem['accuracyRate'],
-                'correct_attempts': weak_problem['correct_attempts'],
-                'incorrect_attempts': weak_problem['incorrect_attempts']
-            })
-
-        return jsonify(status='success', weak_problems=result_problems)
-
-    except Exception as e:
-        app.logger.error(f"部屋全体の苦手問題取得エラー: {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify(status='error', message='サーバーエラーが発生しました。'), 500
-
-
-# ====================================================================
 # 進捗ページ
 # ====================================================================
 @app.route('/progress')
 def progress_page():
-    """個人進捗とみんなの苦手問題を表示"""
+    """個人進捗のみを高速表示（ランキングは非同期）"""
     try:
         if 'user_id' not in session:
             flash('進捗を確認するにはログインしてください。', 'info')
@@ -5644,69 +5393,163 @@ def progress_page():
             flash('ユーザーが見つかりません。', 'danger')
             return redirect(url_for('logout'))
 
-        print(f"\n=== 進捗ページ処理開始 ===")
+        print(f"\n=== 進捗ページ（高速版）処理開始 ===")
         print(f"ユーザー: {current_user.username} (部屋: {current_user.room_number})")
 
-        # ユーザーの学習履歴を取得 (get_problem_history は自動的に辞書を返す)
         user_problem_history = current_user.get_problem_history()
+        print(f"学習履歴数: {len(user_problem_history)}")
         
-        # 部屋の単語データを取得
-        word_data = load_word_data_for_room(current_user.room_number, user=current_user)
-        if not word_data:
-            flash('単語データの読み込みに失敗しました。', 'danger')
-            # ページは表示するが、データは空にする
-            word_data = []
+        # 部屋ごとの単語データを取得
+        word_data = load_word_data_for_room(current_user.room_number)
+        print(f"部屋の単語データ数: {len(word_data)}")
         
-        # --- 章別進捗サマリー（ここは変更なし） ---
         room_setting = RoomSetting.query.filter_by(room_number=current_user.room_number).first()
+        max_enabled_unit_num_str = room_setting.max_enabled_unit_number if room_setting else "9999"
+        parsed_max_enabled_unit_num = parse_unit_number(max_enabled_unit_num_str)
+        print(f"最大単元番号: {max_enabled_unit_num_str}")
+
+        # 章ごとに進捗をまとめる（個人のみ、高速化）
         chapter_progress_summary = {}
+
+        # 有効な単語データで単元進捗を初期化
         for word in word_data:
-            if word['enabled'] and is_unit_enabled_by_room_setting(word.get('number'), room_setting):
-                chapter_num = word['chapter']
+            chapter_num = word['chapter']
+            unit_num = word['number']
+            category_name = word.get('category', '未分類')
+            
+            is_word_enabled_in_csv = word['enabled']
+            is_unit_enabled_by_room = is_unit_enabled_by_room_setting(unit_num, room_setting)  # ←変数名を変更
+
+            if is_word_enabled_in_csv and is_unit_enabled_by_room:
+                # 章の初期化
                 if chapter_num not in chapter_progress_summary:
-                    chapter_progress_summary[chapter_num] = {'total_questions': 0, 'total_mastered': 0, 'chapter_name': f"第{chapter_num}章" if chapter_num != 'S' else "歴史総合", 'units': {}}
+                    chapter_progress_summary[chapter_num] = {
+                        'chapter_name': f'第{chapter_num}章',
+                        'units': {},
+                        'total_questions': 0,
+                        'total_mastered': 0
+                    }
+                
+                # 単元の初期化
+                if unit_num not in chapter_progress_summary[chapter_num]['units']:
+                    chapter_progress_summary[chapter_num]['units'][unit_num] = {
+                        'categoryName': category_name,
+                        'attempted_problems': set(),
+                        'mastered_problems': set(),
+                        'total_questions_in_unit': 0,
+                        'total_attempts': 0
+                    }
+                
+                chapter_progress_summary[chapter_num]['units'][unit_num]['total_questions_in_unit'] += 1
                 chapter_progress_summary[chapter_num]['total_questions'] += 1
 
-        if user_problem_history:
-            for problem_id, history in user_problem_history.items():
-                matched_word = next((w for w in word_data if get_problem_id(w) == problem_id), None)
-                if matched_word and matched_word['enabled'] and is_unit_enabled_by_room_setting(matched_word.get('number'), room_setting):
-                    correct = history.get('correct_attempts', 0)
-                    incorrect = history.get('incorrect_attempts', 0)
-                    if (correct + incorrect) > 0 and (correct / (correct + incorrect)) >= 0.8:
-                        chapter_num = matched_word['chapter']
-                        if chapter_num in chapter_progress_summary:
-                            chapter_progress_summary[chapter_num]['total_mastered'] += 1
+        # 学習履歴を処理（個人のみ）
+        matched_problems = 0
+        unmatched_problems = 0
+        
+        for problem_id, history in user_problem_history.items():
+            # 問題IDに対応する単語を検索
+            matched_word = None
+            for word in word_data:
+                generated_id = get_problem_id(word)
+                if generated_id == problem_id:
+                    matched_word = word
+                    break
 
-        def sort_key_progress(item):
-            chapter_num = item[0]
-            if chapter_num == 'S': return (0, 0)
-            if chapter_num.isdigit(): return (1, int(chapter_num))
+            if matched_word:
+                matched_problems += 1
+                chapter_number = matched_word['chapter']
+                unit_number = matched_word['number']
+                
+                is_word_enabled_in_csv = matched_word['enabled']
+                is_unit_enabled_by_room = parse_unit_number(unit_number) <= parsed_max_enabled_unit_num
+
+                if (is_word_enabled_in_csv and is_unit_enabled_by_room_setting and 
+                    chapter_number in chapter_progress_summary and
+                    unit_number in chapter_progress_summary[chapter_number]['units']):
+                    
+                    correct_attempts = history.get('correct_attempts', 0)
+                    incorrect_attempts = history.get('incorrect_attempts', 0)
+                    total_problem_attempts = correct_attempts + incorrect_attempts
+                    
+                    unit_data = chapter_progress_summary[chapter_number]['units'][unit_number]
+                    unit_data['total_attempts'] += total_problem_attempts
+                    
+                    if total_problem_attempts > 0:
+                        unit_data['attempted_problems'].add(problem_id)
+                        
+                        # マスター判定：正答率80%以上
+                        accuracy_rate = (correct_attempts / total_problem_attempts) * 100
+                        if accuracy_rate >= 80.0:
+                            unit_data['mastered_problems'].add(problem_id)
+                            chapter_progress_summary[chapter_number]['total_mastered'] += 1
+            else:
+                unmatched_problems += 1
+
+        # データを整理してテンプレートに渡す形式に変換
+        sorted_chapter_progress = {}
+
+        # ▼▼▼▼▼ ソート処理を修正 ▼▼▼▼▼
+        def sort_key_progress(chapter_num):
+            if chapter_num == 'S':
+                return (0, 0)
+            if chapter_num.isdigit():
+                return (1, int(chapter_num))
             return (2, chapter_num)
-        sorted_chapter_progress = dict(sorted(chapter_progress_summary.items(), key=sort_key_progress))
 
+        for chapter_num in sorted(chapter_progress_summary.keys(), key=sort_key_progress):
+        # ▲▲▲▲▲ ここまで修正 ▲▲▲▲▲
+            chapter_data = chapter_progress_summary[chapter_num]
+            
+            # 単元データをソートして配列に変換
+            sorted_units = []
+            for unit_num in sorted(chapter_data['units'].keys(), key=lambda x: parse_unit_number(x)):
+                unit_data = chapter_data['units'][unit_num]
+                sorted_units.append({
+                    'unit_num': unit_num,
+                    'category_name': unit_data['categoryName'],
+                    'attempted_problems': list(unit_data['attempted_problems']),
+                    'mastered_problems': list(unit_data['mastered_problems']),
+                    'total_questions_in_unit': unit_data['total_questions_in_unit'],
+                    'total_attempts': unit_data['total_attempts']
+                })
+            
+            # ▼▼▼▼▼ ここから修正 ▼▼▼▼▼
+            # 'S' を「歴史総合」に変換
+            chapter_name = "歴史総合" if chapter_num == "S" else f"第{chapter_num}章"
+            # ▲▲▲▲▲ ここまで修正 ▲▲▲▲▲
+            
+            sorted_chapter_progress[chapter_num] = {
+                'chapter_name': chapter_name, # 修正した章名を代入
+                'units': sorted_units,
+                'total_questions': chapter_data['total_questions'],
+                'total_mastered': chapter_data['total_mastered']
+            }
+
+        print(f"章別進捗: {len(sorted_chapter_progress)}章")
+        print("=== 進捗ページ（高速版）処理完了 ===\n")
 
         context = get_template_context()
+        
+        # ★重要：ランキングデータは空で渡す（Ajax で後から取得）
         return render_template('progress.html',
                                current_user=current_user,
                                user_progress_by_chapter=sorted_chapter_progress,
-                               async_loading=True, # ランキングは非同期
+                               # ランキング関連は空・None で初期化
+                               top_5_ranking=[],  
+                               current_user_stats=None,
+                               current_user_rank=None,
+                               total_users_in_room=0,
+                               ranking_display_count=5,
+                               # 非同期ローディング用フラグ
+                               async_loading=True,
                                **context)
     
     except Exception as e:
         print(f"Error in progress_page: {e}")
         import traceback
         traceback.print_exc()
-        # エラーが発生した場合もページを表示できるよう、空のデータを渡す
-        context = get_template_context()
-        flash('進捗データの読み込み中にエラーが発生しました。', 'danger')
-        return render_template('progress.html',
-                               current_user=current_user,
-                               user_progress_by_chapter={},
-                               my_weak_problems=[],
-                               everyone_weak_problems=[],
-                               async_loading=True,
-                               **context)
+        return f"Progress Error: {e}", 500
 
 @app.route('/api/ranking_data')
 def api_ranking_data():
@@ -5841,7 +5684,7 @@ def fallback_ranking_calculation(current_user, start_time):
         current_room_number = current_user.room_number
         
         # 部屋の単語データと設定を取得
-        word_data = load_word_data_for_room(current_room_number, user=current_user)
+        word_data = load_word_data_for_room(current_room_number)
         room_setting = RoomSetting.query.filter_by(room_number=current_room_number).first()
         max_enabled_unit_num_str = room_setting.max_enabled_unit_number if room_setting else "9999"
         parsed_max_enabled_unit_num = parse_unit_number(max_enabled_unit_num_str)
@@ -6424,6 +6267,10 @@ def admin_page():
                 'recent_logins': recent_logins,
                 'unique_room_numbers': sorted(list(unique_room_numbers), key=lambda x: int(x) if x.isdigit() else float('inf'))
             },
+            'essay_chapters': sorted(
+                [c[0] for c in db.session.query(EssayProblem.chapter).distinct().all()],
+                key=lambda x: int(x) if x.isdigit() else float('inf')
+            ),
             **context
         }
         
@@ -6435,122 +6282,81 @@ def admin_page():
         traceback.print_exc()
         return f"Admin Error: {e}", 500
 
-def _update_app_info_general(app_info, form):
-    """Update general application information from the form."""
-    app_info.version = form.get('version', app_info.version).strip()
-    app_info.last_updated_date = form.get('last_updated_date', app_info.last_updated_date).strip()
-    app_info.update_content = form.get('update_content', app_info.update_content).strip()
-    app_info.footer_text = form.get('footer_text', app_info.footer_text or '').strip()
-    app_info.contact_email = form.get('contact_email', app_info.contact_email or '').strip()
-    app_info.school_name = form.get('school_name', app_info.school_name).strip()
-    app_info.updated_by = session.get('username', 'admin')
-    app_info.updated_at = datetime.now(JST)
-
-def _handle_text_logo(app_info, form):
-    """Handle the logic for 'text' logo type."""
-    logo_folder = os.path.join('static', 'uploads', 'logos')
-    app_info.app_name = form.get('app_name', app_info.app_name).strip()
-    if app_info.logo_image_filename:
-        old_filepath = os.path.join(logo_folder, app_info.logo_image_filename)
-        if os.path.exists(old_filepath):
-            try:
-                os.remove(old_filepath)
-                logger.info(f"Deleted old logo: {old_filepath}")
-            except Exception as e:
-                logger.error(f"Error deleting old logo {old_filepath}: {e}")
-    app_info.logo_image_filename = None
-
-def _crop_and_save_image(img, crop_data_json, save_path):
-    """Crop and save the image based on crop_data."""
-    try:
-        crop_data = json.loads(crop_data_json)
-        x = int(crop_data['x'])
-        y = int(crop_data['y'])
-        width = int(crop_data['width'])
-        height = int(crop_data['height'])
-
-        cropped_img = img.crop((x, y, x + width, y + height))
-        cropped_img.save(save_path)
-        logger.info(f"Saved cropped logo: {save_path}")
-    except (json.JSONDecodeError, KeyError, ValueError) as e:
-        logger.error(f"Error processing crop data: {e}. Saving original image.")
-        img.save(save_path)
-
-def _handle_image_logo(app_info, request):
-    """Handle the logic for 'image' logo type."""
-    file = request.files.get('logo_image')
-    crop_data_json = request.form.get('crop_data')
-    logo_folder = os.path.join('static', 'uploads', 'logos')
-
-    if file and file.filename:
-        file.seek(0, os.SEEK_END)
-        file_size = file.tell()
-        file.seek(0)
-        if file_size > 1 * 1024 * 1024: # 1MB limit
-            flash('ロゴ画像のファイルサイズは1MB以下にしてください。', 'danger')
-            return False
-
-        if app_info.logo_image_filename:
-            old_filepath = os.path.join(logo_folder, app_info.logo_image_filename)
-            if os.path.exists(old_filepath):
-                try:
-                    os.remove(old_filepath)
-                    logger.info(f"Deleted old logo: {old_filepath}")
-                except Exception as e:
-                    logger.error(f"Error deleting old logo {old_filepath}: {e}")
-
-        filename = secure_filename(file.filename)
-        random_hex = secrets.token_hex(8)
-        _, f_ext = os.path.splitext(filename)
-        unique_filename = random_hex + f_ext
-        save_path = os.path.join(logo_folder, unique_filename)
-
-        img = Image.open(file.stream)
-
-        if crop_data_json:
-            _crop_and_save_image(img, crop_data_json, save_path)
-        else:
-            img.save(save_path)
-            logger.info(f"Saved original logo (no crop data): {save_path}")
-
-        app_info.logo_image_filename = unique_filename
-
-    if not app_info.app_name:
-        app_info.app_name = "App" # Provide a default if empty
-    return True
-
 @app.route('/admin/app_info', methods=['GET', 'POST'])
-@admin_required
 def admin_app_info():
     try:
-        app_info = AppInfo.get_current_info()
+        if not session.get('admin_logged_in'):
+            flash('管理者権限がありません。', 'danger')
+            return redirect(url_for('login_page'))
 
+        print("=== admin_app_info デバッグ開始 ===")
+        
+        # データベース接続テスト
+        try:
+            app_info = AppInfo.query.first()
+            print(f"app_info取得結果: {app_info}")
+            
+            if not app_info:
+                print("app_info が存在しません。新規作成します。")
+                app_info = AppInfo()
+                db.session.add(app_info)
+                db.session.commit()
+                print("新しいapp_infoを作成しました。")
+                
+        except Exception as db_error:
+            print(f"データベースエラー: {db_error}")
+            # フェイルセーフ：デフォルト値でapp_infoオブジェクトを作成
+            class MockAppInfo:
+                def __init__(self):
+                    self.app_name = "世界史単語帳"
+                    self.version = "1.0.0"
+                    self.last_updated_date = "2025年6月15日"
+                    self.update_content = "アプリケーションが開始されました。"
+                    self.footer_text = ""
+                    self.contact_email = ""
+                    self.updated_by = "system"
+                    self.updated_at = datetime.now(JST)
+                    
+            app_info = MockAppInfo()
+            print("MockAppInfoを使用します。")
+        
         if request.method == 'POST':
-            _update_app_info_general(app_info, request.form)
-
-            logo_type = request.form.get('logo_type')
-            app_info.logo_type = logo_type
-
-            logo_folder = os.path.join('static', 'uploads', 'logos')
-            os.makedirs(logo_folder, exist_ok=True)
-
-            if logo_type == 'text':
-                _handle_text_logo(app_info, request.form)
-            elif logo_type == 'image':
-                if not _handle_image_logo(app_info, request):
-                    return redirect(url_for('admin_app_info'))
-
-            db.session.commit()
-            flash('アプリ情報を更新しました。', 'success')
-            return redirect(url_for('admin_app_info'))
-
+            print("POST リクエストを処理中...")
+            try:
+                app_info.app_name = request.form.get('app_name', '世界史単語帳').strip()
+                app_info.version = request.form.get('version', '1.0.0').strip()
+                app_info.last_updated_date = request.form.get('last_updated_date', '').strip()
+                app_info.update_content = request.form.get('update_content', '').strip()
+                app_info.footer_text = request.form.get('footer_text', '').strip()
+                app_info.contact_email = request.form.get('contact_email', '').strip()
+                app_info.school_name = request.form.get('school_name', '朋優学院').strip()
+                
+                if hasattr(app_info, 'updated_by'):
+                    app_info.updated_by = session.get('username', 'admin')
+                    app_info.updated_at = datetime.now(JST)
+                    
+                    db.session.commit()
+                    flash('アプリ情報を更新しました。', 'success')
+                else:
+                    flash('テストモードのため、実際の保存は行われませんでした。', 'warning')
+                    
+                return redirect(url_for('admin_app_info'))
+                
+            except Exception as post_error:
+                print(f"POST処理エラー: {post_error}")
+                db.session.rollback()
+                flash(f'更新エラー: {str(post_error)}', 'danger')
+        
+        print("テンプレートをレンダリング中...")
         return render_template('admin_app_info.html', app_info=app_info)
-
+        
     except Exception as e:
-        app.logger.error(f"アプリ情報管理ページエラー: {e}")
+        print(f"=== 致命的エラー ===")
+        print(f"エラー: {e}")
         import traceback
         traceback.print_exc()
-        flash(f'アプリ情報管理ページでエラーが発生しました: {str(e)}', 'danger')
+        
+        flash('アプリ情報管理ページでエラーが発生しました。管理者ページに戻ります。', 'danger')
         return redirect(url_for('admin_page'))
 
 @app.route('/admin/app_info/reset', methods=['POST'])
@@ -6709,36 +6515,6 @@ def admin_delete_user(user_id):
         db.session.rollback()
         flash(f'ユーザー削除中にエラーが発生しました: {str(e)}', 'danger')
         return redirect(url_for('admin_page'))
-
-@app.route('/admin/bulk_delete_users', methods=['POST'])
-def admin_bulk_delete_users():
-    if not session.get('admin_logged_in'):
-        return jsonify({'status': 'error', 'message': '管理者権限がありません。'}), 403
-
-    data = request.get_json()
-    user_ids = data.get('user_ids')
-
-    if not user_ids:
-        return jsonify({'status': 'error', 'message': '削除するユーザーが選択されていません。'}), 400
-
-    try:
-        # 関連するデータを先に削除
-        PasswordResetToken.query.filter(PasswordResetToken.user_id.in_(user_ids)).delete(synchronize_session=False)
-        DailyQuizResult.query.filter(DailyQuizResult.user_id.in_(user_ids)).delete(synchronize_session=False)
-        MonthlyScore.query.filter(MonthlyScore.user_id.in_(user_ids)).delete(synchronize_session=False)
-        MonthlyResultViewed.query.filter(MonthlyResultViewed.user_id.in_(user_ids)).delete(synchronize_session=False)
-        UserStats.query.filter(UserStats.user_id.in_(user_ids)).delete(synchronize_session=False)
-        EssayProgress.query.filter(EssayProgress.user_id.in_(user_ids)).delete(synchronize_session=False)
-
-        # ユーザーを削除
-        num_deleted = User.query.filter(User.id.in_(user_ids)).delete(synchronize_session=False)
-        db.session.commit()
-
-        return jsonify({'status': 'success', 'message': f'{num_deleted}人のユーザーを削除しました。'})
-    except Exception as e:
-        db.session.rollback()
-        app.logger.error(f"一括削除エラー: {str(e)}")
-        return jsonify({'status': 'error', 'message': f'一括削除中にエラーが発生しました: {str(e)}'}), 500
 
 # 部屋設定管理
 @app.route('/admin/get_room_setting', methods=['POST'])
@@ -10809,7 +10585,7 @@ def debug_user_data():
     user_incorrect_words = current_user.get_incorrect_words()
     
     # 部屋ごとの単語データを取得
-    word_data = load_word_data_for_room(current_user.room_number, user=current_user)
+    word_data = load_word_data_for_room(current_user.room_number)
     
     # 問題IDのマッピングをチェック
     id_mapping = {}
@@ -10878,7 +10654,7 @@ def debug_fix_problem_ids():
         number_str = str(word['number'])
         return f"{chapter_str}-{number_str}-{cleaned_question}"
     
-    word_data = load_word_data_for_room(current_user.room_number, user=current_user)
+    word_data = load_word_data_for_room(current_user.room_number)
     user_problem_history = current_user.get_problem_history()
     user_incorrect_words = current_user.get_incorrect_words()
     
@@ -10945,7 +10721,7 @@ def debug_smart_id_fix():
         return jsonify({'error': 'ユーザーが見つかりません'}), 404
     
     try:
-        word_data = load_word_data_for_room(current_user.room_number, user=current_user)
+        word_data = load_word_data_for_room(current_user.room_number)
         old_history = current_user.get_problem_history()
         old_incorrect = current_user.get_incorrect_words()
         
@@ -11669,17 +11445,85 @@ def find_related_essays():
     
     return jsonify({'essays': recommended_essays})
 
+# 論述問題Excelダウンロード
+@app.route('/admin/essay/download_excel')
+@admin_required
+def admin_download_essay_excel():
+    try:
+        import openpyxl
+        from io import BytesIO
+        from datetime import datetime
+        from pytz import timezone
+        from flask import Response, flash, redirect, url_for
+
+        JST = timezone('Asia/Tokyo')
+        
+        # 全ての問題を取得
+        problems = EssayProblem.query.order_by(EssayProblem.chapter, EssayProblem.id).all()
+        
+        # ワークブック作成
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "論述問題一覧"
+        
+        # ヘッダー行
+        headers = ['ID', '章', 'タイプ', '大学名', '年度', '問題文', '模範解答', '文字数', '有効/無効', '画像あり']
+        ws.append(headers)
+        
+        # データ行
+        for p in problems:
+            row = [
+                p.id,
+                p.chapter,
+                p.type,
+                p.university,
+                p.year,
+                p.question,
+                p.answer,
+                p.answer_length,
+                '有効' if p.enabled else '無効',
+                'あり' if p.image_url else 'なし'
+            ]
+            ws.append(row)
+            
+        # 列幅調整（簡易的）
+        for col in ['A', 'B', 'C', 'D', 'E', 'H', 'I', 'J']:
+            ws.column_dimensions[col].width = 10
+        ws.column_dimensions['F'].width = 50
+        ws.column_dimensions['G'].width = 50
+        
+        # メモリ上に保存
+        output = BytesIO()
+        wb.save(output)
+        output.seek(0)
+        
+        filename = f"essay_problems_{datetime.now(JST).strftime('%Y%m%d_%H%M%S')}.xlsx"
+        
+        return Response(
+            output,
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f"attachment;filename={filename}"}
+        )
+        
+    except ImportError:
+        flash('openpyxlライブラリがインストールされていません。', 'danger')
+        return redirect(url_for('admin_page'))
+    except Exception as e:
+        app.logger.error(f"Excel download error: {e}")
+        flash(f'Excelダウンロード中にエラーが発生しました: {e}', 'danger')
+        return redirect(url_for('admin_page'))
+
 # ===== メイン起動処理の修正 =====
 if __name__ == '__main__':
     try:
-        # データベース初期化 (直接実行時のみ)
+        # データベース初期化
         create_tables_and_admin_user()
-
+        
         # サーバー起動
         port = int(os.environ.get('PORT', 5001))
         debug_mode = os.environ.get('RENDER') != 'true'
         
-        logger.info(f"🌐 サーバーを起動します: http://0.0.0.0:{port}")
+        app.logger.info(f"🌐 サーバーを起動します: http://0.0.0.0:{port}")
         
         app.run(host='0.0.0.0', port=port, debug=debug_mode)
         
@@ -12042,7 +11886,7 @@ def get_daily_quiz():
 
     # --- (未回答の場合のクイズ生成ロジック) ---
     if not daily_quiz:
-        all_words = load_word_data_for_room(user.room_number, user=user)
+        all_words = load_word_data_for_room(user.room_number)
         room_setting = RoomSetting.query.filter_by(room_number=user.room_number).first()
         
         public_words = []
@@ -12063,7 +11907,7 @@ def get_daily_quiz():
         db.session.commit()
 
     problem_ids = daily_quiz.get_problem_ids()
-    all_words = load_word_data_for_room(user.room_number, user=user)
+    all_words = load_word_data_for_room(user.room_number)
     quiz_questions = []
     all_answers = list(set(w['answer'] for w in all_words if w.get('answer')))
     for problem_id in problem_ids:
@@ -12189,7 +12033,7 @@ def admin_regenerate_daily_quiz():
             print(f"✅ 既存クイズと結果の削除完了。")
 
         print(f"✨ 部屋{room_number}の新しいクイズを生成します。")
-        all_words = load_word_data_for_room(room_number, user=None)
+        all_words = load_word_data_for_room(room_number)
         room_setting = RoomSetting.query.filter_by(room_number=room_number).first()
         
         public_words = []
