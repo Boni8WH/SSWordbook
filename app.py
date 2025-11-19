@@ -54,6 +54,7 @@ if S3_AVAILABLE and S3_KEY and S3_SECRET:
         s3_client = None
 else:
     print("⚠️ S3設定不完全：ローカル保存を使用")
+    S3_AVAILABLE = False  # 認証情報がない場合はS3_AVAILABLEをFalseに設定
     s3_client = None
 
 def upload_image_to_s3(file, filename, folder='essay_images', content_type='image/jpeg'):
