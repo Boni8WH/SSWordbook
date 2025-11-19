@@ -8,7 +8,7 @@ import math
 import time
 import secrets
 import string
-from io import StringIO
+from io import StringIO, BytesIO
 from datetime import datetime, timedelta
 from sqlalchemy import inspect, text, func, case, cast, Integer
 from sqlalchemy.orm import joinedload
@@ -6473,7 +6473,7 @@ def _handle_image_logo(app_info, request):
         if S3_AVAILABLE:
             try:
                 # BytesIOに保存してS3にアップロード
-                img_byte_arr = StringIO() if False else __import__('io').BytesIO()
+                img_byte_arr = BytesIO()
                 img_format = img.format if img.format else 'PNG'
                 img.save(img_byte_arr, format=img_format)
                 img_byte_arr.seek(0)
