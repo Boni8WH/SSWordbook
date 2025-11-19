@@ -9888,7 +9888,7 @@ def admin_essay_upload_csv():
                     'message': 'ファイルの文字エンコーディングが不正です。UTF-8またはShift_JISで保存してください。'
                 }), 400
         
-        stream = io.StringIO(content)
+        stream = StringIO(content)
         csv_reader = csv.DictReader(stream)
         
         # CSVヘッダーの確認
