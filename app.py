@@ -267,6 +267,8 @@ class AppInfo(db.Model):
     footer_text = db.Column(db.String(200), default="", nullable=True)
     contact_email = db.Column(db.String(100), default="", nullable=True)
     school_name = db.Column(db.String(100), default="朋優学院", nullable=False)
+    logo_type = db.Column(db.String(10), default="text", nullable=False)
+    logo_image_filename = db.Column(db.String(100), nullable=True)
     app_settings = db.Column(JSONEncodedDict, default={})
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(JST), onupdate=lambda: datetime.now(JST))
@@ -611,6 +613,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from sqlalchemy import inspect, text, func
 from functools import wraps
+from PIL import Image
 
 def admin_required(f):
     @wraps(f)
@@ -1547,6 +1550,21 @@ def migrate_database():
                         conn.commit()
                     print("✅ school_nameカラムを追加しました。")
                 
+                # logo_typeとlogo_image_filenameカラムの追加
+                if 'logo_type' not in columns:
+                    print("🔧 logo_typeカラムを追加します...")
+                    with db.engine.connect() as conn:
+                        conn.execute(text('ALTER TABLE app_info ADD COLUMN logo_type VARCHAR(10) DEFAULT \'text\' NOT NULL'))
+                        conn.commit()
+                    print("✅ logo_typeカラムを追加しました。")
+
+                if 'logo_image_filename' not in columns:
+                    print("🔧 logo_image_filenameカラムを追加します...")
+                    with db.engine.connect() as conn:
+                        conn.execute(text('ALTER TABLE app_info ADD COLUMN logo_image_filename VARCHAR(100)'))
+                        conn.commit()
+                    print("✅ logo_image_filenameカラムを追加しました。")
+
                 # 他の不足カラムもチェック
                 required_columns = {
                     'app_settings': 'TEXT DEFAULT \'{}\'',
@@ -4088,6 +4106,73 @@ def api_admin_daily_quiz_info(room_number):
     except Exception as e:
         app.logger.error(f"管理者用「今日の10問」情報取得エラー: {e}")
         return jsonify(status='error', message=str(e)), 500
+
+@app.route('/api/admin/monthly_cumulative_ranking/<room_number>/<int:year>/<int:month>')
+@admin_required
+def api_admin_monthly_cumulative_ranking(room_number, year, month):
+    """管理者用: 指定部屋の月間累計スコアランキングを取得"""
+    try:
+        monthly_scores = db.session.query(
+            User.username,
+            User.student_id,
+            MonthlyScore.total_score
+        ).join(
+            MonthlyScore, User.id == MonthlyScore.user_id
+        ).filter(
+            MonthlyScore.room_number == room_number,
+            MonthlyScore.year == year,
+            MonthlyScore.month == month
+        ).order_by(
+            MonthlyScore.total_score.desc(),
+            User.username
+        ).all()
+
+        ranking_data = [
+            {'rank': i + 1, 'username': row.username, 'student_id': row.student_id, 'total_score': row.total_score}
+            for i, row in enumerate(monthly_scores)
+        ]
+
+        return jsonify({
+            'status': 'success',
+            'ranking': ranking_data
+        })
+
+    except Exception as e:
+        app.logger.error(f"月間累計スコアランキング取得エラー: {e}")
+        return jsonify(status='error', message=str(e)), 500
+
+@app.route('/api/admin/daily_ranking/<room_number>/<int:year>/<int:month>/<int:day>')
+@admin_required
+def api_admin_daily_ranking(room_number, year, month, day):
+    """管理者用: 指定日の「今日の10問」ランキングを取得"""
+    try:
+        target_date = date(year, month, day)
+
+        daily_quiz = DailyQuiz.query.filter_by(date=target_date, room_number=room_number).first()
+
+        daily_ranking = []
+        if daily_quiz:
+            results = DailyQuizResult.query.filter_by(quiz_id=daily_quiz.id)\
+                .join(User)\
+                .order_by(DailyQuizResult.score.desc(), DailyQuizResult.time_taken_ms.asc()).all()
+
+            for i, result in enumerate(results, 1):
+                daily_ranking.append({
+                    'rank': i,
+                    'username': result.user.username,
+                    'student_id': result.user.student_id,
+                    'score': result.score,
+                    'time': f"{(result.time_taken_ms / 1000):.2f}秒"
+                })
+
+        return jsonify({
+            'status': 'success',
+            'ranking': daily_ranking
+        })
+
+    except Exception as e:
+        app.logger.error(f"指定日の日次ランキング取得エラー: {e}")
+        return jsonify(status='error', message=str(e)), 500
     
 # ====================================================================
 # 管理者用ランキング操作 API
@@ -6267,10 +6352,6 @@ def admin_page():
                 'recent_logins': recent_logins,
                 'unique_room_numbers': sorted(list(unique_room_numbers), key=lambda x: int(x) if x.isdigit() else float('inf'))
             },
-            'essay_chapters': sorted(
-                [c[0] for c in db.session.query(EssayProblem.chapter).distinct().all()],
-                key=lambda x: int(x) if x.isdigit() else float('inf')
-            ),
             **context
         }
         
@@ -6282,81 +6363,122 @@ def admin_page():
         traceback.print_exc()
         return f"Admin Error: {e}", 500
 
+def _update_app_info_general(app_info, form):
+    """Update general application information from the form."""
+    app_info.version = form.get('version', app_info.version).strip()
+    app_info.last_updated_date = form.get('last_updated_date', app_info.last_updated_date).strip()
+    app_info.update_content = form.get('update_content', app_info.update_content).strip()
+    app_info.footer_text = form.get('footer_text', app_info.footer_text or '').strip()
+    app_info.contact_email = form.get('contact_email', app_info.contact_email or '').strip()
+    app_info.school_name = form.get('school_name', app_info.school_name).strip()
+    app_info.updated_by = session.get('username', 'admin')
+    app_info.updated_at = datetime.now(JST)
+
+def _handle_text_logo(app_info, form):
+    """Handle the logic for 'text' logo type."""
+    logo_folder = os.path.join('static', 'uploads', 'logos')
+    app_info.app_name = form.get('app_name', app_info.app_name).strip()
+    if app_info.logo_image_filename:
+        old_filepath = os.path.join(logo_folder, app_info.logo_image_filename)
+        if os.path.exists(old_filepath):
+            try:
+                os.remove(old_filepath)
+                logger.info(f"Deleted old logo: {old_filepath}")
+            except Exception as e:
+                logger.error(f"Error deleting old logo {old_filepath}: {e}")
+    app_info.logo_image_filename = None
+
+def _crop_and_save_image(img, crop_data_json, save_path):
+    """Crop and save the image based on crop_data."""
+    try:
+        crop_data = json.loads(crop_data_json)
+        x = int(crop_data['x'])
+        y = int(crop_data['y'])
+        width = int(crop_data['width'])
+        height = int(crop_data['height'])
+
+        cropped_img = img.crop((x, y, x + width, y + height))
+        cropped_img.save(save_path)
+        logger.info(f"Saved cropped logo: {save_path}")
+    except (json.JSONDecodeError, KeyError, ValueError) as e:
+        logger.error(f"Error processing crop data: {e}. Saving original image.")
+        img.save(save_path)
+
+def _handle_image_logo(app_info, request):
+    """Handle the logic for 'image' logo type."""
+    file = request.files.get('logo_image')
+    crop_data_json = request.form.get('crop_data')
+    logo_folder = os.path.join('static', 'uploads', 'logos')
+
+    if file and file.filename:
+        file.seek(0, os.SEEK_END)
+        file_size = file.tell()
+        file.seek(0)
+        if file_size > 1 * 1024 * 1024: # 1MB limit
+            flash('ロゴ画像のファイルサイズは1MB以下にしてください。', 'danger')
+            return False
+
+        if app_info.logo_image_filename:
+            old_filepath = os.path.join(logo_folder, app_info.logo_image_filename)
+            if os.path.exists(old_filepath):
+                try:
+                    os.remove(old_filepath)
+                    logger.info(f"Deleted old logo: {old_filepath}")
+                except Exception as e:
+                    logger.error(f"Error deleting old logo {old_filepath}: {e}")
+
+        filename = secure_filename(file.filename)
+        random_hex = secrets.token_hex(8)
+        _, f_ext = os.path.splitext(filename)
+        unique_filename = random_hex + f_ext
+        save_path = os.path.join(logo_folder, unique_filename)
+
+        img = Image.open(file.stream)
+
+        if crop_data_json:
+            _crop_and_save_image(img, crop_data_json, save_path)
+        else:
+            img.save(save_path)
+            logger.info(f"Saved original logo (no crop data): {save_path}")
+
+        app_info.logo_image_filename = unique_filename
+
+    if not app_info.app_name:
+        app_info.app_name = "App" # Provide a default if empty
+    return True
+
 @app.route('/admin/app_info', methods=['GET', 'POST'])
+@admin_required
 def admin_app_info():
     try:
-        if not session.get('admin_logged_in'):
-            flash('管理者権限がありません。', 'danger')
-            return redirect(url_for('login_page'))
+        app_info = AppInfo.get_current_info()
 
-        print("=== admin_app_info デバッグ開始 ===")
-        
-        # データベース接続テスト
-        try:
-            app_info = AppInfo.query.first()
-            print(f"app_info取得結果: {app_info}")
-            
-            if not app_info:
-                print("app_info が存在しません。新規作成します。")
-                app_info = AppInfo()
-                db.session.add(app_info)
-                db.session.commit()
-                print("新しいapp_infoを作成しました。")
-                
-        except Exception as db_error:
-            print(f"データベースエラー: {db_error}")
-            # フェイルセーフ：デフォルト値でapp_infoオブジェクトを作成
-            class MockAppInfo:
-                def __init__(self):
-                    self.app_name = "世界史単語帳"
-                    self.version = "1.0.0"
-                    self.last_updated_date = "2025年6月15日"
-                    self.update_content = "アプリケーションが開始されました。"
-                    self.footer_text = ""
-                    self.contact_email = ""
-                    self.updated_by = "system"
-                    self.updated_at = datetime.now(JST)
-                    
-            app_info = MockAppInfo()
-            print("MockAppInfoを使用します。")
-        
         if request.method == 'POST':
-            print("POST リクエストを処理中...")
-            try:
-                app_info.app_name = request.form.get('app_name', '世界史単語帳').strip()
-                app_info.version = request.form.get('version', '1.0.0').strip()
-                app_info.last_updated_date = request.form.get('last_updated_date', '').strip()
-                app_info.update_content = request.form.get('update_content', '').strip()
-                app_info.footer_text = request.form.get('footer_text', '').strip()
-                app_info.contact_email = request.form.get('contact_email', '').strip()
-                app_info.school_name = request.form.get('school_name', '朋優学院').strip()
-                
-                if hasattr(app_info, 'updated_by'):
-                    app_info.updated_by = session.get('username', 'admin')
-                    app_info.updated_at = datetime.now(JST)
-                    
-                    db.session.commit()
-                    flash('アプリ情報を更新しました。', 'success')
-                else:
-                    flash('テストモードのため、実際の保存は行われませんでした。', 'warning')
-                    
-                return redirect(url_for('admin_app_info'))
-                
-            except Exception as post_error:
-                print(f"POST処理エラー: {post_error}")
-                db.session.rollback()
-                flash(f'更新エラー: {str(post_error)}', 'danger')
-        
-        print("テンプレートをレンダリング中...")
+            _update_app_info_general(app_info, request.form)
+
+            logo_type = request.form.get('logo_type')
+            app_info.logo_type = logo_type
+
+            logo_folder = os.path.join('static', 'uploads', 'logos')
+            os.makedirs(logo_folder, exist_ok=True)
+
+            if logo_type == 'text':
+                _handle_text_logo(app_info, request.form)
+            elif logo_type == 'image':
+                if not _handle_image_logo(app_info, request):
+                    return redirect(url_for('admin_app_info'))
+
+            db.session.commit()
+            flash('アプリ情報を更新しました。', 'success')
+            return redirect(url_for('admin_app_info'))
+
         return render_template('admin_app_info.html', app_info=app_info)
-        
+
     except Exception as e:
-        print(f"=== 致命的エラー ===")
-        print(f"エラー: {e}")
+        app.logger.error(f"アプリ情報管理ページエラー: {e}")
         import traceback
         traceback.print_exc()
-        
-        flash('アプリ情報管理ページでエラーが発生しました。管理者ページに戻ります。', 'danger')
+        flash(f'アプリ情報管理ページでエラーが発生しました: {str(e)}', 'danger')
         return redirect(url_for('admin_page'))
 
 @app.route('/admin/app_info/reset', methods=['POST'])
@@ -6515,6 +6637,36 @@ def admin_delete_user(user_id):
         db.session.rollback()
         flash(f'ユーザー削除中にエラーが発生しました: {str(e)}', 'danger')
         return redirect(url_for('admin_page'))
+
+@app.route('/admin/bulk_delete_users', methods=['POST'])
+def admin_bulk_delete_users():
+    if not session.get('admin_logged_in'):
+        return jsonify({'status': 'error', 'message': '管理者権限がありません。'}), 403
+
+    data = request.get_json()
+    user_ids = data.get('user_ids')
+
+    if not user_ids:
+        return jsonify({'status': 'error', 'message': '削除するユーザーが選択されていません。'}), 400
+
+    try:
+        # 関連するデータを先に削除
+        PasswordResetToken.query.filter(PasswordResetToken.user_id.in_(user_ids)).delete(synchronize_session=False)
+        DailyQuizResult.query.filter(DailyQuizResult.user_id.in_(user_ids)).delete(synchronize_session=False)
+        MonthlyScore.query.filter(MonthlyScore.user_id.in_(user_ids)).delete(synchronize_session=False)
+        MonthlyResultViewed.query.filter(MonthlyResultViewed.user_id.in_(user_ids)).delete(synchronize_session=False)
+        UserStats.query.filter(UserStats.user_id.in_(user_ids)).delete(synchronize_session=False)
+        EssayProgress.query.filter(EssayProgress.user_id.in_(user_ids)).delete(synchronize_session=False)
+
+        # ユーザーを削除
+        num_deleted = User.query.filter(User.id.in_(user_ids)).delete(synchronize_session=False)
+        db.session.commit()
+
+        return jsonify({'status': 'success', 'message': f'{num_deleted}人のユーザーを削除しました。'})
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"一括削除エラー: {str(e)}")
+        return jsonify({'status': 'error', 'message': f'一括削除中にエラーが発生しました: {str(e)}'}), 500
 
 # 部屋設定管理
 @app.route('/admin/get_room_setting', methods=['POST'])
@@ -9218,6 +9370,66 @@ def admin_essay_problems():
             'message': '問題一覧の取得中にエラーが発生しました'
         }), 500
 
+@app.route('/admin/essay/download_csv')
+def admin_essay_download_csv():
+    """論述問題一覧をCSVとしてダウンロード"""
+    if not session.get('admin_logged_in'):
+        flash('管理者権限が必要です', 'danger')
+        return redirect(url_for('login_page'))
+    
+    try:
+        # 全ての問題を取得（章、タイプ、ID順）
+        # 文字列の章と数値の章が混在しているため、単純なソートでは不十分な場合があるが、
+        # ここではデータベースの順序に依存するか、Python側でソートする
+        # いったん全件取得
+        problems = EssayProblem.query.all()
+        
+        # ソートロジック（admin_essay_chaptersと同様のロジックでソートするのが理想だが、簡易的に実装）
+        # 章（数値優先、comは最後）、タイプ、ID順
+        def sort_key(p):
+            try:
+                chapter_num = int(p.chapter)
+                is_com = False
+            except ValueError:
+                chapter_num = 9999
+                is_com = (p.chapter == 'com')
+            return (is_com, chapter_num, p.chapter, p.type, p.id)
+            
+        problems.sort(key=sort_key)
+        
+        # CSV作成
+        si = io.StringIO()
+        # BOMを付与してExcelで文字化けしないようにする
+        si.write('\ufeff')
+        
+        writer = csv.writer(si)
+        # ヘッダー
+        writer.writerow(['id', 'chapter', 'type', 'university', 'year', 'question', 'answer', 'answer_length', 'enabled', 'image_url'])
+        
+        for p in problems:
+            writer.writerow([
+                p.id,
+                p.chapter,
+                p.type,
+                p.university,
+                p.year,
+                p.question,
+                p.answer,
+                p.answer_length,
+                1 if p.enabled else 0,
+                p.image_url or ''
+            ])
+            
+        output = make_response(si.getvalue())
+        output.headers["Content-Disposition"] = "attachment; filename=essay_problems.csv"
+        output.headers["Content-type"] = "text/csv"
+        return output
+        
+    except Exception as e:
+        logger.error(f"Error downloading essay csv: {e}")
+        flash(f'CSVダウンロード中にエラーが発生しました: {str(e)}', 'danger')
+        return redirect(url_for('admin_page'))
+
 @app.route('/admin/essay/problem/<int:problem_id>')
 def admin_essay_problem_detail(problem_id):
     """特定の論述問題の詳細を取得"""
@@ -11445,85 +11657,17 @@ def find_related_essays():
     
     return jsonify({'essays': recommended_essays})
 
-# 論述問題Excelダウンロード
-@app.route('/admin/essay/download_excel')
-@admin_required
-def admin_download_essay_excel():
-    try:
-        import openpyxl
-        from io import BytesIO
-        from datetime import datetime
-        from pytz import timezone
-        from flask import Response, flash, redirect, url_for
-
-        JST = timezone('Asia/Tokyo')
-        
-        # 全ての問題を取得
-        problems = EssayProblem.query.order_by(EssayProblem.chapter, EssayProblem.id).all()
-        
-        # ワークブック作成
-        wb = openpyxl.Workbook()
-        ws = wb.active
-        ws.title = "論述問題一覧"
-        
-        # ヘッダー行
-        headers = ['ID', '章', 'タイプ', '大学名', '年度', '問題文', '模範解答', '文字数', '有効/無効', '画像あり']
-        ws.append(headers)
-        
-        # データ行
-        for p in problems:
-            row = [
-                p.id,
-                p.chapter,
-                p.type,
-                p.university,
-                p.year,
-                p.question,
-                p.answer,
-                p.answer_length,
-                '有効' if p.enabled else '無効',
-                'あり' if p.image_url else 'なし'
-            ]
-            ws.append(row)
-            
-        # 列幅調整（簡易的）
-        for col in ['A', 'B', 'C', 'D', 'E', 'H', 'I', 'J']:
-            ws.column_dimensions[col].width = 10
-        ws.column_dimensions['F'].width = 50
-        ws.column_dimensions['G'].width = 50
-        
-        # メモリ上に保存
-        output = BytesIO()
-        wb.save(output)
-        output.seek(0)
-        
-        filename = f"essay_problems_{datetime.now(JST).strftime('%Y%m%d_%H%M%S')}.xlsx"
-        
-        return Response(
-            output,
-            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            headers={"Content-Disposition": f"attachment;filename={filename}"}
-        )
-        
-    except ImportError:
-        flash('openpyxlライブラリがインストールされていません。', 'danger')
-        return redirect(url_for('admin_page'))
-    except Exception as e:
-        app.logger.error(f"Excel download error: {e}")
-        flash(f'Excelダウンロード中にエラーが発生しました: {e}', 'danger')
-        return redirect(url_for('admin_page'))
-
 # ===== メイン起動処理の修正 =====
+# データベース初期化
+create_tables_and_admin_user()
+
 if __name__ == '__main__':
     try:
-        # データベース初期化
-        create_tables_and_admin_user()
-        
         # サーバー起動
         port = int(os.environ.get('PORT', 5001))
         debug_mode = os.environ.get('RENDER') != 'true'
         
-        app.logger.info(f"🌐 サーバーを起動します: http://0.0.0.0:{port}")
+        logger.info(f"🌐 サーバーを起動します: http://0.0.0.0:{port}")
         
         app.run(host='0.0.0.0', port=port, debug=debug_mode)
         
