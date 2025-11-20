@@ -4449,6 +4449,95 @@ def save_quiz_progress():
         db.session.rollback()
         return jsonify(status='error', message=f'進捗の保存中にエラーが発生しました: {str(e)}'), 500
 
+@app.route('/weak_problems')
+def weak_problems_page():
+    """苦手問題一覧ページ"""
+    if 'user_id' not in session:
+        flash('ログインが必要です。', 'info')
+        return redirect(url_for('login_page'))
+    
+    context = get_template_context()
+    return render_template('weak_problem.html', **context)
+
+@app.route('/api/weak_problems_everyone')
+def api_weak_problems_everyone():
+    """みんなの苦手問題（部屋ごとの集計）を取得"""
+    try:
+        if 'user_id' not in session:
+            return jsonify(status='error', message='認証されていません。'), 401
+        
+        current_user = User.query.get(session['user_id'])
+        if not current_user:
+            return jsonify(status='error', message='ユーザーが見つかりません。'), 404
+            
+        room_number = current_user.room_number
+        
+        # 部屋の単語データを取得
+        word_data = load_word_data_for_room(room_number)
+        
+        # 有効な問題IDと単語情報のマッピングを作成（Z問題を除外）
+        valid_problems = {}
+        for word in word_data:
+            # Z問題（難関私大対策）は除外
+            if str(word.get('number', '')).upper() == 'Z':
+                continue
+                
+            problem_id = get_problem_id(word)
+            valid_problems[problem_id] = word
+            
+        # 同じ部屋の全ユーザーを取得（管理者は除く）
+        room_users = User.query.filter_by(room_number=room_number).filter(User.username != 'admin').all()
+        
+        # 集計用辞書
+        problem_stats = {}
+        
+        for user in room_users:
+            history = user.get_problem_history()
+            
+            for problem_id, stats in history.items():
+                # 有効な問題（Z問題以外）のみ集計
+                if problem_id in valid_problems:
+                    if problem_id not in problem_stats:
+                        problem_stats[problem_id] = {
+                            'correct': 0,
+                            'incorrect': 0,
+                            'total': 0
+                        }
+                    
+                    problem_stats[problem_id]['correct'] += stats.get('correct_attempts', 0)
+                    problem_stats[problem_id]['incorrect'] += stats.get('incorrect_attempts', 0)
+                    problem_stats[problem_id]['total'] += (stats.get('correct_attempts', 0) + stats.get('incorrect_attempts', 0))
+        
+        # 結果リストを作成
+        results = []
+        for problem_id, stats in problem_stats.items():
+            if stats['total'] > 0:
+                accuracy = (stats['correct'] / stats['total']) * 100
+                word = valid_problems[problem_id]
+                
+                results.append({
+                    'problemId': problem_id,
+                    'question': word['question'],
+                    'answer': word['answer'],
+                    'accuracyRate': accuracy,
+                    'totalAttempts': stats['total'],
+                    'correctAttempts': stats['correct'],
+                    'incorrectAttempts': stats['incorrect']
+                })
+        
+        # ソート: 正答率が低い順 -> 回答数が多い順
+        results.sort(key=lambda x: (x['accuracyRate'], -x['totalAttempts']))
+        
+        # Top 20を返す
+        return jsonify({
+            'status': 'success',
+            'problems': results[:20]
+        })
+        
+    except Exception as e:
+        print(f"Error in api_weak_problems_everyone: {e}")
+        return jsonify(status='error', message=str(e)), 500
+
 @app.route('/api/update_restriction_state', methods=['POST'])
 def update_restriction_state():
     """制限状態を更新"""
