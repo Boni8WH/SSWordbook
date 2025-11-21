@@ -1020,7 +1020,7 @@ function startQuiz() {
     if (selectionArea) selectionArea.classList.add('hidden');
     if (cardArea) cardArea.classList.remove('hidden');
     if (quizResultArea) quizResultArea.classList.add('hidden');
-    if (weakWordsListSection) weakWordsListSection.classList.add('hidden');
+    // weakWordsListSection reference removed
     if (noWeakWordsMessage) noWeakWordsMessage.classList.add('hidden');
 
     updateProgressBar();
@@ -2048,8 +2048,8 @@ function downloadQuizResultImage() {
     }
 
     // ハッシュタグをクリップボードにコピー
-    const appName = window.appInfoFromFlask ? window.appInfoFromFlask.appName : '世界史単語帳';
-    const schoolName = window.appInfoFromFlask ? window.appInfoFromFlask.schoolName : '朋優学院';
+    const appName = window.appInfoFromFlask ? window.appInfoFromFlask.appName : '単語帳';
+    const schoolName = window.appInfoFromFlask ? window.appInfoFromFlask.schoolName : '〇〇高校';
     const hashtagText = `#${appName.replace(/\s/g, '')} ${schoolName}`;
 
     if (navigator.clipboard && navigator.clipboard.writeText) {
