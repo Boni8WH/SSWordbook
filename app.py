@@ -841,11 +841,12 @@ def load_word_data_for_room(room_number):
         if csv_filename == "words.csv":
             word_data = []
             try:
-                with open('words.csv', 'r', encoding='utf-8') as f:
+                # ★修正: BOM付きUTF-8に対応 ('utf-8-sig')
+                with open('words.csv', 'r', encoding='utf-8-sig') as f:
                     reader = csv.DictReader(f)
                     for row in reader:
-                        # 必須フィールドのチェック
-                        if not row.get('question') or not row.get('answer'):
+                        # 必須フィールドのチェック（空白のみも除外）
+                        if not row.get('question') or not row.get('answer') or not row.get('question').strip() or not row.get('answer').strip():
                             continue
 
                         row['enabled'] = row.get('enabled', '1') == '1'
@@ -857,15 +858,16 @@ def load_word_data_for_room(room_number):
                 return []
         else:
             # ★重要：データベースからカスタムCSVの内容を取得
-            csv_file = CsvFileContent.query.filter_by(filename=csv_filename).first()  # この行が抜けていました
+            csv_file = CsvFileContent.query.filter_by(filename=csv_filename).first()
             if csv_file:
                 try:
                     content = csv_file.content
+                    # StringIOはエンコーディング指定できないが、contentは既にデコード済み文字列
                     reader = csv.DictReader(StringIO(content))
                     word_data = []
                     for row in reader:
-                        # 必須フィールドのチェック
-                        if not row.get('question') or not row.get('answer'):
+                        # 必須フィールドのチェック（空白のみも除外）
+                        if not row.get('question') or not row.get('answer') or not row.get('question').strip() or not row.get('answer').strip():
                             continue
 
                         row['enabled'] = row.get('enabled', '1') == '1'
@@ -879,7 +881,14 @@ def load_word_data_for_room(room_number):
                 print(f"❌ データベースにCSVが見つかりません: {csv_filename}")
                 return load_word_data_for_room("default")
         
-        filtered_word_data = filter_special_problems(word_data, room_number)  # 関数名変更
+        filtered_word_data = filter_special_problems(word_data, room_number)
+        
+        # ★デバッグログ: 最初の数件を表示
+        if filtered_word_data:
+            print(f"🔍 load_word_data_for_room: {len(filtered_word_data)} words loaded.")
+            print(f"   First word: {filtered_word_data[0]}")
+        else:
+            print("⚠️ load_word_data_for_room: No words loaded.")
         
         return filtered_word_data
         
