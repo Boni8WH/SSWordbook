@@ -296,6 +296,21 @@ class AppInfo(db.Model):
                 print(f"Error creating app_info: {e}")
                 db.session.rollback()
         return app_info
+    
+    def to_dict(self):
+        """フロントエンド用の辞書形式で返す"""
+        return {
+            'appName': self.app_name,
+            'version': self.version,
+            'lastUpdatedDate': self.last_updated_date,
+            'updateContent': self.update_content,
+            'footerText': self.footer_text,
+            'contactEmail': self.contact_email,
+            'schoolName': getattr(self, 'school_name', '〇〇高校')
+        }
+
+    def __repr__(self):
+        return f'<AppInfo {self.app_name} v{self.version}>'
 
 def _add_logo_columns_to_app_info():
     """AppInfoテーブルにロゴ用カラムを追加するマイグレーション関数"""
@@ -320,21 +335,6 @@ def _add_logo_columns_to_app_info():
             print("✅ AppInfoテーブルのマイグレーション完了")
     except Exception as e:
         print(f"⚠️ マイグレーションエラー (無視可能): {e}")
-
-    def to_dict(self):
-        """フロントエンド用の辞書形式で返す"""
-        return {
-            'appName': self.app_name,
-            'version': self.version,
-            'lastUpdatedDate': self.last_updated_date,
-            'updateContent': self.update_content,
-            'footerText': self.footer_text,
-            'contactEmail': self.contact_email,
-            'schoolName': getattr(self, 'school_name', '〇〇高校')
-        }
-
-    def __repr__(self):
-        return f'<AppInfo {self.app_name} v{self.version}>'
 
 class PasswordResetToken(db.Model):
     id = db.Column(db.Integer, primary_key=True)
