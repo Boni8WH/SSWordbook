@@ -30,8 +30,9 @@
         <div class="tab-pane fade show active" id="my-weak" role="tabpanel" aria-labelledby="my-weak-tab">
             <div class="card shadow-sm">
                 <div class="card-body">
-                    <h5 class="card-title mb-3">自分の苦手問題 Top 20</h5>
-                    <p class="text-muted small">過去の学習で正答率が低い問題の上位20問です。<br>※1回以上間違え、まだ2回連続正解していない問題から選出されます。</p>
+                    <h5 class="card-title mb-3">正答率ワースト20</h5>
+                    <p class="text-muted small">過去の全学習履歴から、正答率が低い順に20問を表示しています。<br>（<span
+                            class="badge bg-danger">苦手</span>バッジがついている問題は、現在「苦手問題モード」の出題対象です）</p>
 
                     <div id="myWeakLoading" class="text-center py-4">
                         <div class="spinner-border text-primary" role="status">
@@ -41,7 +42,7 @@
                     </div>
 
                     <div id="myWeakEmpty" class="alert alert-info hidden">
-                        まだ苦手問題はありません。
+                        まだ回答履歴がありません。
                     </div>
 
                     <ul id="myWeakList" class="list-group list-group-flush">
@@ -55,7 +56,7 @@
         <div class="tab-pane fade" id="everyone-weak" role="tabpanel" aria-labelledby="everyone-weak-tab">
             <div class="card shadow-sm">
                 <div class="card-body">
-                    <h5 class="card-title mb-3">みんなの苦手問題 Top 20</h5>
+                    <h5 class="card-title mb-3">みんなの正答率ワースト20</h5>
                     <p class="text-muted small">同じ部屋のメンバー全員の正答率を集計した、間違いやすい問題Top20です。<br>※Z問題（難関私大対策）は集計対象外です。</p>
 
                     <div id="everyoneWeakLoading" class="text-center py-4">
