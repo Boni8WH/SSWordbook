@@ -2967,7 +2967,10 @@ def index():
             category_name = word.get('category', '未分類')
             
             is_word_enabled_in_csv = word['enabled']
-            is_unit_enabled_by_room = is_unit_enabled_by_room_setting(unit_num, room_setting)
+            
+            # S章の場合は 'S' で判定、それ以外は従来通り number で判定
+            unit_to_check = 'S' if str(chapter_num) == 'S' else unit_num
+            is_unit_enabled_by_room = is_unit_enabled_by_room_setting(unit_to_check, room_setting)
             is_unit_globally_enabled = is_word_enabled_in_csv and is_unit_enabled_by_room 
 
             # 利用可能な単元のみを章データに追加
