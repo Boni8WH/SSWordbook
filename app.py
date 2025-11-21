@@ -12419,23 +12419,46 @@ def get_daily_quiz():
     all_words = load_word_data_for_room(user.room_number)
     quiz_questions = []
     all_answers = list(set(w['answer'] for w in all_words if w.get('answer')))
+    
     for problem_id in problem_ids:
         question_word = next((w for w in all_words if generate_problem_id(w) == problem_id), None)
         if question_word:
             correct_answer = question_word['answer']
-            distractor_pool = [ans for ans in all_answers if ans != correct_answer]
-            distractors_with_distance = [(levenshtein_distance(correct_answer, ans), ans) for ans in distractor_pool]
-            distractors_with_distance.sort(key=lambda x: x[0])
-            distractors = [ans for distance, ans in distractors_with_distance[:3]]
-            if len(distractors) < 3:
-                dummy_options = ["誤答A", "誤答B", "誤答C", "誤答D"]
-                i = 0
-                while len(distractors) < 3:
-                    if dummy_options[i] not in distractors and dummy_options[i] != correct_answer: distractors.append(dummy_options[i])
-                    i += 1
+            
+            # --- 誤答選択肢の生成ロジック (改良版) ---
+            # 1. CSVのG列 (incorrect) に指定がある場合はそれを使用
+            manual_incorrect_str = question_word.get('incorrect', '')
+            
+            if manual_incorrect_str and manual_incorrect_str.strip():
+                # カンマ区切りで分割し、空白を除去
+                manual_candidates = [x.strip() for x in manual_incorrect_str.split(',') if x.strip()]
+                
+                # ランダムに最大3つ選ぶ
+                if len(manual_candidates) > 3:
+                    distractors = random.sample(manual_candidates, 3)
+                else:
+                    distractors = manual_candidates
+            else:
+                # 2. 指定がない場合は従来通りレーベンシュタイン距離で類似語を探す
+                distractor_pool = [ans for ans in all_answers if ans != correct_answer]
+                distractors_with_distance = [(levenshtein_distance(correct_answer, ans), ans) for ans in distractor_pool]
+                distractors_with_distance.sort(key=lambda x: x[0])
+                distractors = [ans for distance, ans in distractors_with_distance[:3]]
+                # 候補が足りない場合はランダムに補充 (念のため)
+                if len(distractors) < 3 and len(distractor_pool) >= 3:
+                    remaining = [ans for ans in distractor_pool if ans not in distractors]
+                    distractors.extend(random.sample(remaining, 3 - len(distractors)))
+
+            # 正解と誤答を合わせてシャッフル
             choices = distractors + [correct_answer]
             random.shuffle(choices)
-            quiz_questions.append({'question': question_word['question'], 'choices': choices, 'answer': correct_answer})
+            
+            quiz_questions.append({
+                'id': problem_id,
+                'question': question_word['question'],
+                'choices': choices,
+                'answer': correct_answer
+            })
 
     return jsonify({
         'status': 'success',
