@@ -377,7 +377,8 @@ function loadWordDataFromServer() {
         .then(response => response.json())
         .then(data => {
             if (data.status === 'success' && data.word_data) {
-                word_data = data.word_data;
+                // 必須フィールドのチェック（クライアント側でもフィルタリング）
+                word_data = data.word_data.filter(w => w.question && w.answer);
 
                 if (data.star_availability) {
                     starProblemStatus = data.star_availability;
@@ -387,7 +388,7 @@ function loadWordDataFromServer() {
                 }
 
             } else if (Array.isArray(data)) {
-                word_data = data;
+                word_data = data.filter(w => w.question && w.answer);
             } else {
             }
 
@@ -979,6 +980,13 @@ function startQuiz() {
 
     if (quizQuestions.length === 0) {
         flashMessage('選択された条件に合う問題がありませんでした。', 'danger');
+        return;
+    }
+
+    // ★最終安全チェック：空の問題を除外
+    quizQuestions = quizQuestions.filter(q => q.question && q.answer);
+    if (quizQuestions.length === 0) {
+        flashMessage('有効な問題が見つかりませんでした。', 'danger');
         return;
     }
 
