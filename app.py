@@ -8,6 +8,8 @@ import math
 import time
 import secrets
 import string
+import uuid
+import io
 from io import StringIO, BytesIO
 from datetime import datetime, timedelta
 from sqlalchemy import inspect, text, func, case, cast, Integer
@@ -127,7 +129,6 @@ class User(db.Model):
     incorrect_words = db.Column(JSONEncodedDict, default=[])
     last_login = db.Column(db.DateTime, default=lambda: datetime.now(JST))
 
-    # set_password や check_password などのメソッド定義は元のままでOKです
     def set_room_password(self, password): self._room_password_hash = generate_password_hash(password)
     def check_room_password(self, password): return check_password_hash(self._room_password_hash, password)
     def set_individual_password(self, password): self._individual_password_hash = generate_password_hash(password)
@@ -261,14 +262,21 @@ class RoomCsvFile(db.Model):
 
 class AppInfo(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    app_name = db.Column(db.String(100), default="世界史単語帳", nullable=False)
+    app_name = db.Column(db.String(100), default="単語帳", nullable=False)
     version = db.Column(db.String(20), default="1.0.0", nullable=False)
     last_updated_date = db.Column(db.String(50), default="2025年6月15日", nullable=False)
     update_content = db.Column(db.Text, default="アプリケーションが開始されました。", nullable=False)
     footer_text = db.Column(db.String(200), default="", nullable=True)
     contact_email = db.Column(db.String(100), default="", nullable=True)
-    school_name = db.Column(db.String(100), default="朋優学院", nullable=False)
-    logo_type = db.Column(db.String(10), default="text", nullable=False)
+    school_name = db.Column(db.String(100), default="〇〇高校", nullable=True)
+    
+    # ロゴ画像データ（DB保存用）
+    logo_image_content = db.Column(db.LargeBinary, nullable=True)
+    logo_image_mimetype = db.Column(db.String(50), nullable=True)
+
+    # ロゴタイプ: 'text' or 'image'
+    logo_type = db.Column(db.String(10), default='text')
+    # ロゴ画像ファイル名（後方互換性とS3用）
     logo_image_filename = db.Column(db.String(100), nullable=True)
     app_settings = db.Column(JSONEncodedDict, default={})
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))
@@ -289,6 +297,30 @@ class AppInfo(db.Model):
                 db.session.rollback()
         return app_info
 
+def _add_logo_columns_to_app_info():
+    """AppInfoテーブルにロゴ用カラムを追加するマイグレーション関数"""
+    try:
+        with db.engine.connect() as conn:
+            # logo_image_content カラムの確認と追加
+            try:
+                conn.execute(text("SELECT logo_image_content FROM app_info LIMIT 1"))
+            except Exception:
+                print("🔄 logo_image_contentカラムを追加します...")
+                conn.execute(text("ALTER TABLE app_info ADD COLUMN logo_image_content BYTEA"))
+                conn.commit()
+
+            # logo_image_mimetype カラムの確認と追加
+            try:
+                conn.execute(text("SELECT logo_image_mimetype FROM app_info LIMIT 1"))
+            except Exception:
+                print("🔄 logo_image_mimetypeカラムを追加します...")
+                conn.execute(text("ALTER TABLE app_info ADD COLUMN logo_image_mimetype VARCHAR(50)"))
+                conn.commit()
+                
+            print("✅ AppInfoテーブルのマイグレーション完了")
+    except Exception as e:
+        print(f"⚠️ マイグレーションエラー (無視可能): {e}")
+
     def to_dict(self):
         """フロントエンド用の辞書形式で返す"""
         return {
@@ -298,7 +330,7 @@ class AppInfo(db.Model):
             'updateContent': self.update_content,
             'footerText': self.footer_text,
             'contactEmail': self.contact_email,
-            'schoolName': getattr(self, 'school_name', '朋優学院')
+            'schoolName': getattr(self, 'school_name', '〇〇高校')
         }
 
     def __repr__(self):
@@ -712,7 +744,15 @@ ROOM_CSV_FOLDER = 'room_csv'
 # アプリ情報を取得するヘルパー関数
 # ====================================================================
 def get_logo_url(filename):
-    """ロゴ画像のURLを取得（S3またはローカル）"""
+    """ロゴ画像のURLを取得（DB -> S3 -> ローカル）"""
+    # DBに画像があるかチェック（AppInfoを取得）
+    try:
+        app_info = AppInfo.query.first()
+        if app_info and app_info.logo_image_content:
+            return url_for('serve_logo')
+    except:
+        pass
+
     if not filename:
         return None
         
@@ -720,6 +760,22 @@ def get_logo_url(filename):
         return f"https://{S3_BUCKET}.s3.{S3_REGION}.amazonaws.com/logos/{filename}"
     else:
         return url_for('static', filename=f'uploads/logos/{filename}')
+
+@app.route('/logo')
+def serve_logo():
+    """DBからロゴ画像を配信するルート"""
+    try:
+        app_info = AppInfo.query.first()
+        if app_info and app_info.logo_image_content:
+            response = make_response(app_info.logo_image_content)
+            response.headers.set('Content-Type', app_info.logo_image_mimetype or 'image/png')
+            return response
+        else:
+            # フォールバック: デフォルト画像など
+            return "", 404
+    except Exception as e:
+        print(f"Error serving logo: {e}")
+        return "", 500
 
 @app.context_processor
 def inject_logo_url():
@@ -733,7 +789,7 @@ def get_app_info_dict(user_id=None, username=None, room_number=None):
         info_dict['isLoggedIn'] = user_id is not None
         info_dict['username'] = username
         info_dict['roomNumber'] = room_number
-        info_dict['schoolName'] = getattr(app_info, 'school_name', '朋優学院')
+        info_dict['schoolName'] = getattr(app_info, 'school_name', '〇〇高校')
         
         return info_dict
     except Exception as e:
@@ -749,7 +805,7 @@ def get_app_info_dict(user_id=None, username=None, room_number=None):
                     'updateContent': app_info.update_content,
                     'footerText': app_info.footer_text,
                     'contactEmail': app_info.contact_email,
-                    'schoolName': getattr(app_info, 'school_name', '朋優学院'),
+                    'schoolName': getattr(app_info, 'school_name', '〇〇高校'),
                     'isLoggedIn': user_id is not None,
                     'username': username,
                     'roomNumber': room_number
@@ -759,10 +815,10 @@ def get_app_info_dict(user_id=None, username=None, room_number=None):
         
         # 最終フォールバック
         return {
-            'appName': '世界史単語帳',
+            'appName': '単語帳',
             'version': '1.0.0', 
             'lastUpdatedDate': '2025年6月15日',
-            'schoolName': '朋優学院', 
+            'schoolName': '〇〇高校', 
             'updateContent': 'アプリケーションが開始されました。',
             'isLoggedIn': user_id is not None,
             'username': username,
@@ -1578,7 +1634,7 @@ def migrate_database():
                 if 'school_name' not in columns:
                     print("🔧 school_nameカラムを追加します...")
                     with db.engine.connect() as conn:
-                        conn.execute(text('ALTER TABLE app_info ADD COLUMN school_name VARCHAR(100) DEFAULT \'朋優学院\''))
+                        conn.execute(text('ALTER TABLE app_info ADD COLUMN school_name VARCHAR(100) DEFAULT \'〇〇高校\''))
                         conn.commit()
                     print("✅ school_nameカラムを追加しました。")
                 
@@ -1986,6 +2042,9 @@ def create_tables_and_admin_user():
                 
             # アプリ情報確認/作成
             try:
+                # ★マイグレーション実行
+                _add_logo_columns_to_app_info()
+                
                 app_info = AppInfo.get_current_info()
                 logger.info("✅ アプリ情報を確認/作成しました")
                 
@@ -3169,7 +3228,7 @@ def emergency_fix_db():
                 # school_nameカラムが存在しない場合は追加
                 if 'school_name' not in existing_columns:
                     print("🔧 school_nameカラムを追加中...")
-                    conn.execute(text("ALTER TABLE app_info ADD COLUMN school_name VARCHAR(100) DEFAULT '朋優学院'"))
+                    conn.execute(text("ALTER TABLE app_info ADD COLUMN school_name VARCHAR(100) DEFAULT '〇〇高校'"))
                     print("✅ school_nameカラムを追加しました")
                 
                 # その他の必要なカラムも追加
@@ -3217,7 +3276,7 @@ def emergency_fix_db():
         <h1>💥 緊急修復失敗</h1>
         <p>エラー: {str(e)}</p>
         <p>手動でPostgreSQLにアクセスして以下のSQLを実行してください：</p>
-        <pre>ALTER TABLE app_info ADD COLUMN school_name VARCHAR(100) DEFAULT '朋優学院';</pre>
+        <pre>ALTER TABLE app_info ADD COLUMN school_name VARCHAR(100) DEFAULT '〇〇高校';</pre>
         """
 
 @app.route('/password_reset_request', methods=['GET', 'POST'])
@@ -6540,7 +6599,7 @@ def _handle_image_logo(app_info, request):
             return False
 
         if app_info.logo_image_filename:
-            # Delete old logo
+            # Delete old logo (S3 or local)
             if S3_AVAILABLE:
                 try:
                     s3_client.delete_object(Bucket=S3_BUCKET, Key=f"logos/{app_info.logo_image_filename}")
@@ -6556,42 +6615,46 @@ def _handle_image_logo(app_info, request):
                     except Exception as e:
                         logger.error(f"Error deleting old logo {old_filepath}: {e}")
 
-        filename = secure_filename(file.filename)
-        random_hex = secrets.token_hex(8)
-        _, f_ext = os.path.splitext(filename)
-        unique_filename = random_hex + f_ext
+        # Generate unique filename
+        ext = os.path.splitext(file.filename)[1]
+        unique_filename = f"{uuid.uuid4().hex}{ext}"
+
+        # Process image
+        img = Image.open(file)
         
-        # 画像処理
-        img = Image.open(file.stream)
-        
-        # クロップ処理
+        # Crop if data exists
         if crop_data_json:
-            try:
+             try:
                 crop_data = json.loads(crop_data_json)
                 x = int(crop_data['x'])
                 y = int(crop_data['y'])
                 width = int(crop_data['width'])
                 height = int(crop_data['height'])
                 img = img.crop((x, y, x + width, y + height))
-            except Exception as e:
-                logger.error(f"Crop error: {e}")
+             except Exception as e:
+                 logger.error(f"Error cropping image: {e}")
 
-        # 保存処理
+        # Save to DB (Primary) or S3/Local (Legacy/Backup)
+        # DB保存を優先
+        try:
+            img_byte_arr = io.BytesIO()
+            # 元のフォーマットを維持、なければPNG
+            format = img.format if img.format else 'PNG'
+            img.save(img_byte_arr, format=format)
+            img_byte_arr = img_byte_arr.getvalue()
+            
+            app_info.logo_image_content = img_byte_arr
+            app_info.logo_image_mimetype = Image.MIME[format] if format in Image.MIME else f'image/{format.lower()}'
+            logger.info("Saved logo to Database")
+        except Exception as e:
+            logger.error(f"Error saving logo to DB: {e}")
+            flash('データベースへの保存に失敗しました。', 'danger')
+            return False
+
+        # S3/Local保存も一応残しておく（後方互換性のため）
         if S3_AVAILABLE:
-            try:
-                # BytesIOに保存してS3にアップロード
-                img_byte_arr = BytesIO()
-                img_format = img.format if img.format else 'PNG'
-                img.save(img_byte_arr, format=img_format)
-                img_byte_arr.seek(0)
-                
-                content_type = f'image/{img_format.lower()}'
-                upload_image_to_s3(img_byte_arr, unique_filename, folder='logos', content_type=content_type)
-                logger.info(f"Uploaded logo to S3: logos/{unique_filename}")
-            except Exception as e:
-                logger.error(f"S3 upload error for logo: {e}")
-                flash('S3へのアップロードに失敗しました。', 'danger')
-                return False
+            # ... (S3 upload logic if needed, but skipping for now to rely on DB)
+            pass
         else:
             # ローカル保存
             os.makedirs(logo_folder, exist_ok=True)
@@ -6649,7 +6712,7 @@ def admin_app_info_reset():
         app_info = AppInfo.get_current_info()
         
         # デフォルト値にリセット
-        app_info.app_name = "世界史単語帳"
+        app_info.app_name = "単語帳"
         app_info.version = "1.0.0"
         app_info.last_updated_date = "2025年6月15日"
         app_info.update_content = "アプリケーションが開始されました。"
@@ -8090,13 +8153,13 @@ def inject_app_info():
         # エラー時はデフォルト値を返す
         return {
             'app_info': None,
-            'app_name': '世界史単語帳',
+            'app_name': '単語帳',
             'app_version': '1.0.0',
             'app_last_updated': '2025年6月15日',
             'app_update_content': 'アプリケーションが開始されました。',
             'app_footer_text': '',
             'app_contact_email': '',
-            'app_school_name': '朋優学院',
+            'app_school_name': '〇〇高校',
             'current_user_id': session.get('user_id'),
             'current_username': session.get('username'),
             'current_room_number': session.get('room_number'),
