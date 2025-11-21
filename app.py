@@ -1669,6 +1669,21 @@ def migrate_database():
                             conn.execute(text(f'ALTER TABLE app_info ADD COLUMN {col_name} {col_definition}'))
                             conn.commit()
                         print(f"✅ {col_name}カラムを追加しました。")
+                
+                # ★ ロゴ画像カラムの追加
+                if 'logo_image_content' not in columns:
+                    print("🔧 logo_image_contentカラムを追加します...")
+                    with db.engine.connect() as conn:
+                        conn.execute(text('ALTER TABLE app_info ADD COLUMN logo_image_content BYTEA'))
+                        conn.commit()
+                    print("✅ logo_image_contentカラムを追加しました。")
+                
+                if 'logo_image_mimetype' not in columns:
+                    print("🔧 logo_image_mimetypeカラムを追加します...")
+                    with db.engine.connect() as conn:
+                        conn.execute(text('ALTER TABLE app_info ADD COLUMN logo_image_mimetype VARCHAR(50)'))
+                        conn.commit()
+                    print("✅ logo_image_mimetypeカラムを追加しました。")
             
             # 4. その他のテーブル確認（password_reset_token, csv_file_content等）
             if inspector.has_table('password_reset_token'):
