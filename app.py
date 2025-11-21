@@ -844,6 +844,10 @@ def load_word_data_for_room(room_number):
                 with open('words.csv', 'r', encoding='utf-8') as f:
                     reader = csv.DictReader(f)
                     for row in reader:
+                        # 必須フィールドのチェック
+                        if not row.get('question') or not row.get('answer'):
+                            continue
+
                         row['enabled'] = row.get('enabled', '1') == '1'
                         row['chapter'] = str(row['chapter'])
                         row['number'] = str(row['number'])
@@ -860,6 +864,10 @@ def load_word_data_for_room(room_number):
                     reader = csv.DictReader(StringIO(content))
                     word_data = []
                     for row in reader:
+                        # 必須フィールドのチェック
+                        if not row.get('question') or not row.get('answer'):
+                            continue
+
                         row['enabled'] = row.get('enabled', '1') == '1'
                         row['chapter'] = str(row['chapter'])
                         row['number'] = str(row['number'])
