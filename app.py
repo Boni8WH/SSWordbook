@@ -4603,19 +4603,40 @@ def api_weak_problems_everyone():
         # 結果リストを作成
         results = []
         for problem_id, stats in problem_stats.items():
-            if stats['total'] > 0:
-                accuracy = (stats['correct'] / stats['total']) * 100
-                word = valid_problems[problem_id]
+            total = stats['total']
+            if total > 0:
+                correct = stats['correct']
+                accuracy = correct / total
                 
-                results.append({
-                    'problemId': problem_id,
-                    'question': word['question'],
-                    'answer': word['answer'],
-                    'accuracyRate': accuracy,
-                    'totalAttempts': stats['total'],
-                    'correctAttempts': stats['correct'],
-                    'incorrectAttempts': stats['incorrect']
-                })
+                # 統計的信頼性（誤差範囲）の計算
+                # 95%信頼区間での誤差範囲 (Margin of Error)
+                # MOE = 1.96 * sqrt(p(1-p)/n)
+                if total >= 5:  # 最低5回は回答が必要（統計的異常値の排除）
+                    if accuracy == 0 or accuracy == 1:
+                        # 正答率0%または100%の場合、標準誤差は0になるが、
+                        # サンプル数が少ないと信頼性が低い。
+                        # ここでは簡易的に、サンプル数が少ない場合は除外するロジックとするか、
+                        # またはMOEの計算を調整する。
+                        # 今回は「最低5回」のフィルタでカバーする。
+                        is_reliable = True
+                    else:
+                        margin_of_error = 1.96 * math.sqrt((accuracy * (1 - accuracy)) / total)
+                        # 誤差範囲が20%以下なら信頼できるとみなす
+                        is_reliable = margin_of_error <= 0.2
+                else:
+                    is_reliable = False
+
+                if is_reliable:
+                    word = valid_problems[problem_id]
+                    results.append({
+                        'problemId': problem_id,
+                        'question': word['question'],
+                        'answer': word['answer'],
+                        'accuracyRate': accuracy * 100,
+                        'totalAttempts': total,
+                        'correctAttempts': correct,
+                        'incorrectAttempts': stats['incorrect']
+                    })
         
         # ソート: 正答率が低い順 -> 回答数が多い順
         results.sort(key=lambda x: (x['accuracyRate'], -x['totalAttempts']))
@@ -5765,98 +5786,6 @@ def admin_force_clean_user(username):
     
     return redirect(url_for('admin_page'))
 
-# 修正版：analyze_unmatched_history関数（より詳細な分析）
-def analyze_unmatched_history_detailed():
-    """ID不一致の学習履歴を詳細分析"""
-    
-    users = User.query.all()
-    analysis_results = {
-        'total_users': 0,
-        'users_with_invalid': 0,
-        'total_invalid_entries': 0,
-        'total_invalid_incorrect': 0,
-        'user_details': [],
-        'debug_info': []
-    }
-    
-    for user in users:
-        if user.username == 'admin':
-            continue
-            
-        analysis_results['total_users'] += 1
-        
-        # 部屋ごとの単語データを取得
-        word_data = load_word_data_for_room(user.room_number)
-        
-        # 有効なIDのセットを作成
-        valid_ids = set()
-        for word in word_data:
-            new_id = get_problem_id(word)
-            valid_ids.add(new_id)
-        
-        user_history = user.get_problem_history()
-        user_incorrect = user.get_incorrect_words()
-        
-        invalid_history_ids = []
-        invalid_incorrect_ids = []
-        
-        # 履歴の各IDをチェック
-        for problem_id in user_history.keys():
-            if problem_id not in valid_ids:
-                invalid_history_ids.append(problem_id)
-        
-        # 苦手問題の各IDをチェック
-        for problem_id in user_incorrect:
-            if problem_id not in valid_ids:
-                invalid_incorrect_ids.append(problem_id)
-        
-        user_invalid_count = len(invalid_history_ids)
-        user_invalid_incorrect_count = len(invalid_incorrect_ids)
-        
-        # デバッグ情報を追加
-        analysis_results['debug_info'].append({
-            'username': user.username,
-            'room_number': user.room_number,
-            'word_data_count': len(word_data),
-            'valid_ids_count': len(valid_ids),
-            'total_history': len(user_history),
-            'invalid_history_ids': invalid_history_ids,
-            'invalid_incorrect_ids': invalid_incorrect_ids
-        })
-        
-        if user_invalid_count > 0 or user_invalid_incorrect_count > 0:
-            analysis_results['users_with_invalid'] += 1
-            analysis_results['total_invalid_entries'] += user_invalid_count
-            analysis_results['total_invalid_incorrect'] += user_invalid_incorrect_count
-            
-            analysis_results['user_details'].append({
-                'username': user.username,
-                'room_number': user.room_number,
-                'total_history': len(user_history),
-                'valid_history': len(user_history) - user_invalid_count,
-                'invalid_history': user_invalid_count,
-                'invalid_incorrect': user_invalid_incorrect_count,
-                'invalid_history_ids': invalid_history_ids[:5],  # 最初の5件のみ
-                'invalid_incorrect_ids': invalid_incorrect_ids[:5]
-            })
-    
-    return analysis_results
-
-@app.route('/admin/analyze_invalid_history_detailed', methods=['POST'])
-def admin_analyze_invalid_history_detailed():
-    """詳細な無効履歴分析"""
-    if not session.get('admin_logged_in'):
-        return jsonify({'status': 'error', 'message': '管理者権限がありません。'}), 403
-    
-    try:
-        analysis = analyze_unmatched_history_detailed()
-        return jsonify({
-            'status': 'success',
-            'analysis': analysis
-        })
-    except Exception as e:
-        return jsonify({'status': 'error', 'message': str(e)}), 500
-
 # ====================================================================
 # 進捗ページ
 # ====================================================================
@@ -5994,13 +5923,11 @@ def progress_page():
                     'total_attempts': unit_data['total_attempts']
                 })
             
-            # ▼▼▼▼▼ ここから修正 ▼▼▼▼▼
             # 'S' を「歴史総合」に変換
             chapter_name = "歴史総合" if chapter_num == "S" else f"第{chapter_num}章"
-            # ▲▲▲▲▲ ここまで修正 ▲▲▲▲▲
             
             sorted_chapter_progress[chapter_num] = {
-                'chapter_name': chapter_name, # 修正した章名を代入
+                'chapter_name': chapter_name,
                 'units': sorted_units,
                 'total_questions': chapter_data['total_questions'],
                 'total_mastered': chapter_data['total_mastered']
