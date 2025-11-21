@@ -5212,7 +5212,156 @@ def admin_fix_all_data_legacy():
     
     return redirect(url_for('admin_page'))
 
-# app.py に以下の関数を追加してください
+# ========================================================================
+# データ損失防止: 安全なデータクリーニング関数
+# ========================================================================
+
+def safe_clean_unmatched_history(dry_run=True, deletion_threshold=0.1):
+    """
+    安全版: ID不一致の学習履歴を削除する
+    
+    Args:
+        dry_run: Trueの場合、実際には削除せずプレビューのみ
+        deletion_threshold: この割合以上のデータ削除時に警告（0.1 = 10%）
+    
+    Returns:
+        dict: 実行結果の詳細情報
+    """
+    
+    # デフォルトの単語データを取得
+    default_word_data = load_default_word_data()
+    if not default_word_data:
+        return {
+            'status': 'error',
+            'message': '単語データが見つかりません'
+        }
+    
+    # 有効なIDのセットを作成
+    valid_ids = set()
+    for word in default_word_data:
+        new_id = get_problem_id(word)
+        valid_ids.add(new_id)
+    
+    print(f"📋 有効な問題ID数: {len(valid_ids)}個")
+    
+    users = User.query.all()
+    analysis_results = []
+    total_data_to_delete = 0
+    total_data_size = 0
+    high_deletion_users = []
+    
+    # 第1フェーズ: 影響分析
+    for user in users:
+        if user.username == 'admin':
+            continue
+        
+        old_history = user.get_problem_history()
+        old_incorrect = user.get_incorrect_words()
+        
+        total_data_size += len(old_history)
+        
+        # 削除されるデータをカウント
+        to_delete_count = sum(1 for pid in old_history.keys() if pid not in valid_ids)
+        to_delete_incorrect = sum(1 for pid in old_incorrect if pid not in valid_ids)
+        
+        if len(old_history) > 0:
+            deletion_rate = to_delete_count / len(old_history)
+            
+            user_result = {
+                'username': user.username,
+                'total_history': len(old_history),
+                'to_delete': to_delete_count,
+                'to_delete_incorrect': to_delete_incorrect,
+                'deletion_rate': deletion_rate,
+                'will_remain': len(old_history) - to_delete_count
+            }
+            
+            # 削除率が高いユーザーを記録
+            if deletion_rate >deletion_threshold:
+                high_deletion_users.append(user_result)
+            
+            analysis_results.append(user_result)
+            total_data_to_delete += to_delete_count
+    
+    # 全体の削除率を計算
+    overall_deletion_rate = total_data_to_delete / total_data_size if total_data_size > 0 else 0
+    
+    print(f"\n📊 影響分析結果:")
+    print(f"   総データ数: {total_data_size}")
+    print(f"   削除予定: {total_data_to_delete} ({overall_deletion_rate*100:.1f}%)")
+    print(f"   高削除率ユーザー数: {len(high_deletion_users)}")
+    
+    # 閾値チェック
+    if overall_deletion_rate > deletion_threshold:
+        warning_msg = f"⚠️ 警告: 全体の{overall_deletion_rate*100:.1f}%のデータが削除されます（閾値: {deletion_threshold*100}%）"
+        print(warning_msg)
+        
+        if len(high_deletion_users) > 0:
+            print("\n⚠️ 高削除率ユーザー:")
+            for user_info in high_deletion_users[:5]:  # 最初の5ユーザーのみ表示
+                print(f"   - {user_info['username']}: {user_info['deletion_rate']*100:.1f}% ({user_info['to_delete']}/{user_info['total_history']})")
+    
+    # Dry-runモードの場合はここで終了
+    if dry_run:
+        return {
+            'status': 'dry_run',
+            'message': 'プレビューモード: 実際の削除は行われませんでした',
+            'total_data': total_data_size,
+            'to_delete': total_data_to_delete,
+            'deletion_rate': overall_deletion_rate,
+            'high_deletion_users': high_deletion_users,
+            'analysis': analysis_results
+        }
+    
+    # 第2フェーズ: 実際の削除（dry_run=Falseの場合のみ）
+    print("\n🔧 データクリーニング開始...")
+    cleaned_users = 0
+    total_removed_entries = 0
+    total_removed_incorrect = 0
+    
+    for user in users:
+        if user.username == 'admin':
+            continue
+        
+        old_history = user.get_problem_history()
+        old_incorrect = user.get_incorrect_words()
+        
+        # 有効なIDのみを保持
+        new_history = {pid: data for pid, data in old_history.items() if pid in valid_ids}
+        new_incorrect = [pid for pid in old_incorrect if pid in valid_ids]
+        
+        removed_count = len(old_history) - len(new_history)
+        removed_incorrect_count = len(old_incorrect) - len(new_incorrect)
+        
+        # 変更があった場合のみ保存
+        if removed_count > 0 or removed_incorrect_count > 0:
+            user.set_problem_history(new_history)
+            user.set_incorrect_words(new_incorrect)
+            cleaned_users += 1
+            total_removed_entries += removed_count
+            total_removed_incorrect += removed_incorrect_count
+            
+            print(f"  ✓ {user.username}: {removed_count}個削除（残存: {len(new_history)}）")
+    
+    try:
+        db.session.commit()
+        print(f"\n✅ クリーニング完了")
+        
+        return {
+            'status': 'success',
+            'message': 'データクリーニングが完了しました',
+            'cleaned_users': cleaned_users,
+            'removed_entries': total_removed_entries,
+            'removed_incorrect': total_removed_incorrect,
+            'analysis': analysis_results
+        }
+    except Exception as e:
+        db.session.rollback()
+        print(f"❌ クリーニングエラー: {e}")
+        return {
+            'status': 'error',
+            'message': f'クリーニング中にエラーが発生しました: {str(e)}'
+        }
 
 def clean_unmatched_history():
     """ID不一致の学習履歴を削除する"""
@@ -5376,8 +5525,58 @@ def admin_analyze_invalid_history():
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
+# ========================================================================
+# データ損失防止: 安全なデータクリーニング用管理者ルート
+# ========================================================================
+
+@app.route('/admin/safe_clean_preview', methods=['POST'])
+def admin_safe_clean_preview():
+    """安全版: データクリーニングのプレビュー（dry-run）"""
+    if not session.get('admin_logged_in'):
+        return jsonify({'status': 'error', 'message': '管理者権限がありません。'}), 403
+    
+    try:
+        # Dry-runモードで実行
+        result = safe_clean_unmatched_history(dry_run=True, deletion_threshold=0.1)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/admin/safe_clean_execute', methods=['POST'])
+def admin_safe_clean_execute():
+    """安全版: データクリーニングの実行"""
+    if not session.get('admin_logged_in'):
+        return jsonify({'status': 'error', 'message': '管理者権限がありません。'}), 403
+    
+    try:
+        # 実際の削除を実行
+        result = safe_clean_unmatched_history(dry_run=False, deletion_threshold=0.1)
+        
+        if result['status'] == 'success':
+            flash(f"データクリーニング完了: {result['removed_entries']}個の履歴を削除しました", 'success')
+        else:
+            flash(f"エラー: {result['message']}", 'danger')
+        
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
 @app.route('/admin/clean_invalid_history', methods=['POST'])
 def admin_clean_invalid_history():
+    """
+    旧版: ID不一致履歴の削除
+    ⚠️ 非推奨: 代わりに /admin/safe_clean_execute を使用してください
+    """
+    if not session.get('admin_logged_in'):
+        flash('管理者権限がありません。', 'danger')
+        return redirect(url_for('login_page'))
+    
+    flash('⚠️ この機能は非推奨です。安全版のプレビュー機能を使用してください。', 'warning')
+    return redirect(url_for('admin_page'))
+
+# 旧版を残すが、安全版を推奨するメッセージを追加
+@app.route('/admin/clean_invalid_history_legacy', methods=['POST'])
+def admin_clean_invalid_history_legacy():
     """ID不一致履歴の削除"""
     if not session.get('admin_logged_in'):
         flash('管理者権限がありません。', 'danger')
