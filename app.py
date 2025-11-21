@@ -950,6 +950,7 @@ def load_word_data_for_room(room_number):
         
     except Exception as e:
         print(f"❌ 読み込みエラー: {e}")
+        db.session.rollback()
         return []
 
 def generate_problem_id(word):
@@ -8150,6 +8151,7 @@ def inject_app_info():
         }
     except Exception as e:
         logger.error(f"Context processor error: {e}")
+        db.session.rollback()
         # エラー時はデフォルト値を返す
         return {
             'app_info': None,
@@ -8285,6 +8287,7 @@ def load_raw_word_data_for_room(room_number):
         
     except Exception as e:
         print(f"❌ 読み込みエラー: {e}")
+        db.session.rollback()
         return []
 
 @app.route('/emergency_add_ranking_column')
