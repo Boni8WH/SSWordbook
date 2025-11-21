@@ -12419,7 +12419,11 @@ def get_daily_quiz():
         
         public_words = []
         for word in all_words:
-            is_enabled_in_room = is_unit_enabled_by_room_setting(word.get('number'), room_setting)
+            chapter = str(word.get('chapter', ''))
+            
+            # S章の場合は 'S' で判定、それ以外は従来通り number で判定
+            unit_to_check = 'S' if chapter == 'S' else word.get('number')
+            is_enabled_in_room = is_unit_enabled_by_room_setting(unit_to_check, room_setting)
             is_not_z_problem = str(word.get('number')).strip().upper() != 'Z'
             
             if is_enabled_in_room and is_not_z_problem: # CSVの有効化チェック(is_enabled_in_csv)を削除
@@ -12589,7 +12593,11 @@ def admin_regenerate_daily_quiz():
         
         public_words = []
         for word in all_words:
-            is_enabled_in_room = is_unit_enabled_by_room_setting(word.get('number'), room_setting)
+            chapter = str(word.get('chapter', ''))
+            
+            # S章の場合は 'S' で判定、それ以外は従来通り number で判定
+            unit_to_check = 'S' if chapter == 'S' else word.get('number')
+            is_enabled_in_room = is_unit_enabled_by_room_setting(unit_to_check, room_setting)
             is_not_z_problem = str(word.get('number')).strip().upper() != 'Z'
             
             if is_enabled_in_room and is_not_z_problem: # CSVの有効化チェック(is_enabled_in_csv)を削除
