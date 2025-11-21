@@ -378,7 +378,8 @@ function loadWordDataFromServer() {
         .then(data => {
             if (data.status === 'success' && data.word_data) {
                 // 必須フィールドのチェック（クライアント側でもフィルタリング）
-                word_data = data.word_data.filter(w => w.question && w.answer);
+                // ★修正: 空白のみのデータも除外
+                word_data = data.word_data.filter(w => w.question && w.answer && w.question.trim() !== '' && w.answer.trim() !== '');
 
                 if (data.star_availability) {
                     starProblemStatus = data.star_availability;
@@ -388,7 +389,7 @@ function loadWordDataFromServer() {
                 }
 
             } else if (Array.isArray(data)) {
-                word_data = data.filter(w => w.question && w.answer);
+                word_data = data.filter(w => w.question && w.answer && w.question.trim() !== '' && w.answer.trim() !== '');
             } else {
             }
 
@@ -984,7 +985,7 @@ function startQuiz() {
     }
 
     // ★最終安全チェック：空の問題を除外
-    quizQuestions = quizQuestions.filter(q => q.question && q.answer);
+    quizQuestions = quizQuestions.filter(q => q.question && q.answer && q.question.trim() !== '' && q.answer.trim() !== '');
     if (quizQuestions.length === 0) {
         flashMessage('有効な問題が見つかりませんでした。', 'danger');
         return;
@@ -992,6 +993,17 @@ function startQuiz() {
 
     currentQuizData = shuffleArray(quizQuestions);
     currentQuestionIndex = 0;
+
+    // ★デバッグログ: 最初の問題をチェック
+    if (currentQuizData.length > 0) {
+        console.log('🔍 クイズ開始: 最初の問題データ', currentQuizData[0]);
+        console.log('   Question:', currentQuizData[0].question);
+        console.log('   Answer:', currentQuizData[0].answer);
+        console.log('   Question Type:', typeof currentQuizData[0].question);
+        console.log('   Question Length:', currentQuizData[0].question.length);
+        console.log('   Question CharCodes:', currentQuizData[0].question.split('').map(c => c.charCodeAt(0)));
+    }
+
     correctCount = 0;
     incorrectCount = 0;
     totalQuestions = currentQuizData.length;
@@ -1151,7 +1163,19 @@ function showNextQuestion() {
 
     if (currentQuestionIndex < totalQuestions) {
         const currentWord = currentQuizData[currentQuestionIndex];
-        if (questionElement) questionElement.textContent = currentWord.question;
+        console.log(`🔍 showNextQuestion: Index ${currentQuestionIndex}`, currentWord);
+
+        if (questionElement) {
+            console.log('   Setting question text to:', currentWord.question);
+            questionElement.textContent = currentWord.question;
+            // 強制再描画
+            questionElement.style.display = 'none';
+            questionElement.offsetHeight; // trigger reflow
+            questionElement.style.display = 'block';
+        } else {
+            console.error('❌ questionElement not found!');
+        }
+
         if (answerElement) answerElement.textContent = currentWord.answer;
     } else {
         showQuizResult();
@@ -1991,8 +2015,8 @@ function shareOnX() {
     const correct = correctCountSpan ? correctCountSpan.textContent : '0';
     const accuracy = accuracyRateSpan ? accuracyRateSpan.textContent : '0';
     const selectedRangeTotal = selectedRangeTotalQuestionsSpan ? selectedRangeTotalQuestionsSpan.textContent : '0';
-    let appName = '世界史単語帳';  // デフォルト値
-    let schoolName = '朋優学院';   // デフォルト値
+    let appName = '単語帳';  // デフォルト値
+    let schoolName = '〇〇高校';   // デフォルト値
 
     if (window.appInfoFromFlask) {
         appName = window.appInfoFromFlask.appName || appName;
