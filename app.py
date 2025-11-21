@@ -3797,10 +3797,23 @@ def admin_get_available_units(room_number):
         units = set()
         for word in word_data:
             if word['enabled']:
-                units.add(str(word['number']))
+                chapter = str(word['chapter'])
+                number = str(word['number'])
+                
+                # S章とZ章は章レベルで管理
+                if chapter == 'S':
+                    units.add('S')
+                elif number == 'Z':
+                    units.add('Z')
+                else:
+                    units.add(number)
         
-        # ソートして返す（Z問題を最後に）
-        sorted_units = sorted(list(units), key=lambda x: (x.upper() == 'Z', parse_unit_number(x)))
+        # ソートして返す（数字 → S → Z の順）
+        sorted_units = sorted(list(units), key=lambda x: (
+            x == 'Z',  # Z を最後に
+            x == 'S',  # S をその次に
+            parse_unit_number(x)  # 残りは数値順
+        ))
         
         return jsonify({
             'status': 'success',
@@ -4475,10 +4488,13 @@ def api_word_data():
 
         filtered_word_data = []
         for word in word_data:
+            chapter = str(word.get('chapter', ''))
             unit_num = word['number']
             is_word_enabled_in_csv = word['enabled']
-            # 修正：新しい関数を使用
-            is_unit_enabled_by_room = is_unit_enabled_by_room_setting(unit_num, room_setting)
+            
+            # S章の場合は 'S' で判定、それ以外は従来通り number で判定
+            unit_to_check = 'S' if chapter == 'S' else unit_num
+            is_unit_enabled_by_room = is_unit_enabled_by_room_setting(unit_to_check, room_setting)
 
             if is_word_enabled_in_csv and is_unit_enabled_by_room:
                 filtered_word_data.append(word)
