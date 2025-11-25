@@ -2990,6 +2990,20 @@
         document.getElementById('loadVisibilitySettings').addEventListener('click', loadVisibilitySettings);
         document.getElementById('saveVisibilitySettings').addEventListener('click', saveVisibilitySettings);
         document.getElementById('resetVisibilitySettings').addEventListener('click', resetVisibilitySettings);
+
+        // タイプヘッダーにクリックイベントを追加
+        const typeHeaders = document.querySelectorAll('.grid-header.grid-cell-type');
+        typeHeaders.forEach((header, index) => {
+            if (index < availableTypes.length) {
+                const type = availableTypes[index];
+                header.style.cursor = 'pointer';
+                header.title = `${type}タイプを一括切り替え`;
+                header.addEventListener('click', () => toggleTypeVisibility(type));
+
+                // ホバー効果のためのクラス追加
+                header.classList.add('clickable-header');
+            }
+        });
     }
 
     function loadRoomList() {
@@ -3030,12 +3044,17 @@
             .then(data => {
 
                 if (data.status === 'success') {
-                    currentVisibilitySettings = data.settings;
-                    availableChapters = data.chapters;
+                    try {
+                        currentVisibilitySettings = data.settings;
+                        availableChapters = data.chapters;
 
-                    createVisibilityMatrix();
-                    updateSettingsSummary();
-                    showVisibilityStatus('success', `部屋 ${roomNumber} の設定を読み込みました`);
+                        createVisibilityMatrix();
+                        updateSettingsSummary();
+                        showVisibilityStatus('success', `部屋 ${roomNumber} の設定を読み込みました`);
+                    } catch (e) {
+                        console.error('❌ 設定反映エラー:', e);
+                        showVisibilityStatus('error', '設定の表示中にエラーが発生しました: ' + e.message);
+                    }
                 } else {
                     console.error('❌ 設定読み込みエラー:', data.message);
                     showVisibilityStatus('error', data.message);
@@ -3062,7 +3081,14 @@
             // 章名セル（クリック可能）
             const chapterCell = document.createElement('div');
             chapterCell.className = 'grid-cell-chapter';
-            chapterCell.textContent = `第${chapter}章`;
+
+            // ラベルの生成
+            let chapterLabel = `第${chapter}章`;
+            if (chapter === 'com') {
+                chapterLabel = '総合問題';
+            }
+
+            chapterCell.textContent = chapterLabel;
             chapterCell.setAttribute('data-chapter', chapter);
 
             // 章名セルクリックで一括設定
@@ -3334,6 +3360,42 @@
 
         setAllVisible(true);
         showVisibilityStatus('info', '全ての設定を公開状態にリセットしました');
+    }
+
+    function setAllVisible(isVisible) {
+        availableChapters.forEach(chapter => {
+            if (!currentVisibilitySettings[chapter]) {
+                currentVisibilitySettings[chapter] = {};
+            }
+            availableTypes.forEach(type => {
+                currentVisibilitySettings[chapter][type] = isVisible;
+
+                // セルを更新
+                const cell = document.querySelector(`[data-chapter="${chapter}"][data-type="${type}"]`);
+                if (cell) {
+                    updateCellAppearance(cell, isVisible);
+                }
+            });
+        });
+        updateSettingsSummary();
+    }
+
+    function toggleTypeVisibility(type) {
+        // 現在の状態を確認（過半数で判定）
+        let visibleCount = 0;
+        let totalCount = 0;
+
+        availableChapters.forEach(chapter => {
+            totalCount++;
+            if (getVisibilitySetting(chapter, type)) {
+                visibleCount++;
+            }
+        });
+
+        // 過半数が公開なら非公開に、そうでなければ公開に
+        const newVisibility = totalCount > 0 && visibleCount < (totalCount / 2);
+
+        setTypeVisible(type, newVisibility);
     }
 
     function showVisibilityStatus(type, message) {
@@ -4000,6 +4062,11 @@
         to {
             opacity: 1;
         }
+    }
+
+    .clickable-header:hover {
+        background-color: #e9ecef;
+        text-decoration: underline;
     }
 
     @keyframes settingChanged {
