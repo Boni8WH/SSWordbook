@@ -10226,7 +10226,7 @@ def admin_essay_upload_csv():
         
         # CSVヘッダーの確認
         required_fields = ['chapter', 'question']
-        optional_fields = ['type', 'university', 'year', 'answer', 'answer_length', 'enabled']
+        optional_fields = ['id', 'type', 'university', 'year', 'answer', 'answer_length', 'enabled', 'image_url']
         
         if not csv_reader.fieldnames:
             return jsonify({
@@ -10250,6 +10250,7 @@ def admin_essay_upload_csv():
             }), 400
         
         added_count = 0
+        updated_count = 0
         error_count = 0
         error_details = []
         
@@ -10274,6 +10275,7 @@ def admin_essay_upload_csv():
                 type_value = normalized_row.get('type', 'A').strip() or 'A'
                 university = normalized_row.get('university', '未指定').strip() or '未指定'
                 answer = normalized_row.get('answer', '解答なし').strip() or '解答なし'
+                image_url = normalized_row.get('image_url', '').strip()
                 
                 # 年度の処理
                 year = 2025  # デフォルト値
@@ -10295,23 +10297,50 @@ def admin_essay_upload_csv():
                 # 文字数の計算
                 answer_length = len(answer)
                 
-                # 新しい問題を作成
-                new_problem = EssayProblem(
-                    chapter=chapter,
-                    type=type_value.upper(),
-                    university=university,
-                    year=year,
-                    question=question,
-                    answer=answer,
-                    answer_length=answer_length,
-                    enabled=enabled
-                )
+                # IDによる更新チェック
+                problem_id_str = normalized_row.get('id', '').strip()
+                existing_problem = None
                 
-                db.session.add(new_problem)
-                added_count += 1
+                if not replace_existing and problem_id_str:
+                    try:
+                        problem_id = int(problem_id_str)
+                        existing_problem = EssayProblem.query.get(problem_id)
+                    except ValueError:
+                        pass # IDが数値でない場合は新規作成扱い
                 
-                # デバッグ情報
-                logger.info(f"問題追加: 章={chapter}, タイプ={type_value}, 大学={university}, 年={year}")
+                if existing_problem:
+                    # 既存の問題を更新
+                    existing_problem.chapter = chapter
+                    existing_problem.type = type_value.upper()
+                    existing_problem.university = university
+                    existing_problem.year = year
+                    existing_problem.question = question
+                    existing_problem.answer = answer
+                    existing_problem.answer_length = answer_length
+                    existing_problem.enabled = enabled
+                    if image_url: # 画像URLが指定されている場合のみ更新
+                        existing_problem.image_url = image_url
+                    
+                    updated_count += 1
+                    logger.info(f"問題更新: ID={existing_problem.id}, 章={chapter}")
+                    
+                else:
+                    # 新しい問題を作成
+                    new_problem = EssayProblem(
+                        chapter=chapter,
+                        type=type_value.upper(),
+                        university=university,
+                        year=year,
+                        question=question,
+                        answer=answer,
+                        answer_length=answer_length,
+                        enabled=enabled,
+                        image_url=image_url if image_url else None
+                    )
+                    
+                    db.session.add(new_problem)
+                    added_count += 1
+                    logger.info(f"問題追加: 章={chapter}, タイプ={type_value}, 大学={university}, 年={year}")
                 
             except Exception as e:
                 error_count += 1
@@ -10321,10 +10350,10 @@ def admin_essay_upload_csv():
                 continue
         
         # データベースにコミット
-        if added_count > 0:
+        if added_count > 0 or updated_count > 0:
             try:
                 db.session.commit()
-                logger.info(f"論述問題 {added_count}件をデータベースに保存しました")
+                logger.info(f"論述問題 追加{added_count}件/更新{updated_count}件 を保存しました")
             except Exception as commit_error:
                 db.session.rollback()
                 logger.error(f"データベース保存エラー: {commit_error}")
@@ -10334,20 +10363,21 @@ def admin_essay_upload_csv():
                 }), 500
         
         # 結果メッセージの作成
-        if added_count > 0:
-            message = f'{added_count}件の論述問題を追加しました'
+        if added_count > 0 or updated_count > 0:
+            message = f'{added_count}件を追加、{updated_count}件を更新しました'
             if error_count > 0:
                 message += f'（{error_count}件のエラーがありました）'
         else:
             if error_count > 0:
-                message = f'問題の追加に失敗しました。{error_count}件のエラーがあります'
+                message = f'処理に失敗しました。{error_count}件のエラーがあります'
             else:
-                message = 'CSVファイルにデータが含まれていません'
+                message = 'CSVファイルに有効なデータが含まれていません'
         
         response_data = {
-            'status': 'success' if added_count > 0 else 'error',
+            'status': 'success' if (added_count > 0 or updated_count > 0) else 'error',
             'message': message,
             'added_count': added_count,
+            'updated_count': updated_count,
             'error_count': error_count
         }
         
@@ -10377,26 +10407,28 @@ def download_essay_template():
     import csv
     
     si = StringIO()
+    # BOMを付与してExcelで文字化けしないようにする
+    si.write('\ufeff')
     cw = csv.writer(si)
     
-    # ヘッダー行
-    cw.writerow(['chapter', 'type', 'university', 'year', 'question', 'answer', 'answer_length', 'enabled'])
+    # ヘッダー行 (登録済みファイルと同じ形式)
+    cw.writerow(['id', 'chapter', 'type', 'university', 'year', 'question', 'answer', 'answer_length', 'enabled', 'image_url'])
     
-    # サンプルデータを追加
+    # サンプルデータを追加 (idは空欄で新規登録扱い、image_urlも空欄)
     cw.writerow([
-        '1', 'A', '東京大学', '2023', 
+        '', '1', 'A', '東京大学', '2023', 
         'フランス革命の社会的背景について200字以上で論述せよ。',
         'フランス革命は18世紀後半のフランスにおいて、アンシャン・レジームと呼ばれる身分制社会の矛盾が深刻化した結果として起こった。第三身分が人口の大部分を占めながらも政治的権利を持たず、重い税負担を強いられていた。一方で特権身分である聖職者と貴族は免税特権を享受していた。また、啓蒙思想の普及により自由・平等の理念が浸透し、アメリカ独立革命の成功も大きな影響を与えた。財政危機も革命の引き金となった重要な要因である。',
-        '245', '1'
+        '245', '1', ''
     ])
     cw.writerow([
-        '1', 'B', '早稲田大学', '2023',
+        '', '1', 'B', '早稲田大学', '2023',
         'ナポレオンの大陸封鎖令について100字程度で説明せよ。',
         'ナポレオンが1806年に発布した対イギリス経済制裁。ヨーロッパ大陸諸国にイギリスとの通商を禁止させ、経済的に孤立させることでイギリスの屈服を図った。しかし密貿易の横行や各国の反発を招き、最終的には失敗に終わった。',
-        '98', '1'
+        '98', '1', ''
     ])
     cw.writerow([
-        '2', 'C', '慶応大学', '2024',
+        '', '2', 'C', '慶応大学', '2024',
         'ウィーン体制の特徴を50字で述べよ。',
         'ナポレオン戦争後の1815年に成立した国際秩序。正統主義・勢力均衡・国際協調を原則とした。',
         '48', '1'
