@@ -1415,6 +1415,10 @@ function showQuizResult() {
         const keywordsArray = Array.from(sessionKeywords);
         const chaptersArray = Array.from(sessionChapters); // <--- ★章の配列を作成
 
+        // ★ローディング表示を追加
+        recommendedContainer.innerHTML = '<li class="loading-message"><i class="fas fa-spinner fa-spin"></i> 関連する論述問題を検索中・・・</li>';
+        recommendedSection.classList.remove('hidden');
+
         fetch('/api/find_related_essays', {
             method: 'POST',
             headers: { // <--- この headers の3行を追加してください
@@ -1424,6 +1428,9 @@ function showQuizResult() {
         })
             .then(response => response.json())
             .then(data => {
+                // ローディング表示をクリア
+                recommendedContainer.innerHTML = '';
+
                 if (data.essays && data.essays.length > 0) {
                     // 4.【見つかった場合】受け取った問題リストを画面に表示する
                     data.essays.forEach(essay => {
@@ -1445,6 +1452,8 @@ function showQuizResult() {
             })
             .catch(error => {
                 console.error('おすすめ論述問題の取得エラー:', error);
+                // エラー時はセクションを隠すか、エラーメッセージを表示
+                recommendedContainer.innerHTML = '<li class="error-message">読み込みに失敗しました。</li>';
             });
     }
 }
