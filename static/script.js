@@ -399,6 +399,8 @@ function loadWordDataFromServer() {
                 if (typeof updateStarProblemUI === 'function') {
                     updateStarProblemUI();
                 }
+                // ★追加：データロード後に制限状態を再評価
+                updateIncorrectOnlySelection();
             }, 500);
 
         })
@@ -581,7 +583,9 @@ function updateIncorrectOnlySelection() {
     const rangeSelectionTitle = document.querySelector('.selection-area h3');
     const questionCountRadios = document.querySelectorAll('input[name="questionCount"]:not(#incorrectOnlyRadio)');
 
-    const weakProblemCount = incorrectWords.length;
+    // ★修正：有効な苦手問題数を使用
+    const weakProblemCount = getValidWeakProblemCount();
+    const rawWeakProblemCount = incorrectWords.length;
 
     let stateChanged = false;
     const oldHasBeenRestricted = hasBeenRestricted;
@@ -795,6 +799,20 @@ function initializeSelectAllButtons() {
 // ヘルパー関数
 // =========================================================
 
+// ★新規追加：有効な苦手問題数を計算する関数
+function getValidWeakProblemCount() {
+    if (!word_data || word_data.length === 0) return 0;
+
+    // 現在のword_dataに存在する問題IDのセットを作成
+    const validProblemIds = new Set(word_data.map(word => generateProblemId(word)));
+
+    // incorrectWordsのうち、現在も存在する有効なものだけをカウント
+    const validWeakProblems = incorrectWords.filter(id => validProblemIds.has(id));
+
+    console.log(`🔍 苦手問題カウント詳細: 全${incorrectWords.length}問中、有効${validWeakProblems.length}問`);
+    return validWeakProblems.length;
+}
+
 function getSelectedQuestionCount() {
     const selectedRadio = document.querySelector('input[name="questionCount"]:checked');
     return selectedRadio ? selectedRadio.value : '10';
@@ -865,13 +883,15 @@ function startQuiz() {
     }
     console.log('📍 クイズ開始 - 答えを見るボタンの状態をリセット');
 
-    const weakProblemCount = incorrectWords.length;
+    // ★修正：有効な苦手問題数を使用
+    const weakProblemCount = getValidWeakProblemCount();
+    const rawWeakProblemCount = incorrectWords.length; // 表示用などに元の数も保持
     const selectedQuestionCount = getSelectedQuestionCount();
 
     // ★修正：制限状態の判定をシンプルに
     const isCurrentlyRestricted = hasBeenRestricted && !restrictionReleased;
 
-    console.log(`startQuiz制限チェック: 苦手${weakProblemCount}問, isCurrentlyRestricted=${isCurrentlyRestricted}`);
+    console.log(`startQuiz制限チェック: 有効苦手${weakProblemCount}問(全${rawWeakProblemCount}問), isCurrentlyRestricted=${isCurrentlyRestricted}`);
 
     // ★修正：制限中は苦手問題モード以外を明確に拒否
     if (isCurrentlyRestricted && selectedQuestionCount !== 'incorrectOnly') {
@@ -924,7 +944,7 @@ function startQuiz() {
         console.log(`抽出された苦手問題: ${quizQuestions.length}個`);
 
         if (quizQuestions.length === 0) {
-            flashMessage('苦手問題がありません。まずは通常の学習で問題に取り組んでください。', 'info');
+            flashMessage('有効な苦手問題がありません。まずは通常の学習で問題に取り組んでください。', 'info');
             return;
         }
 
@@ -1263,7 +1283,8 @@ function handleAnswer(isCorrect) {
 function showQuizTimeProgressNotification(weakCount) {
     // 制限状態に関わる重要な変化のみ通知
     const wasRestricted = hasBeenRestricted && !restrictionReleased;
-    const currentWeakCount = incorrectWords.length;
+    // ★修正：有効な苦手問題数を使用
+    const currentWeakCount = getValidWeakProblemCount();
 
     // 制限解除の瞬間のみ通知
     if (wasRestricted && currentWeakCount <= 10) {
@@ -1370,7 +1391,8 @@ function showQuizResult() {
     displayIncorrectWordsForCurrentQuiz();
 
     // ★追加：制限解除チェック（最終確認）
-    const currentWeakCount = incorrectWords.length;
+    // ★修正：有効な苦手問題数を使用
+    const currentWeakCount = getValidWeakProblemCount();
     const wasRestricted = hasBeenRestricted && !restrictionReleased;
 
     setTimeout(() => {
@@ -1596,7 +1618,8 @@ function backToSelectionScreen() {
         updateIncorrectOnlySelection();
 
         // ★条件付きリセット：制限解除されている場合のみUIをリセット
-        const currentWeakCount = incorrectWords.length;
+        // ★修正：有効な苦手問題数を使用
+        const currentWeakCount = getValidWeakProblemCount();
         const isCurrentlyRestricted = hasBeenRestricted && !restrictionReleased;
 
         console.log(`🔍 backToSelection制限チェック: 苦手${currentWeakCount}問, 制限中=${isCurrentlyRestricted}`);
