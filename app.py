@@ -5268,32 +5268,33 @@ def safe_clean_unmatched_history(dry_run=True, deletion_threshold=0.1):
         dict: 実行結果の詳細情報
     """
     
-    # デフォルトの単語データを取得
-    default_word_data = load_default_word_data()
-    if not default_word_data:
-        return {
-            'status': 'error',
-            'message': '単語データが見つかりません'
-        }
-    
-    # 有効なIDのセットを作成
-    valid_ids = set()
-    for word in default_word_data:
-        new_id = get_problem_id(word)
-        valid_ids.add(new_id)
-    
-    print(f"📋 有効な問題ID数: {len(valid_ids)}個")
-    
     users = User.query.all()
     analysis_results = []
     total_data_to_delete = 0
     total_data_size = 0
     high_deletion_users = []
     
+    # 部屋ごとの有効IDキャッシュ (key: room_number, value: set of valid_ids)
+    room_valid_ids_cache = {}
+    
+    print(f"🔧 データクリーニング開始 (Dry-run: {dry_run})")
+    
     # 第1フェーズ: 影響分析
     for user in users:
         if user.username == 'admin':
             continue
+            
+        # ユーザーの部屋に対応する有効IDを取得
+        room_num = user.room_number
+        if room_num not in room_valid_ids_cache:
+            word_data = load_word_data_for_room(room_num)
+            valid_ids = set()
+            for word in word_data:
+                valid_ids.add(get_problem_id(word))
+            room_valid_ids_cache[room_num] = valid_ids
+            print(f"📋 Room {room_num}: 有効ID {len(valid_ids)}個をキャッシュしました")
+            
+        valid_ids = room_valid_ids_cache[room_num]
         
         old_history = user.get_problem_history()
         old_incorrect = user.get_incorrect_words()
@@ -5309,6 +5310,7 @@ def safe_clean_unmatched_history(dry_run=True, deletion_threshold=0.1):
             
             user_result = {
                 'username': user.username,
+                'room_number': room_num,
                 'total_history': len(old_history),
                 'to_delete': to_delete_count,
                 'to_delete_incorrect': to_delete_incorrect,
@@ -5317,7 +5319,7 @@ def safe_clean_unmatched_history(dry_run=True, deletion_threshold=0.1):
             }
             
             # 削除率が高いユーザーを記録
-            if deletion_rate >deletion_threshold:
+            if deletion_rate > deletion_threshold:
                 high_deletion_users.append(user_result)
             
             analysis_results.append(user_result)
@@ -5339,7 +5341,7 @@ def safe_clean_unmatched_history(dry_run=True, deletion_threshold=0.1):
         if len(high_deletion_users) > 0:
             print("\n⚠️ 高削除率ユーザー:")
             for user_info in high_deletion_users[:5]:  # 最初の5ユーザーのみ表示
-                print(f"   - {user_info['username']}: {user_info['deletion_rate']*100:.1f}% ({user_info['to_delete']}/{user_info['total_history']})")
+                print(f"   - {user_info['username']} (Room {user_info['room_number']}): {user_info['deletion_rate']*100:.1f}% ({user_info['to_delete']}/{user_info['total_history']})")
     
     # Dry-runモードの場合はここで終了
     if dry_run:
@@ -5354,7 +5356,7 @@ def safe_clean_unmatched_history(dry_run=True, deletion_threshold=0.1):
         }
     
     # 第2フェーズ: 実際の削除（dry_run=Falseの場合のみ）
-    print("\n🔧 データクリーニング開始...")
+    print("\n🔧 データクリーニング実行...")
     cleaned_users = 0
     total_removed_entries = 0
     total_removed_incorrect = 0
@@ -5362,6 +5364,18 @@ def safe_clean_unmatched_history(dry_run=True, deletion_threshold=0.1):
     for user in users:
         if user.username == 'admin':
             continue
+            
+        # キャッシュから有効IDを取得（分析フェーズでキャッシュ済みのはずだが念のため）
+        room_num = user.room_number
+        if room_num not in room_valid_ids_cache:
+             # ここに来ることは稀だが、念のため再ロード
+            word_data = load_word_data_for_room(room_num)
+            valid_ids = set()
+            for word in word_data:
+                valid_ids.add(get_problem_id(word))
+            room_valid_ids_cache[room_num] = valid_ids
+            
+        valid_ids = room_valid_ids_cache[room_num]
         
         old_history = user.get_problem_history()
         old_incorrect = user.get_incorrect_words()
