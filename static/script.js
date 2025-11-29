@@ -807,10 +807,11 @@ function getValidWeakProblemCount() {
     const validProblemIds = new Set(word_data.map(word => generateProblemId(word)));
 
     // incorrectWordsのうち、現在も存在する有効なものだけをカウント
-    const validWeakProblems = incorrectWords.filter(id => validProblemIds.has(id));
+    // ★修正: 重複を除外してカウント (Setを使用)
+    const validWeakProblems = new Set(incorrectWords.filter(id => validProblemIds.has(id)));
 
-    console.log(`🔍 苦手問題カウント詳細: 全${incorrectWords.length}問中、有効${validWeakProblems.length}問`);
-    return validWeakProblems.length;
+    console.log(`🔍 苦手問題カウント詳細: 全${incorrectWords.length}問中、有効(ユニーク)${validWeakProblems.size}問`);
+    return validWeakProblems.size;
 }
 
 function getSelectedQuestionCount() {
@@ -895,12 +896,29 @@ function startQuiz() {
 
     // ★修正：制限中は苦手問題モード以外を明確に拒否
     if (isCurrentlyRestricted && selectedQuestionCount !== 'incorrectOnly') {
-        if (weakProblemCount >= 20) {
-            flashMessage('苦手問題が20問以上あります。まず苦手問題モードで学習してください。', 'danger');
+        // ★追加: 制限中だが、有効な苦手問題が0問の場合（データの不整合など）
+        // 自動的に制限を解除して、通常モードで開始できるようにする
+        if (weakProblemCount === 0) {
+            console.warn('⚠️ 制限中ですが有効な苦手問題が0問です。制限を自動解除します。');
+            hasBeenRestricted = false;
+            restrictionReleased = true;
+            saveRestrictionState(); // サーバーに保存
+
+            flashMessage('有効な苦手問題が見つからないため、制限を解除しました。', 'info');
+
+            // 状態更新のためにリロードせず、そのまま処理を続行させる（再帰呼び出しは避ける）
+            // UI更新
+            updateIncorrectOnlySelection();
+
+            // 続行許可（下の処理へ）
         } else {
-            flashMessage(`苦手問題を10問以下に減らすまで、苦手問題モードで学習してください。（現在${weakProblemCount}問）`, 'warning');
+            if (weakProblemCount >= 20) {
+                flashMessage('苦手問題が20問以上あります。まず苦手問題モードで学習してください。', 'danger');
+            } else {
+                flashMessage(`苦手問題を10問以下に減らすまで、苦手問題モードで学習してください。（現在${weakProblemCount}問）`, 'warning');
+            }
+            return;
         }
-        return;
     }
 
     // 既存のstartQuiz処理を続行...
