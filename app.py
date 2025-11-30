@@ -6966,11 +6966,11 @@ def admin_add_user():
             flash('管理者権限がありません。', 'danger')
             return redirect(url_for('login_page'))
 
-        room_number = request.form.get('room_number')
+        room_number = request.form.get('room_number', '').strip()
         room_password = request.form.get('room_password')
-        student_id = request.form.get('student_id')
+        student_id = request.form.get('student_id', '').strip()
         individual_password = request.form.get('individual_password')
-        username = request.form.get('username')
+        username = request.form.get('username', '').strip()
 
         if not all([room_number, room_password, student_id, individual_password, username]):
             flash('すべての項目を入力してください。', 'danger')
