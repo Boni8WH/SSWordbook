@@ -3913,6 +3913,22 @@ def api_admin_room_ranking(room_number):
                 print("⚠️ user_statsテーブルが存在しません。従来方式で計算します...")
                 return admin_fallback_ranking_calculation(room_number, start_time)
             
+            # 統計データがないユーザーを特定して作成（同期処理）
+            try:
+                users_without_stats = User.query.filter_by(room_number=room_number)\
+                    .outerjoin(UserStats, User.id == UserStats.user_id)\
+                    .filter(UserStats.id == None)\
+                    .all()
+                
+                if users_without_stats:
+                    print(f"🔄 統計データ未作成のユーザーを検出: {len(users_without_stats)}人 - 作成中...")
+                    for user in users_without_stats:
+                        UserStats.get_or_create(user.id)
+                    db.session.commit()
+                    print("✅ 統計データの同期完了")
+            except Exception as sync_error:
+                print(f"⚠️ 統計データ同期エラー (無視して続行): {sync_error}")
+                db.session.rollback()
             # 事前計算された統計データを高速取得
             room_stats = UserStats.query.filter_by(room_number=room_number)\
                                         .join(User)\
@@ -6043,6 +6059,21 @@ def api_ranking_data():
                 print("⚠️ user_statsテーブルが存在しません。従来方式で計算します...")
                 return fallback_ranking_calculation(current_user, start_time)
             
+            # ★修正: 統計データがないユーザーを特定して作成（同期処理）
+            try:
+                users_without_stats = User.query.filter_by(room_number=current_room_number)\
+                    .outerjoin(UserStats, User.id == UserStats.user_id)\
+                    .filter(UserStats.id == None)\
+                    .all()
+                
+                if users_without_stats:
+                    print(f"🔄 統計データ未作成のユーザーを検出: {len(users_without_stats)}人 - 作成中...")
+                    for user in users_without_stats:
+                        UserStats.get_or_create(user.id)
+                    db.session.commit()
+            except Exception as sync_error:
+                print(f"⚠️ 統計データ同期エラー (無視して続行): {sync_error}")
+                db.session.rollback()
             # 事前計算された統計データを高速取得
             room_stats = UserStats.query.filter_by(room_number=current_room_number)\
                                         .join(User)\
