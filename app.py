@@ -238,7 +238,10 @@ class RoomSetting(db.Model):
         """有効な単元のリストを取得"""
         try:
             return json.loads(self.enabled_units)
-        except:
+        except (json.JSONDecodeError, TypeError):
+            return []
+        except Exception as e:
+            print(f"Error parsing enabled_units: {e}")
             return []
     
     def set_enabled_units(self, units_list):
@@ -2892,7 +2895,7 @@ def get_essay_keywords(problem_id):
         return jsonify({'status': 'error', 'message': 'ログインが必要です'}), 401
     
     problem = EssayProblem.query.get(problem_id)
-    if not problem:
+    if not problem or not problem.enabled:
         return jsonify({'status': 'error', 'message': '問題が見つかりません'}), 404
 
     # 問題文と解答文を結合してキーワードを抽出
@@ -3349,7 +3352,13 @@ def password_reset_request():
             )
             
             db.session.add(password_reset_token)
-            db.session.commit()
+            try:
+                db.session.commit()
+            except Exception as e:
+                db.session.rollback()
+                print(f"❌ トークン保存エラー: {e}")
+                flash('システムエラーが発生しました。', 'danger')
+                return redirect(url_for('login_page'))
             
             print(f"🔍 トークン作成時刻（UTC）: {now_utc}")
             print(f"🔍 有効期限（UTC）: {expires_at_utc}")
@@ -6009,15 +6018,9 @@ def api_ranking_data():
         
         # ★重要：user_statsテーブルの存在確認
         try:
-            # user_statsテーブルが存在するかチェック
-            with db.engine.connect() as conn:
-                result = conn.execute(text("""
-                    SELECT EXISTS (
-                        SELECT FROM information_schema.tables 
-                        WHERE table_name = 'user_stats'
-                    )
-                """))
-                user_stats_exists = result.fetchone()[0]
+            # user_statsテーブルが存在するかチェック（SQLAlchemy inspectを使用）
+            inspector = inspect(db.engine)
+            user_stats_exists = inspector.has_table('user_stats')
             
             if not user_stats_exists:
                 print("⚠️ user_statsテーブルが存在しません。従来方式で計算します...")
@@ -6100,7 +6103,9 @@ def api_ranking_data():
             'ranking_data': top_ranking,
             'current_user_stats': current_user_stats,
             'current_user_rank': current_user_rank,
-            'total_users_in_room': len(ranking_data),
+            'current_user_rank': current_user_rank,
+            'total_users_in_room': User.query.filter_by(room_number=current_room_number).filter(User.username != 'admin').count(),
+            'ranking_display_count': ranking_display_count,
             'ranking_display_count': ranking_display_count,
             'calculation_time': round(elapsed_time, 3),
             'using_precalculated': True,
@@ -7202,6 +7207,11 @@ def admin_update_room_units_setting():
             return jsonify(status='error', message='部屋番号が指定されていません。'), 400
 
         room_setting = RoomSetting.query.filter_by(room_number=room_number).first()
+
+        # 空リストの場合は明示的に無効化マーカーを設定
+        # これにより、デフォルト（[] = 全有効）と区別する
+        if not enabled_units:
+            enabled_units = ["__DISABLED__"]
 
         if room_setting:
             room_setting.set_enabled_units(enabled_units)
@@ -12752,3 +12762,110 @@ def admin_fix_data_types():
         db.session.rollback()
         flash(f"データ修復中にエラーが発生しました: {str(e)}", 'danger')
         return redirect(url_for('admin_page'))
+
+# ========================================================================
+# ユーザースコア削除機能
+# ========================================================================
+
+def delete_user_score_data(user):
+    """ユーザーのスコア・学習履歴を全て削除する"""
+    try:
+        # 1. 学習履歴 (JSON)
+        user.problem_history = {}
+        user.incorrect_words = []
+        
+        # 2. 統計データ (UserStats)
+        if user.stats:
+            db.session.delete(user.stats)
+            
+        # 3. 日次クイズ結果 (DailyQuizResult)
+        DailyQuizResult.query.filter_by(user_id=user.id).delete()
+        
+        # 4. 月次スコア (MonthlyScore)
+        MonthlyScore.query.filter_by(user_id=user.id).delete()
+        
+        # 5. 論述問題進捗 (EssayProgress)
+        EssayProgress.query.filter_by(user_id=user.id).delete()
+        
+        # 6. 月次結果閲覧履歴 (MonthlyResultViewed)
+        MonthlyResultViewed.query.filter_by(user_id=user.id).delete()
+        
+        # 7. 制限状態のリセット
+        user.restriction_triggered = False
+        user.restriction_released = False
+        
+        return True
+    except Exception as e:
+        print(f"❌ スコア削除エラー ({user.username}): {e}")
+        return False
+
+@app.route('/admin/delete_user_score', methods=['POST'])
+def admin_delete_user_score():
+    """個別のユーザーのスコアを削除"""
+    if not session.get('admin_logged_in'):
+        return jsonify({'status': 'error', 'message': '管理者権限がありません。'}), 403
+        
+    user_id = request.form.get('user_id')
+    admin_password = request.form.get('admin_password')
+    
+    if not user_id or not admin_password:
+        return jsonify({'status': 'error', 'message': '必要な情報が不足しています。'}), 400
+        
+    # 管理者パスワード確認
+    admin_user = AdminUser.query.filter_by(username='admin').first()
+    if not admin_user or not admin_user.check_password(admin_password):
+        return jsonify({'status': 'error', 'message': '管理者パスワードが間違っています。'}), 403
+        
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({'status': 'error', 'message': 'ユーザーが見つかりません。'}), 404
+        
+    try:
+        if delete_user_score_data(user):
+            # 統計再作成（空の状態で）
+            UserStats.get_or_create(user.id)
+            db.session.commit()
+            return jsonify({'status': 'success', 'message': f'ユーザー {user.username} のスコアを削除しました。'})
+        else:
+            db.session.rollback()
+            return jsonify({'status': 'error', 'message': 'スコア削除中にエラーが発生しました。'}), 500
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/admin/delete_room_score', methods=['POST'])
+def admin_delete_room_score():
+    """部屋全体のユーザースコアを削除"""
+    if not session.get('admin_logged_in'):
+        return jsonify({'status': 'error', 'message': '管理者権限がありません。'}), 403
+        
+    room_number = request.form.get('room_number')
+    admin_password = request.form.get('admin_password')
+    
+    if not room_number or not admin_password:
+        return jsonify({'status': 'error', 'message': '必要な情報が不足しています。'}), 400
+        
+    # 管理者パスワード確認
+    admin_user = AdminUser.query.filter_by(username='admin').first()
+    if not admin_user or not admin_user.check_password(admin_password):
+        return jsonify({'status': 'error', 'message': '管理者パスワードが間違っています。'}), 403
+        
+    users = User.query.filter_by(room_number=room_number).all()
+    if not users:
+        return jsonify({'status': 'error', 'message': '指定された部屋にユーザーがいません。'}), 404
+        
+    success_count = 0
+    try:
+        for user in users:
+            if user.username == 'admin':
+                continue
+            if delete_user_score_data(user):
+                # 統計再作成
+                UserStats.get_or_create(user.id)
+                success_count += 1
+        
+        db.session.commit()
+        return jsonify({'status': 'success', 'message': f'部屋 {room_number} の {success_count} 名のスコアを削除しました。'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
