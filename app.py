@@ -2036,6 +2036,9 @@ def create_tables_and_admin_user():
             try:
                 admin_user = User.query.filter_by(username='admin', room_number='ADMIN').first()
                 
+                # 環境変数からパスワードを取得
+                env_admin_password = os.environ.get('ADMIN_PASSWORD')
+                
                 if not admin_user:
                     logger.info("👤 管理者ユーザーを作成します...")
                     admin_user = User(
@@ -2047,13 +2050,27 @@ def create_tables_and_admin_user():
                         incorrect_words=[]
                     )
                     admin_user.last_login = datetime.now(JST)
-                    admin_user.set_room_password('Avignon1309')
-                    admin_user.set_individual_password('Avignon1309')
+                    
+                    # 新規作成時のパスワード設定
+                    password_to_use = env_admin_password if env_admin_password else 'Avignon1309'
+                    if not env_admin_password:
+                        logger.warning("⚠️ ADMIN_PASSWORD環境変数が未設定です。デフォルトのパスワードを使用します。")
+                    
+                    admin_user.set_room_password(password_to_use)
+                    admin_user.set_individual_password(password_to_use)
+                    
                     db.session.add(admin_user)
                     db.session.commit()
                     logger.info("✅ 管理者ユーザー 'admin' を作成しました")
                 else:
                     logger.info("✅ 管理者ユーザー 'admin' は既に存在します。")
+                    
+                    # 既存ユーザーでも環境変数が設定されていればパスワードを更新（強制上書き）
+                    if env_admin_password:
+                        admin_user.set_room_password(env_admin_password)
+                        admin_user.set_individual_password(env_admin_password)
+                        db.session.commit()
+                        logger.info("🔄 環境変数 ADMIN_PASSWORD に基づいて管理者パスワードを更新しました。")
                     
             except Exception as e:
                 logger.error(f"⚠️ 管理者ユーザー処理エラー: {e}")
