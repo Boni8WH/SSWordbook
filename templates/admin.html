@@ -5433,22 +5433,14 @@
                 const userId = this.dataset.userId;
                 const username = this.dataset.username;
 
-                showDeleteScoreModal('user', userId, `ユーザー: $ {
-                                    username
-                                }
-
-                                `);
+                showDeleteScoreModal('user', userId, `ユーザー: ${username}`);
             });
         });
     });
 
     // 部屋のスコア削除確認（onclick属性から呼ばれる）
     function confirmDeleteRoomScore(roomNumber) {
-        showDeleteScoreModal('room', roomNumber, `部屋: $ {
-                roomNumber
-            }
-
-            の全ユーザー`);
+        showDeleteScoreModal('room', roomNumber, `部屋: ${roomNumber} の全ユーザー`);
     }
 
     function showDeleteScoreModal(type, id, name) {
