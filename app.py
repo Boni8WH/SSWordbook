@@ -12812,9 +12812,18 @@ def admin_delete_user_score():
         return jsonify({'status': 'error', 'message': '必要な情報が不足しています。'}), 400
         
     # 管理者パスワード確認
-    admin_user = AdminUser.query.filter_by(username='admin').first()
-    if not admin_user or not admin_user.check_password(admin_password):
-        return jsonify({'status': 'error', 'message': '管理者パスワードが間違っています。'}), 403
+    current_admin_id = session.get('user_id')
+    admin_user = User.query.get(current_admin_id) if current_admin_id else None
+    
+    # フォールバック: セッションにIDがない場合は従来のAdminUserテーブルを確認
+    if not admin_user:
+        admin_user = AdminUser.query.filter_by(username='admin').first()
+        if not admin_user or not admin_user.check_password(admin_password):
+            return jsonify({'status': 'error', 'message': '管理者パスワードが間違っています。'}), 403
+    else:
+        # Userテーブルの管理者アカウントで確認
+        if not admin_user.check_individual_password(admin_password):
+            return jsonify({'status': 'error', 'message': '管理者パスワードが間違っています。'}), 403
         
     user = User.query.get(user_id)
     if not user:
@@ -12846,9 +12855,18 @@ def admin_delete_room_score():
         return jsonify({'status': 'error', 'message': '必要な情報が不足しています。'}), 400
         
     # 管理者パスワード確認
-    admin_user = AdminUser.query.filter_by(username='admin').first()
-    if not admin_user or not admin_user.check_password(admin_password):
-        return jsonify({'status': 'error', 'message': '管理者パスワードが間違っています。'}), 403
+    current_admin_id = session.get('user_id')
+    admin_user = User.query.get(current_admin_id) if current_admin_id else None
+    
+    # フォールバック: セッションにIDがない場合は従来のAdminUserテーブルを確認
+    if not admin_user:
+        admin_user = AdminUser.query.filter_by(username='admin').first()
+        if not admin_user or not admin_user.check_password(admin_password):
+            return jsonify({'status': 'error', 'message': '管理者パスワードが間違っています。'}), 403
+    else:
+        # Userテーブルの管理者アカウントで確認
+        if not admin_user.check_individual_password(admin_password):
+            return jsonify({'status': 'error', 'message': '管理者パスワードが間違っています。'}), 403
         
     users = User.query.filter_by(room_number=room_number).all()
     if not users:
