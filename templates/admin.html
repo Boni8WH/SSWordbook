@@ -204,6 +204,10 @@
                                             data-user-id="{{ user.id }}" data-username="{{ user.username }}">
                                             <i class="fas fa-trash"></i> 削除
                                         </button>
+                                        <button class="btn btn-warning btn-sm delete-score-btn"
+                                            data-user-id="{{ user.id }}" data-username="{{ user.username }}">
+                                            <i class="fas fa-eraser"></i> スコア削除
+                                        </button>
                                     </td>
                                 </tr>
                                 {% endif %}
@@ -371,6 +375,10 @@
                                                 {% else %}
                                                 <i class="fas fa-pause"></i> 一時停止
                                                 {% endif %}
+                                            </button>
+                                            <button class="btn btn-warning btn-sm delete-room-score-btn"
+                                                onclick="confirmDeleteRoomScore('{{ room_num }}')">
+                                                <i class="fas fa-eraser"></i> スコア全削除
                                             </button>
                                             <button class="btn btn-danger btn-sm"
                                                 onclick="deleteRoom('{{ room_num }}')">削除</button>
@@ -5388,7 +5396,115 @@
         color: #721c24;
         border-color: #dc3545;
     }
+</style>
+<!-- スコア削除確認モーダル -->
+<div class="modal fade" id="deleteScoreModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title"><i class="fas fa-exclamation-triangle"></i>スコア削除の確認</h5><button type="button"
+                    class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>以下の対象の<strong>全ての学習履歴とスコア</strong>を削除します。<br>この操作は取り消せません。</p>
+                <div class="alert alert-warning"><strong>対象:</strong><span id="deleteScoreTargetName"></span></div>
+                <p class="text-danger small">※ ユーザー自体は削除されません。学習データのみが初期化されます。</p>
+                <form id="deleteScoreForm"><input type="hidden" id="deleteScoreType" name="type">
+                    < !-- user or room --><input type="hidden" id="deleteScoreTargetId" name="target_id">
+                        <div class="mb-3"><label for="deleteScoreAdminPassword"
+                                class="form-label">管理者パスワード:</label><input type="password" class="form-control"
+                                id="deleteScoreAdminPassword" required></div>
+                </form>
+            </div>
+            <div class="modal-footer"><button type="button" class="btn btn-secondary"
+                    data-bs-dismiss="modal">キャンセル</button><button type="button" class="btn btn-warning"
+                    onclick="executeDeleteScore()"><i class="fas fa-eraser"></i>削除実行 </button></div>
+        </div>
+    </div>
+</div>
+<script> // スコア削除モーダルの制御
 
+    document.addEventListener('DOMContentLoaded', function () {
+        // 個別ユーザーのスコア削除ボタン
+        const deleteScoreBtns = document.querySelectorAll('.delete-score-btn');
+
+        deleteScoreBtns.forEach(btn => {
+            btn.addEventListener('click', function () {
+                const userId = this.dataset.userId;
+                const username = this.dataset.username;
+
+                showDeleteScoreModal('user', userId, `ユーザー: $ {
+                                    username
+                                }
+
+                                `);
+            });
+        });
+    });
+
+    // 部屋のスコア削除確認（onclick属性から呼ばれる）
+    function confirmDeleteRoomScore(roomNumber) {
+        showDeleteScoreModal('room', roomNumber, `部屋: $ {
+                roomNumber
+            }
+
+            の全ユーザー`);
+    }
+
+    function showDeleteScoreModal(type, id, name) {
+        document.getElementById('deleteScoreType').value = type;
+        document.getElementById('deleteScoreTargetId').value = id;
+        document.getElementById('deleteScoreTargetName').textContent = name;
+        document.getElementById('deleteScoreAdminPassword').value = '';
+
+        const modal = new bootstrap.Modal(document.getElementById('deleteScoreModal'));
+        modal.show();
+    }
+
+    function executeDeleteScore() {
+        const type = document.getElementById('deleteScoreType').value;
+        const id = document.getElementById('deleteScoreTargetId').value;
+        const password = document.getElementById('deleteScoreAdminPassword').value;
+
+        if (!password) {
+            alert('管理者パスワードを入力してください。');
+            return;
+        }
+
+        const endpoint = type === 'user' ? '/admin/delete_user_score' : '/admin/delete_room_score';
+        const data = new FormData();
+        data.append('admin_password', password);
+
+        if (type === 'user') {
+            data.append('user_id', id);
+        }
+
+        else {
+            data.append('room_number', id);
+        }
+
+        fetch(endpoint, {
+            method: 'POST',
+            body: data
+
+        }).then(response => response.json()).then(data => {
+            if (data.status === 'success') {
+                alert(data.message);
+                location.reload();
+            }
+
+            else {
+                alert('エラー: ' + data.message);
+            }
+
+        }).catch(error => {
+            console.error('Error:', error);
+            alert('通信エラーが発生しました。');
+        });
+    }
+
+</script>
+<style>
     /* テキストエリアの下部余白確保と高さ調整 */
     .essay-answer-input,
     #edit_answer {
