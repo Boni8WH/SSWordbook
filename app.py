@@ -18,6 +18,7 @@ from datetime import date, datetime, timedelta
 import random
 import glob
 import pytz
+import threading
 try:
     import boto3
     from botocore.exceptions import NoCredentialsError
@@ -742,6 +743,16 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 
 # 部屋ごとのCSVファイルを保存するフォルダ
 ROOM_CSV_FOLDER = 'room_csv'
+
+# ユーザー登録の進捗状況を管理するグローバル変数
+registration_status = {
+    'is_processing': False,
+    'total': 0,
+    'current': 0,
+    'message': '',
+    'errors': [],
+    'completed': False
+}
 
 # ====================================================================
 # アプリ情報を取得するヘルパー関数
@@ -2942,6 +2953,19 @@ def get_essay_keywords(problem_id):
         'problem_id': problem_id,
         'quiz_data': quiz_data # 問題と答えのペアのリストを返す
     })
+
+# 部屋ごとのCSVファイルを保存するフォルダ
+ROOM_CSV_FOLDER = 'room_csv'
+
+# ユーザー登録の進捗状況を管理するグローバル変数
+registration_status = {
+    'is_processing': False,
+    'total': 0,
+    'current': 0,
+    'message': '',
+    'errors': [],
+    'completed': False
+}
 
 # ====================================================================
 # ルーティング
@@ -7683,16 +7707,16 @@ def admin_upload_users():
         content = file.read()
         
         # ファイルサイズチェック
-        if len(content) > 10240:  # 10KB制限
-            flash('CSVファイルが大きすぎます（10KB以下にしてください）。', 'danger')
+        if len(content) > 10 * 1024 * 1024:  # 10MB制限
+            flash('CSVファイルが大きすぎます（10MB以下にしてください）。', 'danger')
             return redirect(url_for('admin_page'))
         
         content_str = content.decode('utf-8')
         lines = content_str.strip().split('\n')
         
         # 行数制限
-        if len(lines) > 50:  # 50行制限
-            flash('CSVファイルの行数が多すぎます（50行以下にしてください）。', 'danger')
+        if len(lines) > 10000:  # 10000行制限
+            flash('CSVファイルの行数が多すぎます（10000行以下にしてください）。', 'danger')
             return redirect(url_for('admin_page'))
         
         print(f"📊 ファイルサイズ: {len(content)}bytes, 行数: {len(lines)}")
@@ -7707,103 +7731,149 @@ def admin_upload_users():
         
         print(f"📋 ヘッダー: {header_line}")
         print(f"📋 処理対象データ行数: {len(data_lines)}")
-        
-        users_added_count = 0
-        errors = []
-        skipped_count = 0
-        
-        # ★修正: すべてのデータ行を処理
-        for line_num, data_line in enumerate(data_lines, start=2):
-            try:
-                if not data_line.strip():
-                    continue
+
+        # バックグラウンド処理関数
+        def process_users_background(app, data_lines):
+            global registration_status
+            with app.app_context():
+                print("🔄 バックグラウンド処理開始: ユーザー登録")
+                
+                # ステータス初期化
+                registration_status['is_processing'] = True
+                registration_status['total'] = len(data_lines)
+                registration_status['current'] = 0
+                registration_status['message'] = '処理を開始します...'
+                registration_status['errors'] = []
+                registration_status['completed'] = False
+                
+                
+                start_time = time.time()
+                users_added_count = 0
+                errors = []
+                skipped_count = 0
+                
+                try:
+                    for line_num, data_line in enumerate(data_lines, start=2):
+                        try:
+                            # 進捗更新
+                            registration_status['current'] = users_added_count + skipped_count
+                            registration_status['message'] = f'ユーザー処理中... ({users_added_count + skipped_count}/{len(data_lines)})'
+                            
+                            if not data_line.strip():
+                                continue
+                                
+                            values = [v.strip() for v in data_line.split(',')]
+                            if len(values) < 5:
+                                error_msg = f"行{line_num}: データが不完全です"
+                                errors.append(error_msg)
+                                registration_status['errors'].append(error_msg)
+                                continue
+                            
+                            room_number, room_password, student_id, individual_password, username = values[:5]
+                            
+                            # 必須項目チェック
+                            if not all([room_number, room_password, student_id, individual_password, username]):
+                                error_msg = f"行{line_num}: 必須項目が不足しています"
+                                errors.append(error_msg)
+                                registration_status['errors'].append(error_msg)
+                                continue
+
+                            # 重複チェック
+                            individual_password_hash = generate_password_hash(individual_password, method='pbkdf2:sha256', salt_length=8)
+                            existing_user = User.query.filter_by(
+                                room_number=room_number,
+                                student_id=student_id
+                            ).first()
+                            
+                            if existing_user:
+                                if existing_user._individual_password_hash == individual_password_hash:
+                                     error_msg = f"行{line_num}: 部屋{room_number}・出席番号{student_id}で同じ個別パスワードのアカウントが既に存在します"
+                                     errors.append(error_msg)
+                                     registration_status['errors'].append(error_msg)
+                                     skipped_count += 1
+                                     continue
+                            
+                            existing_username = User.query.filter_by(
+                                room_number=room_number,
+                                username=username
+                            ).first()
+                            
+                            if existing_username:
+                                error_msg = f"行{line_num}: ユーザー {username} は既に存在します"
+                                errors.append(error_msg)
+                                registration_status['errors'].append(error_msg)
+                                skipped_count += 1
+                                continue
+
+                            # 新規ユーザー作成
+                            new_user = User(
+                                room_number=room_number,
+                                student_id=student_id,
+                                username=username,
+                                original_username=username,
+                                is_first_login=True
+                            )
+                            
+                            new_user._room_password_hash = generate_password_hash(room_password, method='pbkdf2:sha256', salt_length=8)
+                            new_user._individual_password_hash = individual_password_hash
+
+                            new_user.problem_history = {}
+                            new_user.incorrect_words = []
+                            new_user.last_login = datetime.now(JST)
+
+                            db.session.add(new_user)
+                            users_added_count += 1
+                            
+                            # 100件ごとにコミット
+                            if users_added_count % 100 == 0:
+                                db.session.commit()
+                                print(f"💾 バッチコミット: {users_added_count}件完了")
+                                import gc
+                                gc.collect()
+
+                        except Exception as e:
+                            db.session.rollback()
+                            error_msg = f"行{line_num}: エラー - {str(e)[:50]}"
+                            errors.append(error_msg)
+                            registration_status['errors'].append(error_msg)
+                            print(f"❌ 行{line_num}エラー: {e}")
+                            continue
+
+                    # 最終コミット
+                    if users_added_count % 100 != 0:
+                        db.session.commit()
+                        print(f"💾 最終コミット: {users_added_count}件完了")
+
+                    total_time = time.time() - start_time
+                    print(f"🏁 バックグラウンド処理完了: {users_added_count}ユーザー追加, 処理時間: {total_time:.2f}秒")
                     
-                values = [v.strip() for v in data_line.split(',')]
-                if len(values) < 5:
-                    errors.append(f"行{line_num}: データが不完全です")
-                    continue
-                
-                room_number, room_password, student_id, individual_password, username = values[:5]
-                
-                # 必須項目チェック
-                if not all([room_number, room_password, student_id, individual_password, username]):
-                    errors.append(f"行{line_num}: 必須項目が不足しています")
-                    continue
-
-                # 重複チェック
-                individual_password_hash = generate_password_hash(individual_password, method='pbkdf2:sha256', salt_length=8)
-                existing_user = User.query.filter_by(
-                    room_number=room_number,
-                    student_id=student_id,
-                    _individual_password_hash=individual_password_hash
-                ).first()
-                
-                if existing_user:
-                    errors.append(f"行{line_num}: 部屋{room_number}・出席番号{student_id}で同じ個別パスワードのアカウントが既に存在します")
-                    skipped_count += 1
-                    continue
-                if existing_user:
-                    errors.append(f"行{line_num}: ユーザー {username} は既に存在します")
-                    skipped_count += 1
-                    continue
-
-                # 新規ユーザー作成（軽量パスワードハッシュ化）
-                new_user = User(
-                    room_number=room_number,
-                    student_id=student_id,
-                    username=username,
-                    original_username=username,
-                    is_first_login=True  # 🆕 CSV一括追加でも初回ログインフラグを設定
-                )
-                
-                # ★修正: 軽量パスワードハッシュ化
-                new_user._room_password_hash = generate_password_hash(room_password, method='pbkdf2:sha256', salt_length=8)
-                new_user._individual_password_hash = generate_password_hash(individual_password, method='pbkdf2:sha256', salt_length=8)
-
-                new_user.problem_history = {}
-                new_user.incorrect_words = []
-                new_user.last_login = datetime.now(JST)
-
-                db.session.add(new_user)
-                users_added_count += 1
-                print(f"✅ ユーザー準備: {username} ({users_added_count}/{len(data_lines)})")
-                
-                # 5件ごとにコミット（効率化）
-                if users_added_count % 5 == 0:
-                    db.session.commit()
-                    print(f"💾 バッチコミット: {users_added_count}件完了")
+                    # 完了ステータス更新
+                    registration_status['is_processing'] = False
+                    registration_status['completed'] = True
+                    registration_status['current'] = len(data_lines)
+                    registration_status['message'] = f'完了: {users_added_count}件追加, {skipped_count}件スキップ, {len(errors)}件エラー'
                     
-                    # メモリ解放
-                    import gc
-                    gc.collect()
+                except Exception as e:
+                    print(f"❌ バックグラウンド処理全体エラー: {e}")
+                    registration_status['is_processing'] = False
+                    registration_status['message'] = f'エラー発生: {str(e)}'
+                    import traceback
+                    traceback.print_exc()
 
-            except Exception as e:
-                db.session.rollback()
-                errors.append(f"行{line_num}: エラー - {str(e)[:50]}")
-                print(f"❌ 行{line_num}エラー: {e}")
-                continue
-
-        # 最終コミット（余りがある場合）
-        if users_added_count % 5 != 0:
-            db.session.commit()
-            print(f"💾 最終コミット: {users_added_count}件完了")
-
-        total_time = time.time() - start_time
-        print(f"🏁 全体処理完了: {users_added_count}ユーザー追加, 処理時間: {total_time:.2f}秒")
-
-        # 結果メッセージ
-        if users_added_count > 0:
-            flash(f'✅ {users_added_count}人のユーザーを追加しました（処理時間: {total_time:.1f}秒）', 'success')
+        # スレッド開始
+        thread = threading.Thread(target=process_users_background, args=(app, data_lines))
+        thread.start()
         
-        if skipped_count > 0:
-            flash(f'⚠️ {skipped_count}人のユーザーは重複のためスキップしました', 'warning')
-            
-        if errors:
-            error_count = len(errors)
-            if error_count <= 3:
-                flash(f'❌ エラー: {", ".join(errors)}', 'danger')
-            else:
-                flash(f'❌ {error_count}件のエラーが発生しました。最初の3件: {", ".join(errors[:3])}', 'danger')
+        # JSONリクエストの場合はJSONで返す
+        if request.args.get('json') == 'true':
+            return jsonify({
+                'status': 'success',
+                'message': 'バックグラウンド処理を開始しました',
+                'total_lines': len(data_lines)
+            })
+        
+        flash(f'✅ ユーザー登録処理をバックグラウンドで開始しました。完了までしばらくお待ちください。（対象: {len(data_lines)}件）', 'info')
+        return redirect(url_for('admin_page'))
                 
     except Exception as e:
         error_time = time.time() - start_time if 'start_time' in locals() else 0
@@ -7814,6 +7884,12 @@ def admin_upload_users():
         flash(f'CSV処理エラー: {str(e)} (処理時間: {error_time:.1f}秒)', 'danger')
 
     return redirect(url_for('admin_page'))
+
+@app.route('/admin/api/registration_status')
+def get_registration_status():
+    if not session.get('admin_logged_in'):
+        return jsonify({'status': 'error', 'message': 'Unauthorized'}), 403
+    return jsonify(registration_status)
 
 # データエクスポート関数
 @app.route('/admin/download_users_csv')
