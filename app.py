@@ -6983,6 +6983,53 @@ def admin_app_info_reset():
         flash(f'アプリ情報のリセット中にエラーが発生しました: {str(e)}', 'danger')
         return redirect(url_for('admin_app_info'))
 
+
+def initialize_essay_visibility(room_number):
+    """部屋作成時に論述問題の公開設定を初期化（デフォルト非公開）"""
+    try:
+        print(f"🔒 部屋 {room_number} の論述問題公開設定を初期化中（デフォルト非公開）...")
+        
+        # 1. 有効な論述問題の章を取得
+        chapters = db.session.query(EssayProblem.chapter).filter(
+            EssayProblem.enabled == True
+        ).distinct().all()
+        
+        unique_chapters = sorted(list(set([c[0] for c in chapters])))
+        if 'com' in unique_chapters:
+            unique_chapters.remove('com')
+            unique_chapters.append('com')
+            
+        problem_types = ['A', 'B', 'C', 'D']
+        created_count = 0
+        
+        for chapter in unique_chapters:
+            for p_type in problem_types:
+                # 既に設定があるか確認
+                existing = EssayVisibilitySetting.query.filter_by(
+                    room_number=room_number,
+                    chapter=chapter,
+                    problem_type=p_type
+                ).first()
+                
+                if not existing:
+                    # デフォルトで非公開(False)に設定
+                    setting = EssayVisibilitySetting(
+                        room_number=room_number,
+                        chapter=chapter,
+                        problem_type=p_type,
+                        is_visible=False  # ★ ここで非公開に設定
+                    )
+                    db.session.add(setting)
+                    created_count += 1
+        
+        db.session.commit()
+        print(f"✅ 部屋 {room_number} の公開設定を初期化しました（{created_count}件作成）")
+        return True
+        
+    except Exception as e:
+        print(f"❌ 公開設定初期化エラー: {e}")
+        return False
+
 @app.route('/admin/add_user', methods=['POST'])
 def admin_add_user():
     try:
@@ -7034,6 +7081,10 @@ def admin_add_user():
             default_room_setting = RoomSetting(room_number=room_number)
             db.session.add(default_room_setting)
             db.session.commit()
+            
+            # ★ 論述問題の公開設定を初期化（非公開）
+            initialize_essay_visibility(room_number)
+            
             flash(f'部屋 {room_number} の設定をデフォルトで作成しました。', 'info')
 
         flash(f'ユーザー {username} (部屋: {room_number}, 出席番号: {student_id}) を登録しました。', 'success')
@@ -7848,15 +7899,15 @@ def admin_upload_users():
                     print(f"🏁 バックグラウンド処理完了: {users_added_count}ユーザー追加, 処理時間: {total_time:.2f}秒")
                     
                     # 完了ステータス更新
-                    registration_status['is_processing'] = False
-                    registration_status['completed'] = True
-                    registration_status['current'] = len(data_lines)
                     registration_status['message'] = f'完了: {users_added_count}件追加, {skipped_count}件スキップ, {len(errors)}件エラー'
+                    registration_status['completed'] = True
+                    registration_status['is_processing'] = False
                     
                 except Exception as e:
                     print(f"❌ バックグラウンド処理全体エラー: {e}")
-                    registration_status['is_processing'] = False
                     registration_status['message'] = f'エラー発生: {str(e)}'
+                    registration_status['completed'] = True
+                    registration_status['is_processing'] = False
                     import traceback
                     traceback.print_exc()
 
