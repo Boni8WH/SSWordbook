@@ -95,16 +95,56 @@
                     </a>
                 </div>
 
-                <form action="{{ url_for('admin_upload_users') }}" method="POST" enctype="multipart/form-data"
-                    class="upload-form">
+                <form id="userUploadForm" enctype="multipart/form-data" class="upload-form">
                     <div class="input-group">
                         <label for="users_csv_file">ユーザーCSVファイルを選択:</label>
                         <input type="file" id="users_csv_file" name="file" accept=".csv" required>
                     </div>
-                    <button type="submit" class="btn btn-success">
+                    <button type="button" class="btn btn-success" onclick="prepareUserUpload()">
                         <i class="fas fa-upload"></i> CSV一括ユーザー追加
                     </button>
                 </form>
+
+                <!-- 進捗バー -->
+                <div id="uploadProgressContainer" style="display: none; margin-top: 20px;">
+                    <h5><i class="fas fa-spinner fa-spin"></i> ユーザー登録処理中...</h5>
+                    <div class="progress" style="height: 25px;">
+                        <div id="uploadProgressBar" class="progress-bar progress-bar-striped progress-bar-animated"
+                            role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0"
+                            aria-valuemax="100">0%</div>
+                    </div>
+                    <p id="uploadStatusMessage" class="text-muted mt-2">準備中...</p>
+                </div>
+
+                <!-- 確認モーダル -->
+                <div class="modal fade" id="uploadConfirmModal" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">ユーザー一括登録の確認</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"
+                                    aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <p>以下の内容で登録を開始しますか？</p>
+                                <ul>
+                                    <li><strong>対象ファイル:</strong> <span id="confirmFileName"></span></li>
+                                    <li><strong>登録ユーザー数:</strong> <span id="confirmUserCount"></span> 人</li>
+                                    <li><strong>推定所要時間:</strong> <span id="confirmTimeEstimate"></span></li>
+                                </ul>
+                                <div class="alert alert-info">
+                                    <small>※ 処理はバックグラウンドで行われます。開始後は他の作業を行っても問題ありません。</small>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+                                <button type="button" class="btn btn-primary" onclick="startUserUpload()">
+                                    <i class="fas fa-play"></i> 登録開始
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
                 <h4>個別ユーザー追加</h4>
                 <form action="{{ url_for('admin_add_user') }}" method="POST" class="add-user-form">
@@ -5574,4 +5614,123 @@
     }
 </style>
 
+<script>
+    // ユーザーアップロード準備（推定時間計算）
+    function prepareUserUpload() {
+        const fileInput = document.getElementById('users_csv_file');
+        if (!fileInput.files.length) {
+            alert('ファイルを選択してください。');
+            return;
+        }
+
+        const file = fileInput.files[0];
+        const reader = new FileReader();
+
+        reader.onload = function (e) {
+            const text = e.target.result;
+            const lines = text.split('\n').filter(line => line.trim() !== '');
+            // ヘッダー行を除く
+            const userCount = Math.max(0, lines.length - 1);
+
+            if (userCount === 0) {
+                alert('有効なデータが含まれていません。');
+                return;
+            }
+
+            // 推定時間計算 (1ユーザーあたり約0.08秒 + オーバーヘッド)
+            // 100ユーザーで16秒だったので、0.16秒/ユーザーと見積もる（安全マージン込み）
+            const estimatedSeconds = Math.ceil(userCount * 0.16);
+            let timeString = '';
+            if (estimatedSeconds < 60) {
+                timeString = `約 ${estimatedSeconds} 秒`;
+            } else {
+                const minutes = Math.floor(estimatedSeconds / 60);
+                const seconds = estimatedSeconds % 60;
+                timeString = `約 ${minutes} 分 ${seconds} 秒`;
+            }
+
+            document.getElementById('confirmFileName').textContent = file.name;
+            document.getElementById('confirmUserCount').textContent = userCount;
+            document.getElementById('confirmTimeEstimate').textContent = timeString;
+
+            const modal = new bootstrap.Modal(document.getElementById('uploadConfirmModal'));
+            modal.show();
+        };
+
+        reader.readAsText(file);
+    }
+
+    // アップロード開始
+    function startUserUpload() {
+        const fileInput = document.getElementById('users_csv_file');
+        const file = fileInput.files[0];
+        const formData = new FormData();
+        formData.append('file', file);
+
+        // モーダルを閉じる
+        const modalEl = document.getElementById('uploadConfirmModal');
+        const modal = bootstrap.Modal.getInstance(modalEl);
+        modal.hide();
+
+        // 進捗バー表示
+        document.getElementById('uploadProgressContainer').style.display = 'block';
+        document.getElementById('uploadProgressBar').style.width = '0%';
+        document.getElementById('uploadProgressBar').textContent = '0%';
+        document.getElementById('uploadStatusMessage').textContent = 'アップロード中...';
+
+        // AJAX送信
+        fetch("{{ url_for('admin_upload_users') }}?json=true", {
+            method: 'POST',
+            body: formData
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    // ポーリング開始
+                    pollRegistrationStatus();
+                } else {
+                    alert('エラー: ' + data.message);
+                    document.getElementById('uploadProgressContainer').style.display = 'none';
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('アップロード中にエラーが発生しました。');
+                document.getElementById('uploadProgressContainer').style.display = 'none';
+            });
+    }
+
+    // 進捗ポーリング
+    function pollRegistrationStatus() {
+        fetch("{{ url_for('get_registration_status') }}")
+            .then(response => response.json())
+            .then(status => {
+                if (status.is_processing) {
+                    const percent = Math.round((status.current / status.total) * 100);
+                    const progressBar = document.getElementById('uploadProgressBar');
+                    progressBar.style.width = percent + '%';
+                    progressBar.textContent = percent + '%';
+                    progressBar.setAttribute('aria-valuenow', percent);
+
+                    document.getElementById('uploadStatusMessage').textContent = status.message;
+
+                    // 1秒後に再確認
+                    setTimeout(pollRegistrationStatus, 1000);
+                } else if (status.completed) {
+                    // 完了
+                    document.getElementById('uploadProgressBar').style.width = '100%';
+                    document.getElementById('uploadProgressBar').textContent = '100%';
+                    document.getElementById('uploadProgressBar').classList.remove('progress-bar-animated');
+                    document.getElementById('uploadProgressBar').classList.add('bg-success');
+                    document.getElementById('uploadStatusMessage').textContent = status.message;
+
+                    alert('登録が完了しました！\n' + status.message);
+                    location.reload(); // ページリロードして一覧更新
+                }
+            })
+            .catch(error => {
+                console.error('Polling Error:', error);
+            });
+    }
+</script>
 {% endblock %}
