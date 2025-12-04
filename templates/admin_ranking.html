@@ -57,8 +57,8 @@
                     </div>
                 </div>
 
-                <div id="grid-selector" class="room-selector" style="display: none;">
-                    <div class="rooms-grid" id="rooms-grid">
+                <div id="compact-selector" class="room-selector" style="display: none;">
+                    <div class="rooms-compact" id="rooms-compact">
                     </div>
                 </div>
 
@@ -899,13 +899,7 @@
     // 9. アクション関数
     // ========================================
     function refreshRanking() {
-        if (selectedRoom) {
-            console.log(`🔄 ランキング再取得: 部屋${selectedRoom}`);
-            loadRankingForRoom(selectedRoom, true);
-        } else {
-            console.warn('⚠️ 部屋が選択されていません');
-            alert('部屋を選択してください。');
-        }
+        refreshAllData();
     }
 
     function refreshAllData() {
