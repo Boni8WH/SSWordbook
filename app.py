@@ -423,25 +423,37 @@ class UserStats(db.Model):
                 db.session.flush()
         return stats
 
-    def update_stats(self, word_data=None):
+    def update_stats(self, word_data=None, problem_id_map=None, parsed_max_enabled_unit_num=None):
         """統計を再計算して更新"""
         try:
             user = self.user
             if not user:
                 return False
             
-            print(f"📊 統計更新開始: {user.username}")
+            # print(f"📊 統計更新開始: {user.username}") # ログ抑制
             
             # 部屋の単語データを取得
             if word_data is None:
                 word_data = load_word_data_for_room(user.room_number)
             
-            # 部屋設定を取得
-            room_setting = RoomSetting.query.filter_by(room_number=user.room_number).first()
-            max_enabled_unit_num_str = room_setting.max_enabled_unit_number if room_setting else "9999"
-            parsed_max_enabled_unit_num = parse_unit_number(max_enabled_unit_num_str)
+            # マップと設定が渡されていない場合はここで計算（単体呼び出し用）
+            if problem_id_map is None or parsed_max_enabled_unit_num is None:
+                # 部屋設定を取得
+                room_setting = RoomSetting.query.filter_by(room_number=user.room_number).first()
+                max_enabled_unit_num_str = room_setting.max_enabled_unit_number if room_setting else "9999"
+                parsed_max_enabled_unit_num = parse_unit_number(max_enabled_unit_num_str)
+                
+                # IDマップを作成
+                problem_id_map = {}
+                for word in word_data:
+                    pid = get_problem_id(word)
+                    problem_id_map[pid] = word
+
+            # 有効な問題数を計算（これはword_dataから計算できるので高速）
+            # ただし、毎回計算するのは無駄なので、呼び出し元で計算して渡すのがベストだが、
+            # ここではマップ構築時に一緒にやるか、既存ロジックを維持しつつマップを使う。
+            # いったん既存ロジックをマップベースに書き換える。
             
-            # 有効な問題数を計算
             total_questions_for_room = 0
             for word in word_data:
                 is_word_enabled_in_csv = word['enabled']
@@ -457,12 +469,8 @@ class UserStats(db.Model):
             mastered_problem_ids = set()
             
             for problem_id, history in user_history.items():
-                # 対応する単語を検索
-                matched_word = None
-                for word in word_data:
-                    if get_problem_id(word) == problem_id:
-                        matched_word = word
-                        break
+                # 対応する単語をマップから高速検索
+                matched_word = problem_id_map.get(problem_id)
                 
                 if matched_word:
                     is_word_enabled_in_csv = matched_word['enabled']
@@ -3951,15 +3959,26 @@ def api_admin_room_ranking(room_number):
                 # 部屋の単語データを一度だけロード（最適化）
                 word_data = load_word_data_for_room(room_number)
                 
+                # 部屋設定とIDマップを一度だけ計算（最適化）
+                room_setting = RoomSetting.query.filter_by(room_number=room_number).first()
+                max_enabled_unit_num_str = room_setting.max_enabled_unit_number if room_setting else "9999"
+                parsed_max_enabled_unit_num = parse_unit_number(max_enabled_unit_num_str)
+                
+                problem_id_map = {}
+                for word in word_data:
+                    pid = get_problem_id(word)
+                    problem_id_map[pid] = word
+                
                 count = 0
                 for user in users_in_room:
                     if user.username == 'admin':
                         continue
                     stats = UserStats.get_or_create(user.id)
-                    stats.update_stats(word_data)
+                    # 最適化されたupdate_statsを呼び出し
+                    stats.update_stats(word_data, problem_id_map, parsed_max_enabled_unit_num)
                     count += 1
-                    if count % 10 == 0:
-                        db.session.commit() # 定期的にコミット
+                    if count % 50 == 0: # コミット頻度を調整
+                        db.session.commit()
                 
                 db.session.commit()
                 print(f"✅ 全ユーザーの統計更新完了 ({count}人)")
