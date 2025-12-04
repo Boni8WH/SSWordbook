@@ -3928,6 +3928,11 @@ def api_admin_room_ranking(room_number):
         print(f"\n=== 管理者用ランキング取得開始 (部屋: {room_number}) ===")
         start_time = time.time()
         
+        # 強制更新フラグの確認
+        force_refresh = request.args.get('refresh') == 'true'
+        if force_refresh:
+            print("🔄 ランキング強制更新リクエストを受信しました")
+        
         # user_statsテーブルの存在確認
         try:
             inspector = inspect(db.engine)
@@ -3936,6 +3941,28 @@ def api_admin_room_ranking(room_number):
             if not user_stats_exists:
                 print("⚠️ user_statsテーブルが存在しません。従来方式で計算します...")
                 return admin_fallback_ranking_calculation(room_number, start_time)
+            
+            # 強制更新または統計データがないユーザーの同期
+            if force_refresh:
+                # 部屋の全ユーザーを取得して統計を更新
+                users_in_room = User.query.filter_by(room_number=room_number).all()
+                print(f"🔄 全ユーザー({len(users_in_room)}人)の統計を再計算中...")
+                
+                # 部屋の単語データを一度だけロード（最適化）
+                word_data = load_word_data_for_room(room_number)
+                
+                count = 0
+                for user in users_in_room:
+                    if user.username == 'admin':
+                        continue
+                    stats = UserStats.get_or_create(user.id)
+                    stats.update_stats(word_data)
+                    count += 1
+                    if count % 10 == 0:
+                        db.session.commit() # 定期的にコミット
+                
+                db.session.commit()
+                print(f"✅ 全ユーザーの統計更新完了 ({count}人)")
             
             # 統計データがないユーザーを特定して作成（同期処理）
             try:
