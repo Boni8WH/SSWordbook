@@ -32,10 +32,7 @@
                             <i class="fas fa-list"></i> ドロップダウン
                         </label>
 
-                        <input type="radio" class="btn-check" name="viewMode" id="gridMode">
-                        <label class="btn btn-outline-primary btn-sm" for="gridMode">
-                            <i class="fas fa-th"></i> グリッド表示
-                        </label>
+
 
                         <input type="radio" class="btn-check" name="viewMode" id="compactMode">
                         <label class="btn btn-outline-primary btn-sm" for="compactMode">
@@ -65,10 +62,6 @@
                     </div>
                 </div>
 
-                <div id="compact-selector" class="room-selector" style="display: none;">
-                    <div class="rooms-compact" id="rooms-compact">
-                    </div>
-                </div>
 
                 <div id="selected-room-info" class="selected-room-info mt-3" style="display: none;">
                     <div class="alert alert-info d-flex justify-content-between align-items-center">
@@ -424,7 +417,6 @@
 
         // 各表示モードを更新
         updateDropdownSelector(rooms);
-        updateGridSelector(rooms);
         updateCompactSelector(rooms);
 
         console.log(`✅ ${rooms.length}個の部屋選択肢を表示しました`);
@@ -445,30 +437,6 @@
             option.value = room.room_number;
             option.textContent = `部屋 ${room.room_number} (${room.user_count}人)`;
             select.appendChild(option);
-        });
-    }
-
-    function updateGridSelector(rooms) {
-        const container = document.getElementById('rooms-grid');
-        if (!container) return;
-
-        container.innerHTML = '';
-
-        rooms.forEach(room => {
-            const roomCard = document.createElement('div');
-            roomCard.className = 'room-card';
-            roomCard.setAttribute('data-room-number', room.room_number);
-            roomCard.innerHTML = `
-            <div class="room-card-content">
-                <div class="room-number">部屋 ${room.room_number}</div>
-                <div class="room-users">${room.user_count}人</div>
-                <div class="room-status">
-                    <i class="fas fa-users"></i> アクティブ
-                </div>
-            </div>
-        `;
-            roomCard.onclick = () => selectRoom(room.room_number, room.user_count);
-            container.appendChild(roomCard);
         });
     }
 
@@ -548,11 +516,6 @@
         const select = document.getElementById('room-select-dropdown');
         if (select) select.value = '';
 
-        // グリッドの選択状態をリセット
-        document.querySelectorAll('.room-card').forEach(card => {
-            card.classList.remove('selected');
-        });
-
         // コンパクトボタンの選択状態をリセット
         document.querySelectorAll('.room-button-compact').forEach(btn => {
             btn.classList.remove('btn-primary');
@@ -564,10 +527,6 @@
         // ドロップダウンの選択状態を更新
         const select = document.getElementById('room-select-dropdown');
         if (select) select.value = roomNumber;
-
-        // グリッドの選択状態を更新
-        const selectedCard = document.querySelector(`[data-room-number="${roomNumber}"].room-card`);
-        if (selectedCard) selectedCard.classList.add('selected');
 
         // コンパクトボタンの選択状態を更新
         const selectedButton = document.querySelector(`[data-room-number="${roomNumber}"].room-button-compact`);
@@ -1237,56 +1196,6 @@
 
     .room-selector {
         margin-top: 20px;
-    }
-
-    /* グリッド表示 */
-    .rooms-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-        gap: 15px;
-        margin-top: 15px;
-    }
-
-    .room-card {
-        border: 2px solid #dee2e6;
-        border-radius: 8px;
-        padding: 20px;
-        text-align: center;
-        cursor: pointer;
-        transition: all 0.3s ease;
-        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-    }
-
-    .room-card:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
-        border-color: #007bff;
-    }
-
-    .room-card.selected {
-        border-color: #007bff;
-        background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
-        transform: translateY(-3px);
-        box-shadow: 0 6px 20px rgba(0, 123, 255, 0.3);
-    }
-
-    .room-card-content .room-number {
-        font-size: 1.2rem;
-        font-weight: bold;
-        color: #343a40;
-        margin-bottom: 8px;
-    }
-
-    .room-card-content .room-users {
-        font-size: 1.4rem;
-        color: #007bff;
-        font-weight: 600;
-        margin-bottom: 8px;
-    }
-
-    .room-card-content .room-status {
-        font-size: 0.8rem;
-        color: #6c757d;
     }
 
     /* コンパクト表示 */
