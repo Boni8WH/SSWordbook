@@ -9788,10 +9788,6 @@ def admin_save_essay_visibility_settings():
 # ========================================
 # 既存の論述問題ルートの修正部分
 # ========================================
-
-# 既存の essay_chapter ルートがある場合は、以下の関数で置き換える
-# （存在しない場合は、そのまま追加）
-
 def get_essay_filter_data_with_visibility(chapter, room_number):
     """公開設定を考慮したフィルター用データを取得"""
     try:
@@ -9841,9 +9837,7 @@ def get_essay_filter_data_with_visibility(chapter, room_number):
             'year_range': {'min': 2020, 'max': 2025},
             'types': []
         }
-# ========================================
-# 不足しているEssay関連ルート（app.pyに追加）
-# ========================================
+
 @app.route('/admin/essay/stats')
 def admin_essay_stats():
     """論述問題の統計情報を取得"""
@@ -12848,22 +12842,7 @@ def admin_regenerate_daily_quiz():
     today = (datetime.now(JST) - timedelta(hours=7)).date()
 
     try:
-        existing_quiz = DailyQuiz.query.filter_by(date=today, room_number=room_number).first()
-
-        if existing_quiz:
-            print(f"🔧 部屋{room_number}の既存クイズ(ID: {existing_quiz.id})を削除します。")
-            
-            if not existing_quiz.monthly_score_processed:
-                print("スコアが未集計のため、先に集計処理を実行します...")
-                process_daily_quiz_results_for_scoring(existing_quiz.id)
-            else:
-                print("スコアは集計済みです。")
-
-            DailyQuizResult.query.filter_by(quiz_id=existing_quiz.id).delete()
-            db.session.delete(existing_quiz)
-            db.session.commit()
-            print(f"✅ 既存クイズと結果の削除完了。")
-
+        # 1. 新しい問題を先に生成
         print(f"✨ 部屋{room_number}の新しいクイズを生成します。")
         all_words = load_word_data_for_room(room_number)
         room_setting = RoomSetting.query.filter_by(room_number=room_number).first()
@@ -12885,13 +12864,29 @@ def admin_regenerate_daily_quiz():
 
         selected_problems = random.sample(public_words, 10)
         problem_ids = [generate_problem_id(p) for p in selected_problems]
-        
-        new_quiz = DailyQuiz(date=today, room_number=room_number, problem_ids_json=json.dumps(problem_ids), monthly_score_processed=False)
-        db.session.add(new_quiz)
-        db.session.commit()
-        print(f"✅ 新しいクイズ(ID: {new_quiz.id})の生成完了。")
+        problem_ids_json = json.dumps(problem_ids)
 
-        return jsonify({'status': 'success', 'message': f'部屋{room_number}の「今日の10問」を正常に再選考しました。'})
+        # 2. 既存のクイズを確認して更新または作成
+        existing_quiz = DailyQuiz.query.filter_by(date=today, room_number=room_number).first()
+
+        if existing_quiz:
+            print(f"🔧 部屋{room_number}の既存クイズ(ID: {existing_quiz.id})を更新します（再選考）。")
+            # 既存の結果を保持するため、削除せずに問題IDのみ更新
+            existing_quiz.problem_ids_json = problem_ids_json
+            # monthly_score_processed は変更しない（未集計なら未集計のまま、集計済みなら集計済みのまま）
+            # これにより、既存のランキングデータ（DailyQuizResult）は保持され、
+            # 月間取り組み回数（DailyQuizResultのカウント）も維持される。
+            db.session.commit()
+            print(f"✅ 既存クイズの問題を更新しました。")
+            message = f'部屋{room_number}の「今日の10問」を再選考しました。（過去の記録は保持されます）'
+        else:
+            new_quiz = DailyQuiz(date=today, room_number=room_number, problem_ids_json=problem_ids_json, monthly_score_processed=False)
+            db.session.add(new_quiz)
+            db.session.commit()
+            print(f"✅ 新しいクイズ(ID: {new_quiz.id})の生成完了。")
+            message = f'部屋{room_number}の「今日の10問」を新規作成しました。'
+
+        return jsonify({'status': 'success', 'message': message})
 
     except Exception as e:
         db.session.rollback()
