@@ -7009,6 +7009,8 @@ def admin_page():
                 'recent_logins': recent_logins,
                 'unique_room_numbers': sorted(list(unique_room_numbers), key=lambda x: int(x) if x.isdigit() else float('inf'))
             },
+            'announcements': announcements,
+            'room_settings': room_settings,
             **context
         }
         
