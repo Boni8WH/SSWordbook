@@ -145,13 +145,6 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    <form action="{{ url_for('admin_toggle_announcement', id=ann.id) }}" method="POST"
-                                        style="display: inline;">
-                                        <button type="submit"
-                                            class="btn btn-sm {% if ann.is_active %}btn-outline-secondary{% else %}btn-outline-primary{% endif %}">
-                                            {% if ann.is_active %}無効化{% else %}有効化{% endif %}
-                                        </button>
-                                    </form>
                                     <form action="{{ url_for('admin_delete_announcement', id=ann.id) }}" method="POST"
                                         style="display: inline;" onsubmit="return confirm('本当に削除しますか？');">
                                         <button type="submit" class="btn btn-sm btn-danger">削除</button>
