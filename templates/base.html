@@ -90,6 +90,12 @@
                             </a>
                         </li>
                         <li class="nav-item">
+                            <button class="nav-link btn btn-outline-secondary btn-sm me-2" data-bs-toggle="modal"
+                                data-bs-target="#settingsModal">
+                                <i class="fas fa-cog me-1"></i>設定
+                            </button>
+                        </li>
+                        <li class="nav-item">
                             <a class="nav-link btn btn-danger btn-sm" href="{{ url_for('logout') }}">
                                 <i class="fas fa-sign-out-alt me-1"></i>ログアウト
                             </a>
@@ -140,6 +146,41 @@
 
 
         {% block content %}{% endblock %}
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="modal fade" id="settingsModal" tabindex="-1" aria-labelledby="settingsModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="settingsModalLabel">設定</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">通知設定</label>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="notificationToggle">
+                            <label class="form-check-label" for="notificationToggle">通知を有効にする</label>
+                        </div>
+                        <div class="form-text text-muted">
+                            毎日の学習リマインダーやお知らせを受け取れます。
+                        </div>
+                    </div>
+                    <div class="mb-3" id="notificationTimeArea">
+                        <label for="notificationTime" class="form-label">リマインダー時間</label>
+                        <input type="time" class="form-control" id="notificationTime" value="21:00">
+                        <div class="form-text">
+                            「今日の10問」が未完了の場合、この時間に通知します。
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
+                    <button type="button" class="btn btn-primary" id="saveSettingsBtn">保存</button>
+                </div>
+            </div>
+        </div>
     </div>
 
 
