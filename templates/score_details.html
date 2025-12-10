@@ -18,15 +18,15 @@
         <h3>🔢 基本式</h3>
         <div class="formula-box">
             <div class="formula-main">
-            総合スコア = <span class="condition">マスタースコア + 正答率スコア + 継続性スコア + 精度ボーナス</span>
-        </div>
+                総合スコア = <span class="condition">マスタースコア + 正答率スコア + 継続性スコア + 精度ボーナス</span>
+            </div>
         </div>
     </div>
 
     <!-- 各要素の詳細 -->
     <div class="components-section">
         <h3>📊 各要素の計算</h3>
-        
+
         <!-- 1. マスタースコア -->
         <div class="component-card mastery-card">
             <div class="component-header">
@@ -120,7 +120,8 @@
             <div class="calculation-steps">
                 <div class="step">
                     <span class="step-label">1</span>
-                    <span class="step-calc">マスタースコア: floor(250÷100)×250 + (50÷100)×125 = 500 + 62.5 = <strong>562.5点</strong></span>
+                    <span class="step-calc">マスタースコア: floor(250÷100)×250 + (50÷100)×125 = 500 + 62.5 =
+                        <strong>562.5点</strong></span>
                 </div>
                 <div class="step">
                     <span class="step-label">2</span>
@@ -176,265 +177,284 @@
 </section>
 
 <style>
-.score-details-section {
-    max-width: 1000px;
-    margin: 0 auto;
-    padding: 20px;
-}
-
-.header-section {
-    text-align: center;
-    margin-bottom: 30px;
-    padding-bottom: 20px;
-    border-bottom: 3px solid #007bff;
-}
-
-.subtitle {
-    color: #6c757d;
-    font-size: 1.1rem;
-    margin-bottom: 15px;
-}
-
-.back-link {
-    margin-top: 15px;
-}
-
-.formula-container {
-    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-    border-radius: 10px;
-    padding: 25px;
-    margin-bottom: 30px;
-    border-left: 5px solid #007bff;
-}
-
-.formula-box {
-    text-align: center;
-}
-
-.formula-main {
-    font-size: 1.2rem;
-    font-weight: 600;
-    color: #2c3e50;
-    background: white;
-    padding: 15px;
-    border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.condition {
-    color: #007bff;
-}
-
-.components-section {
-    margin-bottom: 30px;
-}
-
-.component-card {
-    background: white;
-    border-radius: 10px;
-    padding: 20px;
-    margin-bottom: 20px;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-    border-left: 5px solid;
-}
-
-.mastery-card { border-left-color: #28a745; }
-.accuracy-card { border-left-color: #ffc107; }
-.effort-card { border-left-color: #17a2b8; }
-
-.component-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 15px;
-}
-
-.component-label {
-    background: #007bff;
-    color: white;
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-weight: bold;
-    margin-right: 10px;
-}
-
-.weight-badge { background: #28a745; }
-.feature-badge { background: #ffc107; color: #000; }
-.balance-badge { background: #17a2b8; }
-
-.weight-badge, .feature-badge, .balance-badge {
-    color: white;
-    padding: 3px 8px;
-    border-radius: 12px;
-    font-size: 0.8rem;
-    font-weight: 500;
-}
-
-.formula-detail {
-    background: #f8f9fa;
-    padding: 10px 15px;
-    border-radius: 6px;
-    margin-bottom: 15px;
-    font-family: 'Courier New', monospace;
-    border: 1px solid #dee2e6;
-}
-
-.explanation-list {
-    margin-bottom: 15px;
-    padding-left: 20px;
-}
-
-.explanation-list li {
-    margin-bottom: 5px;
-    color: #495057;
-}
-
-.example-box {
-    background: #e7f3ff;
-    padding: 10px 15px;
-    border-radius: 6px;
-    border: 1px solid #b8daff;
-    color: #004085;
-}
-
-.example-section {
-    background: #f8f9fa;
-    border-radius: 10px;
-    padding: 25px;
-    margin-bottom: 30px;
-}
-
-.calculation-example {
-    background: white;
-    border-radius: 8px;
-    padding: 20px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.example-title {
-    font-weight: 600;
-    color: #2c3e50;
-    margin-bottom: 20px;
-    text-align: center;
-    font-size: 1.1rem;
-}
-
-.calculation-steps {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
-.step {
-    display: flex;
-    align-items: center;
-    gap: 15px;
-    padding: 10px;
-    background: #f8f9fa;
-    border-radius: 6px;
-}
-
-.step-label {
-    background: #007bff;
-    color: white;
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-weight: bold;
-    min-width: 25px;
-    text-align: center;
-}
-
-.final-result {
-    display: flex;
-    align-items: center;
-    gap: 15px;
-    padding: 15px;
-    background: linear-gradient(135deg, #28a745, #20c997);
-    color: white;
-    border-radius: 6px;
-    font-weight: 600;
-    margin-top: 10px;
-}
-
-.result-label {
-    background: rgba(255,255,255,0.2);
-    padding: 4px 8px;
-    border-radius: 4px;
-    min-width: 80px;
-    text-align: center;
-}
-
-.philosophy-section {
-    background: linear-gradient(135deg, #6f42c1, #007bff);
-    color: white;
-    border-radius: 10px;
-    padding: 25px;
-    margin-bottom: 30px;
-}
-
-.philosophy-main {
-    font-size: 1.1rem;
-    line-height: 1.6;
-    margin-bottom: 20px;
-    text-align: center;
-}
-
-.fairness-features {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 15px;
-}
-
-.feature-item {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    background: rgba(255,255,255,0.1);
-    padding: 12px;
-    border-radius: 6px;
-}
-
-.comparison-section {
-    margin-bottom: 30px;
-}
-
-.back-section {
-    text-align: center;
-    padding-top: 20px;
-    border-top: 2px solid #e9ecef;
-}
-
-/* レスポンシブ対応 */
-@media (max-width: 768px) {
     .score-details-section {
-        padding: 15px;
+        max-width: 1000px;
+        margin: 0 auto;
+        padding: 20px;
     }
-    
+
+    .header-section {
+        text-align: center;
+        margin-bottom: 30px;
+        padding-bottom: 20px;
+        border-bottom: 3px solid #007bff;
+    }
+
+    .subtitle {
+        color: #6c757d;
+        font-size: 1.1rem;
+        margin-bottom: 15px;
+    }
+
+    .back-link {
+        margin-top: 15px;
+    }
+
+    .formula-container {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        border-radius: 10px;
+        padding: 25px;
+        margin-bottom: 30px;
+        border-left: 5px solid #007bff;
+    }
+
+    .formula-box {
+        text-align: center;
+    }
+
+    .formula-main {
+        font-size: 1.2rem;
+        font-weight: 600;
+        color: #2c3e50;
+        background: white;
+        padding: 15px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .condition {
+        color: #007bff;
+    }
+
+    .components-section {
+        margin-bottom: 30px;
+    }
+
+    .component-card {
+        background: white;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        border-left: 5px solid;
+    }
+
+    .mastery-card {
+        border-left-color: #28a745;
+    }
+
+    .accuracy-card {
+        border-left-color: #ffc107;
+    }
+
+    .effort-card {
+        border-left-color: #17a2b8;
+    }
+
     .component-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+    }
+
+    .component-label {
+        background: #007bff;
+        color: white;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-weight: bold;
+        margin-right: 10px;
+    }
+
+    .weight-badge {
+        background: #28a745;
+    }
+
+    .feature-badge {
+        background: #ffc107;
+        color: #000;
+    }
+
+    .balance-badge {
+        background: #17a2b8;
+    }
+
+    .weight-badge,
+    .feature-badge,
+    .balance-badge {
+        color: white;
+        padding: 3px 8px;
+        border-radius: 12px;
+        font-size: 0.8rem;
+        font-weight: 500;
+    }
+
+    .formula-detail {
+        background: #f8f9fa;
+        padding: 10px 15px;
+        border-radius: 6px;
+        margin-bottom: 15px;
+        font-family: 'Courier New', monospace;
+        border: 1px solid #dee2e6;
+    }
+
+    .explanation-list {
+        margin-bottom: 15px;
+        padding-left: 20px;
+    }
+
+    .explanation-list li {
+        margin-bottom: 5px;
+        color: #495057;
+    }
+
+    .example-box {
+        background: #e7f3ff;
+        padding: 10px 15px;
+        border-radius: 6px;
+        border: 1px solid #b8daff;
+        color: #004085;
+    }
+
+    .example-section {
+        background: #f8f9fa;
+        border-radius: 10px;
+        padding: 25px;
+        margin-bottom: 30px;
+    }
+
+    .calculation-example {
+        background: white;
+        border-radius: 8px;
+        padding: 20px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .example-title {
+        font-weight: 600;
+        color: #2c3e50;
+        margin-bottom: 20px;
+        text-align: center;
+        font-size: 1.1rem;
+    }
+
+    .calculation-steps {
+        display: flex;
         flex-direction: column;
-        align-items: flex-start;
         gap: 10px;
     }
-    
+
     .step {
-        flex-direction: column;
-        align-items: flex-start;
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        padding: 10px;
+        background: #f8f9fa;
+        border-radius: 6px;
+    }
+
+    .step-label {
+        background: #007bff;
+        color: white;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-weight: bold;
+        min-width: 25px;
+        text-align: center;
+    }
+
+    .final-result {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        padding: 15px;
+        background: linear-gradient(135deg, #28a745, #20c997);
+        color: white;
+        border-radius: 6px;
+        font-weight: 600;
+        margin-top: 10px;
+    }
+
+    .result-label {
+        background: rgba(255, 255, 255, 0.2);
+        padding: 4px 8px;
+        border-radius: 4px;
+        min-width: 80px;
+        text-align: center;
+    }
+
+    .philosophy-section {
+        background: linear-gradient(135deg, #6f42c1, #007bff);
+        color: white;
+        border-radius: 10px;
+        padding: 25px;
+        margin-bottom: 30px;
+    }
+
+    .philosophy-main {
+        font-size: 1.1rem;
+        line-height: 1.6;
+        margin-bottom: 20px;
         text-align: left;
     }
-    
-    .final-result {
-        flex-direction: column;
-        align-items: flex-start;
-    }
-    
+
     .fairness-features {
-        grid-template-columns: 1fr;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 15px;
     }
-    
-    .formula-main {
-        font-size: 1rem;
-        line-height: 1.4;
+
+    .feature-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        background: rgba(255, 255, 255, 0.1);
+        padding: 12px;
+        border-radius: 6px;
     }
-}
+
+    .comparison-section {
+        margin-bottom: 30px;
+    }
+
+    .back-section {
+        text-align: center;
+        padding-top: 20px;
+        border-top: 2px solid #e9ecef;
+    }
+
+    /* レスポンシブ対応 */
+    @media (max-width: 768px) {
+        .score-details-section {
+            padding: 15px;
+        }
+
+        .component-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 10px;
+        }
+
+        .step {
+            flex-direction: column;
+            align-items: flex-start;
+            text-align: left;
+        }
+
+        .final-result {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .fairness-features {
+            grid-template-columns: 1fr;
+        }
+
+        .formula-main {
+            font-size: 1rem;
+            line-height: 1.4;
+        }
+    }
 </style>
 {% endblock %}
