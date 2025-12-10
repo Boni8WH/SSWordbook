@@ -3888,29 +3888,7 @@ def is_mail_configured():
 # 管理者用全員ランキングページ
 # ====================================================================
 
-    try:
-        if not session.get('admin_logged_in'):
-            flash('管理者権限がありません。', 'danger')
-            return redirect(url_for('login_page'))
 
-        print("🏆 管理者用ランキングページ表示開始...")
-
-        # お知らせ一覧を取得
-        announcements = Announcement.query.order_by(Announcement.date.desc()).all()
-
-        # テンプレートに必要な基本情報のみ渡す
-        # 実際のデータは Ajax で後から取得
-        context = get_template_context()
-        context['announcements'] = announcements
-        
-        return render_template('admin.html', **context)
-        
-    except Exception as e:
-        print(f"❌ 管理者ページエラー: {e}")
-        import traceback
-        traceback.print_exc()
-        flash('管理者ページの読み込み中にエラーが発生しました。', 'danger')
-        return redirect(url_for('login_page'))
 
 @app.route('/admin/ranking')
 def admin_ranking_page():
@@ -4759,7 +4737,18 @@ def admin_add_announcement():
     try:
         title = request.form.get('title')
         content = request.form.get('content')
-        target_rooms = request.form.get('target_rooms', 'all')
+        # target_roomsは複数選択なのでgetlistで取得
+        target_rooms_list = request.form.getlist('target_rooms')
+        
+        # リストが空の場合はデフォルトでallにする（念のため）
+        if not target_rooms_list:
+            target_rooms = 'all'
+        else:
+            # 'all'が含まれている場合は'all'のみにする、または他の選択肢があっても'all'扱いにする
+            if 'all' in target_rooms_list:
+                target_rooms = 'all'
+            else:
+                target_rooms = ','.join(target_rooms_list)
         
         if not title or not content:
             flash('タイトルと内容は必須です。', 'danger')
@@ -6919,6 +6908,7 @@ def admin_page():
 
         users = User.query.all()
         room_settings = RoomSetting.query.all()
+        announcements = Announcement.query.order_by(Announcement.date.desc()).all()
         
         # 部屋設定のマッピングを作成
         room_max_unit_settings = {}
