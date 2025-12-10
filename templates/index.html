@@ -4,6 +4,11 @@
 {% block content %}
 <section class="selection-area">
     <div class="controls-area">
+        <div class="search-container" style="text-align: right; margin-bottom: 10px;">
+            <button id="openSearchButton" class="btn btn-sm btn-outline-secondary">
+                <i class="fas fa-search"></i> 問題検索
+            </button>
+        </div>
         <div class="question-count-and-auth">
             <div class="question-count-selection">
                 <h3>出題数を選択</h3>
@@ -28,6 +33,14 @@
                         <input type="radio" name="questionCount" value="incorrectOnly" id="incorrectOnlyRadio" {% if not
                             session.get('user_id') %}disabled{% endif %}>
                         <span>苦手問題</span>
+                    </label>
+                </div>
+                <!-- 未解答のみチェックボックス -->
+                <div class="checkbox-group" style="margin-top: 10px;">
+                    <label>
+                        <input type="checkbox" id="unsolvedOnlyCheckbox" {% if not session.get('user_id') %}disabled{%
+                            endif %}>
+                        <span>未解答のみ</span>
                     </label>
                 </div>
             </div>
@@ -156,6 +169,27 @@
             <i class="fas fa-envelope me-1"></i>
             <a href="#" id="contactEmail" class="text-decoration-none"></a>
         </p>
+    </div>
+</div>
+
+<!-- 検索モーダル -->
+<div class="modal fade" id="searchModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-search"></i> 問題検索</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="input-group mb-3">
+                    <input type="text" id="searchInput" class="form-control" placeholder="キーワードを入力（例: 織田信長）">
+                    <button class="btn btn-primary" type="button" id="searchExecuteButton">検索</button>
+                </div>
+                <div id="searchResults" class="list-group" style="max-height: 400px; overflow-y: auto;">
+                    <!-- 検索結果がここに表示されます -->
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 {% endblock %}
