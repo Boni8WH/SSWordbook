@@ -740,11 +740,23 @@ class Announcement(db.Model):
     is_active = db.Column(db.Boolean, default=True, nullable=False)
 
     def to_dict(self):
+        # 日時をJSTに変換して文字列化
+        d = self.date
+        if d:
+            if d.tzinfo is None:
+                # Naiveな場合はUTCとみなしてJSTに変換
+                d = pytz.utc.localize(d).astimezone(JST)
+            else:
+                d = d.astimezone(JST)
+            date_str = d.strftime('%Y-%m-%d %H:%M')
+        else:
+            date_str = ''
+
         return {
             'id': self.id,
             'title': self.title,
             'content': self.content,
-            'date': self.date.strftime('%Y-%m-%d %H:%M'),
+            'date': date_str,
             'target_rooms': self.target_rooms,
             'is_active': self.is_active
         }
