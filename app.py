@@ -7025,8 +7025,8 @@ def admin_page():
 def _update_app_info_general(app_info, form):
     """Update general application information from the form."""
     app_info.version = form.get('version', app_info.version).strip()
-    app_info.last_updated_date = form.get('last_updated_date', app_info.last_updated_date).strip()
-    app_info.update_content = form.get('update_content', app_info.update_content).strip()
+    # app_info.last_updated_date = form.get('last_updated_date', app_info.last_updated_date).strip()
+    # app_info.update_content = form.get('update_content', app_info.update_content).strip()
     app_info.footer_text = form.get('footer_text', app_info.footer_text or '').strip()
     app_info.contact_email = form.get('contact_email', app_info.contact_email or '').strip()
     app_info.school_name = form.get('school_name', app_info.school_name).strip()
