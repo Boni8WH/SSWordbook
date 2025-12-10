@@ -876,6 +876,7 @@ mail = Mail(app)
 # ===== スケジューラー設定 =====
 scheduler = APScheduler()
 scheduler.init_app(app)
+# スケジューラーは後で起動（関数定義後）
 scheduler.start()
 
 # スケジューラーにジョブ追加
