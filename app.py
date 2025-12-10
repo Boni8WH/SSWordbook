@@ -438,48 +438,7 @@ def check_daily_quiz_reminders():
 
 
 
-@app.route('/api/vapid_public_key')
-def get_vapid_public_key():
-    return jsonify({'publicKey': VAPID_PUBLIC_KEY})
 
-@app.route('/api/save_subscription', methods=['POST'])
-def save_subscription():
-    if 'user_id' not in session:
-        return jsonify({'status': 'error', 'message': 'Login required'}), 401
-    
-    data = request.get_json()
-    user = User.query.get(session['user_id'])
-    user.push_subscription = data
-    db.session.commit()
-    return jsonify({'status': 'success'})
-
-@app.route('/api/notification_settings', methods=['GET'])
-def get_notification_settings():
-    if 'user_id' not in session:
-        return jsonify({'status': 'error', 'message': 'Login required'}), 401
-    
-    user = User.query.get(session['user_id'])
-    return jsonify({
-        'status': 'success',
-        'enabled': user.notification_enabled,
-        'time': user.notification_time
-    })
-
-@app.route('/api/update_notification_settings', methods=['POST'])
-def update_notification_settings():
-    if 'user_id' not in session:
-        return jsonify({'status': 'error', 'message': 'Login required'}), 401
-    
-    data = request.get_json()
-    user = User.query.get(session['user_id'])
-    
-    if 'enabled' in data:
-        user.notification_enabled = data['enabled']
-    if 'time' in data:
-        user.notification_time = data['time']
-        
-    db.session.commit()
-    return jsonify({'status': 'success'})
 
 class PasswordResetToken(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -12684,6 +12643,53 @@ def find_related_essays():
 # ===== メイン起動処理の修正 =====
 # データベース初期化
 create_tables_and_admin_user()
+
+# ====================================================================
+# 通知APIルート
+# ====================================================================
+
+@app.route('/api/vapid_public_key')
+def get_vapid_public_key():
+    return jsonify({'publicKey': VAPID_PUBLIC_KEY})
+
+@app.route('/api/save_subscription', methods=['POST'])
+def save_subscription():
+    if 'user_id' not in session:
+        return jsonify({'status': 'error', 'message': 'Login required'}), 401
+    
+    data = request.get_json()
+    user = User.query.get(session['user_id'])
+    user.push_subscription = data
+    db.session.commit()
+    return jsonify({'status': 'success'})
+
+@app.route('/api/notification_settings', methods=['GET'])
+def get_notification_settings():
+    if 'user_id' not in session:
+        return jsonify({'status': 'error', 'message': 'Login required'}), 401
+    
+    user = User.query.get(session['user_id'])
+    return jsonify({
+        'status': 'success',
+        'enabled': user.notification_enabled,
+        'time': user.notification_time
+    })
+
+@app.route('/api/update_notification_settings', methods=['POST'])
+def update_notification_settings():
+    if 'user_id' not in session:
+        return jsonify({'status': 'error', 'message': 'Login required'}), 401
+    
+    data = request.get_json()
+    user = User.query.get(session['user_id'])
+    
+    if 'enabled' in data:
+        user.notification_enabled = data['enabled']
+    if 'time' in data:
+        user.notification_time = data['time']
+        
+    db.session.commit()
+    return jsonify({'status': 'success'})
 
 if __name__ == '__main__':
     try:
