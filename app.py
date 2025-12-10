@@ -730,6 +730,25 @@ class EssayImage(db.Model):
     def __repr__(self):
         return f'<EssayImage {self.problem_id}>'
 
+class Announcement(db.Model):
+    __tablename__ = 'announcements'
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(200), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    date = db.Column(db.DateTime, default=lambda: datetime.now(JST))
+    target_rooms = db.Column(db.String(200), nullable=True) # "all" or "101,102"
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'title': self.title,
+            'content': self.content,
+            'date': self.date.strftime('%Y-%m-%d %H:%M'),
+            'target_rooms': self.target_rooms,
+            'is_active': self.is_active
+        }
+
 # ===== メール設定 =====
 app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
 app.config['MAIL_PORT'] = int(os.environ.get('MAIL_PORT', '587'))
@@ -1829,6 +1848,24 @@ def migrate_database():
                     try:
                         with db.engine.connect() as conn:
                             conn.execute(text('ALTER TABLE essay_problems ADD COLUMN image_url VARCHAR(500)'))
+                            conn.commit()
+                        print("✅ image_urlカラムを追加しました")
+                    except Exception as e:
+                        print(f"⚠️ image_urlカラム追加エラー: {e}")
+                else:
+                    print("✅ image_urlカラムは既に存在します")
+            else:
+                print("📋 essay_problemsテーブルが存在しません（論述機能未使用）")
+
+            print("✅ EssayProblems関連のマイグレーション完了")
+
+            # 8. Announcementテーブルの作成
+            if not inspector.has_table('announcements'):
+                print("🔧 announcementsテーブルを作成します...")
+                db.create_all()
+                print("✅ announcementsテーブルを作成しました。")
+            else:
+                print("✅ announcementsテーブルは既に存在します。")
                             conn.commit()
                         print("✅ image_urlカラムを追加しました")
                     except Exception as e:
@@ -3860,6 +3897,30 @@ def is_mail_configured():
 # 管理者用全員ランキングページ
 # ====================================================================
 
+    try:
+        if not session.get('admin_logged_in'):
+            flash('管理者権限がありません。', 'danger')
+            return redirect(url_for('login_page'))
+
+        print("🏆 管理者用ランキングページ表示開始...")
+
+        # お知らせ一覧を取得
+        announcements = Announcement.query.order_by(Announcement.date.desc()).all()
+
+        # テンプレートに必要な基本情報のみ渡す
+        # 実際のデータは Ajax で後から取得
+        context = get_template_context()
+        context['announcements'] = announcements
+        
+        return render_template('admin.html', **context)
+        
+    except Exception as e:
+        print(f"❌ 管理者ページエラー: {e}")
+        import traceback
+        traceback.print_exc()
+        flash('管理者ページの読み込み中にエラーが発生しました。', 'danger')
+        return redirect(url_for('login_page'))
+
 @app.route('/admin/ranking')
 def admin_ranking_page():
     """管理者用全員ランキング表示ページ"""
@@ -4656,8 +4717,106 @@ def api_word_data():
         return jsonify(filtered_word_data)
         
     except Exception as e:
-        print(f"Error in api_word_data: {e}")
-        return jsonify(status='error', message=str(e)), 500
+        print(f"Error searching essays: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+# =========================================================
+# お知らせ機能 API & 管理ルート
+# =========================================================
+
+@app.route('/api/announcements', methods=['GET'])
+def get_announcements():
+    """アクティブなお知らせを取得（最新5件）"""
+    try:
+        user_id = session.get('user_id')
+        user_room = None
+        if user_id:
+            user = User.query.get(user_id)
+            if user:
+                user_room = user.room_number
+
+        # 全体向けまたは自室向けのお知らせを取得
+        query = Announcement.query.filter_by(is_active=True)
+        
+        # フィルタリングロジック
+        # target_roomsが 'all' または 自分の部屋番号を含むものを抽出
+        # SQLレベルでのフィルタリングは複雑になるため、Python側でフィルタリングするか、
+        # シンプルに 'all' と 部分一致を使う
+        
+        all_announcements = query.order_by(Announcement.date.desc()).all()
+        filtered_announcements = []
+        
+        for ann in all_announcements:
+            targets = [t.strip() for t in (ann.target_rooms or 'all').split(',')]
+            if 'all' in targets:
+                filtered_announcements.append(ann.to_dict())
+            elif user_room and user_room in targets:
+                filtered_announcements.append(ann.to_dict())
+            
+            if len(filtered_announcements) >= 5:
+                break
+                
+        return jsonify({'status': 'success', 'announcements': filtered_announcements})
+        
+    except Exception as e:
+        print(f"Error fetching announcements: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/admin/announcements/add', methods=['POST'])
+@admin_required
+def admin_add_announcement():
+    try:
+        title = request.form.get('title')
+        content = request.form.get('content')
+        target_rooms = request.form.get('target_rooms', 'all')
+        
+        if not title or not content:
+            flash('タイトルと内容は必須です。', 'danger')
+            return redirect(url_for('admin_page'))
+            
+        new_announcement = Announcement(
+            title=title,
+            content=content,
+            target_rooms=target_rooms
+        )
+        db.session.add(new_announcement)
+        db.session.commit()
+        
+        flash('お知らせを追加しました。', 'success')
+        return redirect(url_for('admin_page'))
+    except Exception as e:
+        db.session.rollback()
+        flash(f'エラーが発生しました: {e}', 'danger')
+        return redirect(url_for('admin_page'))
+
+@app.route('/admin/announcements/delete/<int:id>', methods=['POST'])
+@admin_required
+def admin_delete_announcement(id):
+    try:
+        announcement = Announcement.query.get_or_404(id)
+        db.session.delete(announcement)
+        db.session.commit()
+        flash('お知らせを削除しました。', 'success')
+        return redirect(url_for('admin_page'))
+    except Exception as e:
+        db.session.rollback()
+        flash(f'エラーが発生しました: {e}', 'danger')
+        return redirect(url_for('admin_page'))
+
+@app.route('/admin/announcements/toggle/<int:id>', methods=['POST'])
+@admin_required
+def admin_toggle_announcement(id):
+    try:
+        announcement = Announcement.query.get_or_404(id)
+        announcement.is_active = not announcement.is_active
+        db.session.commit()
+        status = '有効' if announcement.is_active else '無効'
+        flash(f'お知らせを{status}にしました。', 'success')
+        return redirect(url_for('admin_page'))
+    except Exception as e:
+        db.session.rollback()
+        flash(f'エラーが発生しました: {e}', 'danger')
+        return redirect(url_for('admin_page'))
 
 @app.route('/api/load_quiz_progress')
 def api_load_quiz_progress():
