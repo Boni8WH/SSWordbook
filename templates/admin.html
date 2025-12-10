@@ -41,26 +41,7 @@
 
                 <div class="admin-panel" style="background-color: #e8f4fd; border-left: 5px solid #3498db;">
                     <h4>現在のアプリ情報</h4>
-                    <div class="row">
-                        <div class="col-md-6">
-                            <p><strong>アプリ名:</strong> {{ app_info.app_name if app_info else '世界史単語帳' }}</p>
-                            <p><strong>バージョン:</strong> {{ app_info.version if app_info else '1.0.0' }}</p>
-                            <p><strong>最終更新日:</strong> {{ app_info.last_updated_date if app_info else '2025年6月15日' }}
-                            </p>
-                        </div>
-                        <div class="col-md-6">
-                            <p><strong>更新内容:</strong></p>
-                            <div
-                                style="background-color: white; padding: 10px; border-radius: 5px; border: 1px solid #ddd; font-size: 0.9em;">
-                                {{ app_info.update_content if app_info else 'アプリケーションが開始されました。' }}
-                            </div>
-                        </div>
-                    </div>
-
                     <div style="margin-top: 15px;">
-                        <a href="{{ url_for('admin_app_info') }}" class="btn btn-primary">
-                            <i class="fas fa-edit"></i> アプリ情報を編集
-                        </a>
                         <a href="{{ url_for('index') }}" class="btn btn-outline-info" target="_blank">
                             <i class="fas fa-external-link-alt"></i> 実際の表示を確認
                         </a>
@@ -96,9 +77,15 @@
                                 placeholder="お知らせの詳細を入力してください"></textarea>
                         </div>
                         <div class="mb-3">
-                            <label for="announcementTarget" class="form-label">対象部屋（カンマ区切り、全対象は 'all'）</label>
-                            <input type="text" class="form-control" id="announcementTarget" name="target_rooms"
-                                value="all" placeholder="例: 101,102 または all">
+                            <label for="announcementTarget" class="form-label">対象部屋（複数選択可）</label>
+                            <select class="form-select" id="announcementTarget" name="target_rooms" multiple size="5"
+                                required>
+                                <option value="all" selected>全員 (All)</option>
+                                {% for room in room_settings %}
+                                <option value="{{ room.room_number }}">{{ room.room_number }}</option>
+                                {% endfor %}
+                            </select>
+                            <div class="form-text">Ctrl(Windows)またはCommand(Mac)を押しながらクリックで複数選択できます。</div>
                         </div>
                         <button type="submit" class="btn btn-warning">
                             <i class="fas fa-paper-plane"></i> お知らせを配信

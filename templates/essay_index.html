@@ -615,7 +615,7 @@
                                 item.innerHTML = `
                             <div class="d-flex w-100 justify-content-between">
                                 <h6 class="mb-1">${essay.university} ${essay.year}年 (${essay.type})</h6>
-                                <small class="text-muted">第${essay.chapter}章</small>
+                                <small class="text-muted">${essay.chapter === 'com' ? '総合問題' : '第' + essay.chapter + '章'}</small>
                             </div>
                             <p class="mb-1">${essay.question_snippet}</p>
                         `;
