@@ -2099,10 +2099,48 @@ function toggleInfoPanel() {
 function openInfoPanel() {
     if (infoPanel) {
         infoPanel.classList.remove('hidden');
+
+        // お知らせを取得して表示
+        fetchAnnouncements();
+
         // 外側クリックイベントを追加（少し遅延させて即座に閉じるのを防ぐ）
         setTimeout(() => {
             document.addEventListener('click', handleOutsideClick);
         }, 100);
+    }
+}
+
+async function fetchAnnouncements() {
+    const announcementsList = document.getElementById('announcementsList');
+    if (!announcementsList) return;
+
+    try {
+        const response = await fetch('/api/announcements');
+        const data = await response.json();
+
+        if (data.status === 'success') {
+            if (data.announcements.length === 0) {
+                announcementsList.innerHTML = '<p class="text-muted" style="font-size: 0.9em;">現在お知らせはありません。</p>';
+            } else {
+                let html = '<ul style="list-style: none; padding-left: 0;">';
+                data.announcements.forEach(ann => {
+                    html += `
+                        <li style="margin-bottom: 10px; border-bottom: 1px solid #f0f0f0; padding-bottom: 8px;">
+                            <div style="font-size: 0.8em; color: #7f8c8d; margin-bottom: 2px;">${ann.date}</div>
+                            <div style="font-weight: bold; color: #2c3e50; margin-bottom: 4px;">${ann.title}</div>
+                            <div style="font-size: 0.9em; color: #34495e; white-space: pre-wrap;">${ann.content}</div>
+                        </li>
+                    `;
+                });
+                html += '</ul>';
+                announcementsList.innerHTML = html;
+            }
+        } else {
+            announcementsList.innerHTML = '<p class="text-danger" style="font-size: 0.9em;">お知らせの読み込みに失敗しました。</p>';
+        }
+    } catch (error) {
+        console.error('お知らせ取得エラー:', error);
+        announcementsList.innerHTML = '<p class="text-danger" style="font-size: 0.9em;">エラーが発生しました。</p>';
     }
 }
 
