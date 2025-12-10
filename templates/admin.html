@@ -70,6 +70,100 @@
         </div>
     </div>
 
+    <!-- お知らせ管理セクション -->
+    <div class="admin-section">
+        <div class="section-header" data-bs-toggle="collapse" data-bs-target="#section-announcements"
+            aria-expanded="false">
+            <h3><i class="fas fa-bullhorn"></i> お知らせ管理 <i class="fas fa-chevron-down toggle-icon"></i></h3>
+        </div>
+        <div class="collapse" id="section-announcements">
+            <div class="section-content">
+                <p>ユーザーにお知らせを配信できます。最新5件が「i」ボタンの情報パネルに表示されます。</p>
+
+                <!-- 新規お知らせ作成 -->
+                <div class="admin-panel"
+                    style="background-color: #fff3cd; border-left: 5px solid #ffc107; margin-bottom: 20px;">
+                    <h4><i class="fas fa-plus"></i> 新規お知らせ作成</h4>
+                    <form action="{{ url_for('admin_add_announcement') }}" method="POST">
+                        <div class="mb-3">
+                            <label for="announcementTitle" class="form-label">タイトル</label>
+                            <input type="text" class="form-control" id="announcementTitle" name="title" required
+                                placeholder="例: メンテナンスのお知らせ">
+                        </div>
+                        <div class="mb-3">
+                            <label for="announcementContent" class="form-label">内容</label>
+                            <textarea class="form-control" id="announcementContent" name="content" rows="3" required
+                                placeholder="お知らせの詳細を入力してください"></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="announcementTarget" class="form-label">対象部屋（カンマ区切り、全対象は 'all'）</label>
+                            <input type="text" class="form-control" id="announcementTarget" name="target_rooms"
+                                value="all" placeholder="例: 101,102 または all">
+                        </div>
+                        <button type="submit" class="btn btn-warning">
+                            <i class="fas fa-paper-plane"></i> お知らせを配信
+                        </button>
+                    </form>
+                </div>
+
+                <!-- お知らせ一覧 -->
+                <h4>配信済みお知らせ一覧</h4>
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>日付</th>
+                                <th>タイトル</th>
+                                <th>対象</th>
+                                <th>状態</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for ann in announcements %}
+                            <tr>
+                                <td>{{ ann.date.strftime('%Y/%m/%d %H:%M') }}</td>
+                                <td>{{ ann.title }}</td>
+                                <td>
+                                    {% if ann.target_rooms == 'all' %}
+                                    <span class="badge bg-success">全員</span>
+                                    {% else %}
+                                    <span class="badge bg-info">{{ ann.target_rooms }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if ann.is_active %}
+                                    <span class="badge bg-primary">有効</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">無効</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <form action="{{ url_for('admin_toggle_announcement', id=ann.id) }}" method="POST"
+                                        style="display: inline;">
+                                        <button type="submit"
+                                            class="btn btn-sm {% if ann.is_active %}btn-outline-secondary{% else %}btn-outline-primary{% endif %}">
+                                            {% if ann.is_active %}無効化{% else %}有効化{% endif %}
+                                        </button>
+                                    </form>
+                                    <form action="{{ url_for('admin_delete_announcement', id=ann.id) }}" method="POST"
+                                        style="display: inline;" onsubmit="return confirm('本当に削除しますか？');">
+                                        <button type="submit" class="btn btn-sm btn-danger">削除</button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="5" class="text-center">お知らせはありません</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- ユーザー管理セクション -->
     <div class="admin-section">
         <div class="section-header" data-bs-toggle="collapse" data-bs-target="#section-user-management"
