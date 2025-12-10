@@ -2977,7 +2977,8 @@ def api_search_essays():
         essays = EssayProblem.query.filter(
             db.or_(
                 EssayProblem.question.like(search_term),
-                EssayProblem.answer.like(search_term)
+                EssayProblem.answer.like(search_term),
+                EssayProblem.university.like(search_term)
             )
         ).limit(50).all()
         
