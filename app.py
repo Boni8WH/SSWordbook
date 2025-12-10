@@ -12678,6 +12678,34 @@ def get_notification_settings():
         'time': user.notification_time
     })
 
+@app.route('/api/test_notification', methods=['POST'])
+def test_notification():
+    if 'user_id' not in session:
+        return jsonify({'status': 'error', 'message': 'Login required'}), 401
+    
+    user = User.query.get(session['user_id'])
+    if not user:
+        return jsonify({'status': 'error', 'message': 'User not found'}), 404
+        
+    if not user.push_subscription:
+        return jsonify({'status': 'error', 'message': 'Push subscription not found. Please enable notifications first.'}), 400
+        
+    try:
+        success = send_push_notification(
+            user,
+            "通知テスト",
+            "これはテスト通知です。通知機能は正常に動作しています！",
+            url="/"
+        )
+        
+        if success:
+            return jsonify({'status': 'success', 'message': 'Notification sent successfully'})
+        else:
+            return jsonify({'status': 'error', 'message': 'Failed to send notification. Subscription might be invalid.'}), 500
+            
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
 @app.route('/api/update_notification_settings', methods=['POST'])
 def update_notification_settings():
     if 'user_id' not in session:
