@@ -2824,9 +2824,9 @@ function initNotificationSettings() {
                 .then(res => res.json())
                 .then(data => {
                     if (data.status === 'success') {
-                        alert('送信しました！スマホ等に通知が届いたか確認してください。');
+                        alert('送信成功！\n\nもし通知が届かない場合は、スマホの「おやすみモード」や「通知設定」を確認してください。\n（PC/Androidは数秒、iOSは少し時間がかかることがあります）');
                     } else {
-                        alert('送信失敗: ' + data.message);
+                        alert('送信失敗:\n' + data.message + '\n\n(詳細エラー: ' + JSON.stringify(data) + ')');
                     }
                 })
                 .catch(err => {
