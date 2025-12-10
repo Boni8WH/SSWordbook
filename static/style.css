@@ -2704,7 +2704,7 @@ body {
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
     padding: 15px;
     width: calc(100vw - 40px);
-    max-width: 280px;
+    max-width: 400px;
     z-index: 999;
 }
 
