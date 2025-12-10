@@ -2774,3 +2774,143 @@ function executeSearch() {
         }
     }, 100); // UIブロックを防ぐための微小な遅延
 }
+// ==========================================
+// 通知機能 (Notification)
+// ==========================================
+
+document.addEventListener('DOMContentLoaded', function() {
+    initNotificationSettings();
+});
+
+function initNotificationSettings() {
+    const saveBtn = document.getElementById('saveSettingsBtn');
+    if (!saveBtn) return; // 設定モーダルがないページでは何もしない
+
+    // 設定読み込み
+    fetch('/api/notification_settings')
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'success') {
+                const toggle = document.getElementById('notificationToggle');
+                const timeInput = document.getElementById('notificationTime');
+                
+                if (toggle) toggle.checked = data.enabled;
+                if (timeInput) timeInput.value = data.time || '21:00';
+                
+                // トグル状態に応じて時間入力の有効/無効切り替え
+                toggleTimeInput(data.enabled);
+                
+                if (toggle) {
+                    toggle.addEventListener('change', (e) => {
+                        toggleTimeInput(e.target.checked);
+                    });
+                }
+            }
+        })
+        .catch(err => console.error('設定読み込みエラー:', err));
+
+    // 保存ボタン
+    saveBtn.addEventListener('click', async function() {
+        const toggle = document.getElementById('notificationToggle');
+        const timeInput = document.getElementById('notificationTime');
+        
+        const enabled = toggle ? toggle.checked : false;
+        const time = timeInput ? timeInput.value : '21:00';
+        
+        // 通知有効化時は権限リクエストとSW登録
+        if (enabled) {
+            const permission = await Notification.requestPermission();
+            if (permission === 'granted') {
+                await registerServiceWorker();
+            } else {
+                alert('通知権限が許可されませんでした。ブラウザの設定を確認してください。');
+                return;
+            }
+        }
+        
+        // 設定保存
+        fetch('/api/update_notification_settings', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ enabled: enabled, time: time })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'success') {
+                // モーダルを閉じる
+                const modalEl = document.getElementById('settingsModal');
+                const modal = bootstrap.Modal.getInstance(modalEl);
+                if (modal) modal.hide();
+                
+                flashMessage('設定を保存しました', 'success');
+            } else {
+                alert('保存に失敗しました: ' + data.message);
+            }
+        })
+        .catch(err => {
+            console.error('保存エラー:', err);
+            alert('通信エラーが発生しました');
+        });
+    });
+}
+
+function toggleTimeInput(enabled) {
+    const area = document.getElementById('notificationTimeArea');
+    const input = document.getElementById('notificationTime');
+    if (area && input) {
+        if (enabled) {
+            area.style.opacity = '1';
+            input.disabled = false;
+        } else {
+            area.style.opacity = '0.5';
+            input.disabled = true;
+        }
+    }
+}
+
+async function registerServiceWorker() {
+    if (!('serviceWorker' in navigator)) return;
+    if (!('PushManager' in window)) return;
+
+    try {
+        const registration = await navigator.serviceWorker.register('/static/sw.js');
+        console.log('Service Worker registered');
+
+        // VAPIDキー取得
+        const keyRes = await fetch('/api/vapid_public_key');
+        const keyData = await keyRes.json();
+        const applicationServerKey = urlBase64ToUint8Array(keyData.publicKey);
+
+        const subscription = await registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: applicationServerKey
+        });
+
+        // サブスクリプション送信
+        await fetch('/api/save_subscription', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(subscription)
+        });
+        
+        console.log('Push subscription saved');
+
+    } catch (error) {
+        console.error('Service Worker Error:', error);
+    }
+}
+
+function urlBase64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding)
+        .replace(/\-/g, '+')
+        .replace(/_/g, '/');
+
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+
+    for (let i = 0; i < rawData.length; ++i) {
+        outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+}
