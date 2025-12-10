@@ -892,6 +892,10 @@ if not os.path.exists(VAPID_PRIVATE_KEY_PATH):
     vapid_private_key_content = os.environ.get('VAPID_PRIVATE_KEY')
     if vapid_private_key_content:
         try:
+            # 環境変数の改行文字エスケープを修正 (\n -> 実際の改行)
+            if '\\n' in vapid_private_key_content:
+                vapid_private_key_content = vapid_private_key_content.replace('\\n', '\n')
+                
             with open(VAPID_PRIVATE_KEY_PATH, 'w') as f:
                 f.write(vapid_private_key_content)
             print("RUN: VAPID private key restored from environment variable.")
