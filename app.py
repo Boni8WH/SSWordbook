@@ -2922,6 +2922,45 @@ def extract_keywords_from_text(text):
     
     return found_keywords[:10]
 
+@app.route('/api/search_essays', methods=['POST'])
+def api_search_essays():
+    """論述問題をキーワード検索するAPI"""
+    try:
+        data = request.get_json()
+        query = data.get('query', '').strip()
+        
+        if not query:
+            return jsonify({'status': 'success', 'results': []})
+            
+        # キーワードで検索（問題文または模範解答）
+        search_term = f"%{query}%"
+        essays = EssayProblem.query.filter(
+            db.or_(
+                EssayProblem.question.like(search_term),
+                EssayProblem.model_answer.like(search_term)
+            )
+        ).limit(50).all()
+        
+        results = []
+        for essay in essays:
+            # 問題文を短く切り詰める
+            snippet = essay.question[:100] + '...' if len(essay.question) > 100 else essay.question
+            
+            results.append({
+                'id': essay.id,
+                'chapter': essay.chapter,
+                'university': essay.university,
+                'year': essay.year,
+                'type': essay.type,
+                'question_snippet': snippet
+            })
+            
+        return jsonify({'status': 'success', 'results': results})
+        
+    except Exception as e:
+        app.logger.error(f"Essay search error: {str(e)}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
 @app.route('/api/essay/get_keywords/<int:problem_id>')
 def get_essay_keywords(problem_id):
     """
