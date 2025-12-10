@@ -436,9 +436,7 @@ def check_daily_quiz_reminders():
                         url="/"
                     )
 
-# スケジューラーにジョブ追加
-if not scheduler.get_job('daily_reminder'):
-    scheduler.add_job(id='daily_reminder', func=check_daily_quiz_reminders, trigger='cron', minute='*')
+
 
 @app.route('/api/vapid_public_key')
 def get_vapid_public_key():
@@ -918,6 +916,10 @@ mail = Mail(app)
 scheduler = APScheduler()
 scheduler.init_app(app)
 scheduler.start()
+
+# スケジューラーにジョブ追加
+if not scheduler.get_job('daily_reminder'):
+    scheduler.add_job(id='daily_reminder', func=check_daily_quiz_reminders, trigger='cron', minute='*')
 
 # VAPID Keys (本来は環境変数推奨)
 VAPID_PUBLIC_KEY = "BJJXMPrN1SvmAwKkab8rW50Aa96KLVHCIDQcvPkWZ9xeTfmQ8CDWV-a1CJMO5Xqapcrw4fX85ekwbzmrJfi7qr0"
