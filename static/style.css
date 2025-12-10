@@ -1583,6 +1583,10 @@ hr {
         padding: 20px;
     }
 
+    .search-container {
+        grid-column: 1 / -1;
+    }
+
     .question-count-selection h3,
     .selection-area h3 {
         font-size: 1.4em;
