@@ -2778,7 +2778,7 @@ function executeSearch() {
 // 通知機能 (Notification)
 // ==========================================
 
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     initNotificationSettings();
 });
 
@@ -2793,13 +2793,13 @@ function initNotificationSettings() {
             if (data.status === 'success') {
                 const toggle = document.getElementById('notificationToggle');
                 const timeInput = document.getElementById('notificationTime');
-                
+
                 if (toggle) toggle.checked = data.enabled;
                 if (timeInput) timeInput.value = data.time || '21:00';
-                
+
                 // トグル状態に応じて時間入力の有効/無効切り替え
                 toggleTimeInput(data.enabled);
-                
+
                 if (toggle) {
                     toggle.addEventListener('change', (e) => {
                         toggleTimeInput(e.target.checked);
@@ -2809,14 +2809,46 @@ function initNotificationSettings() {
         })
         .catch(err => console.error('設定読み込みエラー:', err));
 
+    // 通知テストボタン
+    const testBtn = document.getElementById('testNotificationBtn');
+    if (testBtn) {
+        testBtn.addEventListener('click', function () {
+            // ボタンを一時的に無効化
+            testBtn.disabled = true;
+            testBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> 送信中...';
+
+            fetch('/api/test_notification', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        alert('送信しました！スマホ等に通知が届いたか確認してください。');
+                    } else {
+                        alert('送信失敗: ' + data.message);
+                    }
+                })
+                .catch(err => {
+                    console.error('テスト送信エラー:', err);
+                    alert('通信エラーが発生しました');
+                })
+                .finally(() => {
+                    // ボタンを元に戻す
+                    testBtn.disabled = false;
+                    testBtn.innerHTML = '<i class="fas fa-paper-plane me-1"></i> 通知をテスト送信';
+                });
+        });
+    }
+
     // 保存ボタン
-    saveBtn.addEventListener('click', async function() {
+    saveBtn.addEventListener('click', async function () {
         const toggle = document.getElementById('notificationToggle');
         const timeInput = document.getElementById('notificationTime');
-        
+
         const enabled = toggle ? toggle.checked : false;
         const time = timeInput ? timeInput.value : '21:00';
-        
+
         // 通知有効化時は権限リクエストとSW登録
         if (enabled) {
             const permission = await Notification.requestPermission();
@@ -2827,30 +2859,32 @@ function initNotificationSettings() {
                 return;
             }
         }
-        
+
         // 設定保存
         fetch('/api/update_notification_settings', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ enabled: enabled, time: time })
         })
-        .then(res => res.json())
-        .then(data => {
-            if (data.status === 'success') {
-                // モーダルを閉じる
-                const modalEl = document.getElementById('settingsModal');
-                const modal = bootstrap.Modal.getInstance(modalEl);
-                if (modal) modal.hide();
-                
-                flashMessage('設定を保存しました', 'success');
-            } else {
-                alert('保存に失敗しました: ' + data.message);
-            }
-        })
-        .catch(err => {
-            console.error('保存エラー:', err);
-            alert('通信エラーが発生しました');
-        });
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    // モーダルを閉じる前にフォーカスを外す（aria-hidden警告対策）
+                    saveBtn.blur();
+
+                    const modalEl = document.getElementById('settingsModal');
+                    const modal = bootstrap.Modal.getInstance(modalEl);
+                    if (modal) modal.hide();
+
+                    flashMessage('設定を保存しました', 'success');
+                } else {
+                    alert('保存に失敗しました: ' + data.message);
+                }
+            })
+            .catch(err => {
+                console.error('保存エラー:', err);
+                alert('通信エラーが発生しました');
+            });
     });
 }
 
@@ -2889,10 +2923,10 @@ async function registerServiceWorker() {
         // サブスクリプション送信
         await fetch('/api/save_subscription', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(subscription)
         });
-        
+
         console.log('Push subscription saved');
 
     } catch (error) {
