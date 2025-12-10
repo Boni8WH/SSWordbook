@@ -886,6 +886,20 @@ if not scheduler.get_job('daily_reminder'):
 # VAPID Keys (本来は環境変数推奨)
 VAPID_PUBLIC_KEY = "BJJXMPrN1SvmAwKkab8rW50Aa96KLVHCIDQcvPkWZ9xeTfmQ8CDWV-a1CJMO5Xqapcrw4fX85ekwbzmrJfi7qr0"
 VAPID_PRIVATE_KEY_PATH = os.path.join(basedir, 'private_key.pem')
+
+# サーバー環境(Render等)で秘密鍵ファイルがない場合、環境変数から復元
+if not os.path.exists(VAPID_PRIVATE_KEY_PATH):
+    vapid_private_key_content = os.environ.get('VAPID_PRIVATE_KEY')
+    if vapid_private_key_content:
+        try:
+            with open(VAPID_PRIVATE_KEY_PATH, 'w') as f:
+                f.write(vapid_private_key_content)
+            print("RUN: VAPID private key restored from environment variable.")
+        except Exception as e:
+            print(f"ERROR: Failed to restore VAPID private key: {e}")
+    else:
+        print("WARNING: VAPID private key not found in file or environment.")
+
 VAPID_CLAIMS = {"sub": "mailto:admin@example.com"}
 
 # ===== SQLAlchemy初期化 =====
@@ -12690,6 +12704,9 @@ def test_notification():
     if not user.push_subscription:
         return jsonify({'status': 'error', 'message': 'Push subscription not found. Please enable notifications first.'}), 400
         
+    if not os.path.exists(VAPID_PRIVATE_KEY_PATH):
+        return jsonify({'status': 'error', 'message': 'Server Error: VAPID Private Key is missing on the server.'}), 500
+
     try:
         success = send_push_notification(
             user,
