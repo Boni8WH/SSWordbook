@@ -19,6 +19,8 @@ import random
 import glob
 import pytz
 import threading
+from flask_apscheduler import APScheduler
+from pywebpush import webpush, WebPushException
 try:
     import boto3
     from botocore.exceptions import NoCredentialsError
@@ -129,6 +131,11 @@ class User(db.Model):
     problem_history = db.Column(JSONEncodedDict, default={})
     incorrect_words = db.Column(JSONEncodedDict, default=[])
     last_login = db.Column(db.DateTime, default=lambda: datetime.now(JST))
+    
+    # 通知設定
+    notification_enabled = db.Column(db.Boolean, default=True, nullable=False)
+    notification_time = db.Column(db.String(5), default="21:00", nullable=False)
+    push_subscription = db.Column(JSONEncodedDict, nullable=True)
 
     def set_room_password(self, password): self._room_password_hash = generate_password_hash(password)
     def check_room_password(self, password): return check_password_hash(self._room_password_hash, password)
@@ -339,6 +346,142 @@ def _add_logo_columns_to_app_info():
             print("✅ AppInfoテーブルのマイグレーション完了")
     except Exception as e:
         print(f"⚠️ マイグレーションエラー (無視可能): {e}")
+
+def _add_notification_columns_to_user():
+    """Userテーブルに通知用カラムを追加するマイグレーション関数"""
+    try:
+        with db.engine.connect() as conn:
+            # notification_enabled
+            try:
+                conn.execute(text("SELECT notification_enabled FROM user LIMIT 1"))
+            except Exception:
+                print("🔄 notification_enabledカラムを追加します...")
+                conn.execute(text("ALTER TABLE \"user\" ADD COLUMN notification_enabled BOOLEAN DEFAULT TRUE"))
+                conn.commit()
+
+            # notification_time
+            try:
+                conn.execute(text("SELECT notification_time FROM user LIMIT 1"))
+            except Exception:
+                print("🔄 notification_timeカラムを追加します...")
+                conn.execute(text("ALTER TABLE \"user\" ADD COLUMN notification_time VARCHAR(5) DEFAULT '21:00'"))
+                conn.commit()
+
+            # push_subscription
+            try:
+                conn.execute(text("SELECT push_subscription FROM user LIMIT 1"))
+            except Exception:
+                print("🔄 push_subscriptionカラムを追加します...")
+                conn.execute(text("ALTER TABLE \"user\" ADD COLUMN push_subscription TEXT"))
+                conn.commit()
+                
+            print("✅ Userテーブルの通知マイグレーション完了")
+    except Exception as e:
+        print(f"⚠️ Userマイグレーションエラー (無視可能): {e}")
+
+# ====================================================================
+# 通知機能関連
+# ====================================================================
+
+def send_push_notification(user, title, body, url="/"):
+    """プッシュ通知を送信"""
+    if not user.push_subscription:
+        return False
+    
+    try:
+        subscription_info = user.push_subscription
+        if isinstance(subscription_info, str):
+            subscription_info = json.loads(subscription_info)
+
+        webpush(
+            subscription_info=subscription_info,
+            data=json.dumps({"title": title, "body": body, "url": url}),
+            vapid_private_key=VAPID_PRIVATE_KEY_PATH,
+            vapid_claims=VAPID_CLAIMS
+        )
+        return True
+    except WebPushException as ex:
+        if ex.response and ex.response.status_code == 410:
+            # 登録が無効になっている場合
+            user.push_subscription = None
+            db.session.commit()
+        print(f"Push Error: {ex}")
+        return False
+    except Exception as e:
+        print(f"Push Error: {e}")
+        return False
+
+def check_daily_quiz_reminders():
+    """毎分実行：通知時刻のユーザーにリマインド"""
+    with app.app_context():
+        now = datetime.now(JST)
+        current_time_str = now.strftime("%H:%M")
+        
+        # 通知有効かつ現在時刻設定のユーザーを取得
+        users = User.query.filter_by(notification_enabled=True, notification_time=current_time_str).all()
+        
+        for user in users:
+            # 今日のクイズ完了チェック
+            today = (datetime.now(JST) - timedelta(hours=7)).date()
+            daily_quiz = DailyQuiz.query.filter_by(date=today, room_number=user.room_number).first()
+            
+            if daily_quiz:
+                result = DailyQuizResult.query.filter_by(user_id=user.id, quiz_id=daily_quiz.id).first()
+                if not result:
+                    # 未完了なら通知
+                    send_push_notification(
+                        user,
+                        "今日の10問が未完了です",
+                        "毎日の積み重ねが大切です。頑張りましょう！",
+                        url="/"
+                    )
+
+# スケジューラーにジョブ追加
+if not scheduler.get_job('daily_reminder'):
+    scheduler.add_job(id='daily_reminder', func=check_daily_quiz_reminders, trigger='cron', minute='*')
+
+@app.route('/api/vapid_public_key')
+def get_vapid_public_key():
+    return jsonify({'publicKey': VAPID_PUBLIC_KEY})
+
+@app.route('/api/save_subscription', methods=['POST'])
+def save_subscription():
+    if 'user_id' not in session:
+        return jsonify({'status': 'error', 'message': 'Login required'}), 401
+    
+    data = request.get_json()
+    user = User.query.get(session['user_id'])
+    user.push_subscription = data
+    db.session.commit()
+    return jsonify({'status': 'success'})
+
+@app.route('/api/notification_settings', methods=['GET'])
+def get_notification_settings():
+    if 'user_id' not in session:
+        return jsonify({'status': 'error', 'message': 'Login required'}), 401
+    
+    user = User.query.get(session['user_id'])
+    return jsonify({
+        'status': 'success',
+        'enabled': user.notification_enabled,
+        'time': user.notification_time
+    })
+
+@app.route('/api/update_notification_settings', methods=['POST'])
+def update_notification_settings():
+    if 'user_id' not in session:
+        return jsonify({'status': 'error', 'message': 'Login required'}), 401
+    
+    data = request.get_json()
+    user = User.query.get(session['user_id'])
+    
+    if 'enabled' in data:
+        user.notification_enabled = data['enabled']
+    if 'time' in data:
+        user.notification_time = data['time']
+        
+    db.session.commit()
+    return jsonify({'status': 'success'})
 
 class PasswordResetToken(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -770,6 +913,16 @@ app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
 app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_DEFAULT_SENDER', app.config['MAIL_USERNAME'])
 
 mail = Mail(app)
+
+# ===== スケジューラー設定 =====
+scheduler = APScheduler()
+scheduler.init_app(app)
+scheduler.start()
+
+# VAPID Keys (本来は環境変数推奨)
+VAPID_PUBLIC_KEY = "BJJXMPrN1SvmAwKkab8rW50Aa96KLVHCIDQcvPkWZ9xeTfmQ8CDWV-a1CJMO5Xqapcrw4fX85ekwbzmrJfi7qr0"
+VAPID_PRIVATE_KEY_PATH = os.path.join(basedir, 'private_key.pem')
+VAPID_CLAIMS = {"sub": "mailto:admin@example.com"}
 
 # ===== SQLAlchemy初期化 =====
 db.init_app(app)
@@ -2090,6 +2243,9 @@ def create_tables_and_admin_user():
                 logger.info("✅ マイグレーション完了")
             except Exception as migration_error:
                 logger.error(f"⚠️ マイグレーションエラー: {migration_error}")
+
+            # 通知カラム追加マイグレーション
+            _add_notification_columns_to_user()
             
             # 管理者ユーザー確認/作成
             try:
@@ -4774,6 +4930,23 @@ def admin_add_announcement():
         )
         db.session.add(new_announcement)
         db.session.commit()
+        
+        # 通知送信
+        try:
+            target_users = []
+            if target_rooms == 'all':
+                target_users = User.query.filter_by(notification_enabled=True).all()
+            else:
+                rooms = target_rooms.split(',')
+                target_users = User.query.filter(User.room_number.in_(rooms), User.notification_enabled == True).all()
+            
+            count = 0
+            for user in target_users:
+                if send_push_notification(user, "新しいお知らせ: " + title, "アプリを開いて確認しましょう！", url="/"):
+                    count += 1
+            print(f"📢 お知らせ通知送信: {count}件")
+        except Exception as e:
+            print(f"⚠️ 通知送信エラー: {e}")
         
         flash('お知らせを追加しました。', 'success')
         return redirect(url_for('admin_page'))
