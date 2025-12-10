@@ -887,34 +887,22 @@ if not scheduler.get_job('daily_reminder'):
 VAPID_PUBLIC_KEY = "BJJXMPrN1SvmAwKkab8rW50Aa96KLVHCIDQcvPkWZ9xeTfmQ8CDWV-a1CJMO5Xqapcrw4fX85ekwbzmrJfi7qr0"
 VAPID_PRIVATE_KEY_PATH = os.path.join(basedir, 'private_key.pem')
 
-# サーバー環境((Render等)で秘密鍵ファイルがない場合、環境変数から復元
+# サーバー環境(Render等)で秘密鍵ファイルがない場合、環境変数から復元
 if not os.path.exists(VAPID_PRIVATE_KEY_PATH):
     vapid_private_key_content = os.environ.get('VAPID_PRIVATE_KEY')
     if vapid_private_key_content:
         try:
-            # 1. まず単純な改行文字エスケープを処理
+            # 環境変数の改行文字エスケープを修正 (\n -> 実際の改行)
             content = vapid_private_key_content.replace('\\n', '\n')
             
-            # 2. 余分な空白や改行を一度全て削除して、きれいな状態にする
-            # ヘッダーとフッターを一時的に削除
-            clean_body = content.replace('-----BEGIN EC PRIVATE KEY-----', '') \
-                                .replace('-----END EC PRIVATE KEY-----', '') \
-                                .replace(' ', '') \
-                                .replace('\n', '') \
-                                .replace('\r', '')
-            
-            # 3. 正しいPEM形式で再構築 (ヘッダーとフッターの後に確実に改行を入れる)
-            formatted_key = (
-                "-----BEGIN EC PRIVATE KEY-----\n" +
-                clean_body + "\n" +
-                "-----END EC PRIVATE KEY-----\n"
-            )
+            # 念のため、前後の余分な空白を削除
+            content = content.strip()
             
             # ファイルに書き込み
             with open(VAPID_PRIVATE_KEY_PATH, 'w') as f:
-                f.write(formatted_key)
+                f.write(content)
                 
-            print("RUN: VAPID private key restored and formatted from environment variable.")
+            print("RUN: VAPID private key restored from environment variable.")
         except Exception as e:
             print(f"ERROR: Failed to restore VAPID private key: {e}")
     else:
