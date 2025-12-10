@@ -24,7 +24,8 @@
                         <div class="col-md-6">
                             <p><strong>アプリ名:</strong> {{ app_info.app_name }}</p>
                             <p><strong>バージョン:</strong> {{ app_info.version }}</p>
-                            <p><strong>最終更新日:</strong> {{ app_info.last_updated_date }}</p>
+                            <p><strong>アプリ名:</strong> {{ app_info.app_name }}</p>
+                            <p><strong>バージョン:</strong> {{ app_info.version }}</p>
                         </div>
                         <div class="col-md-6">
                             <p><strong>フッターテキスト:</strong> {{ app_info.footer_text or "（未設定）" }}</p>
@@ -32,12 +33,7 @@
                             <p><strong>最終更新者:</strong> {{ app_info.updated_by }}</p>
                         </div>
                     </div>
-                    <div class="row">
-                        <div class="col-md-12">
-                            <p><strong>更新内容:</strong></p>
-                            <div class="alert alert-light">{{ app_info.update_content }}</div>
-                        </div>
-                    </div>
+
                 </div>
             </div>
         </div>
@@ -108,15 +104,7 @@
                 </div>
 
                 <div class="row">
-                    <div class="col-md-6">
-                        <div class="mb-3">
-                            <label for="last_updated_date" class="form-label">最終更新日:</label>
-                            <input type="text" id="last_updated_date" name="last_updated_date" class="form-control"
-                                value="{{ app_info.last_updated_date }}" required maxlength="50"
-                                placeholder="例: 2025年6月15日">
-                            <div class="form-text">ユーザーに表示される更新日</div>
-                        </div>
-                    </div>
+
                     <div class="col-md-6">
                         <div class="mb-3">
                             <label for="contact_email" class="form-label">連絡先メール:</label>
@@ -148,16 +136,7 @@
                     </div>
                 </div>
 
-                <div class="row">
-                    <div class="col-md-12">
-                        <div class="mb-3">
-                            <label for="update_content" class="form-label">更新内容:</label>
-                            <textarea id="update_content" name="update_content" class="form-control" rows="4" required
-                                placeholder="例: 新機能として苦手問題の自動出題機能を追加しました。">{{ app_info.update_content }}</textarea>
-                            <div class="form-text">ユーザーに表示される更新内容の説明</div>
-                        </div>
-                    </div>
-                </div>
+
 
                 <div class="d-flex gap-2 mb-4">
                     <button type="submit" class="btn btn-primary">

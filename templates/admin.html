@@ -78,6 +78,8 @@
                         </div>
                         <div class="mb-3">
                             <label for="announcementTarget" class="form-label">対象部屋（複数選択可）</label>
+                            <input type="text" id="roomSearchInput" class="form-control mb-2" placeholder="部屋番号を検索..."
+                                onkeyup="filterRooms()">
                             <select class="form-select" id="announcementTarget" name="target_rooms" multiple size="5"
                                 required>
                                 <option value="all" selected>全員 (All)</option>
@@ -87,6 +89,23 @@
                             </select>
                             <div class="form-text">Ctrl(Windows)またはCommand(Mac)を押しながらクリックで複数選択できます。</div>
                         </div>
+                        <script>
+                            function filterRooms() {
+                                var input, filter, select, options, i, txtValue;
+                                input = document.getElementById("roomSearchInput");
+                                filter = input.value.toUpperCase();
+                                select = document.getElementById("announcementTarget");
+                                options = select.getElementsByTagName("option");
+                                for (i = 0; i < options.length; i++) {
+                                    txtValue = options[i].textContent || options[i].innerText;
+                                    if (txtValue.toUpperCase().indexOf(filter) > -1) {
+                                        options[i].style.display = "";
+                                    } else {
+                                        options[i].style.display = "none";
+                                    }
+                                }
+                            }
+                        </script>
                         <button type="submit" class="btn btn-warning">
                             <i class="fas fa-paper-plane"></i> お知らせを配信
                         </button>
@@ -109,7 +128,7 @@
                         <tbody>
                             {% for ann in announcements %}
                             <tr>
-                                <td>{{ ann.date.strftime('%Y/%m/%d %H:%M') }}</td>
+                                <td>{{ ann.date | to_jst }}</td>
                                 <td>{{ ann.title }}</td>
                                 <td>
                                     {% if ann.target_rooms == 'all' %}
