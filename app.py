@@ -1866,16 +1866,7 @@ def migrate_database():
                 print("✅ announcementsテーブルを作成しました。")
             else:
                 print("✅ announcementsテーブルは既に存在します。")
-                            conn.commit()
-                        print("✅ image_urlカラムを追加しました")
-                    except Exception as e:
-                        print(f"⚠️ image_urlカラム追加エラー: {e}")
-                else:
-                    print("✅ image_urlカラムは既に存在します")
-            else:
-                print("📋 essay_problemsテーブルが存在しません（論述機能未使用）")
 
-            print("✅ EssayProblems関連のマイグレーション完了")
 
             # 8. EssayImageテーブルの作成
             if not inspector.has_table('essay_images'):
