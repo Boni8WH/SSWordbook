@@ -2122,17 +2122,23 @@ async function fetchAnnouncements() {
             if (data.announcements.length === 0) {
                 announcementsList.innerHTML = '<p class="text-muted" style="font-size: 0.9em;">現在お知らせはありません。</p>';
             } else {
-                let html = '<ul style="list-style: none; padding-left: 0;">';
+                let html = '<div class="accordion-list" style="display: flex; flex-direction: column; gap: 8px;">';
                 data.announcements.forEach(ann => {
+                    // 日時をJSTでフォーマット（サーバーから既にJSTで来ている前提だが、念のため調整）
+                    // サーバーが "YYYY-MM-DD HH:MM:SS" 形式で返している場合、そのまま表示でOK
+                    // 必要なら new Date(ann.date).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) など
+
                     html += `
-                        <li style="margin-bottom: 10px; border-bottom: 1px solid #f0f0f0; padding-bottom: 8px;">
-                            <div style="font-size: 0.8em; color: #7f8c8d; margin-bottom: 2px;">${ann.date}</div>
-                            <div style="font-weight: bold; color: #2c3e50; margin-bottom: 4px;">${ann.title}</div>
-                            <div style="font-size: 0.9em; color: #34495e; white-space: pre-wrap;">${ann.content}</div>
-                        </li>
+                        <details style="border: 1px solid #eee; border-radius: 6px; overflow: hidden; background-color: #fff;">
+                            <summary style="padding: 10px; cursor: pointer; background-color: #f9f9f9; font-size: 0.95em; outline: none; list-style: none; display: flex; flex-direction: column;">
+                                <span style="font-size: 0.8em; color: #7f8c8d; margin-bottom: 2px;">${ann.date}</span>
+                                <span style="font-weight: bold; color: #2c3e50;">${ann.title}</span>
+                            </summary>
+                            <div style="padding: 12px; font-size: 0.9em; color: #34495e; white-space: pre-wrap; border-top: 1px solid #eee; background-color: #fff;">${ann.content}</div>
+                        </details>
                     `;
                 });
-                html += '</ul>';
+                html += '</div>';
                 announcementsList.innerHTML = html;
             }
         } else {
@@ -2751,7 +2757,7 @@ function executeSearch() {
                 item.className = 'list-group-item';
                 item.innerHTML = `
                     <div class="d-flex w-100 justify-content-between">
-                        <h6 class="mb-1">第${word.chapter}章 - ${word.number}</h6>
+                        <h6 class="mb-1">${word.chapter === 'S' ? '歴史総合' : '第' + word.chapter + '章'} - ${word.number}</h6>
                         <small class="text-muted">${word.answer}</small>
                     </div>
                     <p class="mb-1">${word.question}</p>
