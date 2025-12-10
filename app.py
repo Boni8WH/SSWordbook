@@ -350,34 +350,36 @@ def _add_logo_columns_to_app_info():
 def _add_notification_columns_to_user():
     """Userテーブルに通知用カラムを追加するマイグレーション関数"""
     try:
+        inspector = inspect(db.engine)
+        columns = [c['name'] for c in inspector.get_columns('user')]
+        
         with db.engine.connect() as conn:
-            # notification_enabled
+            # トランザクション開始
+            trans = conn.begin()
             try:
-                conn.execute(text("SELECT notification_enabled FROM user LIMIT 1"))
-            except Exception:
-                print("🔄 notification_enabledカラムを追加します...")
-                conn.execute(text("ALTER TABLE \"user\" ADD COLUMN notification_enabled BOOLEAN DEFAULT TRUE"))
-                conn.commit()
+                # notification_enabled
+                if 'notification_enabled' not in columns:
+                    print("🔄 notification_enabledカラムを追加します...")
+                    conn.execute(text("ALTER TABLE \"user\" ADD COLUMN notification_enabled BOOLEAN DEFAULT TRUE"))
 
-            # notification_time
-            try:
-                conn.execute(text("SELECT notification_time FROM user LIMIT 1"))
-            except Exception:
-                print("🔄 notification_timeカラムを追加します...")
-                conn.execute(text("ALTER TABLE \"user\" ADD COLUMN notification_time VARCHAR(5) DEFAULT '21:00'"))
-                conn.commit()
+                # notification_time
+                if 'notification_time' not in columns:
+                    print("🔄 notification_timeカラムを追加します...")
+                    conn.execute(text("ALTER TABLE \"user\" ADD COLUMN notification_time VARCHAR(5) DEFAULT '21:00'"))
 
-            # push_subscription
-            try:
-                conn.execute(text("SELECT push_subscription FROM user LIMIT 1"))
-            except Exception:
-                print("🔄 push_subscriptionカラムを追加します...")
-                conn.execute(text("ALTER TABLE \"user\" ADD COLUMN push_subscription TEXT"))
-                conn.commit()
+                # push_subscription
+                if 'push_subscription' not in columns:
+                    print("🔄 push_subscriptionカラムを追加します...")
+                    conn.execute(text("ALTER TABLE \"user\" ADD COLUMN push_subscription TEXT"))
                 
-            print("✅ Userテーブルの通知マイグレーション完了")
+                trans.commit()
+                print("✅ Userテーブルの通知マイグレーション完了")
+            except Exception as e:
+                trans.rollback()
+                print(f"⚠️ Userマイグレーションエラー (ロールバック): {e}")
+                raise e
     except Exception as e:
-        print(f"⚠️ Userマイグレーションエラー (無視可能): {e}")
+        print(f"⚠️ Userマイグレーションエラー (全体): {e}")
 
 # ====================================================================
 # 通知機能関連
