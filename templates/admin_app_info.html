@@ -14,31 +14,6 @@
         ここで設定した情報は、ログイン画面や学習画面のアプリ情報として表示されます。
     </div>
 
-    <!-- 現在の設定内容の表示 -->
-    <div class="row mb-4">
-        <div class="col-md-12">
-            <h3>📋 現在の設定</h3>
-            <div class="card">
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <p><strong>アプリ名:</strong> {{ app_info.app_name }}</p>
-                            <p><strong>バージョン:</strong> {{ app_info.version }}</p>
-                            <p><strong>アプリ名:</strong> {{ app_info.app_name }}</p>
-                            <p><strong>バージョン:</strong> {{ app_info.version }}</p>
-                        </div>
-                        <div class="col-md-6">
-                            <p><strong>フッターテキスト:</strong> {{ app_info.footer_text or "（未設定）" }}</p>
-                            <p><strong>連絡先:</strong> {{ app_info.contact_email or "（未設定）" }}</p>
-                            <p><strong>最終更新者:</strong> {{ app_info.updated_by }}</p>
-                        </div>
-                    </div>
-
-                </div>
-            </div>
-        </div>
-    </div>
-
     <!-- アプリ情報編集フォーム -->
     <div class="row mb-4">
         <div class="col-md-12">

@@ -4,11 +4,7 @@
 {% block content %}
 <section class="selection-area">
     <div class="controls-area">
-        <div class="search-container" style="text-align: right; margin-bottom: 10px;">
-            <button id="openSearchButton" class="btn btn-sm btn-outline-secondary">
-                <i class="fas fa-search"></i> 問題検索
-            </button>
-        </div>
+
         <div class="question-count-and-auth">
             <div class="question-count-selection">
                 <h3>出題数を選択</h3>
@@ -47,7 +43,12 @@
         </div>
 
         <div class="range-selection-area">
-            <h3>出題範囲を選択</h3>
+            <div class="section-header-with-action">
+                <h3>出題範囲を選択</h3>
+                <button id="openSearchButton" class="btn btn-sm btn-outline-secondary">
+                    <i class="fas fa-search"></i> 問題検索
+                </button>
+            </div>
             <div class="chapters-container">
                 {% for chapter_num, chapter in chapter_data.items() %}
                 <div class="chapter-item" data-chapter-num="{{ chapter_num }}">
