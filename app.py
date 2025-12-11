@@ -12988,14 +12988,6 @@ def submit_rpg_result():
         db.session.commit()
         return jsonify({'status': 'success', 'message': 'Failed. Cooldown started.'})
 
-@app.route('/api/rpg/boss_image')
-def get_rpg_boss_image():
-    # Hardcoded for now
-    image_path = "/Users/kitsukaasaki/.gemini/antigravity/brain/a292f61e-f7a8-439a-b46c-733e215e39d2/boss_alexander_1765439544849.png"
-    if os.path.exists(image_path):
-        return send_file(image_path, mimetype='image/png')
-    else:
-        return "", 404
 
 if __name__ == '__main__':
 
