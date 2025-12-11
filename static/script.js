@@ -3195,8 +3195,8 @@ function showNextRpgQuestion() {
     const problem = rpgGameData[rpgCurrentIndex];
     document.getElementById('rpgQuestionText').textContent = problem.question;
 
-    // Generate choices
-    const choices = generateRpgChoices(problem.answer);
+    // Server now provides choices (similar to Daily Quiz)
+    const choices = problem.choices;
     const container = document.getElementById('rpgChoicesContainer');
     container.innerHTML = '';
 
@@ -3207,31 +3207,6 @@ function showNextRpgQuestion() {
         btn.onclick = () => handleRpgAnswer(choice === problem.answer, btn);
         container.appendChild(btn);
     });
-}
-
-function generateRpgChoices(correctAnswer) {
-    // Use global word_data to find distractors
-    if (!window.word_data || window.word_data.length === 0) return [correctAnswer, "A", "B", "C"]; // Fallback
-
-    const distractors = window.word_data
-        .filter(w => w.answer !== correctAnswer)
-        .map(w => w.answer);
-
-    // Shuffle distractors
-    for (let i = distractors.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [distractors[i], distractors[j]] = [distractors[j], distractors[i]];
-    }
-
-    const selected = distractors.slice(0, 3);
-    selected.push(correctAnswer);
-
-    // Shuffle final choices
-    for (let i = selected.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [selected[i], selected[j]] = [selected[j], selected[i]];
-    }
-    return selected;
 }
 
 function handleRpgAnswer(isCorrect, btnElement) {
