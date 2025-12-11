@@ -749,6 +749,24 @@ function setupEventListeners() {
             radio.addEventListener('change', updateIncorrectOnlySelection);
         });
 
+        // ★未解答のみ・未マスターのみの排他制御
+        const unsolvedCheckbox = document.getElementById('unsolvedOnlyCheckbox');
+        const unmasteredCheckbox = document.getElementById('unmasteredOnlyCheckbox');
+
+        if (unsolvedCheckbox && unmasteredCheckbox) {
+            unsolvedCheckbox.addEventListener('change', function () {
+                if (this.checked) {
+                    unmasteredCheckbox.checked = false;
+                }
+            });
+
+            unmasteredCheckbox.addEventListener('change', function () {
+                if (this.checked) {
+                    unsolvedCheckbox.checked = false;
+                }
+            });
+        }
+
         if (chaptersContainer) {
             chaptersContainer.addEventListener('click', (event) => {
                 // 「全て選択」ボタンがクリックされた場合の処理
@@ -1830,6 +1848,35 @@ function restartQuiz() {
 
         if (newQuizQuestions.length === 0) {
             flashMessage('全ての未解答問題を学習しました！', 'success');
+            backToSelectionScreen();
+            return;
+        }
+    }
+
+    // ★未マスターモードの場合、マスター済みの問題（80%以上）を除外する
+    if (lastQuizSettings.isUnmasteredOnly) {
+        console.log('🔍 未マスターモード：高い正答率の問題を除外します');
+        newQuizQuestions = newQuizQuestions.filter(word => {
+            const wordIdentifier = generateProblemId(word);
+            const history = problemHistory[wordIdentifier];
+
+            // 履歴がない (未解答) -> 対象
+            if (!history) return true;
+
+            const correct = history.correct_attempts || 0;
+            const incorrect = history.incorrect_attempts || 0;
+            const total = correct + incorrect;
+
+            // 未解答 -> 対象
+            if (total === 0) return true;
+
+            // 正答率80%未満 -> 対象 (未マスター)
+            const accuracy = correct / total;
+            return accuracy < 0.8;
+        });
+
+        if (newQuizQuestions.length === 0) {
+            flashMessage('全ての未マスター問題を克服しました！', 'success');
             backToSelectionScreen();
             return;
         }
