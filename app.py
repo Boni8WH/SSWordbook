@@ -3454,6 +3454,17 @@ def first_time_password_change():
 @app.route('/logout')
 def logout():
     try:
+        # ログアウト時にプッシュ通知の購読を解除（任意）
+        # モバイル端末の共有利用などを考慮すると、ログアウト時は通知も切るべき
+        if 'user_id' in session:
+            try:
+                user = User.query.get(session['user_id'])
+                if user:
+                    user.push_subscription = None
+                    db.session.commit()
+            except Exception as e:
+                print(f"Error clearing subscription on logout: {e}")
+
         session.pop('user_id', None)
         session.pop('username', None)
         session.pop('room_number', None)
@@ -4945,11 +4956,10 @@ def admin_add_announcement():
             count = 0
             for user in users:
                 if user.notification_enabled:
-                    print(f"DEBUG: Sending to user {user.username} (Room {user.room_number})")
                     send_push_notification(
                         user,
-                        f"新しいお知らせ: {title}",
-                        "アプリを開いて確認しましょう！",
+                        f"ナポレオン「{title}」",
+                        "勝利は、わが迅速果敢な行動にあり",
                         url=website_url
                     )
                     count += 1
