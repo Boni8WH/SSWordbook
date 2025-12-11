@@ -1,0 +1,281 @@
+{% extends "base.html" %}
+
+{% block content %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+<style>
+    body,
+    html {
+        height: 100%;
+        overflow: hidden;
+    }
+
+    /* Full screen map experience */
+    .content-wrapper {
+        padding: 0 !important;
+        margin: 0 !important;
+        max-width: 100% !important;
+    }
+
+    /* Override base container */
+
+    #map-quiz-container {
+        position: relative;
+        height: 80vh;
+        /* Adjust based on header/footer */
+        width: 100%;
+    }
+
+    #map {
+        height: 100%;
+        width: 100%;
+    }
+
+    .quiz-panel {
+        position: absolute;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 90%;
+        max-width: 600px;
+        background: rgba(255, 255, 255, 0.95);
+        padding: 20px;
+        border-radius: 12px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        z-index: 1000;
+        /* Above map */
+        text-align: center;
+    }
+
+    .question-text {
+        font-size: 1.5rem;
+        font-weight: bold;
+        margin-bottom: 15px;
+        color: #333;
+    }
+
+    .hint-text {
+        font-size: 0.9rem;
+        color: #666;
+        margin-bottom: 10px;
+    }
+
+    .feedback-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        pointer-events: none;
+        /* Let clicks pass through if needed, but usually blocks */
+        z-index: 2000;
+        font-size: 5rem;
+        opacity: 0;
+        transition: opacity 0.3s;
+    }
+
+    .feedback-correct {
+        color: #28a745;
+        text-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
+    }
+
+    .feedback-wrong {
+        color: #dc3545;
+        text-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
+    }
+
+    .pulse-icon {
+        /* CSS animation for correct location hint if needed */
+    }
+</style>
+
+<div id="map-quiz-container">
+    <div id="map"></div>
+
+    <div class="feedback-overlay" id="feedback"></div>
+
+    <div class="quiz-panel">
+        <div id="question-area">
+            <div class="hint-text">Type: <span id="q-type"></span></div>
+            <div class="question-text" id="q-text">Loading...</div>
+            <div id="status-bar" class="progress" style="height: 5px; margin-top:10px;">
+                <div class="progress-bar" role="progressbar" style="width: 0%"></div>
+            </div>
+            <div class="mt-2 text-muted small">
+                <span id="q-counter">0</span> / <span id="q-total">0</span>
+            </div>
+        </div>
+        <div id="result-area" style="display:none;">
+            <h3>Quiz Completed!</h3>
+            <p>Score: <span id="score-val"></span></p>
+            <a href="{{ url_for('map_menu') }}" class="btn btn-primary">Back to Menu</a>
+            <button onclick="location.reload()" class="btn btn-secondary">Retry</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Data passed from Flask
+    var allLocations = {{ locations | tojson }};
+    // Filter out locations without coordinates
+    var quizLocations = allLocations.filter(l => l.lat !== null && l.lng !== null);
+
+    // Check if we have locations
+    if (quizLocations.length === 0) {
+        alert("条件に一致する場所（座標登録済み）が見つかりません。");
+        window.location.href = "{{ url_for('map_menu') }}";
+    }
+
+    // Shuffle
+    quizLocations.sort(() => Math.random() - 0.5);
+
+    var currentIndex = 0;
+    var score = 0;
+    var currentLoc = null;
+    var isAnswering = true;
+
+    // --- Map Setup ---
+    var map = L.map('map', {
+        crs: L.CRS.EPSG3857,
+        center: [0, 0],
+        zoom: 2,
+        minZoom: 1,
+        maxZoom: 6,
+        attributionControl: false
+    });
+    var bounds = [[-85, -180], [85, 180]];
+    L.imageOverlay('/static/images/world_map.png', bounds).addTo(map);
+    map.fitBounds(bounds);
+
+    // Icons
+    var icons = {
+        1: L.divIcon({ className: 'custom-icon', html: '🏙️', iconSize: [24, 24] }), // City
+        2: L.divIcon({ className: 'custom-icon', html: '🏞️', iconSize: [24, 24] }), // Region
+        3: L.divIcon({ className: 'custom-icon', html: '🏔️', iconSize: [24, 24] }), // Mountain
+        4: L.divIcon({ className: 'custom-icon', html: '🏝️', iconSize: [24, 24] }), // Peninsula
+        5: L.divIcon({ className: 'custom-icon', html: '💧', iconSize: [24, 24] }), // River
+        6: L.divIcon({ className: 'custom-icon', html: '🌊', iconSize: [24, 24] }), // Sea
+        7: L.divIcon({ className: 'custom-icon', html: '🚢', iconSize: [24, 24] }), // Canal
+        8: L.divIcon({ className: 'custom-icon', html: '📍', iconSize: [24, 24] }), // Other
+    };
+
+    // Correct Marker (initially hidden)
+    var correctMarker = L.marker([0, 0], { icon: icons[8] }).addTo(map);
+    correctMarker.setOpacity(0);
+
+    // Type Names
+    var typeNames = {
+        1: "都市 (City)", 2: "地方 (Region)", 3: "山脈 (Mountain)",
+        4: "半島 (Peninsula)", 5: "河川 (River)", 6: "海 (Sea)",
+        7: "運河 (Canal)", 8: "その他 (Other)"
+    };
+
+    // --- Quiz Logic ---
+    function showQuestion() {
+        if (currentIndex >= quizLocations.length) {
+            showResult();
+            return;
+        }
+
+        isAnswering = true;
+        currentLoc = quizLocations[currentIndex];
+
+        // Update UI
+        document.getElementById('q-text').innerText = currentLoc.name;
+        document.getElementById('q-type').innerText = typeNames[currentLoc.type] || "Unknown";
+        document.getElementById('q-counter').innerText = currentIndex + 1;
+        document.getElementById('q-total').innerText = quizLocations.length;
+
+        // Hide marker
+        correctMarker.setOpacity(0);
+
+        // Clear feedback
+        document.getElementById('feedback').style.opacity = 0;
+        document.getElementById('feedback').innerHTML = "";
+    }
+
+    function checkAnswer(lat, lng) {
+        if (!isAnswering) return;
+        isAnswering = false;
+
+        var targetLatLng = L.latLng(currentLoc.lat, currentLoc.lng);
+        var clickLatLng = L.latLng(lat, lng);
+
+        // Calculate distance in pixels (at current zoom) or meters?
+        // Since we are using EPSG3857, map.distance returns meters.
+        // But our map is "fake" overlaid on the world.
+        // It's better to use screen pixel distance or simple lat/lng distance.
+        // Let's use map.containPoint-like logic or simpler euclidean on lat/lng for robustness against projection
+        // Actually, Leaflet has `distanceTo`. Let's assume a threshold relative to map scale.
+        // Let's use a generous threshold.
+        // Approx 500km? (Typical world map view).
+        // Or better: Convert both to container points (pixels) at standard zoom.
+
+        var d = map.project(targetLatLng, 3).distanceTo(map.project(clickLatLng, 3));
+
+        // Threshold in pixels at Zoom 3:
+        var threshold = 30; // 30 pixels error margin
+
+        var isCorrect = d < threshold;
+
+        // Visual Feedback
+        var feedbackEl = document.getElementById('feedback');
+        if (isCorrect) {
+            feedbackEl.innerHTML = '<span class="feedback-correct">⭕</span>';
+            score++;
+            saveProgress(currentLoc.id, true);
+        } else {
+            feedbackEl.innerHTML = '<span class="feedback-wrong">❌</span>';
+            // Show correct answer
+            correctMarker.setLatLng(targetLatLng);
+            correctMarker.setIcon(icons[currentLoc.type] || icons[8]);
+            correctMarker.setOpacity(1);
+            correctMarker.bindPopup(currentLoc.name).openPopup();
+            saveProgress(currentLoc.id, false);
+        }
+        feedbackEl.style.opacity = 1;
+
+        // Next question
+        setTimeout(function () {
+            feedbackEl.style.opacity = 0;
+            correctMarker.closePopup();
+            currentIndex++;
+
+            // Update Progress Bar
+            var pct = (currentIndex / quizLocations.length) * 100;
+            document.querySelector('.progress-bar').style.width = pct + "%";
+
+            showQuestion();
+        }, 1500);
+    }
+
+    function showResult() {
+        document.getElementById('question-area').style.display = 'none';
+        document.getElementById('result-area').style.display = 'block';
+        document.getElementById('score-val').innerText = score + " / " + quizLocations.length;
+    }
+
+    function saveProgress(locId, success) {
+        fetch('/map/save_progress', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ location_id: locId, is_correct: success })
+        });
+    }
+
+    // Map Click Listener
+    map.on('click', function (e) {
+        checkAnswer(e.latlng.lat, e.latlng.lng);
+    });
+
+    // Start
+    showQuestion();
+
+</script>
+{% endblock %}
