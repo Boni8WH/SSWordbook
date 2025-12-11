@@ -399,7 +399,7 @@ def send_push_notification(user, title, body, url="/"):
             subscription_info=subscription_info,
             data=json.dumps({"title": title, "body": body, "url": url}),
             vapid_private_key=VAPID_PRIVATE_KEY_PATH,
-            vapid_claims=VAPID_CLAIMS
+            vapid_claims=VAPID_CLAIMS.copy()
         )
         return True
     except WebPushException as ex:
