@@ -12792,57 +12792,6 @@ def update_notification_settings():
     db.session.commit()
     return jsonify({'status': 'success'})
 
-@app.route('/api/debug_reminder', methods=['POST'])
-def debug_reminder():
-    if 'user_id' not in session:
-        return jsonify({'status': 'error', 'message': 'Login required'}), 401
-    
-    user = User.query.get(session['user_id'])
-    
-    # ロジックのシミュレーション
-    results = {}
-    results['user'] = f"{user.username} (Room {user.room_number})"
-    results['settings'] = f"Enabled: {user.notification_enabled}, Time: {user.notification_time}"
-    
-    # 今日のクイズ検索
-    today = (datetime.now(JST) - timedelta(hours=7)).date()
-    results['target_date'] = str(today)
-    
-    daily_quiz = DailyQuiz.query.filter_by(date=today, room_number=user.room_number).first()
-    if daily_quiz:
-        results['quiz_found'] = f"Yes (ID: {daily_quiz.id})"
-        quiz_result = DailyQuizResult.query.filter_by(user_id=user.id, quiz_id=daily_quiz.id).first()
-        if quiz_result:
-            results['status'] = "Done (完了済みのため通知されません)"
-            results['should_send'] = False
-        else:
-            results['status'] = "Not Done (未完了)"
-            results['should_send'] = True
-            
-            # 実際に送ってみる
-            success = send_push_notification(
-                user,
-                "【テスト】リマインド通知",
-                "これは「リマインド条件確認」によるテストです。\n条件合致のため送信されました。",
-                url="/"
-            )
-            results['send_result'] = "Success" if success else "Failed (Check Logs)"
-    else:
-        results['quiz_found'] = "No (今日のクイズがまだ生成されていません)"
-        results['status'] = "Not Done (未生成 = 未完了)"
-        results['should_send'] = True
-        
-        # 実際に送ってみる
-        success = send_push_notification(
-            user,
-            "【テスト】リマインド通知",
-            "これは「リマインド条件確認」によるテストです。\n条件合致（クイズ未生成）のため送信されました。",
-            url="/"
-        )
-        results['send_result'] = "Success" if success else "Failed (Check Logs)"
-        
-    return jsonify({'status': 'success', 'debug_info': results})
-
 if __name__ == '__main__':
     try:
         # サーバー起動
