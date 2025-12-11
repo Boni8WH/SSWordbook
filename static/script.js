@@ -2846,36 +2846,7 @@ function initNotificationSettings() {
                 });
         });
 
-        // リマインド条件確認ボタン (デバッグ用)
-        const debugBtn = document.createElement('button');
-        debugBtn.type = 'button';
-        debugBtn.className = 'btn btn-outline-warning w-100 mt-2';
-        debugBtn.innerHTML = '<i class="fas fa-stethoscope me-1"></i> リマインド条件を確認';
-        debugBtn.onclick = function () {
-            debugBtn.disabled = true;
-            fetch('/api/debug_reminder', { method: 'POST' })
-                .then(res => res.json())
-                .then(data => {
-                    if (data.status === 'success') {
-                        const info = data.debug_info;
-                        let msg = `【診断結果】\n`;
-                        msg += `ユーザー: ${info.user}\n`;
-                        msg += `設定: ${info.settings}\n`;
-                        msg += `判定日付: ${info.target_date}\n`;
-                        msg += `今日のクイズ: ${info.quiz_found}\n`;
-                        if (info.status) msg += `ステータス: ${info.status}\n`;
-                        msg += `\n判定: ${info.should_send ? "送信対象です" : "送信対象外です"}`;
-                        if (info.send_result) msg += `\n送信試行: ${info.send_result}`;
-                        alert(msg);
-                    } else {
-                        alert('診断エラー: ' + data.message);
-                    }
-                })
-                .catch(err => alert('通信エラー'))
-                .finally(() => debugBtn.disabled = false);
-        };
-        // テスト送信ボタンの下に追加
-        testBtn.parentNode.insertBefore(debugBtn, testBtn.nextSibling);
+
     }
 
     // 保存ボタン
