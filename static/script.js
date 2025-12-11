@@ -3077,11 +3077,11 @@ function checkRpgStatus() {
             if (data.available && !data.is_cooldown && !data.is_cleared) {
                 // Show banner
                 if (banner) banner.classList.remove('hidden');
-                
+
                 // Update Boss Name in modal (if opened)
                 if (data.boss_name) {
                     const bossNameEl = document.getElementById('rpgBossName');
-                    if(bossNameEl) bossNameEl.textContent = data.boss_name;
+                    if (bossNameEl) bossNameEl.textContent = data.boss_name;
                 }
             } else {
                 if (banner) banner.classList.add('hidden');
@@ -3095,30 +3095,30 @@ function openRpgIntro() {
     const intro = document.getElementById('rpgIntroScreen');
     const battle = document.getElementById('rpgBattleScreen');
     const result = document.getElementById('rpgResultScreen');
-    
-    if(overlay) overlay.classList.remove('hidden');
-    if(intro) intro.classList.remove('hidden');
-    if(battle) battle.classList.add('hidden');
-    if(result) result.classList.add('hidden');
-    
+
+    if (overlay) overlay.classList.remove('hidden');
+    if (intro) intro.classList.remove('hidden');
+    if (battle) battle.classList.add('hidden');
+    if (result) result.classList.add('hidden');
+
     // Set Image
     const img = document.getElementById('rpgBossImage');
-    if(img) img.src = "/api/rpg/boss_image?" + new Date().getTime(); // cache bust
+    if (img) img.src = "/static/images/boss_alexander.png";
 }
 
 // Add event listeners if elements exist (safe check)
 const btnRpgCancel = document.getElementById('btnRpgCancel');
-if(btnRpgCancel) btnRpgCancel.addEventListener('click', closeRpgModal);
+if (btnRpgCancel) btnRpgCancel.addEventListener('click', closeRpgModal);
 
 const btnRpgClose = document.getElementById('btnRpgClose');
-if(btnRpgClose) btnRpgClose.addEventListener('click', closeRpgModal);
+if (btnRpgClose) btnRpgClose.addEventListener('click', closeRpgModal);
 
 const btnRpgStart = document.getElementById('btnRpgStart');
-if(btnRpgStart) btnRpgStart.addEventListener('click', startRpgGame);
+if (btnRpgStart) btnRpgStart.addEventListener('click', startRpgGame);
 
 function closeRpgModal() {
     const overlay = document.getElementById('rpgOverlay');
-    if(overlay) overlay.classList.add('hidden');
+    if (overlay) overlay.classList.add('hidden');
     clearInterval(rpgTimerInterval);
 }
 
@@ -3131,20 +3131,20 @@ function startRpgGame() {
                 rpgTimeLeft = data.time_limit || 60;
                 rpgCurrentIndex = 0;
                 rpgCorrectCount = 0;
-                
+
                 // Switch screen
                 document.getElementById('rpgIntroScreen').classList.add('hidden');
                 document.getElementById('rpgBattleScreen').classList.remove('hidden');
-                
+
                 updateRpgHud();
                 showNextRpgQuestion();
                 startRpgTimer();
-                
+
                 // Set battle image
                 const battleImg = document.getElementById('rpgBattleBossImage');
                 const introImg = document.getElementById('rpgBossImage');
-                if(battleImg && introImg) battleImg.src = introImg.src;
-                
+                if (battleImg && introImg) battleImg.src = introImg.src;
+
             } else {
                 alert(data.message || 'Error starting battle');
             }
@@ -3159,12 +3159,12 @@ function startRpgTimer() {
     clearInterval(rpgTimerInterval);
     const timerBar = document.getElementById('rpgTimerBar');
     const totalTime = rpgTimeLeft;
-    
+
     rpgTimerInterval = setInterval(() => {
         rpgTimeLeft--;
         const pct = (rpgTimeLeft / totalTime) * 100;
-        if(timerBar) timerBar.style.width = `${pct}%`;
-        
+        if (timerBar) timerBar.style.width = `${pct}%`;
+
         if (rpgTimeLeft <= 0) {
             clearInterval(rpgTimerInterval);
             finishRpgGame(false); // Time up = Lose
@@ -3180,7 +3180,7 @@ function updateRpgHud() {
     const currentHp = 10 - rpgCorrectCount;
     const pct = (currentHp / 10) * 100;
     const hpBar = document.getElementById('rpgBossHpBar');
-    if(hpBar) hpBar.style.width = `${pct}%`;
+    if (hpBar) hpBar.style.width = `${pct}%`;
 }
 
 function showNextRpgQuestion() {
@@ -3191,15 +3191,15 @@ function showNextRpgQuestion() {
         finishRpgGame(isWin);
         return;
     }
-    
+
     const problem = rpgGameData[rpgCurrentIndex];
     document.getElementById('rpgQuestionText').textContent = problem.question;
-    
+
     // Generate choices
     const choices = generateRpgChoices(problem.answer);
     const container = document.getElementById('rpgChoicesContainer');
     container.innerHTML = '';
-    
+
     choices.forEach(choice => {
         const btn = document.createElement('button');
         btn.className = 'rpg-choice-btn';
@@ -3212,20 +3212,20 @@ function showNextRpgQuestion() {
 function generateRpgChoices(correctAnswer) {
     // Use global word_data to find distractors
     if (!window.word_data || window.word_data.length === 0) return [correctAnswer, "A", "B", "C"]; // Fallback
-    
+
     const distractors = window.word_data
         .filter(w => w.answer !== correctAnswer)
         .map(w => w.answer);
-        
+
     // Shuffle distractors
     for (let i = distractors.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [distractors[i], distractors[j]] = [distractors[j], distractors[i]];
     }
-    
+
     const selected = distractors.slice(0, 3);
     selected.push(correctAnswer);
-    
+
     // Shuffle final choices
     for (let i = selected.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -3238,31 +3238,31 @@ function handleRpgAnswer(isCorrect, btnElement) {
     // Disable buttons
     const btns = document.querySelectorAll('.rpg-choice-btn');
     btns.forEach(b => b.disabled = true);
-    
+
     if (isCorrect) {
         btnElement.classList.add('correct');
         rpgCorrectCount++;
-        
+
         // Damage effect
         const dmg = document.getElementById('rpgDamageEffect');
-        if(dmg) {
+        if (dmg) {
             dmg.classList.remove('hidden');
             dmg.classList.add('damage-text'); // restart anim (needs re-trigger hack if repetitive)
             // Hack to restart animation: remove class, void offsetWidth, add class
-            dmg.classList.remove('damage-text'); 
-            void dmg.offsetWidth; 
+            dmg.classList.remove('damage-text');
+            void dmg.offsetWidth;
             dmg.classList.add('damage-text');
-            
+
             setTimeout(() => dmg.classList.add('hidden'), 800);
         }
-        
+
         // Shake boss
         const boss = document.getElementById('rpgBattleBossImage');
-        if(boss) {
+        if (boss) {
             boss.classList.add('shake-anim');
             setTimeout(() => boss.classList.remove('shake-anim'), 500);
         }
-        
+
         updateRpgHud();
     } else {
         btnElement.classList.add('incorrect');
@@ -3270,7 +3270,7 @@ function handleRpgAnswer(isCorrect, btnElement) {
         document.body.classList.add('shake-anim');
         setTimeout(() => document.body.classList.remove('shake-anim'), 500);
     }
-    
+
     // Next question delay
     setTimeout(() => {
         rpgCurrentIndex++;
@@ -3280,51 +3280,51 @@ function handleRpgAnswer(isCorrect, btnElement) {
 
 function finishRpgGame(isWin) {
     clearInterval(rpgTimerInterval);
-    
+
     const resultScreen = document.getElementById('rpgResultScreen');
     const battleScreen = document.getElementById('rpgBattleScreen');
-    
-    if(battleScreen) battleScreen.classList.add('hidden');
-    if(resultScreen) resultScreen.classList.remove('hidden');
-    
+
+    if (battleScreen) battleScreen.classList.add('hidden');
+    if (resultScreen) resultScreen.classList.remove('hidden');
+
     const title = document.getElementById('rpgResultTitle');
     const winContent = document.getElementById('rpgWinContent');
     const loseContent = document.getElementById('rpgLoseContent');
-    
-    if(title) {
+
+    if (title) {
         title.textContent = isWin ? "MISSION CLEAR" : "MISSION FAILED";
         title.style.color = isWin ? "#f1c40f" : "#e74c3c";
     }
-    
+
     if (isWin) {
-        if(winContent) winContent.classList.remove('hidden');
-        if(loseContent) loseContent.classList.add('hidden');
+        if (winContent) winContent.classList.remove('hidden');
+        if (loseContent) loseContent.classList.add('hidden');
     } else {
-        if(winContent) winContent.classList.add('hidden');
-        if(loseContent) loseContent.classList.remove('hidden');
+        if (winContent) winContent.classList.add('hidden');
+        if (loseContent) loseContent.classList.remove('hidden');
     }
-    
+
     // Send result
     fetch('/api/rpg/result', {
         method: 'POST',
-        headers: {'Content-Type': 'application/json'},
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ is_win: isWin, stage_id: 1 })
     })
-    .then(res => res.json())
-    .then(data => {
-        if (data.status === 'success') {
-             if (isWin) {
-                checkRpgStatus(); // Hide banner
-                if (data.reward) {
-                     // Check if new clear
-                     if (data.new_clear) {
-                         // Play sound or bigger celebration
-                     }
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'success') {
+                if (isWin) {
+                    checkRpgStatus(); // Hide banner
+                    if (data.reward) {
+                        // Check if new clear
+                        if (data.new_clear) {
+                            // Play sound or bigger celebration
+                        }
+                    }
+                } else {
+                    // Lose
+                    checkRpgStatus(); // Hide banner since it's now cooldown
                 }
-             } else {
-                 // Lose
-                 checkRpgStatus(); // Hide banner since it's now cooldown
-             }
-        }
-    });
+            }
+        });
 }
