@@ -2805,6 +2805,12 @@ function initNotificationSettings() {
                         toggleTimeInput(e.target.checked);
                     });
                 }
+
+                // 修正: 既に権限がある場合は、バックグラウンドでSWを登録・更新してサーバーにキーを送る
+                // これにより、再ログイン時やデバイス変更時も自動で購読が復活する
+                if (data.enabled && Notification.permission === 'granted') {
+                    registerServiceWorker().catch(err => console.log('Auto-register SW failed:', err));
+                }
             }
         })
         .catch(err => console.error('設定読み込みエラー:', err));
