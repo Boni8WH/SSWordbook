@@ -235,15 +235,15 @@
             <div class="mission-details">
                 <div class="rule-item">
                     <i class="fas fa-stopwatch"></i>
-                    <span>制限時間 60秒</span>
+                    <span id="rpgRuleTime">制限時間 60秒</span>
                 </div>
                 <div class="rule-item">
                     <i class="fas fa-bullseye"></i>
-                    <span>合格ライン 正解数8以上</span>
+                    <span id="rpgRuleCondition">合格ライン 10問正解</span>
                 </div>
-                <div class="rule-item warning">
-                    <i class="fas fa-exclamation-triangle"></i>
-                    <span>敗北で翌朝7時までロック</span>
+                <div class="rule-item warning" style="color: #e74c3c;">
+                    <i class="fas fa-heart-broken"></i>
+                    <span id="rpgRuleMistake">3ミスで即終了</span>
                 </div>
             </div>
 
@@ -296,10 +296,10 @@
                 <div class="reward-box">
                     <h3>報酬獲得</h3>
                     <div class="reward-row">
-                        <span class="reward-icon">🎖</span>
+                        <div class="reward-icon">🎖️</div>
                         <div class="reward-info">
                             <span class="reward-label">称号</span>
-                            <span id="rpgRewardBadge" class="reward-value">Badge Name</span>
+                            <span class="reward-curr" id="rpgRewardBadgeName">Badge Name</span>
                         </div>
                     </div>
                     <div class="reward-row">

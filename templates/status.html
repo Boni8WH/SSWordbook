@@ -1,0 +1,443 @@
+{% extends "base.html" %}
+{% block title %}冒険の記録 - {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="rpg-status-wrapper">
+    <div class="status-container">
+        <div class="status-header">
+            <h2 class="rpg-title">⚔️ 冒険の記録 ⚔️</h2>
+            <p class="status-subtitle">{{ current_user.username }} の英雄譚</p>
+        </div>
+
+        <!-- Stats Summary -->
+        <div class="status-stats-row">
+            <div class="status-stat-card rpg-card">
+                <div class="stat-icon-wrapper">
+                    <i class="fas fa-bolt stat-icon"></i>
+                </div>
+                <div class="stat-info">
+                    <span class="stat-label">永続ボーナス</span>
+                    <span class="stat-value text-gold">+{{ "%.1f"|format(bonus_percent) }}%</span>
+                </div>
+                <small class="stat-desc">全てのスコア計算に加算</small>
+            </div>
+
+            <div class="status-stat-card rpg-card">
+                <div class="stat-icon-wrapper">
+                    <i class="fas fa-skull stat-icon"></i>
+                </div>
+                <div class="stat-info">
+                    <span class="stat-label">討伐数</span>
+                    <span class="stat-value text-crimson">{{ cleared_count }} 体</span>
+                </div>
+                <small class="stat-desc">倒したボスの数</small>
+            </div>
+        </div>
+
+        <div class="rpg-divider">
+            <span>⚜️</span>
+        </div>
+
+        <!-- Badges Grid -->
+        <h3 class="badges-title">獲得した称号</h3>
+
+        <div class="row g-3">
+            {% for badge in earned_badges %}
+            <div class="col-6 col-sm-4 col-md-3">
+                <div class="card h-100 rpg-badge-card {{ 'earned' if badge.earned else 'locked' }}" {% if badge.earned
+                    %}onclick="showMonsterDetail('{{ badge.name }}', '{{ badge.description }}', '{{ badge.boss_name }}', '{{ badge.boss_icon }}')"
+                    {% endif %}>
+                    <div class="card-body text-center d-flex flex-column align-items-center justify-content-center p-2">
+                        <div class="badge-icon mb-2">
+                            {% if badge.earned %}
+                            {% if badge.icon.startswith('fa') %}
+                            <i class="{{ badge.icon }} fa-2x badge-icon-symbol"></i>
+                            {% else %}
+                            <img src="{{ badge.icon }}" alt="Badge" class="img-fluid badge-img"
+                                style="max-height: 50px;">
+                            {% endif %}
+                            {% else %}
+                            <i class="fas fa-lock fa-2x text-muted"></i>
+                            {% endif %}
+                        </div>
+                        <h6 class="card-title small mb-1">{{ badge.name if badge.earned else '???' }}</h6>
+                        <p class="card-text x-small text-muted mb-0">
+                            {{ badge.description if badge.earned else '未獲得' }}
+                        </p>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="text-center mt-4">
+            <a href="{{ url_for('progress_page') }}" class="btn btn-outline-light px-4 rpg-btn">
+                <i class="fas fa-arrow-left me-2"></i> 進捗に戻る
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Monster Detail Modal -->
+<div class="modal fade" id="monsterDetailModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content"
+            style="background: rgba(20, 20, 30, 0.95); border: 2px solid #c5a059; color: #e0e0e0;">
+            <div class="modal-header border-bottom-0">
+                <h5 class="modal-title" style="font-family: 'Cinzel', serif; color: #f1c40f;" id="monsterDetailTitle">
+                    Monster Name</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                    aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center">
+                <div class="mb-3">
+                    <img id="monsterDetailIcon" src="" alt="Monster"
+                        class="img-fluid rounded-circle border border-warning p-1"
+                        style="width: 100px; height: 100px; object-fit: cover;">
+                </div>
+                <h4 id="monsterDetailBadge" class="text-warning mb-3" style="font-family: 'Cinzel', serif;">Badge Name
+                </h4>
+                <p id="monsterDetailDesc" class="px-3" style="line-height: 1.8; color: #ccc;">Description goes here...
+                </p>
+            </div>
+            <div class="modal-footer border-top-0 justify-content-center">
+                <button type="button" class="btn btn-outline-light btn-sm" data-bs-dismiss="modal">閉じる</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Background Animation (Particles) -->
+<div id="particles-js" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1;"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    function showMonsterDetail(badgeName, badgeDesc, bossName, bossIcon) {
+        document.getElementById('monsterDetailTitle').textContent = bossName || 'Unknown Monster';
+        document.getElementById('monsterDetailBadge').textContent = badgeName;
+        document.getElementById('monsterDetailDesc').textContent = badgeDesc || '情報がありません。';
+
+        const iconImg = document.getElementById('monsterDetailIcon');
+        if (bossIcon && bossIcon !== 'None') {
+            if (bossIcon.startsWith('http') || bossIcon.startsWith('/')) {
+                iconImg.src = bossIcon;
+            } else {
+                iconImg.src = '/static/images/rpg/' + bossIcon;
+            }
+        } else {
+            iconImg.src = '/static/images/boss_alexander.png'; // Fallback
+        }
+
+        var myModal = new bootstrap.Modal(document.getElementById('monsterDetailModal'));
+        myModal.show();
+    }
+</script>
+
+<style>
+    /* Google Fonts for Fantasy usage */
+    @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Noto+Serif+JP:wght@400;700&display=swap');
+
+    .rpg-status-wrapper {
+        min-height: 100vh;
+        /* Dark gradient background */
+        background: radial-gradient(circle at center, #2c3e50 0%, #000000 100%);
+        padding: 40px 20px;
+        color: #ecf0f1;
+        font-family: 'Noto Serif JP', serif;
+    }
+
+    .status-container {
+        max-width: 900px;
+        margin: 0 auto;
+        /* Optional: Add a subtle texture or frame */
+    }
+
+    .rpg-title {
+        font-family: 'Cinzel', serif;
+        font-size: 2.5rem;
+        color: #f1c40f;
+        text-shadow: 0 0 10px rgba(241, 196, 15, 0.5);
+        margin-bottom: 5px;
+        letter-spacing: 2px;
+    }
+
+    .status-header {
+        text-align: center;
+        margin-bottom: 50px;
+    }
+
+    .status-subtitle {
+        color: #bdc3c7;
+        font-size: 1.1rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        display: inline-block;
+        padding-bottom: 5px;
+    }
+
+    /* Cards */
+    .rpg-card {
+        background: rgba(20, 20, 20, 0.8);
+        border: 2px solid #555;
+        border-radius: 8px;
+        padding: 20px;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+        position: relative;
+        overflow: hidden;
+        transition: transform 0.3s, box-shadow 0.3s;
+    }
+
+    .rpg-card::before {
+        /* Decoration corners */
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        margin: 4px;
+        pointer-events: none;
+    }
+
+    /* Stats Row */
+    .status-stats-row {
+        display: flex;
+        gap: 30px;
+        justify-content: center;
+        margin-bottom: 50px;
+        flex-wrap: wrap;
+    }
+
+    .status-stat-card {
+        flex: 1;
+        min-width: 280px;
+        max-width: 350px;
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        background: linear-gradient(145deg, #1a1a1a, #2a2a2a);
+        border-color: #444;
+    }
+
+    .stat-icon-wrapper {
+        background: rgba(0, 0, 0, 0.3);
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid #555;
+    }
+
+    .stat-icon {
+        font-size: 1.8rem;
+        color: #95a5a6;
+    }
+
+    .stat-info {
+        flex: 1;
+    }
+
+    .stat-label {
+        display: block;
+        font-size: 0.9rem;
+        color: #ddd;
+        /* Improved contrast */
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+
+    .stat-value {
+        font-family: 'Cinzel', serif;
+        font-size: 2.2rem;
+        font-weight: 700;
+        line-height: 1.2;
+    }
+
+    .text-gold {
+        color: #f1c40f;
+        text-shadow: 0 0 15px rgba(241, 196, 15, 0.3);
+    }
+
+    .text-crimson {
+        color: #ff6b6b;
+        /* Lighter crimson */
+        text-shadow: 0 0 15px rgba(231, 76, 60, 0.3);
+    }
+
+    .stat-desc {
+        display: block;
+        margin-top: 5px;
+        font-size: 0.75rem;
+        color: #bbb;
+        /* Improved contrast */
+    }
+
+    /* Divider */
+    .rpg-divider {
+        text-align: center;
+        margin: 40px 0;
+        position: relative;
+    }
+
+    .rpg-divider::before,
+    .rpg-divider::after {
+        content: "";
+        display: inline-block;
+        width: 30%;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, #777, transparent);
+        /* Lighter divider */
+        vertical-align: middle;
+        margin: 0 15px;
+    }
+
+    .rpg-divider span {
+        color: #f1c40f;
+        font-size: 1.5rem;
+        vertical-align: middle;
+    }
+
+    /* Badges */
+    .badges-title {
+        text-align: center;
+        font-family: 'Cinzel', serif;
+        color: #fff;
+        /* Pure white */
+        margin-bottom: 30px;
+        font-size: 1.8rem;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+    }
+
+    .badges-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 25px;
+        margin-bottom: 60px;
+    }
+
+    .badge-card {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        transition: transform 0.3s ease, border-color 0.3s ease;
+    }
+
+    .badge-card.earned {
+        border-color: #f1c40f;
+        background: linear-gradient(135deg, rgba(241, 196, 15, 0.1), rgba(40, 40, 40, 0.8));
+        /* Slightly lighter BG */
+    }
+
+    .badge-card.earned:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 25px rgba(241, 196, 15, 0.15);
+    }
+
+    .badge-card.locked {
+        filter: grayscale(1);
+        opacity: 0.7;
+        /* Increased opacity for readability */
+        border-color: #555;
+    }
+
+    .badge-icon-area {
+        position: relative;
+        width: 70px;
+        height: 70px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .badge-glow {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+        filter: blur(15px);
+        opacity: 0.3;
+        animation: pulse 3s infinite;
+    }
+
+    .badge-icon-symbol {
+        font-size: 3rem;
+        z-index: 1;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+    }
+
+    .badge-name {
+        margin: 0;
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: #f1c40f;
+        margin-bottom: 5px;
+        text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+    }
+
+    .badge-desc {
+        margin: 0;
+        font-size: 0.9rem;
+        color: #ccc;
+        /* Improved contrast */
+        line-height: 1.4;
+    }
+
+    .badge-ribbon {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background: #e74c3c;
+        color: white;
+        font-size: 0.6rem;
+        font-weight: bold;
+        padding: 2px 8px;
+        border-radius: 10px;
+        transform: rotate(5deg);
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+    }
+
+    @keyframes pulse {
+        0% {
+            transform: scale(0.95);
+            opacity: 0.2;
+        }
+
+        50% {
+            transform: scale(1.05);
+            opacity: 0.4;
+        }
+
+        100% {
+            transform: scale(0.95);
+            opacity: 0.2;
+        }
+    }
+
+    /* Button */
+    .status-actions {
+        text-align: center;
+    }
+
+    .rpg-btn-back {
+        background: transparent;
+        border: 2px solid #555;
+        color: #bdc3c7;
+        padding: 12px 30px;
+        font-family: 'Noto Serif JP', serif;
+        font-size: 1rem;
+        transition: all 0.3s;
+        border-radius: 4px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+
+    .rpg-btn-back:hover {
+        border-color: #f1c40f;
+        color: #f1c40f;
+        background: rgba(241, 196, 15, 0.1);
+        text-decoration: none;
+    }
+</style>
+{% endblock %}
