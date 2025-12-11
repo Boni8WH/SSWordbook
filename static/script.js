@@ -3078,10 +3078,20 @@ function checkRpgStatus() {
                 // Show banner
                 if (banner) banner.classList.remove('hidden');
 
-                // Update Boss Name in modal (if opened)
+                // Update Boss Name & Icon
                 if (data.boss_name) {
                     const bossNameEl = document.getElementById('rpgBossName');
                     if (bossNameEl) bossNameEl.textContent = data.boss_name;
+                }
+                if (data.boss_icon) {
+                    const bossImgEl = document.getElementById('rpgBossImage');
+                    if (bossImgEl) {
+                        let iconUrl = data.boss_icon;
+                        if (!iconUrl.startsWith('http') && !iconUrl.startsWith('/')) {
+                            iconUrl = '/static/images/rpg/' + iconUrl;
+                        }
+                        bossImgEl.src = iconUrl;
+                    }
                 }
             } else {
                 if (banner) banner.classList.add('hidden');
@@ -3102,8 +3112,15 @@ function openRpgIntro() {
     if (result) result.classList.add('hidden');
 
     // Set Image
+    // Set Image with onload handler to hide shadow
     const img = document.getElementById('rpgBossImage');
-    if (img) img.src = "/static/images/boss_alexander.png";
+    if (img) {
+        img.onload = () => {
+            const shadow = img.parentElement.querySelector('.boss-shadow');
+            if (shadow) shadow.style.display = 'none';
+        };
+        img.src = "/static/images/boss_alexander.png";
+    }
 }
 
 // Add event listeners if elements exist (safe check)
@@ -3122,6 +3139,11 @@ function closeRpgModal() {
     clearInterval(rpgTimerInterval);
 }
 
+let rpgIncorrectCount = 0; // 新規追加: ミス回数カウント
+let rpgPassScore = 10;
+let rpgMaxMistakes = 3;
+let rpgStageId = 1;
+
 function startRpgGame() {
     fetch('/api/rpg/start', { method: 'POST' })
         .then(res => res.json())
@@ -3129,8 +3151,33 @@ function startRpgGame() {
             if (data.status === 'success') {
                 rpgGameData = data.problems;
                 rpgTimeLeft = data.time_limit || 60;
+                rpgPassScore = data.pass_score || 10;
+                rpgMaxMistakes = data.max_mistakes || 3;
+
+                if (data.boss_info) {
+                    rpgStageId = data.boss_info.id;
+
+                    // Update UI Texts
+                    document.getElementById('rpgBossName').textContent = data.boss_info.name;
+                    document.getElementById('rpgRuleTime').textContent = `制限時間 ${rpgTimeLeft}秒`;
+                    document.getElementById('rpgRuleCondition').textContent = `合格ライン ${rpgPassScore}問正解`;
+                    document.getElementById('rpgRuleMistake').textContent = `${rpgMaxMistakes + 1}ミスで即終了`; // 3ミスでアウトなら表記は「3ミス」等。サーバーは「max_mistakes=2」を送るかも？
+                    // app.py: clear_max_mistakes defaults to 2 (allowed). So 3rd mistake kills.
+                    // Text: "3ミスで即終了" -> "2ミスまでOK" or "3ミスで終了".
+                    // Let's explicitly say: `${rpgMaxMistakes + 1}ミスで終了`
+
+                    // Update Image
+                    let iconUrl = data.boss_info.icon_image;
+                    if (iconUrl && !iconUrl.startsWith('http') && !iconUrl.startsWith('/')) {
+                        iconUrl = '/static/images/rpg/' + iconUrl;
+                    }
+                    const introImg = document.getElementById('rpgBossImage');
+                    if (introImg) introImg.src = iconUrl;
+                }
+
                 rpgCurrentIndex = 0;
                 rpgCorrectCount = 0;
+                rpgIncorrectCount = 0; // リセット
 
                 // Switch screen
                 document.getElementById('rpgIntroScreen').classList.add('hidden');
@@ -3173,27 +3220,38 @@ function startRpgTimer() {
 }
 
 function updateRpgHud() {
-    // Boss HP starts at 100% (Visual only? or based on questions left?)
-    // Let's say Boss Max HP = 10.
-    // HP = Max HP - Correct Answers.
-    // If Correct = 8, HP = 2 (Low).
-    const currentHp = 10 - rpgCorrectCount;
-    const pct = (currentHp / 10) * 100;
+    // Boss HP Logic: Dynamic
+    const maxHp = rpgPassScore;
+    const currentHp = Math.max(0, maxHp - rpgCorrectCount);
+    const pct = (currentHp / maxHp) * 100;
+
     const hpBar = document.getElementById('rpgBossHpBar');
-    if (hpBar) hpBar.style.width = `${pct}%`;
+    if (hpBar) {
+        hpBar.style.width = `${pct}%`;
+
+        // 色を変える演出（任意）
+        if (pct <= 30) {
+            hpBar.style.backgroundColor = '#e74c3c'; // 赤
+        } else if (pct <= 60) {
+            hpBar.style.backgroundColor = '#f1c40f'; // 黄
+        } else {
+            hpBar.style.backgroundColor = '#e67e22'; // デフォルト（オレンジ系）
+        }
+    }
 }
 
 function showNextRpgQuestion() {
+    // インデックスチェックだけでは終了しない（正解数orミス数で判定）
     if (rpgCurrentIndex >= rpgGameData.length) {
-        // Finished all questions
-        // Check win condition (>= 8)
-        const isWin = rpgCorrectCount >= 8;
-        finishRpgGame(isWin);
+        // 問題が尽きた場合（通常30問あるので稀だが）
+        // 目標未達なら失敗扱い
+        finishRpgGame(false);
         return;
     }
 
     const problem = rpgGameData[rpgCurrentIndex];
-    document.getElementById('rpgQuestionText').textContent = problem.question;
+    const qText = document.getElementById('rpgQuestionText');
+    if (qText) qText.textContent = problem.question;
 
     // Server now provides choices (similar to Daily Quiz)
     const choices = problem.choices;
@@ -3239,11 +3297,26 @@ function handleRpgAnswer(isCorrect, btnElement) {
         }
 
         updateRpgHud();
+
+        // Win Condition Check
+        if (rpgCorrectCount >= rpgPassScore) {
+            setTimeout(() => finishRpgGame(true), 1000);
+            return;
+        }
+
     } else {
         btnElement.classList.add('incorrect');
-        // Screen shake
+        rpgIncorrectCount++;
+
+        // Screen shake or visual feedback
         document.body.classList.add('shake-anim');
         setTimeout(() => document.body.classList.remove('shake-anim'), 500);
+
+        // Lose Condition Check: Mistakes > Max
+        if (rpgIncorrectCount > rpgMaxMistakes) {
+            setTimeout(() => finishRpgGame(false), 1000);
+            return;
+        }
     }
 
     // Next question delay
@@ -3283,7 +3356,7 @@ function finishRpgGame(isWin) {
     fetch('/api/rpg/result', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ is_win: isWin, stage_id: 1 })
+        body: JSON.stringify({ is_win: isWin, stage_id: rpgStageId })
     })
         .then(res => res.json())
         .then(data => {
@@ -3291,6 +3364,12 @@ function finishRpgGame(isWin) {
                 if (isWin) {
                     checkRpgStatus(); // Hide banner
                     if (data.reward) {
+                        // Update Badge Name
+                        const badgeNameEl = document.getElementById('rpgRewardBadgeName');
+                        if (badgeNameEl && data.reward.badge) {
+                            badgeNameEl.textContent = data.reward.badge;
+                        }
+
                         // Check if new clear
                         if (data.new_clear) {
                             // Play sound or bigger celebration
