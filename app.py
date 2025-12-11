@@ -385,6 +385,18 @@ def _add_notification_columns_to_user():
 # 通知機能関連
 # ====================================================================
 
+def _create_rpg_state_table():
+    """RpgStateテーブルを作成するマイグレーション関数"""
+    try:
+        inspector = inspect(db.engine)
+        if 'rpg_state' not in inspector.get_tables():
+            print("🔄 rpg_stateテーブルを作成します...")
+            RpgState.__table__.create(db.engine)
+            print("✅ rpg_stateテーブル作成完了")
+    except Exception as e:
+        print(f"⚠️ rpg_stateテーブル作成エラー: {e}")
+
+
 def send_push_notification(user, title, body, url="/"):
     """プッシュ通知を送信"""
     if not user.push_subscription:
@@ -662,7 +674,16 @@ class UserStats(db.Model):
                     precision_bonus = (accuracy_rate - 0.8) * 1000
                 
                 # 総合スコア
-                self.balance_score = self.mastery_score + self.reliability_score + self.activity_score + precision_bonus
+                raw_score = self.mastery_score + self.reliability_score + self.activity_score + precision_bonus
+                
+                # RPGボーナス適用
+                rpg_state = RpgState.query.filter_by(user_id=self.user_id).first()
+                if rpg_state and rpg_state.permanent_bonus_percent > 0:
+                    bonus_multiplier = 1 + (rpg_state.permanent_bonus_percent / 100.0)
+                    self.balance_score = raw_score * bonus_multiplier
+                else:
+                    self.balance_score = raw_score
+
             
             # 更新日時
             self.last_updated = datetime.now(JST)
@@ -674,7 +695,34 @@ class UserStats(db.Model):
             print(f"❌ 統計更新エラー ({user.username}): {e}")
             return False
 
+class RpgState(db.Model):
+    """ユーザーのRPGモード進行状況を保存するテーブル"""
+    __tablename__ = 'rpg_state'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False, unique=True)
+    
+    # クリア済みステージIDのリスト (JSON)
+    cleared_stages = db.Column(JSONEncodedDict, default=[], nullable=False)
+    
+    # 最後に挑戦した日時 (再挑戦クールダウン用)
+    last_challenge_at = db.Column(db.DateTime, nullable=True)
+    
+    # 永続ボーナス (%単位, float)
+    permanent_bonus_percent = db.Column(db.Float, default=0.0, nullable=False)
+    
+    # 獲得したバッジIDのリスト (JSON)
+    earned_badges = db.Column(JSONEncodedDict, default=[], nullable=False)
+    
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(JST), onupdate=lambda: datetime.now(JST))
+
+    user = db.relationship('User', backref=db.backref('rpg_state', uselist=False, cascade="all, delete-orphan"))
+
+    def __repr__(self):
+        return f'<RpgState User:{self.user_id} Bonus:{self.permanent_bonus_percent}%>'
+
 # 論述問題の部屋別公開設定モデル
+
 class EssayVisibilitySetting(db.Model):
     __tablename__ = 'essay_visibility_setting'
     
@@ -768,7 +816,7 @@ class EssayCsvFile(db.Model):
     problem_count = db.Column(db.Integer, default=0, nullable=False)
     upload_date = db.Column(db.DateTime, default=lambda: datetime.now(JST))
 
-from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, Response, abort, make_response
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, Response, abort, make_response, send_file
 from flask_sqlalchemy import SQLAlchemy
 from flask_mail import Mail, Message
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -2247,6 +2295,7 @@ def create_tables_and_admin_user():
 
             # 通知カラム追加マイグレーション
             _add_notification_columns_to_user()
+            _create_rpg_state_table()
             
             # 管理者ユーザー確認/作成
             try:
@@ -12794,7 +12843,162 @@ def update_notification_settings():
 
 
 
+# =========================================================
+# RPGモード (Chronicle Quest) 関連ルート
+# =========================================================
+
+@app.route('/api/rpg/status')
+def get_rpg_status():
+    if 'user_id' not in session:
+        return jsonify({'status': 'error', 'message': 'Not logged in'}), 401
+    
+    user_id = session['user_id']
+    user_stats = UserStats.query.filter_by(user_id=user_id).first()
+    
+    # 総合スコア1000未満なら非公開（開発中は緩和してもいいが仕様通りにする）
+    balance_score = user_stats.balance_score if user_stats else 0
+    if balance_score < 1000:
+         return jsonify({'available': False, 'reason': 'score_low', 'current_score': balance_score})
+         
+    rpg_state = RpgState.query.filter_by(user_id=user_id).first()
+    
+    # クールダウンチェック
+    now = datetime.now(JST)
+    is_cooldown = False
+    next_challenge_time = None
+    
+    if rpg_state and rpg_state.last_challenge_at:
+        last_challenge = rpg_state.last_challenge_at.replace(tzinfo=JST) if rpg_state.last_challenge_at.tzinfo is None else rpg_state.last_challenge_at
+        
+        # 最後に挑戦した日の「次の朝7時」を計算
+        if last_challenge.hour < 7:
+            target_time = last_challenge.replace(hour=7, minute=0, second=0, microsecond=0)
+        else:
+            target_time = (last_challenge + timedelta(days=1)).replace(hour=7, minute=0, second=0, microsecond=0)
+            
+        if now < target_time:
+            is_cooldown = True
+            next_challenge_time = target_time.isoformat()
+            
+    # ステージ1 (アレクサンドロス) のクリア状況
+    cleared_stages = rpg_state.cleared_stages if rpg_state else []
+    is_cleared = 1 in cleared_stages
+    
+    return jsonify({
+        'available': True,
+        'is_cooldown': is_cooldown,
+        'next_challenge_time': next_challenge_time,
+        'is_cleared': is_cleared,
+        'current_stage': 1,
+        'boss_name': 'アレクサンドロス大王',
+        'current_score': balance_score
+    })
+
+@app.route('/api/rpg/start', methods=['POST'])
+def start_rpg_battle():
+    if 'user_id' not in session:
+        return jsonify({'status': 'error', 'message': 'Not logged in'}), 401
+        
+    user_id = session['user_id']
+    user = User.query.get(user_id)
+    room_number = user.room_number
+    
+    # 問題データロード
+    word_data = load_word_data_for_room(room_number)
+    
+    # Z問題以外、かつ有効な問題をフィルタリング
+    valid_problems = []
+    
+    # RoomSettingから有効な単元を取得
+    room_setting = RoomSetting.query.filter_by(room_number=room_number).first()
+    max_enabled_unit_num_str = room_setting.max_enabled_unit_number if room_setting else "9999"
+    parsed_max_enabled_unit_num = parse_unit_number(max_enabled_unit_num_str)
+    
+    for word in word_data:
+        # Z問題除外
+        if str(word.get('number', '')).upper() == 'Z':
+            continue
+            
+        is_word_enabled_in_csv = word['enabled']
+        is_unit_enabled_by_room_setting = parse_unit_number(word['number']) <= parsed_max_enabled_unit_num
+        
+        if is_word_enabled_in_csv and is_unit_enabled_by_room_setting:
+            valid_problems.append(word)
+            
+    if len(valid_problems) < 10:
+        return jsonify({'status': 'error', 'message': '出題可能な問題が少なすぎます（10問以上必要）'}), 400
+        
+    # ランダムに10問選択
+    selected_problems = random.sample(valid_problems, 10)
+    
+    return jsonify({
+        'status': 'success',
+        'problems': selected_problems,
+        'time_limit': 60, # 秒
+        'pass_score': 8   # 8割以上
+    })
+
+@app.route('/api/rpg/result', methods=['POST'])
+def submit_rpg_result():
+    if 'user_id' not in session:
+        return jsonify({'status': 'error', 'message': 'Not logged in'}), 401
+        
+    user_id = session['user_id']
+    data = request.json
+    is_win = data.get('is_win', False)
+    stage_id = data.get('stage_id', 1) # 今回は1固定
+    
+    # RpgState取得または作成
+    rpg_state = RpgState.query.filter_by(user_id=user_id).first()
+    if not rpg_state:
+        rpg_state = RpgState(user_id=user_id)
+        db.session.add(rpg_state)
+    
+    now = datetime.now(JST)
+    
+    if is_win:
+        # 勝利処理
+        cleared_stages = set(rpg_state.cleared_stages)
+        new_clear = False
+        if stage_id not in cleared_stages:
+            cleared_stages.add(stage_id)
+            rpg_state.cleared_stages = list(cleared_stages)
+            new_clear = True
+            
+            # 初回クリアボーナス
+            rpg_state.permanent_bonus_percent += 0.5
+            
+            # バッジ付与
+            earned_badges = set(rpg_state.earned_badges)
+            if 'alexander_slayer' not in earned_badges:
+                earned_badges.add('alexander_slayer')
+                rpg_state.earned_badges = list(earned_badges)
+        
+        db.session.commit()
+        
+        # 統計再計算（ボーナス反映のため）
+        UserStats.get_or_create(user_id).update_stats()
+        db.session.commit()
+        
+        return jsonify({'status': 'success', 'new_clear': new_clear, 'reward': {'bonus_percent': 0.5, 'badge': '征服王'}})
+        
+    else:
+        # 敗北処理
+        rpg_state.last_challenge_at = now
+        db.session.commit()
+        return jsonify({'status': 'success', 'message': 'Failed. Cooldown started.'})
+
+@app.route('/api/rpg/boss_image')
+def get_rpg_boss_image():
+    # Hardcoded for now
+    image_path = "/Users/kitsukaasaki/.gemini/antigravity/brain/a292f61e-f7a8-439a-b46c-733e215e39d2/boss_alexander_1765439544849.png"
+    if os.path.exists(image_path):
+        return send_file(image_path, mimetype='image/png')
+    else:
+        return "", 404
+
 if __name__ == '__main__':
+
     try:
         # サーバー起動
         port = int(os.environ.get('PORT', 5001))
