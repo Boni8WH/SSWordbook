@@ -418,18 +418,24 @@ def check_daily_quiz_reminders():
     with app.app_context():
         now = datetime.now(JST)
         current_time_str = now.strftime("%H:%M")
+        print(f"DEBUG: Reminder check running at {current_time_str} (JST)")
         
         # 通知有効かつ現在時刻設定のユーザーを取得
         users = User.query.filter_by(notification_enabled=True, notification_time=current_time_str).all()
+        print(f"DEBUG: Found {len(users)} users for time {current_time_str}")
         
         for user in users:
             # 今日のクイズ完了チェック
-            today = (datetime.now(JST) - timedelta(hours=7)).date()
+            today = (datetime.now(JST) - timedelta(hours=7)).date() # 7時間引いて日付区切り調整？（要確認）
+            # シンプルにJSTの日付を使うなら: today = datetime.now(JST).date()
+            # 既存ロジックに従う
+            
             daily_quiz = DailyQuiz.query.filter_by(date=today, room_number=user.room_number).first()
             
             if daily_quiz:
                 result = DailyQuizResult.query.filter_by(user_id=user.id, quiz_id=daily_quiz.id).first()
                 if not result:
+                    print(f"DEBUG: Sending reminder to {user.username}")
                     # 未完了なら通知
                     send_push_notification(
                         user,
@@ -437,6 +443,8 @@ def check_daily_quiz_reminders():
                         "毎日の積み重ねが大切です。頑張りましょう！",
                         url="/"
                     )
+            else:
+                print(f"DEBUG: No daily quiz found for room {user.room_number} on {today}")
 
 
 
@@ -4916,25 +4924,43 @@ def admin_add_announcement():
         )
         db.session.add(new_announcement)
         db.session.commit()
-        
-        # 通知送信
+
+        # Update: 対象ユーザーにプッシュ通知
         try:
-            target_users = []
-            if target_rooms == 'all':
-                target_users = User.query.filter_by(notification_enabled=True).all()
-            else:
-                rooms = target_rooms.split(',')
-                target_users = User.query.filter(User.room_number.in_(rooms), User.notification_enabled == True).all()
+            print(f"DEBUG: Announcement created. Target rooms: {target_rooms}")
+            # 全員または特定の部屋
+            website_url = url_for('index', _external=True)
             
+            if target_rooms == "all":
+                users = User.query.filter(User.push_subscription.isnot(None)).all()
+                print(f"DEBUG: Target 'all'. Found {len(users)} users with subscription.")
+            else:
+                target_room_list = [r.strip() for r in target_rooms.split(',')]
+                users = User.query.filter(
+                    User.room_number.in_(target_room_list),
+                    User.push_subscription.isnot(None)
+                ).all()
+                print(f"DEBUG: Target rooms {target_room_list}. Found {len(users)} users with subscription.")
+
             count = 0
-            for user in target_users:
-                if send_push_notification(user, "新しいお知らせ: " + title, "アプリを開いて確認しましょう！", url="/"):
+            for user in users:
+                if user.notification_enabled:
+                    print(f"DEBUG: Sending to user {user.username} (Room {user.room_number})")
+                    send_push_notification(
+                        user,
+                        f"新しいお知らせ: {title}",
+                        "アプリを開いて確認しましょう！",
+                        url=website_url
+                    )
                     count += 1
-            print(f"📢 お知らせ通知送信: {count}件")
+                else:
+                    print(f"DEBUG: User {user.username} has notifications disabled.")
+            print(f"DEBUG: Sent notification to {count} users.")
+            
         except Exception as e:
-            print(f"⚠️ 通知送信エラー: {e}")
-        
-        flash('お知らせを追加しました。', 'success')
+            print(f"Error sending announcement push: {e}")
+
+        flash('お知らせを投稿しました', 'success')
         return redirect(url_for('admin_page'))
     except Exception as e:
         db.session.rollback()
