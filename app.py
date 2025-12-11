@@ -435,7 +435,7 @@ def check_daily_quiz_reminders():
             if daily_quiz:
                 result = DailyQuizResult.query.filter_by(user_id=user.id, quiz_id=daily_quiz.id).first()
                 if not result:
-                    print(f"DEBUG: Sending reminder to {user.username}")
+                    print(f"DEBUG: Sending reminder to {user.username} (Quiz exists but not done)")
                     # 未完了なら通知
                     send_push_notification(
                         user,
@@ -444,7 +444,14 @@ def check_daily_quiz_reminders():
                         url="/"
                     )
             else:
-                print(f"DEBUG: No daily quiz found for room {user.room_number} on {today}")
+                # クイズ自体がまだ生成されていない場合も、当然「未完了」なので通知する
+                print(f"DEBUG: Sending reminder to {user.username} (Quiz not generated yet)")
+                send_push_notification(
+                    user,
+                    "今日の10問が未完では？",
+                    "勝利は、わが迅速果敢な行動にあり",
+                    url="/"
+                )
 
 
 
@@ -12821,8 +12828,18 @@ def debug_reminder():
             )
             results['send_result'] = "Success" if success else "Failed (Check Logs)"
     else:
-        results['quiz_found'] = "No (今日のクイズが存在しません)"
-        results['should_send'] = False
+        results['quiz_found'] = "No (今日のクイズがまだ生成されていません)"
+        results['status'] = "Not Done (未生成 = 未完了)"
+        results['should_send'] = True
+        
+        # 実際に送ってみる
+        success = send_push_notification(
+            user,
+            "【テスト】リマインド通知",
+            "これは「リマインド条件確認」によるテストです。\n条件合致（クイズ未生成）のため送信されました。",
+            url="/"
+        )
+        results['send_result'] = "Success" if success else "Failed (Check Logs)"
         
     return jsonify({'status': 'success', 'debug_info': results})
 
