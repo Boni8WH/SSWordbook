@@ -12929,11 +12929,53 @@ def start_rpg_battle():
         return jsonify({'status': 'error', 'message': '出題可能な問題が少なすぎます（10問以上必要）'}), 400
         
     # ランダムに10問選択
-    selected_problems = random.sample(valid_problems, 10)
+    selected_problems_data = random.sample(valid_problems, 10)
+    
+    # 全回答リストを作成（ダミー生成用）
+    all_answers = list(set(w['answer'] for w in word_data if w.get('answer')))
+
+    final_problems = []
+    for problem in selected_problems_data:
+        correct_answer = problem['answer']
+        
+        # --- 誤答選択肢の生成ロジック (DailyQuizと同等) ---
+        # 1. CSVのG列 (incorrect) に指定がある場合はそれを使用
+        manual_incorrect_str = problem.get('incorrect', '')
+        
+        if manual_incorrect_str and manual_incorrect_str.strip():
+            manual_candidates = [x.strip() for x in manual_incorrect_str.split(',') if x.strip()]
+            if len(manual_candidates) > 3:
+                distractors = random.sample(manual_candidates, 3)
+            else:
+                distractors = manual_candidates
+        else:
+            # 2. 指定がない場合はレーベンシュタイン距離で類似語を探す
+            distractor_pool = [ans for ans in all_answers if ans != correct_answer]
+            # パフォーマンス考慮: プールが大きすぎる場合はランダムサンプリング後に計算しても良いが
+            # 今回はDailyQuiz同様に全件計算（数千件程度なら高速）
+            distractors_with_distance = [(levenshtein_distance(correct_answer, ans), ans) for ans in distractor_pool]
+            distractors_with_distance.sort(key=lambda x: x[0])
+            distractors = [ans for distance, ans in distractors_with_distance[:3]]
+            
+            # 候補が足りない場合はランダムに補充
+            if len(distractors) < 3 and len(distractor_pool) >= 3:
+                remaining = [ans for ans in distractor_pool if ans not in distractors]
+                distractors.extend(random.sample(remaining, 3 - len(distractors)))
+        
+        # 正解と誤答を合わせてシャッフル
+        choices = distractors + [correct_answer]
+        random.shuffle(choices)
+        
+        final_problems.append({
+            'id': get_problem_id(problem),
+            'question': problem['question'],
+            'answer': correct_answer,
+            'choices': choices
+        })
     
     return jsonify({
         'status': 'success',
-        'problems': selected_problems,
+        'problems': final_problems,
         'time_limit': 60, # 秒
         'pass_score': 8   # 8割以上
     })
