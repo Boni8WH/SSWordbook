@@ -5,6 +5,13 @@
 <section class="progress-section">
     <h2>進捗確認 - {{ current_user.username }} (部屋: {{ current_user.room_number }})</h2>
 
+    <!-- Status Link Button -->
+    <div style="text-align: right; margin-bottom: 20px;">
+        <a href="{{ url_for('status') }}" class="btn btn-outline-warning">
+            <i class="fas fa-scroll"></i> 冒険の記録を見る
+        </a>
+    </div>
+
     <!-- ユーザー順位（ランキング枠の外） -->
     <div class="progress-user-rank-section" id="user-rank-section" style="display: none;">
         <h4>あなたの順位</h4>
@@ -111,17 +118,18 @@
                         <span class="chapter-title">{{ chapter_data.chapter_name }}</span>
                     </div>
                     <div class="chapter-summary">
-                        <span class="mastered-count">{{ chapter_data.total_mastered }}/{{ chapter_data.total_questions }}問マスター</span>
-                        <span class="chapter-percentage">({{ ((chapter_data.total_mastered / chapter_data.total_questions * 100) if chapter_data.total_questions > 0 else 0)|round(1) }}%)</span>
+                        <span class="mastered-count">{{ chapter_data.total_mastered }}/{{ chapter_data.total_questions
+                            }}問マスター</span>
+                        <span class="chapter-percentage">({{ ((chapter_data.total_mastered /
+                            chapter_data.total_questions * 100) if chapter_data.total_questions > 0 else 0)|round(1)
+                            }}%)</span>
                     </div>
                 </div>
-                
+
                 <!-- 章の進捗バー -->
                 <div class="chapter-progress-bar-container">
-                    <div class="chapter-progress-bar" 
-                        data-total-mastered="{{ chapter_data.total_mastered }}"
-                        data-total-questions="{{ chapter_data.total_questions }}"
-                        style="width: 0%;"></div>
+                    <div class="chapter-progress-bar" data-total-mastered="{{ chapter_data.total_mastered }}"
+                        data-total-questions="{{ chapter_data.total_questions }}" style="width: 0%;"></div>
                 </div>
 
                 <!-- 単元詳細（初期状態は非表示） -->
@@ -132,17 +140,16 @@
                         {% set total_attempts = unit_data.total_attempts %}
                         {% set mastered_count = unit_data.mastered_problems|length %}
                         {% set total_questions = unit_data.total_questions_in_unit %}
-                        
+
                         <p>問題を解いた数: {{ total_attempts }}回</p>
                         <p>
                             マスターした問題数: {{ mastered_count }} / {{ total_questions }}
-                            （{% if total_questions > 0 %}{{ (mastered_count / total_questions * 100)|round(1) }}%{% else %}0%{% endif %}）
+                            （{% if total_questions > 0 %}{{ (mastered_count / total_questions * 100)|round(1) }}%{% else
+                            %}0%{% endif %}）
                         </p>
                         <div class="unit-progress-bar-container">
-                            <div class="unit-progress-bar" 
-                                data-mastered-count="{{ mastered_count }}"
-                                data-total-questions="{{ total_questions }}"
-                                style="width: 0%;"></div>
+                            <div class="unit-progress-bar" data-mastered-count="{{ mastered_count }}"
+                                data-total-questions="{{ total_questions }}" style="width: 0%;"></div>
                         </div>
                     </div>
                     {% endfor %}
@@ -157,99 +164,99 @@
 </section>
 
 <script>
-// 章別進捗の展開/折りたたみ
-function toggleChapterProgress(chapterNum) {
-    const unitsDiv = document.getElementById('units-' + chapterNum);
-    const icon = document.getElementById('icon-' + chapterNum);
-    
-    if (unitsDiv.style.display === 'none' || unitsDiv.style.display === '') {
-        unitsDiv.style.display = 'block';
-        icon.textContent = '▼';
-    } else {
-        unitsDiv.style.display = 'none';
-        icon.textContent = '▶';
-    }
-}
+    // 章別進捗の展開/折りたたみ
+    function toggleChapterProgress(chapterNum) {
+        const unitsDiv = document.getElementById('units-' + chapterNum);
+        const icon = document.getElementById('icon-' + chapterNum);
 
-// ランキングデータの非同期読み込み
-// ランキングデータの非同期読み込み（修正版）
-async function loadRankingData() {
-    try {
-        console.log('🔄 ランキングデータを取得中...');
-        
-        // ローディング表示
-        document.getElementById('ranking-loading').style.display = 'block';
-        document.getElementById('ranking-error').style.display = 'none';
-        document.getElementById('ranking-table-container').style.display = 'none';
-        
-        // 正しいAPIエンドポイントを使用
-        const response = await fetch('/api/ranking_data', {
-            method: 'GET',  // POSTからGETに変更
-            headers: {
-                'Content-Type': 'application/json',
-            }
-        });
-        
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        
-        if (data.status === 'success') {
-            console.log(`📊 ランキングデータ取得成功: ${data.ranking_data.length}人分`);
-            console.log(`📋 表示制限: ${data.ranking_display_count}人`);
-            
-            // グローバル変数に表示制限数を保存
-            window.rankingDisplayCount = data.ranking_display_count;
-            
-            // ランキングテーブルを更新（制限適用）
-            updateRankingTable(data.ranking_data);
-            
-            // ユーザー統計を更新
-            updateUserStats(data.current_user_stats);
-            
-            // ユーザー順位を更新
-            updateUserRank(data.current_user_rank, data.total_users_in_room);
-            
-            // 表示切り替え
-            document.getElementById('ranking-loading').style.display = 'none';
-            document.getElementById('ranking-table-container').style.display = 'block';
-            document.getElementById('current-user-stats').style.display = 'block';
-            document.getElementById('user-rank-section').style.display = 'block';
-            
-            console.log('✅ ランキング表示完了');
-            
+        if (unitsDiv.style.display === 'none' || unitsDiv.style.display === '') {
+            unitsDiv.style.display = 'block';
+            icon.textContent = '▼';
         } else {
-            throw new Error(data.message || 'ランキングデータの取得に失敗しました');
-        }
-        
-    } catch (error) {
-        console.error('❌ ランキング読み込みエラー:', error);
-        
-        // エラー表示
-        document.getElementById('ranking-loading').style.display = 'none';
-        document.getElementById('ranking-error').style.display = 'block';
-        
-        // エラーメッセージを詳細表示
-        const errorButton = document.querySelector('#ranking-error .btn');
-        if (errorButton) {
-            errorButton.innerHTML = `<i class="fas fa-redo"></i> 再試行 (${error.message})`;
+            unitsDiv.style.display = 'none';
+            icon.textContent = '▶';
         }
     }
-}
 
-// ランキングテーブルを更新
-function updateRankingTable(rankingData) {
-    const tbody = document.getElementById('ranking-table-body');
-    tbody.innerHTML = '';
-    
-    // rankingDataは既にサーバー側で制限されているが、念のためクライアント側でも制限
-    const limitedRankingData = rankingData.slice(0, window.rankingDisplayCount || 5);
-    
-    limitedRankingData.forEach((user, index) => {
-        const row = document.createElement('tr');
-        row.innerHTML = `
+    // ランキングデータの非同期読み込み
+    // ランキングデータの非同期読み込み（修正版）
+    async function loadRankingData() {
+        try {
+            console.log('🔄 ランキングデータを取得中...');
+
+            // ローディング表示
+            document.getElementById('ranking-loading').style.display = 'block';
+            document.getElementById('ranking-error').style.display = 'none';
+            document.getElementById('ranking-table-container').style.display = 'none';
+
+            // 正しいAPIエンドポイントを使用
+            const response = await fetch('/api/ranking_data', {
+                method: 'GET',  // POSTからGETに変更
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+
+            if (data.status === 'success') {
+                console.log(`📊 ランキングデータ取得成功: ${data.ranking_data.length}人分`);
+                console.log(`📋 表示制限: ${data.ranking_display_count}人`);
+
+                // グローバル変数に表示制限数を保存
+                window.rankingDisplayCount = data.ranking_display_count;
+
+                // ランキングテーブルを更新（制限適用）
+                updateRankingTable(data.ranking_data);
+
+                // ユーザー統計を更新
+                updateUserStats(data.current_user_stats);
+
+                // ユーザー順位を更新
+                updateUserRank(data.current_user_rank, data.total_users_in_room);
+
+                // 表示切り替え
+                document.getElementById('ranking-loading').style.display = 'none';
+                document.getElementById('ranking-table-container').style.display = 'block';
+                document.getElementById('current-user-stats').style.display = 'block';
+                document.getElementById('user-rank-section').style.display = 'block';
+
+                console.log('✅ ランキング表示完了');
+
+            } else {
+                throw new Error(data.message || 'ランキングデータの取得に失敗しました');
+            }
+
+        } catch (error) {
+            console.error('❌ ランキング読み込みエラー:', error);
+
+            // エラー表示
+            document.getElementById('ranking-loading').style.display = 'none';
+            document.getElementById('ranking-error').style.display = 'block';
+
+            // エラーメッセージを詳細表示
+            const errorButton = document.querySelector('#ranking-error .btn');
+            if (errorButton) {
+                errorButton.innerHTML = `<i class="fas fa-redo"></i> 再試行 (${error.message})`;
+            }
+        }
+    }
+
+    // ランキングテーブルを更新
+    function updateRankingTable(rankingData) {
+        const tbody = document.getElementById('ranking-table-body');
+        tbody.innerHTML = '';
+
+        // rankingDataは既にサーバー側で制限されているが、念のためクライアント側でも制限
+        const limitedRankingData = rankingData.slice(0, window.rankingDisplayCount || 5);
+
+        limitedRankingData.forEach((user, index) => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
             <td>${index + 1}</td>
             <td>${user.username}</td>
             <td>${user.total_attempts}</td>
@@ -258,16 +265,16 @@ function updateRankingTable(rankingData) {
             <td><strong>${user.balance_score.toFixed(1)}</strong></td>
             <td>${user.coverage_rate.toFixed(1)}%</td>
         `;
-        tbody.appendChild(row);
-    });
-}
+            tbody.appendChild(row);
+        });
+    }
 
-// ユーザー統計を更新
-function updateUserStats(userStats) {
-    if (!userStats) return;
-    
-    const statsGrid = document.getElementById('stats-grid');
-    statsGrid.innerHTML = `
+    // ユーザー統計を更新
+    function updateUserStats(userStats) {
+        if (!userStats) return;
+
+        const statsGrid = document.getElementById('stats-grid');
+        statsGrid.innerHTML = `
         <div class="progress-stat-item">
             <span class="progress-stat-label">総合スコア</span>
             <span class="progress-stat-value progress-main-score">${userStats.balance_score.toFixed(1)}</span>
@@ -288,9 +295,9 @@ function updateUserStats(userStats) {
             <small class="progress-stat-description">√回答数 × 3</small>
         </div>
     `;
-    
-    const basicStats = document.getElementById('basic-stats');
-    basicStats.innerHTML = `
+
+        const basicStats = document.getElementById('basic-stats');
+        basicStats.innerHTML = `
         <p><strong>基本統計:</strong> 
             回答数: ${userStats.total_attempts}回 | 
             正解数: ${userStats.total_correct}回 | 
@@ -299,636 +306,646 @@ function updateUserStats(userStats) {
             網羅率: ${userStats.coverage_rate.toFixed(1)}%
         </p>
     `;
-}
-
-// ユーザー順位を更新
-function updateUserRank(rank, totalUsers) {
-    if (!rank) return;
-    
-    const rankDisplay = document.getElementById('rank-display');
-    let rankClass = '';
-    let rankIcon = '';
-    
-    if (rank === 1) {
-        rankClass = 'progress-rank-1';
-        rankIcon = '<span class="progress-rank-icon">👑</span>';
-    } else if (rank === 2) {
-        rankClass = 'progress-rank-2';
-        rankIcon = '<span class="progress-rank-icon">🥈</span>';
-    } else if (rank === 3) {
-        rankClass = 'progress-rank-3';
-        rankIcon = '<span class="progress-rank-icon">🥉</span>';
     }
-    
-    rankDisplay.className = `progress-rank-display ${rankClass}`;
-    rankDisplay.innerHTML = `
+
+    // ユーザー順位を更新
+    function updateUserRank(rank, totalUsers) {
+        if (!rank) return;
+
+        const rankDisplay = document.getElementById('rank-display');
+        let rankClass = '';
+        let rankIcon = '';
+
+        if (rank === 1) {
+            rankClass = 'progress-rank-1';
+            rankIcon = '<span class="progress-rank-icon">👑</span>';
+        } else if (rank === 2) {
+            rankClass = 'progress-rank-2';
+            rankIcon = '<span class="progress-rank-icon">🥈</span>';
+        } else if (rank === 3) {
+            rankClass = 'progress-rank-3';
+            rankIcon = '<span class="progress-rank-icon">🥉</span>';
+        }
+
+        rankDisplay.className = `progress-rank-display ${rankClass}`;
+        rankDisplay.innerHTML = `
         ${rankIcon}
         <span class="progress-rank-number">${rank}</span>
         <span class="progress-rank-text">位</span>
         <span class="progress-rank-total">/ ${totalUsers}人</span>
     `;
-}
+    }
 
-// ページ読み込み時にランキングデータを非同期取得
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('📋 進捗ページ読み込み完了');
-    
-    // 章の進捗バーを設定
-    document.querySelectorAll('.chapter-progress-bar').forEach(function(bar) {
-        const mastered = parseInt(bar.getAttribute('data-total-mastered') || '0');
-        const total = parseInt(bar.getAttribute('data-total-questions') || '0');
-        const percentage = total > 0 ? Math.round((mastered / total) * 100 * 10) / 10 : 0;
-        bar.style.width = Math.max(0, Math.min(100, percentage)) + '%';
+    // ページ読み込み時にランキングデータを非同期取得
+    document.addEventListener('DOMContentLoaded', function () {
+        console.log('📋 進捗ページ読み込み完了');
+
+        // 章の進捗バーを設定
+        document.querySelectorAll('.chapter-progress-bar').forEach(function (bar) {
+            const mastered = parseInt(bar.getAttribute('data-total-mastered') || '0');
+            const total = parseInt(bar.getAttribute('data-total-questions') || '0');
+            const percentage = total > 0 ? Math.round((mastered / total) * 100 * 10) / 10 : 0;
+            bar.style.width = Math.max(0, Math.min(100, percentage)) + '%';
+        });
+
+        // 単元の進捗バーを設定
+        document.querySelectorAll('.unit-progress-bar').forEach(function (bar) {
+            const mastered = parseInt(bar.getAttribute('data-mastered-count') || '0');
+            const total = parseInt(bar.getAttribute('data-total-questions') || '0');
+            const percentage = total > 0 ? Math.round((mastered / total) * 100 * 10) / 10 : 0;
+            bar.style.width = Math.max(0, Math.min(100, percentage)) + '%';
+        });
+
+        console.log('✅ 個人進捗表示完了');
+
+        // ランキングデータを非同期で取得
+        setTimeout(() => {
+            console.log('🔄 ランキングデータ読み込み開始...');
+            loadRankingData();
+        }, 100); // 100ms後に開始（画面描画完了を待つ）
     });
-    
-    // 単元の進捗バーを設定
-    document.querySelectorAll('.unit-progress-bar').forEach(function(bar) {
-        const mastered = parseInt(bar.getAttribute('data-mastered-count') || '0');
-        const total = parseInt(bar.getAttribute('data-total-questions') || '0');
-        const percentage = total > 0 ? Math.round((mastered / total) * 100 * 10) / 10 : 0;
-        bar.style.width = Math.max(0, Math.min(100, percentage)) + '%';
-    });
-    
-    console.log('✅ 個人進捗表示完了');
-    
-    // ランキングデータを非同期で取得
-    setTimeout(() => {
-        console.log('🔄 ランキングデータ読み込み開始...');
-        loadRankingData();
-    }, 100); // 100ms後に開始（画面描画完了を待つ）
-});
 </script>
 
 <style>
-/* =======================================
+    /* =======================================
    進捗ページ専用スタイル（競合回避）
    ======================================= */
 
-/* ローディングスピナー */
-.spinner-border {
-    width: 2rem;
-    height: 2rem;
-}
+    /* ローディングスピナー */
+    .spinner-border {
+        width: 2rem;
+        height: 2rem;
+    }
 
-/* ユーザー順位セクション（ランキング枠の外） */
-.progress-user-rank-section {
-    text-align: center;
-    margin-bottom: 30px;
-    padding: 20px;
-    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-    border-radius: 12px;
-    border: 2px solid #dee2e6;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-}
-
-.progress-user-rank-section h4 {
-    margin-bottom: 15px;
-    color: #2c3e50;
-    font-size: 1.3em;
-    font-weight: 600;
-}
-
-/* ユーザー統計セクション（ランキング枠の外） */
-.current-user-stats {
-    background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%);
-    border: 2px solid #2196f3;
-    border-radius: 12px;
-    padding: 25px;
-    margin-bottom: 30px;
-    box-shadow: 0 6px 15px rgba(33, 150, 243, 0.15);
-}
-
-.current-user-stats h4 {
-    color: #1565c0;
-    font-size: 1.4em;
-    margin-bottom: 20px;
-    text-align: center;
-    border-bottom: 2px solid #90caf9;
-    padding-bottom: 10px;
-}
-
-/* ランキングヘッダー（シンプル化） */
-.progress-ranking-header {
-    margin-bottom: 25px;
-}
-
-.progress-ranking-title-section h3 {
-    margin-bottom: 8px;
-    color: #2c3e50;
-    font-size: 1.4em;
-}
-
-.progress-ranking-title-section p {
-    margin-bottom: 0;
-    color: #6c757d;
-    font-size: 0.95em;
-}
-
-/* 統計グリッド（専用クラス名） */
-.progress-stats-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 15px;
-    margin-bottom: 15px;
-}
-
-.progress-stat-item {
-    text-align: center;
-    padding: 15px;
-    background-color: #f8f9fa;
-    border-radius: 8px;
-    border-left: 4px solid #007bff;
-}
-
-.progress-stat-label {
-    display: block;
-    font-size: 0.9em;
-    color: #6c757d;
-    margin-bottom: 5px;
-}
-
-.progress-stat-value {
-    display: block;
-    font-size: 1.5em;
-    font-weight: bold;
-    color: #2c3e50;
-}
-
-.progress-stat-value.progress-main-score {
-    color: #e74c3c;
-    font-size: 1.8em;
-}
-
-.progress-stat-description {
-    display: block;
-    font-size: 0.7em;
-    color: #95a5a6;
-    margin-top: 3px;
-}
-
-/* 順位表示（専用クラス名） */
-.progress-rank-display {
-    text-align: center;
-    padding: 12px 16px;
-    background-color: #f8f9fa;
-    border-radius: 12px;
-    border: 2px solid #dee2e6;
-    min-width: 120px;
-    max-width: 160px;
-    margin: 0 auto;
-}
-
-.progress-rank-display.progress-rank-1 {
-    background: linear-gradient(135deg, #ffd700, #ffed4e);
-    border-color: #ffd700;
-    color: #8b4513;
-}
-
-.progress-rank-display.progress-rank-2 {
-    background: linear-gradient(135deg, #c0c0c0, #e8e8e8);
-    border-color: #c0c0c0;
-    color: #4a4a4a;
-}
-
-.progress-rank-display.progress-rank-3 {
-    background: linear-gradient(135deg, #cd7f32, #daa520);
-    border-color: #cd7f32;
-    color: #654321;
-}
-
-.progress-rank-icon {
-    font-size: 1.1em;
-    margin-right: 6px;
-    display: inline-block;
-}
-
-.progress-rank-number {
-    font-size: 1.8em;
-    font-weight: bold;
-    line-height: 1;
-}
-
-.progress-rank-text {
-    font-size: 1em;
-    margin-left: 3px;
-}
-
-.progress-rank-total {
-    display: block;
-    font-size: 0.75em;
-    opacity: 0.8;
-    margin-top: 3px;
-}
-
-/* 基本統計（専用クラス名） */
-.progress-basic-stats {
-    background-color: rgba(255, 255, 255, 0.8);
-    border-radius: 6px;
-    padding: 12px;
-    margin-top: 15px;
-    border-left: 4px solid #4caf50;
-}
-
-.progress-basic-stats p {
-    margin: 0;
-    font-size: 0.9em;
-    color: #333;
-    line-height: 1.4;
-}
-
-/* エラー表示 */
-#ranking-error {
-    text-align: center;
-    margin: 20px 0;
-}
-
-/* レスポンシブ対応 */
-@media (max-width: 768px) {
+    /* ユーザー順位セクション（ランキング枠の外） */
     .progress-user-rank-section {
-        margin-bottom: 20px;
-        padding: 15px;
-    }
-    
-    .progress-user-rank-section h4 {
-        font-size: 1.2em;
-        margin-bottom: 12px;
-    }
-    
-    .current-user-stats {
+        text-align: center;
+        margin-bottom: 30px;
         padding: 20px;
-        margin-bottom: 20px;
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        border-radius: 12px;
+        border: 2px solid #dee2e6;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
     }
-    
-    .current-user-stats h4 {
-        font-size: 1.2em;
-        margin-bottom: 15px;
-    }
-    
-    .progress-stats-grid {
-        grid-template-columns: 1fr;
-    }
-    
-    .progress-rank-display {
-        margin: 0 auto;
-        max-width: 140px;
-    }
-    
-    .progress-rank-number {
-        font-size: 1.6em;
-    }
-    
-    .progress-rank-icon {
-        font-size: 1em;
-    }
-}
 
-@media (max-width: 480px) {
-    .progress-user-rank-section {
-        padding: 12px;
-        margin-bottom: 15px;
-    }
-    
     .progress-user-rank-section h4 {
-        font-size: 1.1em;
-    }
-    
-    .current-user-stats {
-        padding: 15px;
         margin-bottom: 15px;
+        color: #2c3e50;
+        font-size: 1.3em;
+        font-weight: 600;
     }
-    
+
+    /* ユーザー統計セクション（ランキング枠の外） */
+    .current-user-stats {
+        background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%);
+        border: 2px solid #2196f3;
+        border-radius: 12px;
+        padding: 25px;
+        margin-bottom: 30px;
+        box-shadow: 0 6px 15px rgba(33, 150, 243, 0.15);
+    }
+
     .current-user-stats h4 {
-        font-size: 1.1em;
+        color: #1565c0;
+        font-size: 1.4em;
+        margin-bottom: 20px;
+        text-align: center;
+        border-bottom: 2px solid #90caf9;
+        padding-bottom: 10px;
     }
-    
-    .progress-rank-display {
-        max-width: 120px;
+
+    /* ランキングヘッダー（シンプル化） */
+    .progress-ranking-header {
+        margin-bottom: 25px;
     }
-    
-    .progress-rank-number {
+
+    .progress-ranking-title-section h3 {
+        margin-bottom: 8px;
+        color: #2c3e50;
         font-size: 1.4em;
     }
-}
 
-/* アニメーション効果 */
-#ranking-table-container {
-    animation: progressFadeIn 0.5s ease-in;
-}
-
-.current-user-stats {
-    animation: progressSlideUp 0.6s ease-out;
-}
-
-.progress-user-rank-section {
-    animation: progressBounceIn 0.8s ease-out;
-}
-
-@keyframes progressFadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-}
-
-@keyframes progressSlideUp {
-    from { 
-        opacity: 0; 
-        transform: translateY(20px); 
+    .progress-ranking-title-section p {
+        margin-bottom: 0;
+        color: #6c757d;
+        font-size: 0.95em;
     }
-    to { 
-        opacity: 1; 
-        transform: translateY(0); 
+
+    /* 統計グリッド（専用クラス名） */
+    .progress-stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+        margin-bottom: 15px;
     }
-}
 
-@keyframes progressBounceIn {
-    0% { 
-        opacity: 0; 
-        transform: scale(0.8); 
-    }
-    50% { 
-        opacity: 0.8; 
-        transform: scale(1.05); 
-    }
-    100% { 
-        opacity: 1; 
-        transform: scale(1); 
-    }
-}
-
-/* 章別進捗のスタイル（既存のstyle.cssからコピー） */
-.progress-accordion {
-    display: flex;
-    flex-direction: column;
-    gap: 15px;
-}
-
-.chapter-progress-item {
-    background-color: #ffffff;
-    border: 1px solid #e0e0e0;
-    border-radius: 10px;
-    overflow: hidden;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-    transition: box-shadow 0.2s ease;
-}
-
-.chapter-progress-item:hover {
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-}
-
-.chapter-progress-header {
-    padding: 20px;
-    cursor: pointer;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-    border-bottom: 1px solid #e0e0e0;
-    transition: background-color 0.2s ease;
-    user-select: none;
-}
-
-.chapter-progress-header:hover {
-    background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%);
-}
-
-.chapter-progress-info {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-
-.chapter-toggle-icon {
-    font-size: 1.2em;
-    color: #495057;
-    transition: transform 0.2s ease;
-    width: 20px;
-    text-align: center;
-}
-
-.chapter-title {
-    font-size: 1.2em;
-    font-weight: 600;
-    color: #2c3e50;
-}
-
-.chapter-summary {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 4px;
-}
-
-.mastered-count {
-    font-size: 1.1em;
-    font-weight: 600;
-    color: #27ae60;
-}
-
-.chapter-percentage {
-    font-size: 0.9em;
-    color: #6c757d;
-}
-
-.chapter-progress-bar-container {
-    height: 8px;
-    background-color: #e9ecef;
-    margin: 0 20px 20px 20px;
-    border-radius: 4px;
-    overflow: hidden;
-}
-
-.chapter-progress-bar {
-    height: 100%;
-    background: linear-gradient(90deg, #28a745 0%, #20c997 100%);
-    border-radius: 4px;
-    transition: width 0.8s ease-in-out;
-}
-
-.unit-details {
-    padding: 0 20px 20px 20px;
-    background-color: #f8f9fa;
-    border-top: 1px solid #e0e0e0;
-}
-
-.unit-progress-item {
-    background-color: #ffffff;
-    border: 1px solid #e0e0e0;
-    border-radius: 8px;
-    padding: 15px;
-    margin-bottom: 10px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-}
-
-.unit-progress-item:last-child {
-    margin-bottom: 0;
-}
-
-.unit-progress-item h5 {
-    color: #2c3e50;
-    font-size: 1.1em;
-    margin-bottom: 10px;
-    padding-bottom: 5px;
-    border-bottom: 1px solid #e9ecef;
-}
-
-.unit-progress-item p {
-    margin-bottom: 6px;
-    color: #555;
-    font-size: 0.95em;
-}
-
-.unit-progress-bar-container {
-    background-color: #e9ecef;
-    border-radius: 6px;
-    height: 8px;
-    margin-top: 10px;
-    overflow: hidden;
-}
-
-.unit-progress-bar {
-    background: linear-gradient(90deg, #007bff 0%, #0056b3 100%);
-    height: 100%;
-    border-radius: 6px;
-    transition: width 0.8s ease-in-out;
-}
-
-/* レスポンシブ対応 */
-@media (max-width: 767px) {
-    .chapter-progress-header {
+    .progress-stat-item {
+        text-align: center;
         padding: 15px;
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 10px;
+        background-color: #f8f9fa;
+        border-radius: 8px;
+        border-left: 4px solid #007bff;
     }
-    
-    .chapter-progress-info {
-        gap: 8px;
-    }
-    
-    .chapter-title {
-        font-size: 1.0em;
-        line-height: 1.3;
-    }
-    
-    .chapter-summary {
-        align-items: flex-start;
-        width: 100%;
-    }
-    
-    .mastered-count {
-        font-size: 1.0em;
-    }
-    
-    .chapter-percentage {
-        font-size: 0.85em;
-    }
-    
-    .chapter-progress-bar-container {
-        margin: 0 15px 15px 15px;
-    }
-    
-    .unit-details {
-        padding: 0 15px 15px 15px;
-    }
-    
-    .unit-progress-item {
-        padding: 12px;
-    }
-    
-    .unit-progress-item h5 {
-        font-size: 1.0em;
-        line-height: 1.3;
-    }
-    
-    .unit-progress-item p {
+
+    .progress-stat-label {
+        display: block;
         font-size: 0.9em;
+        color: #6c757d;
+        margin-bottom: 5px;
     }
-}
 
-@media (max-width: 480px) {
-    .chapter-progress-header {
+    .progress-stat-value {
+        display: block;
+        font-size: 1.5em;
+        font-weight: bold;
+        color: #2c3e50;
+    }
+
+    .progress-stat-value.progress-main-score {
+        color: #e74c3c;
+        font-size: 1.8em;
+    }
+
+    .progress-stat-description {
+        display: block;
+        font-size: 0.7em;
+        color: #95a5a6;
+        margin-top: 3px;
+    }
+
+    /* 順位表示（専用クラス名） */
+    .progress-rank-display {
+        text-align: center;
+        padding: 12px 16px;
+        background-color: #f8f9fa;
+        border-radius: 12px;
+        border: 2px solid #dee2e6;
+        min-width: 120px;
+        max-width: 160px;
+        margin: 0 auto;
+    }
+
+    .progress-rank-display.progress-rank-1 {
+        background: linear-gradient(135deg, #ffd700, #ffed4e);
+        border-color: #ffd700;
+        color: #8b4513;
+    }
+
+    .progress-rank-display.progress-rank-2 {
+        background: linear-gradient(135deg, #c0c0c0, #e8e8e8);
+        border-color: #c0c0c0;
+        color: #4a4a4a;
+    }
+
+    .progress-rank-display.progress-rank-3 {
+        background: linear-gradient(135deg, #cd7f32, #daa520);
+        border-color: #cd7f32;
+        color: #654321;
+    }
+
+    .progress-rank-icon {
+        font-size: 1.1em;
+        margin-right: 6px;
+        display: inline-block;
+    }
+
+    .progress-rank-number {
+        font-size: 1.8em;
+        font-weight: bold;
+        line-height: 1;
+    }
+
+    .progress-rank-text {
+        font-size: 1em;
+        margin-left: 3px;
+    }
+
+    .progress-rank-total {
+        display: block;
+        font-size: 0.75em;
+        opacity: 0.8;
+        margin-top: 3px;
+    }
+
+    /* 基本統計（専用クラス名） */
+    .progress-basic-stats {
+        background-color: rgba(255, 255, 255, 0.8);
+        border-radius: 6px;
         padding: 12px;
+        margin-top: 15px;
+        border-left: 4px solid #4caf50;
     }
-    
+
+    .progress-basic-stats p {
+        margin: 0;
+        font-size: 0.9em;
+        color: #333;
+        line-height: 1.4;
+    }
+
+    /* エラー表示 */
+    #ranking-error {
+        text-align: center;
+        margin: 20px 0;
+    }
+
+    /* レスポンシブ対応 */
+    @media (max-width: 768px) {
+        .progress-user-rank-section {
+            margin-bottom: 20px;
+            padding: 15px;
+        }
+
+        .progress-user-rank-section h4 {
+            font-size: 1.2em;
+            margin-bottom: 12px;
+        }
+
+        .current-user-stats {
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .current-user-stats h4 {
+            font-size: 1.2em;
+            margin-bottom: 15px;
+        }
+
+        .progress-stats-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .progress-rank-display {
+            margin: 0 auto;
+            max-width: 140px;
+        }
+
+        .progress-rank-number {
+            font-size: 1.6em;
+        }
+
+        .progress-rank-icon {
+            font-size: 1em;
+        }
+    }
+
+    @media (max-width: 480px) {
+        .progress-user-rank-section {
+            padding: 12px;
+            margin-bottom: 15px;
+        }
+
+        .progress-user-rank-section h4 {
+            font-size: 1.1em;
+        }
+
+        .current-user-stats {
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+
+        .current-user-stats h4 {
+            font-size: 1.1em;
+        }
+
+        .progress-rank-display {
+            max-width: 120px;
+        }
+
+        .progress-rank-number {
+            font-size: 1.4em;
+        }
+    }
+
+    /* アニメーション効果 */
+    #ranking-table-container {
+        animation: progressFadeIn 0.5s ease-in;
+    }
+
+    .current-user-stats {
+        animation: progressSlideUp 0.6s ease-out;
+    }
+
+    .progress-user-rank-section {
+        animation: progressBounceIn 0.8s ease-out;
+    }
+
+    @keyframes progressFadeIn {
+        from {
+            opacity: 0;
+        }
+
+        to {
+            opacity: 1;
+        }
+    }
+
+    @keyframes progressSlideUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @keyframes progressBounceIn {
+        0% {
+            opacity: 0;
+            transform: scale(0.8);
+        }
+
+        50% {
+            opacity: 0.8;
+            transform: scale(1.05);
+        }
+
+        100% {
+            opacity: 1;
+            transform: scale(1);
+        }
+    }
+
+    /* 章別進捗のスタイル（既存のstyle.cssからコピー） */
+    .progress-accordion {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+    }
+
+    .chapter-progress-item {
+        background-color: #ffffff;
+        border: 1px solid #e0e0e0;
+        border-radius: 10px;
+        overflow: hidden;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        transition: box-shadow 0.2s ease;
+    }
+
+    .chapter-progress-item:hover {
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .chapter-progress-header {
+        padding: 20px;
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        border-bottom: 1px solid #e0e0e0;
+        transition: background-color 0.2s ease;
+        user-select: none;
+    }
+
+    .chapter-progress-header:hover {
+        background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%);
+    }
+
+    .chapter-progress-info {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .chapter-toggle-icon {
+        font-size: 1.2em;
+        color: #495057;
+        transition: transform 0.2s ease;
+        width: 20px;
+        text-align: center;
+    }
+
     .chapter-title {
-        font-size: 0.95em;
+        font-size: 1.2em;
+        font-weight: 600;
+        color: #2c3e50;
     }
-    
+
+    .chapter-summary {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 4px;
+    }
+
     .mastered-count {
-        font-size: 0.95em;
+        font-size: 1.1em;
+        font-weight: 600;
+        color: #27ae60;
     }
-    
+
     .chapter-percentage {
-        font-size: 0.8em;
+        font-size: 0.9em;
+        color: #6c757d;
     }
-    
+
+    .chapter-progress-bar-container {
+        height: 8px;
+        background-color: #e9ecef;
+        margin: 0 20px 20px 20px;
+        border-radius: 4px;
+        overflow: hidden;
+    }
+
+    .chapter-progress-bar {
+        height: 100%;
+        background: linear-gradient(90deg, #28a745 0%, #20c997 100%);
+        border-radius: 4px;
+        transition: width 0.8s ease-in-out;
+    }
+
+    .unit-details {
+        padding: 0 20px 20px 20px;
+        background-color: #f8f9fa;
+        border-top: 1px solid #e0e0e0;
+    }
+
     .unit-progress-item {
-        padding: 10px;
+        background-color: #ffffff;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 10px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
     }
-    
+
+    .unit-progress-item:last-child {
+        margin-bottom: 0;
+    }
+
     .unit-progress-item h5 {
+        color: #2c3e50;
+        font-size: 1.1em;
+        margin-bottom: 10px;
+        padding-bottom: 5px;
+        border-bottom: 1px solid #e9ecef;
+    }
+
+    .unit-progress-item p {
+        margin-bottom: 6px;
+        color: #555;
         font-size: 0.95em;
     }
-    
-    .unit-progress-item p {
-        font-size: 0.85em;
+
+    .unit-progress-bar-container {
+        background-color: #e9ecef;
+        border-radius: 6px;
+        height: 8px;
+        margin-top: 10px;
+        overflow: hidden;
     }
-}
 
-/* ランキングテーブルの横スクロール強制 */
-#ranking-table-container .table-responsive {
-    overflow-x: auto !important;
-    -webkit-overflow-scrolling: touch;
-}
+    .unit-progress-bar {
+        background: linear-gradient(90deg, #007bff 0%, #0056b3 100%);
+        height: 100%;
+        border-radius: 6px;
+        transition: width 0.8s ease-in-out;
+    }
 
-#ranking-table-container table {
-    min-width: 650px !important;
-    table-layout: fixed;
-}
+    /* レスポンシブ対応 */
+    @media (max-width: 767px) {
+        .chapter-progress-header {
+            padding: 15px;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 10px;
+        }
 
-#ranking-table-container th,
-#ranking-table-container td {
-    white-space: nowrap !important;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    padding: 0.4rem 0.3rem !important; /* パディングも少し狭く */
-    text-align: center; /* 中央揃えで見やすく */
-}
+        .chapter-progress-info {
+            gap: 8px;
+        }
 
-/* 順位列は特に狭く */
-#ranking-table-container th:first-child,
-#ranking-table-container td:first-child {
-    text-align: center;
-    font-weight: bold;
-}
+        .chapter-title {
+            font-size: 1.0em;
+            line-height: 1.3;
+        }
 
-/* モバイルでの横スクロール改善 */
-@media (max-width: 768px) {
+        .chapter-summary {
+            align-items: flex-start;
+            width: 100%;
+        }
+
+        .mastered-count {
+            font-size: 1.0em;
+        }
+
+        .chapter-percentage {
+            font-size: 0.85em;
+        }
+
+        .chapter-progress-bar-container {
+            margin: 0 15px 15px 15px;
+        }
+
+        .unit-details {
+            padding: 0 15px 15px 15px;
+        }
+
+        .unit-progress-item {
+            padding: 12px;
+        }
+
+        .unit-progress-item h5 {
+            font-size: 1.0em;
+            line-height: 1.3;
+        }
+
+        .unit-progress-item p {
+            font-size: 0.9em;
+        }
+    }
+
+    @media (max-width: 480px) {
+        .chapter-progress-header {
+            padding: 12px;
+        }
+
+        .chapter-title {
+            font-size: 0.95em;
+        }
+
+        .mastered-count {
+            font-size: 0.95em;
+        }
+
+        .chapter-percentage {
+            font-size: 0.8em;
+        }
+
+        .unit-progress-item {
+            padding: 10px;
+        }
+
+        .unit-progress-item h5 {
+            font-size: 0.95em;
+        }
+
+        .unit-progress-item p {
+            font-size: 0.85em;
+        }
+    }
+
+    /* ランキングテーブルの横スクロール強制 */
     #ranking-table-container .table-responsive {
-        border: 1px solid #dee2e6;
-        border-radius: 0.375rem;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch;
     }
-    
-    #ranking-table-container table {
-        min-width: 580px !important;
-    }
-    
-    #ranking-table-container th,
-    #ranking-table-container td {
-        padding: 0.3rem 0.2rem !important;
-        font-size: 0.8rem;
-    }
-}
 
-@media (max-width: 480px) {
     #ranking-table-container table {
-        min-width: 520px !important;
+        min-width: 650px !important;
+        table-layout: fixed;
     }
-    
+
     #ranking-table-container th,
     #ranking-table-container td {
-        padding: 0.25rem 0.15rem !important;
-        font-size: 0.75rem;
+        white-space: nowrap !important;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        padding: 0.4rem 0.3rem !important;
+        /* パディングも少し狭く */
+        text-align: center;
+        /* 中央揃えで見やすく */
     }
-}
+
+    /* 順位列は特に狭く */
+    #ranking-table-container th:first-child,
+    #ranking-table-container td:first-child {
+        text-align: center;
+        font-weight: bold;
+    }
+
+    /* モバイルでの横スクロール改善 */
+    @media (max-width: 768px) {
+        #ranking-table-container .table-responsive {
+            border: 1px solid #dee2e6;
+            border-radius: 0.375rem;
+        }
+
+        #ranking-table-container table {
+            min-width: 580px !important;
+        }
+
+        #ranking-table-container th,
+        #ranking-table-container td {
+            padding: 0.3rem 0.2rem !important;
+            font-size: 0.8rem;
+        }
+    }
+
+    @media (max-width: 480px) {
+        #ranking-table-container table {
+            min-width: 520px !important;
+        }
+
+        #ranking-table-container th,
+        #ranking-table-container td {
+            padding: 0.25rem 0.15rem !important;
+            font-size: 0.75rem;
+        }
+    }
 </style>
 {% endblock %}
