@@ -90,12 +90,6 @@
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link btn btn-outline-warning change-username-button btn-sm me-1"
-                                href="{{ url_for('change_username_page') }}" title="アカウント名変更">
-                                <i class="fas fa-user-edit"></i>
-                            </a>
-                        </li>
-                        <li class="nav-item">
                             <button class="nav-link btn btn-outline-secondary btn-sm me-1" data-bs-toggle="modal"
                                 data-bs-target="#settingsModal" title="設定">
                                 <i class="fas fa-cog"></i>
@@ -189,6 +183,11 @@
                     <div class="form-text mt-1">
                         ※保存前に現在の設定でテスト通知を送ります
                     </div>
+                </div>
+                <div class="mb-3 text-center border-top pt-3">
+                    <a href="{{ url_for('change_username_page') }}" class="btn btn-outline-warning w-100">
+                        <i class="fas fa-user-edit me-1"></i> アカウント名を変更
+                    </a>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
