@@ -189,23 +189,6 @@ class DailyQuiz(db.Model):
     def get_problem_ids(self):
         return json.loads(self.problem_ids_json)
 
-class GeoData(db.Model):
-    __tablename__ = 'geo_data'
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False)
-    type = db.Column(db.String(50), nullable=False)  # city, river, mountain, etc.
-    data = db.Column(db.Text, nullable=False)  # GeoJSON string
-    description = db.Column(db.Text, nullable=True)
-
-    def to_dict(self):
-        return {
-            'id': self.id,
-            'name': self.name,
-            'type': self.type,
-            'data': json.loads(self.data),
-            'description': self.description
-        }
-
 class DailyQuizResult(db.Model):
     """ユーザーごとの今日の10問の結果を保存するテーブル"""
     __tablename__ = 'daily_quiz_result'
@@ -275,6 +258,47 @@ class RoomSetting(db.Model):
 
     def __repr__(self):
         return f'<RoomSetting {self.room_number}, Max Unit: {self.max_enabled_unit_number}, CSV: {self.csv_filename}>'
+
+
+class MapLocation(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    area = db.Column(db.String(100), nullable=False)
+    era = db.Column(db.String(100), nullable=True) # Modified: nullable=True
+    name = db.Column(db.String(100), nullable=False)
+    type = db.Column(db.Integer, nullable=False)
+    level = db.Column(db.Integer, default=2)
+    lat = db.Column(db.Float, nullable=True)
+    lng = db.Column(db.Float, nullable=True)
+    zoom = db.Column(db.Integer, nullable=True)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'area': self.area,
+            'era': self.era,
+            'name': self.name,
+            'type': self.type,
+            'level': self.level,
+            'lat': self.lat,
+            'lng': self.lng,
+            'zoom': self.zoom
+        }
+
+class MapProgress(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    location_id = db.Column(db.Integer, db.ForeignKey('map_location.id'), nullable=False)
+    status = db.Column(db.Integer, default=0) # 0=New, 1=Learned, 2=Mastered
+    last_reviewed = db.Column(db.DateTime, default=datetime.utcnow)
+
+    user = db.relationship('User', backref=db.backref('map_progress', lazy=True))
+    location = db.relationship('MapLocation', backref=db.backref('progress', lazy=True))
+    word_count = db.Column(db.Integer, default=0)
+    upload_date = db.Column(db.DateTime, default=lambda: datetime.now(JST))
+    description = db.Column(db.Text)
+    
+    def __repr__(self):
+        return f'<MapProgress User:{self.user_id} Location:{self.location_id} Status:{self.status}>'
 
 class RoomCsvFile(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -4822,6 +4846,104 @@ def api_admin_update_ranking_display_count():
         print(f"❌ ランキング表示人数更新エラー: {e}")
         db.session.rollback()
         return jsonify(status='error', message=f'設定更新エラー: {str(e)}'), 500
+# ==========================
+# ==========================================
+# Map User Routes
+# ==========================================
+
+@app.route('/map')
+def map_menu():
+    if 'user_id' not in session:
+        return redirect(url_for('login_page'))
+    current_user = User.query.get(session['user_id'])
+
+    # Get unique Areas and Eras for filter
+    areas = db.session.query(MapLocation.area).distinct().all()
+    eras = db.session.query(MapLocation.era).distinct().all()
+    areas = [a[0] for a in areas if a[0]]
+    eras = [e[0] for e in eras if e[0]]
+    return render_template('map_menu.html', areas=areas, eras=eras)
+
+@app.route('/map/quiz')
+def map_quiz():
+    if 'user_id' not in session:
+        return redirect(url_for('login_page'))
+    current_user = User.query.get(session['user_id'])
+
+    area = request.args.get('area')
+    era = request.args.get('era')
+    
+    query = MapLocation.query
+    if area and area != 'All':
+        query = query.filter_by(area=area)
+    if era and era != 'All':
+        query = query.filter_by(era=era)
+    
+    locations = query.all()
+    locations_data = [loc.to_dict() for loc in locations]
+    
+    return render_template('map_quiz.html', locations=locations_data)
+
+@app.route('/map/save_progress', methods=['POST'])
+def save_map_progress():
+    if 'user_id' not in session:
+        return jsonify({'status': 'error', 'message': 'Unauthorized'}), 401
+    current_user = User.query.get(session['user_id'])
+
+    data = request.json
+    loc_id = data.get('location_id')
+    is_correct = data.get('is_correct')
+    
+    record = MapProgress.query.filter_by(user_id=current_user.id, location_id=loc_id).first()
+    if not record:
+        record = MapProgress(user_id=current_user.id, location_id=loc_id)
+        db.session.add(record)
+    
+    if is_correct:
+         if record.status < 1:
+             record.status = 1
+         record.last_reviewed = datetime.utcnow()
+    
+    db.session.commit()
+    return jsonify({'status': 'success'})
+
+# ==========================================
+# Map Admin Routes
+# ==========================================
+
+@app.route('/admin/map/register')
+@admin_required
+def admin_map_register():
+    locations = MapLocation.query.all()
+    # Group by Area for easier navigation
+    grouped_locations = {}
+    for loc in locations:
+        if loc.area not in grouped_locations:
+            grouped_locations[loc.area] = []
+        grouped_locations[loc.area].append(loc.to_dict())
+    
+    return render_template('admin_map_register.html', locations=grouped_locations)
+
+@app.route('/admin/map/update_coords', methods=['POST'])
+@admin_required
+def admin_map_update_coords():
+    # admin_required ensures admin is logged in
+    data = request.json
+    loc_id = data.get('id')
+    lat = data.get('lat')
+    lng = data.get('lng')
+    zoom = data.get('zoom')
+    
+    location = MapLocation.query.get(loc_id)
+    if location:
+        location.lat = lat
+        location.lng = lng
+        if zoom is not None:
+            location.zoom = zoom
+        db.session.commit()
+        return jsonify({'status': 'success'})
+    return jsonify({'status': 'error', 'message': 'Location not found'}), 404
+
 # ====================================================================
 # APIエンドポイント
 # ====================================================================
@@ -12859,71 +12981,6 @@ def debug_reminder():
         results['send_result'] = "Success" if success else "Failed (Check Logs)"
         
     return jsonify({'status': 'success', 'debug_info': results})
-
-@app.route('/api/geo_data', methods=['GET'])
-def get_geo_data():
-    try:
-        geo_items = GeoData.query.all()
-        features = []
-        for item in geo_items:
-            try:
-                geometry = json.loads(item.data)
-                feature = {
-                    "type": "Feature",
-                    "properties": {
-                        "id": item.id,
-                        "name": item.name,
-                        "type": item.type,
-                        "description": item.description
-                    },
-                    "geometry": geometry
-                }
-                features.append(feature)
-            except json.JSONDecodeError:
-                continue
-
-        collection = {
-            "type": "FeatureCollection",
-            "features": features
-        }
-        return jsonify(collection)
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/geo_data', methods=['POST'])
-@admin_required
-def add_geo_data():
-    # Admin check logic if necessary, for now relying on login_required or add admin specific check later
-    # if current_user.username != 'admin': return jsonify({'error': 'Unauthorized'}), 403
-    
-    try:
-        data = request.json
-        name = data.get('name')
-        geo_type = data.get('type')
-        geometry = data.get('geometry') # Expecting GeoJSON geometry object or string
-        description = data.get('description', '')
-
-        if not name or not geo_type or not geometry:
-            return jsonify({'error': 'Missing required fields'}), 400
-
-        if isinstance(geometry, dict):
-            geometry_str = json.dumps(geometry)
-        else:
-            geometry_str = geometry
-
-        new_item = GeoData(name=name, type=geo_type, data=geometry_str, description=description)
-        db.session.add(new_item)
-        db.session.commit()
-
-        return jsonify({'status': 'success', 'id': new_item.id})
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/map')
-def map_page():
-    is_admin = session.get('admin_logged_in', False)
-    return render_template('map.html', is_admin=is_admin)
 
 if __name__ == '__main__':
     try:
