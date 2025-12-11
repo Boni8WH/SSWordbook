@@ -189,6 +189,23 @@ class DailyQuiz(db.Model):
     def get_problem_ids(self):
         return json.loads(self.problem_ids_json)
 
+class GeoData(db.Model):
+    __tablename__ = 'geo_data'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    type = db.Column(db.String(50), nullable=False)  # city, river, mountain, etc.
+    data = db.Column(db.Text, nullable=False)  # GeoJSON string
+    description = db.Column(db.Text, nullable=True)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'type': self.type,
+            'data': json.loads(self.data),
+            'description': self.description
+        }
+
 class DailyQuizResult(db.Model):
     """ユーザーごとの今日の10問の結果を保存するテーブル"""
     __tablename__ = 'daily_quiz_result'
@@ -12842,6 +12859,71 @@ def debug_reminder():
         results['send_result'] = "Success" if success else "Failed (Check Logs)"
         
     return jsonify({'status': 'success', 'debug_info': results})
+
+@app.route('/api/geo_data', methods=['GET'])
+def get_geo_data():
+    try:
+        geo_items = GeoData.query.all()
+        features = []
+        for item in geo_items:
+            try:
+                geometry = json.loads(item.data)
+                feature = {
+                    "type": "Feature",
+                    "properties": {
+                        "id": item.id,
+                        "name": item.name,
+                        "type": item.type,
+                        "description": item.description
+                    },
+                    "geometry": geometry
+                }
+                features.append(feature)
+            except json.JSONDecodeError:
+                continue
+
+        collection = {
+            "type": "FeatureCollection",
+            "features": features
+        }
+        return jsonify(collection)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/geo_data', methods=['POST'])
+@admin_required
+def add_geo_data():
+    # Admin check logic if necessary, for now relying on login_required or add admin specific check later
+    # if current_user.username != 'admin': return jsonify({'error': 'Unauthorized'}), 403
+    
+    try:
+        data = request.json
+        name = data.get('name')
+        geo_type = data.get('type')
+        geometry = data.get('geometry') # Expecting GeoJSON geometry object or string
+        description = data.get('description', '')
+
+        if not name or not geo_type or not geometry:
+            return jsonify({'error': 'Missing required fields'}), 400
+
+        if isinstance(geometry, dict):
+            geometry_str = json.dumps(geometry)
+        else:
+            geometry_str = geometry
+
+        new_item = GeoData(name=name, type=geo_type, data=geometry_str, description=description)
+        db.session.add(new_item)
+        db.session.commit()
+
+        return jsonify({'status': 'success', 'id': new_item.id})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/map')
+def map_page():
+    is_admin = session.get('admin_logged_in', False)
+    return render_template('map.html', is_admin=is_admin)
 
 if __name__ == '__main__':
     try:
