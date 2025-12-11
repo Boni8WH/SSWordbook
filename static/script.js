@@ -416,15 +416,18 @@ function loadWordDataFromServer() {
 function updateIncorrectOnlyRadio() {
     const incorrectOnlyRadio = document.getElementById('incorrectOnlyRadio');
     const unsolvedOnlyCheckbox = document.getElementById('unsolvedOnlyCheckbox');
+    const unmasteredOnlyCheckbox = document.getElementById('unmasteredOnlyCheckbox');
     const authMessageIncorrectOnly = document.querySelector('.auth-message-incorrect-only');
 
     if (window.appInfoFromFlask && window.appInfoFromFlask.isLoggedIn) {
         if (incorrectOnlyRadio) incorrectOnlyRadio.disabled = false;
         if (unsolvedOnlyCheckbox) unsolvedOnlyCheckbox.disabled = false;
+        if (unmasteredOnlyCheckbox) unmasteredOnlyCheckbox.disabled = false;
         if (authMessageIncorrectOnly) authMessageIncorrectOnly.classList.add('hidden');
     } else {
         if (incorrectOnlyRadio) incorrectOnlyRadio.disabled = true;
         if (unsolvedOnlyCheckbox) unsolvedOnlyCheckbox.disabled = true;
+        if (unmasteredOnlyCheckbox) unmasteredOnlyCheckbox.disabled = true;
         if (authMessageIncorrectOnly) authMessageIncorrectOnly.classList.remove('hidden');
     }
 }
@@ -901,6 +904,7 @@ let lastQuizSettings = {
     selectedUnits: [],
     isIncorrectOnly: false,
     isUnsolvedOnly: false,
+    isUnmasteredOnly: false,
     availableQuestions: [] // 選択範囲の全問題
 };
 
@@ -933,8 +937,9 @@ function startQuiz() {
         console.log(`startQuiz制限チェック: 有効苦手${weakProblemCount}問(全${rawWeakProblemCount}問), isCurrentlyRestricted=${isCurrentlyRestricted}`);
 
         // ★修正：制限中は苦手問題モード以外を明確に拒否
-        // 未解答のみチェックボックスの状態も取得
+        // 未解答のみ・未マスターのみチェックボックスの状態も取得
         const isUnsolvedOnly = document.getElementById('unsolvedOnlyCheckbox')?.checked || false;
+        const isUnmasteredOnly = document.getElementById('unmasteredOnlyCheckbox')?.checked || false;
 
         if (isCurrentlyRestricted && selectedQuestionCount !== 'incorrectOnly') {
             // ★追加: 制限中だが、有効な苦手問題が0問の場合（データの不整合など）
@@ -965,8 +970,8 @@ function startQuiz() {
         // 既存のstartQuiz処理を続行...
         let quizQuestions = getSelectedQuestions(); // let に変更
 
-        // 苦手問題モード・未解答モードの場合は範囲選択チェックをスキップ
-        if (selectedQuestionCount !== 'incorrectOnly' && !isUnsolvedOnly && quizQuestions.length === 0) {
+        // 苦手問題モード・未解答モード・未マスターモードの場合は範囲選択チェックをスキップ
+        if (selectedQuestionCount !== 'incorrectOnly' && !isUnsolvedOnly && !isUnmasteredOnly && quizQuestions.length === 0) {
             flashMessage('出題範囲を選択してください。', 'danger');
             return;
         }
@@ -976,6 +981,7 @@ function startQuiz() {
             questionCount: selectedQuestionCount,
             isIncorrectOnly: (selectedQuestionCount === 'incorrectOnly'),
             isUnsolvedOnly: isUnsolvedOnly,
+            isUnmasteredOnly: isUnmasteredOnly,
             selectedUnits: [],
             availableQuestions: [],
             totalSelectedRangeQuestions: 0  // ★新規追加：選択範囲の正確な問題数
@@ -1024,35 +1030,69 @@ function startQuiz() {
 
             // quizQuestions は getSelectedQuestions() で既に取得済み
 
-            // ★未解答のみフィルタリング
-            if (isUnsolvedOnly) {
-                console.log('🔍 未解答のみフィルタリング適用');
-                const beforeCount = quizQuestions.length;
-
-                quizQuestions = quizQuestions.filter(word => {
-                    const wordIdentifier = generateProblemId(word);
-                    const history = problemHistory[wordIdentifier];
-                    // 履歴がない、または正解数+不正解数が0の場合
-                    return !history || ((history.correct_attempts || 0) + (history.incorrect_attempts || 0) === 0);
-                });
-
-                console.log(`未解答フィルタ: ${beforeCount}問 -> ${quizQuestions.length}問`);
-
-                if (quizQuestions.length === 0) {
-                    flashMessage('選択範囲に未解答の問題はありません。', 'info');
-                    return;
-                }
-            }
-
-            lastQuizSettings.availableQuestions = [...quizQuestions]; // フィルタ後の問題を保存
-            lastQuizSettings.totalSelectedRangeQuestions = quizQuestions.length;
-
-            console.log(`📊 選択範囲詳細:`);
-            console.log(`  選択単元数: ${lastQuizSettings.selectedUnits.length}`);
-            console.log(`  出題候補数: ${lastQuizSettings.totalSelectedRangeQuestions}問`);
         }
 
-        // 選択状態を保存（苦手問題モード以外の場合のみ）
+        // ★未マスターのみフィルタリング
+        if (isUnmasteredOnly) {
+            console.log('🔍 未マスターのみフィルタリング適用');
+            const beforeCount = quizQuestions.length;
+
+            quizQuestions = quizQuestions.filter(word => {
+                const wordIdentifier = generateProblemId(word);
+                const history = problemHistory[wordIdentifier];
+
+                // 履歴がない (未解答) -> 対象
+                if (!history) return true;
+
+                const correct = history.correct_attempts || 0;
+                const incorrect = history.incorrect_attempts || 0;
+                const total = correct + incorrect;
+
+                // 未解答 -> 対象
+                if (total === 0) return true;
+
+                // 正答率80%未満 -> 対象 (未マスター)
+                const accuracy = correct / total;
+                return accuracy < 0.8;
+            });
+
+            console.log(`未マスターフィルタ: ${beforeCount}問 -> ${quizQuestions.length}問`);
+
+            if (quizQuestions.length === 0) {
+                flashMessage('選択範囲に未マスターの問題はありません。（全て80%以上の正答率です！）', 'success');
+                return;
+            }
+        }
+
+        // ★未解答のみフィルタリング
+        // 未マスターモードがOFFの場合、または未マスターモードと併用された場合（さらに絞り込み）
+        // ※仕様確認：未マスター(未解答含む) > 未解答 なので、両方ONなら未解答のみになるべき
+        // ここでは独立して動作するように実装し、両方ONなら積集合（つまり未解答のみ）になる
+        if (isUnsolvedOnly) {
+            console.log('🔍 未解答のみフィルタリング適用');
+            const beforeCount = quizQuestions.length;
+
+            quizQuestions = quizQuestions.filter(word => {
+                const wordIdentifier = generateProblemId(word);
+                const history = problemHistory[wordIdentifier];
+                // 履歴がない、または正解数+不正解数が0の場合
+                return !history || ((history.correct_attempts || 0) + (history.incorrect_attempts || 0) === 0);
+            });
+
+            console.log(`未解答フィルタ: ${beforeCount}問 -> ${quizQuestions.length}問`);
+
+            if (quizQuestions.length === 0) {
+                flashMessage('選択範囲に未解答の問題はありません。', 'info');
+                return;
+            }
+        }
+
+        lastQuizSettings.availableQuestions = [...quizQuestions]; // フィルタ後の問題を保存
+        lastQuizSettings.totalSelectedRangeQuestions = quizQuestions.length;
+
+        console.log(`📊 選択範囲詳細:`);
+        console.log(`  選択単元数: ${lastQuizSettings.selectedUnits.length}`);
+        console.log(`  出題候補数: ${lastQuizSettings.totalSelectedRangeQuestions}問`);
         if (selectedQuestionCount !== 'incorrectOnly') {
             saveSelectionState();
         }
@@ -1096,7 +1136,7 @@ function startQuiz() {
         quizStartTime = Date.now();
 
         console.log('✅ クイズ開始設定完了:', {
-            mode: lastQuizSettings.isIncorrectOnly ? '苦手問題' : (lastQuizSettings.isUnsolvedOnly ? '未解答' : '通常'),
+            mode: lastQuizSettings.isIncorrectOnly ? '苦手問題' : (lastQuizSettings.isUnsolvedOnly ? '未解答' : (lastQuizSettings.isUnmasteredOnly ? '未マスター' : '通常')),
             totalQuestions: totalQuestions,
             totalSelectedRangeQuestions: lastQuizSettings.totalSelectedRangeQuestions,
             availableQuestions: lastQuizSettings.availableQuestions.length
