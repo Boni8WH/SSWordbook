@@ -32,11 +32,16 @@
                     </label>
                 </div>
                 <!-- 未解答のみチェックボックス -->
-                <div class="checkbox-group" style="margin-top: 10px;">
+                <div class="checkbox-group" style="margin-top: 10px; display: flex; gap: 15px;">
                     <label>
                         <input type="checkbox" id="unsolvedOnlyCheckbox" {% if not session.get('user_id') %}disabled{%
                             endif %}>
                         <span>未解答のみ</span>
+                    </label>
+                    <label>
+                        <input type="checkbox" id="unmasteredOnlyCheckbox" {% if not session.get('user_id') %}disabled{%
+                            endif %}>
+                        <span>未マスターのみ</span>
                     </label>
                 </div>
             </div>
