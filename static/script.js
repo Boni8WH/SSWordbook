@@ -965,7 +965,7 @@ function startQuiz() {
         // 既存のstartQuiz処理を続行...
         let quizQuestions = getSelectedQuestions(); // let に変更
 
-        // 苦手問題モード・未回答モードの場合は範囲選択チェックをスキップ
+        // 苦手問題モード・未解答モードの場合は範囲選択チェックをスキップ
         if (selectedQuestionCount !== 'incorrectOnly' && !isUnsolvedOnly && quizQuestions.length === 0) {
             flashMessage('出題範囲を選択してください。', 'danger');
             return;
@@ -1778,13 +1778,20 @@ function restartQuiz() {
     // 前回と同じ範囲の全問題を取得
     let newQuizQuestions = [...lastQuizSettings.availableQuestions];
 
-    // 問題数制限を適用
-    if (lastQuizSettings.questionCount !== 'all') {
-        const count = parseInt(lastQuizSettings.questionCount);
-        if (newQuizQuestions.length > count) {
-            // 前回とは異なる問題セットを選択
-            newQuizQuestions = shuffleArray(newQuizQuestions).slice(0, count);
-            console.log(`${count}問を新しく選択しました`);
+    // ★未解答モードの場合、学習済みの問題を除外する
+    if (lastQuizSettings.isUnsolvedOnly) {
+        console.log('🔍 未解答モード：学習済みの問題を除外します');
+        newQuizQuestions = newQuizQuestions.filter(word => {
+            const wordIdentifier = generateProblemId(word);
+            const history = problemHistory[wordIdentifier];
+            // 履歴がない、または正解数+不正解数が0の場合
+            return !history || ((history.correct_attempts || 0) + (history.incorrect_attempts || 0) === 0);
+        });
+
+        if (newQuizQuestions.length === 0) {
+            flashMessage('全ての未解答問題を学習しました！', 'success');
+            backToSelectionScreen();
+            return;
         }
     }
 
@@ -1839,20 +1846,20 @@ function updateRestartButtonText() {
 
         console.log('🎯 苦手問題モード用のボタンテキストに更新');
     } else if (lastQuizSettings.isUnsolvedOnly) {
-        // 未回答モードの場合
-        restartButton.innerHTML = '<i class="fas fa-redo"></i> 未回答問題で再学習';
+        // 未解答モードの場合
+        restartButton.innerHTML = '<i class="fas fa-redo"></i> 未解答問題で再学習';
 
         if (explanationDiv) {
             explanationDiv.innerHTML = `
                 <small>
                     <i class="fas fa-info-circle" style="color: #27ae60;"></i>
-                    <strong>「未回答問題で再学習」</strong>：選択範囲の未回答問題から出題されます。
+                    <strong>「未解答問題で再学習」</strong>：選択範囲の未解答問題から出題されます。
                 </small>
             `;
             explanationDiv.style.borderLeftColor = '#27ae60';
             explanationDiv.style.backgroundColor = '#eafaf1';
         }
-        console.log('🆕 未回答モード用のボタンテキストに更新');
+        console.log('🆕 未解答モード用のボタンテキストに更新');
     } else {
         // ★通常モードの場合
         restartButton.innerHTML = '<i class="fas fa-redo"></i> 同じ範囲から新しい問題で再学習';
