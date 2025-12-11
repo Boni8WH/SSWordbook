@@ -439,8 +439,8 @@ def check_daily_quiz_reminders():
                     # 未完了なら通知
                     send_push_notification(
                         user,
-                        "今日の10問が未完了です",
-                        "毎日の積み重ねが大切です。頑張りましょう！",
+                        "今日の10問が未完では？",
+                        "勝利は、わが迅速果敢な行動にあり",
                         url="/"
                     )
             else:
@@ -4956,10 +4956,12 @@ def admin_add_announcement():
             count = 0
             for user in users:
                 if user.notification_enabled:
+                    # 本文を通知に使用（長すぎる場合は省略）
+                    body_text = content[:40] + "..." if len(content) > 40 else content
                     send_push_notification(
                         user,
                         f"ナポレオン「{title}」",
-                        "勝利は、わが迅速果敢な行動にあり",
+                        body_text,
                         url=website_url
                     )
                     count += 1
@@ -12782,6 +12784,47 @@ def update_notification_settings():
         
     db.session.commit()
     return jsonify({'status': 'success'})
+
+@app.route('/api/debug_reminder', methods=['POST'])
+def debug_reminder():
+    if 'user_id' not in session:
+        return jsonify({'status': 'error', 'message': 'Login required'}), 401
+    
+    user = User.query.get(session['user_id'])
+    
+    # ロジックのシミュレーション
+    results = {}
+    results['user'] = f"{user.username} (Room {user.room_number})"
+    results['settings'] = f"Enabled: {user.notification_enabled}, Time: {user.notification_time}"
+    
+    # 今日のクイズ検索
+    today = (datetime.now(JST) - timedelta(hours=7)).date()
+    results['target_date'] = str(today)
+    
+    daily_quiz = DailyQuiz.query.filter_by(date=today, room_number=user.room_number).first()
+    if daily_quiz:
+        results['quiz_found'] = f"Yes (ID: {daily_quiz.id})"
+        quiz_result = DailyQuizResult.query.filter_by(user_id=user.id, quiz_id=daily_quiz.id).first()
+        if quiz_result:
+            results['status'] = "Done (完了済みのため通知されません)"
+            results['should_send'] = False
+        else:
+            results['status'] = "Not Done (未完了)"
+            results['should_send'] = True
+            
+            # 実際に送ってみる
+            success = send_push_notification(
+                user,
+                "【テスト】リマインド通知",
+                "これは「リマインド条件確認」によるテストです。\n条件合致のため送信されました。",
+                url="/"
+            )
+            results['send_result'] = "Success" if success else "Failed (Check Logs)"
+    else:
+        results['quiz_found'] = "No (今日のクイズが存在しません)"
+        results['should_send'] = False
+        
+    return jsonify({'status': 'success', 'debug_info': results})
 
 if __name__ == '__main__':
     try:
