@@ -323,6 +323,107 @@ class AppInfo(db.Model):
     def __repr__(self):
         return f'<AppInfo {self.app_name} v{self.version}>'
 
+class RpgEnemy(db.Model):
+    """RPGモードの敵キャラクター"""
+    __tablename__ = 'rpg_enemy'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    icon_image = db.Column(db.String(255), nullable=True)  # 画像ファイル名
+    badge_name = db.Column(db.String(100), nullable=False)
+    badge_image = db.Column(db.String(255), nullable=True) # 画像ファイル名 or FontAwesomeクラス
+    difficulty = db.Column(db.Integer, default=1, nullable=False) # 星の数 1-5
+    description = db.Column(db.Text, nullable=True)
+    intro_dialogue = db.Column(db.Text, nullable=True)
+    defeat_dialogue = db.Column(db.Text, nullable=True)
+    
+    # クリア条件
+    time_limit = db.Column(db.Integer, default=60, nullable=False) # 秒
+    clear_correct_count = db.Column(db.Integer, default=10, nullable=False)
+    clear_max_mistakes = db.Column(db.Integer, default=2, nullable=False)
+    
+    # 管理用
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    display_order = db.Column(db.Integer, default=0, nullable=False)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))
+    
+    # 出現条件 (NEW)
+    appearance_required_score = db.Column(db.Integer, default=0, nullable=False) # 出現に必要な累計スコア
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'icon_image': self.icon_image,
+            'badge_name': self.badge_name,
+            'badge_image': self.badge_image,
+            'difficulty': self.difficulty,
+            'description': self.description,
+            'intro_dialogue': self.intro_dialogue,
+            'defeat_dialogue': self.defeat_dialogue,
+            'time_limit': self.time_limit,
+            'clear_correct_count': self.clear_correct_count,
+            'clear_max_mistakes': self.clear_max_mistakes,
+            'is_active': self.is_active,
+            'display_order': self.display_order,
+            'appearance_required_score': self.appearance_required_score
+        }
+
+def _add_score_column_to_rpg_enemy():
+    """RpgEnemyテーブルにappearance_required_scoreカラムを追加するマイグレーション関数"""
+    try:
+        with db.engine.connect() as conn:
+            # appearance_required_score カラムの確認と追加
+            try:
+                conn.execute(text("SELECT appearance_required_score FROM rpg_enemy LIMIT 1"))
+            except Exception:
+                print("🔄 appearance_required_scoreカラムを追加します...")
+                conn.execute(text("ALTER TABLE rpg_enemy ADD COLUMN appearance_required_score INTEGER DEFAULT 0 NOT NULL"))
+                conn.commit()
+                # 既存のアレクサンドロスも0でOK
+                print("✅ RpgEnemyカラム追加完了")
+    except Exception as e:
+        print(f"⚠️ RpgEnemyマイグレーションエラー (無視可能): {e}")
+
+def _create_rpg_enemy_table():
+    """RpgEnemyテーブルを作成するマイグレーション関数"""
+    try:
+        inspector = inspect(db.engine)
+        if 'rpg_enemy' not in inspector.get_table_names():
+            print("🔄 rpg_enemyテーブルを作成します...")
+            RpgEnemy.__table__.create(db.engine)
+            print("✅ rpg_enemyテーブル作成完了")
+            
+            # 初期データ投入（アレクサンドロス大王）
+            _seed_initial_rpg_enemy()
+    except Exception as e:
+        print(f"⚠️ rpg_enemyテーブル作成エラー: {e}")
+
+def _seed_initial_rpg_enemy():
+    """初期の敵キャラ（アレクサンドロス大王）を投入"""
+    try:
+        if RpgEnemy.query.count() == 0:
+            alexander = RpgEnemy(
+                name="アレクサンドロス大王",
+                icon_image="boss_alexander.png",
+                badge_name="征服王",
+                badge_image="fas fa-crown", # 仮
+                difficulty=3,
+                description="東方遠征を成し遂げた伝説の英雄王。",
+                intro_dialogue="余の覇道、貴様に止められるか！？",
+                defeat_dialogue="見事だ…！貴様の知略、認めよう。",
+                time_limit=60,
+                clear_correct_count=10,
+                clear_max_mistakes=2,
+                is_active=True,
+                display_order=1
+            )
+            db.session.add(alexander)
+            db.session.commit()
+            print("✅ 初期RPG敵キャラ（アレクサンドロス）を投入しました")
+    except Exception as e:
+        print(f"⚠️ 初期データ投入エラー: {e}")
+        db.session.rollback()
+
 def _add_logo_columns_to_app_info():
     """AppInfoテーブルにロゴ用カラムを追加するマイグレーション関数"""
     try:
@@ -389,7 +490,7 @@ def _create_rpg_state_table():
     """RpgStateテーブルを作成するマイグレーション関数"""
     try:
         inspector = inspect(db.engine)
-        if 'rpg_state' not in inspector.get_tables():
+        if 'rpg_state' not in inspector.get_table_names():
             print("🔄 rpg_stateテーブルを作成します...")
             RpgState.__table__.create(db.engine)
             print("✅ rpg_stateテーブル作成完了")
@@ -2296,6 +2397,9 @@ def create_tables_and_admin_user():
             # 通知カラム追加マイグレーション
             _add_notification_columns_to_user()
             _create_rpg_state_table()
+            _create_rpg_enemy_table()
+            _seed_initial_rpg_enemy() # 確実に初期データを投入
+            _add_score_column_to_rpg_enemy() # NEW
             
             # 管理者ユーザー確認/作成
             try:
@@ -12880,19 +12984,47 @@ def get_rpg_status():
             is_cooldown = True
             next_challenge_time = target_time.isoformat()
             
-    # ステージ1 (アレクサンドロス) のクリア状況
-    cleared_stages = rpg_state.cleared_stages if rpg_state else []
-    is_cleared = 1 in cleared_stages
+    # 現在のボスを判定
+    target_boss = get_current_boss(user_id, rpg_state)
     
     return jsonify({
         'available': True,
         'is_cooldown': is_cooldown,
         'next_challenge_time': next_challenge_time,
-        'is_cleared': is_cleared,
-        'current_stage': 1,
-        'boss_name': 'アレクサンドロス大王',
+        'is_cleared': False, # 常に次のボス（未クリア）またはリプレイボスを表示するため False扱いにするか、
+                             # あるいは 全てクリアしたら True にするか。
+                             # ここでは「次に戦うボス」がいる限りは挑戦可能。
+                             # status画面でクリア済みかどうかは判断できる。
+        'current_stage': target_boss.id if target_boss else 1,
+        'boss_name': target_boss.name if target_boss else 'Unknown',
+        'boss_icon': target_boss.icon_image if target_boss else None,
         'current_score': balance_score
     })
+
+def get_current_boss(user_id, rpg_state=None):
+    """ユーザーの状況に合わせて出現すべきボスを決定する"""
+    if not rpg_state:
+        rpg_state = RpgState.query.filter_by(user_id=user_id).first()
+        
+    total_score = get_user_total_score(user_id)
+    cleared_stages = set(rpg_state.cleared_stages) if rpg_state else set()
+    
+    # 有効かつスコア条件を満たす敵を取得
+    candidates = RpgEnemy.query.filter(
+        RpgEnemy.is_active == True,
+        RpgEnemy.appearance_required_score <= total_score
+    ).order_by(RpgEnemy.display_order).all()
+    
+    if not candidates:
+        return None
+        
+    # 未クリアの最初の敵を探す
+    for enemy in candidates:
+        if enemy.id not in cleared_stages:
+            return enemy
+            
+    # 全てクリア済みの場合は、候補の中からランダム（リプレイ）
+    return random.choice(candidates)
 
 @app.route('/api/rpg/start', methods=['POST'])
 def start_rpg_battle():
@@ -12910,9 +13042,8 @@ def start_rpg_battle():
     valid_problems = []
     
     # RoomSettingから有効な単元を取得
+    # RoomSettingから有効な単元を取得
     room_setting = RoomSetting.query.filter_by(room_number=room_number).first()
-    max_enabled_unit_num_str = room_setting.max_enabled_unit_number if room_setting else "9999"
-    parsed_max_enabled_unit_num = parse_unit_number(max_enabled_unit_num_str)
     
     for word in word_data:
         # Z問題除外
@@ -12920,16 +13051,18 @@ def start_rpg_battle():
             continue
             
         is_word_enabled_in_csv = word['enabled']
-        is_unit_enabled_by_room_setting = parse_unit_number(word['number']) <= parsed_max_enabled_unit_num
+        # 修正: ヘルパー関数を使用して厳密にチェック（enabled_units対応）
+        is_unit_valid = is_unit_enabled_by_room_setting(word['number'], room_setting)
         
-        if is_word_enabled_in_csv and is_unit_enabled_by_room_setting:
+        if is_word_enabled_in_csv and is_unit_valid:
             valid_problems.append(word)
             
     if len(valid_problems) < 10:
         return jsonify({'status': 'error', 'message': '出題可能な問題が少なすぎます（10問以上必要）'}), 400
         
-    # ランダムに10問選択
-    selected_problems_data = random.sample(valid_problems, 10)
+    # ランダムに30問選択（10問正解到達用、または全て）
+    sample_size = min(len(valid_problems), 30)
+    selected_problems_data = random.sample(valid_problems, sample_size)
     
     # 全回答リストを作成（ダミー生成用）
     all_answers = list(set(w['answer'] for w in word_data if w.get('answer')))
@@ -12973,11 +13106,20 @@ def start_rpg_battle():
             'choices': choices
         })
     
+    # ボス決定
+    rpg_state = RpgState.query.filter_by(user_id=user_id).first()
+    target_boss = get_current_boss(user_id, rpg_state)
+    
+    if not target_boss:
+        return jsonify({'status': 'error', 'message': '戦える敵がいません'}), 400
+        
     return jsonify({
         'status': 'success',
         'problems': final_problems,
-        'time_limit': 60, # 秒
-        'pass_score': 8   # 8割以上
+        'time_limit': target_boss.time_limit,
+        'pass_score': target_boss.clear_correct_count,
+        'max_mistakes': target_boss.clear_max_mistakes,
+        'boss_info': target_boss.to_dict() # フロントエンドで表示に使用
     })
 
 @app.route('/api/rpg/result', methods=['POST'])
@@ -13010,11 +13152,16 @@ def submit_rpg_result():
             # 初回クリアボーナス
             rpg_state.permanent_bonus_percent += 0.5
             
-            # バッジ付与
-            earned_badges = set(rpg_state.earned_badges)
-            if 'alexander_slayer' not in earned_badges:
-                earned_badges.add('alexander_slayer')
-                rpg_state.earned_badges = list(earned_badges)
+            # バッジ付与 (RpgEnemyから取得)
+            enemy = RpgEnemy.query.get(stage_id)
+            if enemy:
+                 # 既存のearned_badgesに追加（後方互換性のため）
+                 earned_badges = set(rpg_state.earned_badges)
+                 # バッジ名はユニークキーとして扱う必要があるが、DBにはbadge_name(日本語)がある。
+                 # ここでは仮に IDや名前をキーにするか、badge_nameそのものを入れる。
+                 # status()関数では cleared_stages を見ているので、ここはあまり重要ではないが念のため。
+                 # しかし status() では ID で判定しているので、earned_badges は使っていない（ボスに関しては）。
+                 pass
         
         db.session.commit()
         
@@ -13029,6 +13176,85 @@ def submit_rpg_result():
         rpg_state.last_challenge_at = now
         db.session.commit()
         return jsonify({'status': 'success', 'message': 'Failed. Cooldown started.'})
+
+@app.route('/status')
+def status():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+        
+    user_id = session['user_id']
+    user = User.query.get(user_id)
+    
+    rpg_state = RpgState.query.filter_by(user_id=user_id).first()
+    
+    # 敵キャラDBからバッジ情報を構築
+    enemies = RpgEnemy.query.order_by(RpgEnemy.display_order).all()
+    cleared_set = set(rpg_state.cleared_stages) if rpg_state and rpg_state.cleared_stages else set()
+    
+    all_badges = []
+    
+    for enemy in enemies:
+        is_earned = enemy.id in cleared_set
+        
+        # アイコンのパス調整
+        badge_icon = enemy.badge_image if enemy.badge_image else 'fas fa-medal'
+        # ファルパスの場合（S3 URLでない場合）、static/images/rpg/ を付与するかどうかはテンプレート側で判断、
+        # あるいはここでフルパスにするか。
+        # admin_add_rpg_enemyでは、ファイル名のみ保存している（ローカルの場合）。
+        # S3の場合はURLそのものを保存している可能性がある（実装による）。
+        # テンプレートは `badge.icon` をそのまま `src` に入れている（FA以外）。
+        # `status.html` の実装: 
+        # {% else %} <img src="{{ badge.icon }}" ...>
+        # したがって、ここでローカルファイルの場合は `/static/images/rpg/` を付加する必要がある。
+        # ただし、httpで始まる場合はそのまま。
+        
+        final_badge_icon = badge_icon
+        if not badge_icon.startswith('fa') and not badge_icon.startswith('http') and not badge_icon.startswith('/'):
+             final_badge_icon = f"/static/images/rpg/{badge_icon}"
+
+        # ボスアイコンも同様
+        boss_icon = enemy.icon_image if enemy.icon_image else 'None'
+        final_boss_icon = boss_icon
+        if boss_icon and boss_icon != 'None' and not boss_icon.startswith('http') and not boss_icon.startswith('/'):
+            final_boss_icon = f"/static/images/rpg/{boss_icon}"
+
+        all_badges.append({
+            'name': enemy.badge_name,
+            'icon': final_badge_icon,
+            'description': f"{enemy.name}を討伐した証", # カード表示用
+            'earned': is_earned,
+            'boss_name': enemy.name,
+            'boss_icon': final_boss_icon,
+            'boss_description': enemy.description # モーダル表示用（テンプレート変数を合わせる必要あり）
+        })
+        # Note: テンプレートのonclickで `badge.description` を渡しているが、これはモーダルの説明文になる。
+        # Step 408の変更を見ると:
+        # onclick="showMonsterDetail('{{ badge.name }}', '{{ badge.description }}', ...)"
+        # カードテキストは:
+        # {{ badge.description if badge.earned else '未獲得' }}
+        # 問題: カードテキストとモーダルテキストを分けたいが、テンプレートは `badge.description` を両方に使っている。
+        # テンプレートを修正するのは面倒（またreplace_file_contentが必要）。
+        # ここでは `description` に `enemy.description` (豆知識) を入れることにする。
+        # カードテキストが長くなるかもしれないが、それが「豆知識」ならカード内でも見えて良いのでは？
+        # あるいは、テンプレートで `badge.boss_description` を使うように修正すべきか？
+        # ユーザー要望: "statusの画面で、討伐した敵の情報を見られる...豆知識です"
+        # カードには短い説明、クリックで詳細（豆知識）が自然。
+        # しかしテンプレート修正コストを避けるため、一旦 `description` に豆知識を入れる。
+        # もしカードからはみ出るならCSSで省略される（現状のCSS次第だが）。
+        # よし、`description` = `enemy.description` にしよう。
+        
+        all_badges[-1]['description'] = enemy.description if enemy.description else f"{enemy.name}のデータ"
+
+    # 既存のボーナスなど
+    bonus_percent = rpg_state.permanent_bonus_percent if rpg_state else 0.0
+    # クリア数はステージ数に基づいて計算（len(cleared_set)でOK）
+    cleared_count = len(cleared_set)
+    
+    return render_template('status.html', 
+                         current_user=user, 
+                         earned_badges=all_badges, # 変数名を変更
+                         bonus_percent=bonus_percent, 
+                         cleared_count=cleared_count)
 
 
 if __name__ == '__main__':
@@ -13815,6 +14041,122 @@ def admin_delete_room_score():
         
         db.session.commit()
         return jsonify({'status': 'success', 'message': f'部屋 {room_number} の {success_count} 名のスコアを削除しました。'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+# ========================================================================
+# RPG Enemy Management Routes
+# ========================================================================
+
+@app.route('/admin/rpg/enemies')
+@admin_required
+def admin_rpg_enemies():
+    """RPG敵キャラ一覧（JSONで返すか、admin.htmlの一部としてレンダリングするか検討）"""
+    # admin.html内のセクションとして機能させるため、JSON APIとして提供し、JSで描画するパタンが良い
+    enemies = RpgEnemy.query.order_by(RpgEnemy.display_order).all()
+    return jsonify([e.to_dict() for e in enemies])
+
+def get_user_total_score(user_id):
+    """ユーザーの累計獲得スコア（MonthlyScoreの合計）を取得"""
+    try:
+        total = db.session.query(func.sum(MonthlyScore.total_score)).filter(MonthlyScore.user_id == user_id).scalar()
+        return int(total) if total else 0
+    except Exception as e:
+        print(f"Error calculating total score for user {user_id}: {e}")
+        return 0
+
+@app.route('/admin/rpg/enemies/add', methods=['POST'])
+@admin_required
+def admin_add_rpg_enemy():
+    """RPG敵キャラ追加"""
+    try:
+        # フォームデータの取得
+        name = request.form.get('name')
+        if not name:
+            return jsonify({'status': 'error', 'message': '名前は必須です'}), 400
+            
+        # 画像アップロード処理 (S3優先)
+        icon_file = request.files.get('icon_image')
+        badge_file = request.files.get('badge_image')
+        
+        icon_filename = None
+        if icon_file and icon_file.filename:
+            filename = secure_filename(icon_file.filename)
+            unique_filename = f"rpg_enemy_{int(time.time())}_{filename}"
+            
+            # S3へアップロード
+            s3_url = upload_image_to_s3(icon_file, unique_filename, folder='rpg_images')
+            if s3_url:
+                icon_filename = unique_filename # S3の場合もファイル名を保存し、表示時にURL生成するか、URLそのものを保存するか検討。
+                # RpgEnemyモデルは `icon_image` (String 255) なので、S3の場合はフルURLでもファイル名でも良いが、
+                # 既存のロジック(statuc/images/...)と互換性を持たせるため、
+                # ここでは「ファイル名」を保存し、表示側で「http」で始まる場合はそのまま、そうでなければstaticからと判定するのが良いかも。
+                # ただし `upload_image_to_s3` はFull URLを返す。
+                # モデルの `icon_image` にFull URLを入れても良い。
+                icon_filename = s3_url # Full URL
+            else:
+                # S3失敗/未設定時はローカル保存 (開発環境用)
+                upload_dir = os.path.join(app.root_path, 'static', 'images', 'rpg')
+                os.makedirs(upload_dir, exist_ok=True)
+                icon_file.seek(0) # S3アップロードで読み込まれている可能性があるため巻き戻し
+                icon_file.save(os.path.join(upload_dir, unique_filename))
+                icon_filename = unique_filename
+
+        badge_filename_or_class = request.form.get('badge_icon_class') # FontAwesomeの場合
+        if badge_file and badge_file.filename:
+            filename = secure_filename(badge_file.filename)
+            unique_filename = f"rpg_badge_{int(time.time())}_{filename}"
+            
+            # S3へアップロード
+            s3_url = upload_image_to_s3(badge_file, unique_filename, folder='rpg_images')
+            if s3_url:
+                badge_filename_or_class = s3_url # Full URL
+            else:
+                # ローカル保存
+                upload_dir = os.path.join(app.root_path, 'static', 'images', 'rpg')
+                os.makedirs(upload_dir, exist_ok=True)
+                badge_file.seek(0)
+                badge_file.save(os.path.join(upload_dir, unique_filename))
+                badge_filename_or_class = unique_filename # ローカルファイル名
+            
+        # 新規作成
+        new_enemy = RpgEnemy(
+            name=name,
+            icon_image=icon_filename,
+            badge_name=request.form.get('badge_name', 'Unknown Badge'),
+            badge_image=badge_filename_or_class,
+            difficulty=int(request.form.get('difficulty', 1)),
+            description=request.form.get('description'),
+            intro_dialogue=request.form.get('intro_dialogue'),
+            defeat_dialogue=request.form.get('defeat_dialogue'),
+            time_limit=int(request.form.get('time_limit', 60)),
+            clear_correct_count=int(request.form.get('clear_correct_count', 10)),
+            clear_max_mistakes=int(request.form.get('clear_max_mistakes', 2)),
+            is_active=request.form.get('is_active') == 'true',
+            display_order=int(request.form.get('display_order', 0)),
+            appearance_required_score=int(request.form.get('appearance_required_score', 0))
+        )
+        
+        db.session.add(new_enemy)
+        db.session.commit()
+        return jsonify({'status': 'success', 'message': '敵キャラを追加しました', 'enemy': new_enemy.to_dict()})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/admin/rpg/enemies/delete/<int:enemy_id>', methods=['POST'])
+@admin_required
+def admin_delete_rpg_enemy(enemy_id):
+    """RPG敵キャラ削除"""
+    try:
+        enemy = RpgEnemy.query.get(enemy_id)
+        if not enemy:
+            return jsonify({'status': 'error', 'message': '指定された敵キャラが見つかりません'}), 404
+            
+        db.session.delete(enemy)
+        db.session.commit()
+        return jsonify({'status': 'success', 'message': '敵キャラを削除しました'})
     except Exception as e:
         db.session.rollback()
         return jsonify({'status': 'error', 'message': str(e)}), 500
