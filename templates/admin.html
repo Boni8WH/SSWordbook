@@ -554,136 +554,139 @@
                             </div>
                         </div>
 
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label">ボス画像 (戦闘用)</label>
-                            <input type="file" class="form-control" name="icon_image" accept="image/*">
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">ボス画像 (戦闘用)</label>
+                                <input type="file" class="form-control" name="icon_image" accept="image/*">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">討伐後画像 (Status用)</label>
+                                <input type="file" class="form-control" name="defeated_image" accept="image/*">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">称号名</label>
+                                <input type="text" class="form-control" name="badge_name" placeholder="例: 雷光の将軍"
+                                    required>
+                            </div>
                         </div>
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label">討伐後画像 (Status用)</label>
-                            <input type="file" class="form-control" name="defeated_image" accept="image/*">
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">称号アイコン (画像)</label>
+                                <input type="file" class="form-control" name="badge_image" accept="image/*">
+                                <small class="text-muted">または FontAwesomeクラス名を入力:</small>
+                                <input type="text" class="form-control mt-1" name="badge_icon_class"
+                                    placeholder="例: fas fa-bolt">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">説明文</label>
+                                <textarea class="form-control" name="description" rows="2"
+                                    placeholder="ボスの説明..."></textarea>
+                            </div>
                         </div>
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label">称号名</label>
-                            <input type="text" class="form-control" name="badge_name" placeholder="例: 雷光の将軍" required>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">開始セリフ</label>
+                                <textarea class="form-control" name="intro_dialogue" rows="2"></textarea>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">討伐セリフ</label>
+                                <textarea class="form-control" name="defeat_dialogue" rows="2"></textarea>
+                            </div>
                         </div>
+
+                        <hr>
+                        <hr>
+                        <h5>クリア条件・出現条件</h5>
+                        <div class="row">
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label">制限時間 (秒)</label>
+                                <input type="number" class="form-control" name="time_limit" value="60">
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label">合格正解数</label>
+                                <input type="number" class="form-control" name="clear_correct_count" value="10">
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label">許容ミス数</label>
+                                <input type="number" class="form-control" name="clear_max_mistakes" value="2">
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label">出現必要スコア</label>
+                                <input type="number" class="form-control" name="appearance_required_score" value="0">
+                            </div>
+                        </div>
+
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" name="is_active" value="true" checked
+                                id="isActiveCheck">
+                            <label class="form-check-label" for="isActiveCheck">すぐに有効にする</label>
+                        </div>
+
+                        <button type="submit" class="btn btn-danger">
+                            <i class="fas fa-save"></i> ボスを登録
+                        </button>
+                    </form>
                 </div>
 
-                <div class="row">
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label">称号アイコン (画像)</label>
-                        <input type="file" class="form-control" name="badge_image" accept="image/*">
-                        <small class="text-muted">または FontAwesomeクラス名を入力:</small>
-                        <input type="text" class="form-control mt-1" name="badge_icon_class"
-                            placeholder="例: fas fa-bolt">
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label">説明文</label>
-                        <textarea class="form-control" name="description" rows="2" placeholder="ボスの説明..."></textarea>
-                    </div>
+                <!-- ボス一覧 -->
+                <h4>登録済みボス一覧</h4>
+                <div id="rpgEnemyListContainer">
+                    <!-- JSで一覧をロード -->
+                    <div class="text-center"><i class="fas fa-spinner fa-spin"></i> 読み込み中...</div>
                 </div>
-
-                <div class="row">
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label">開始セリフ</label>
-                        <textarea class="form-control" name="intro_dialogue" rows="2"></textarea>
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label">討伐セリフ</label>
-                        <textarea class="form-control" name="defeat_dialogue" rows="2"></textarea>
-                    </div>
-                </div>
-
-                <hr>
-                <hr>
-                <h5>クリア条件・出現条件</h5>
-                <div class="row">
-                    <div class="col-md-3 mb-3">
-                        <label class="form-label">制限時間 (秒)</label>
-                        <input type="number" class="form-control" name="time_limit" value="60">
-                    </div>
-                    <div class="col-md-3 mb-3">
-                        <label class="form-label">合格正解数</label>
-                        <input type="number" class="form-control" name="clear_correct_count" value="10">
-                    </div>
-                    <div class="col-md-3 mb-3">
-                        <label class="form-label">許容ミス数</label>
-                        <input type="number" class="form-control" name="clear_max_mistakes" value="2">
-                    </div>
-                    <div class="col-md-3 mb-3">
-                        <label class="form-label">出現必要スコア</label>
-                        <input type="number" class="form-control" name="appearance_required_score" value="0">
-                    </div>
-                </div>
-
-                <div class="form-check mb-3">
-                    <input class="form-check-input" type="checkbox" name="is_active" value="true" checked
-                        id="isActiveCheck">
-                    <label class="form-check-label" for="isActiveCheck">すぐに有効にする</label>
-                </div>
-
-                <button type="submit" class="btn btn-danger">
-                    <i class="fas fa-save"></i> ボスを登録
-                </button>
-                </form>
-            </div>
-
-            <!-- ボス一覧 -->
-            <h4>登録済みボス一覧</h4>
-            <div id="rpgEnemyListContainer">
-                <!-- JSで一覧をロード -->
-                <div class="text-center"><i class="fas fa-spinner fa-spin"></i> 読み込み中...</div>
             </div>
         </div>
     </div>
-</div>
 
-<!-- スクリプト: RPG管理機能 -->
-<script>
-    document.addEventListener('DOMContentLoaded', function () {
-        loadRpgEnemies();
+    <!-- スクリプト: RPG管理機能 -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            loadRpgEnemies();
 
-        document.getElementById('addRpgEnemyForm').addEventListener('submit', function (e) {
-            e.preventDefault();
-            if (!confirm('このボスを登録しますか？')) return;
+            document.getElementById('addRpgEnemyForm').addEventListener('submit', function (e) {
+                e.preventDefault();
+                if (!confirm('このボスを登録しますか？')) return;
 
-            const formData = new FormData(this);
+                const formData = new FormData(this);
 
-            fetch('/admin/rpg/enemies/add', {
-                method: 'POST',
-                body: formData
-            })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.status === 'success') {
-                        alert('登録しました！');
-                        this.reset();
-                        loadRpgEnemies();
-                    } else {
-                        alert('エラー: ' + data.message);
-                    }
+                fetch('/admin/rpg/enemies/add', {
+                    method: 'POST',
+                    body: formData
                 })
-                .catch(err => alert('通信エラーが発生しました'));
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.status === 'success') {
+                            alert('登録しました！');
+                            this.reset();
+                            loadRpgEnemies();
+                        } else {
+                            alert('エラー: ' + data.message);
+                        }
+                    })
+                    .catch(err => alert('通信エラーが発生しました'));
+            });
         });
-    });
 
-    function loadRpgEnemies() {
-        fetch('/admin/rpg/enemies')
-            .then(res => res.json())
-            .then(enemies => {
-                const container = document.getElementById('rpgEnemyListContainer');
-                if (enemies.length === 0) {
-                    container.innerHTML = '<p class="text-muted">登録されているボスはいません。</p>';
-                    return;
-                }
+        function loadRpgEnemies() {
+            fetch('/admin/rpg/enemies')
+                .then(res => res.json())
+                .then(enemies => {
+                    const container = document.getElementById('rpgEnemyListContainer');
+                    if (enemies.length === 0) {
+                        container.innerHTML = '<p class="text-muted">登録されているボスはいません。</p>';
+                        return;
+                    }
 
-                let html = '<div class="table-responsive"><table class="table table-bordered table-hover align-middle">';
-                html += '<thead class="table-dark"><tr><th>Icon</th><th>名前 (難易度)</th><th>称号</th><th>条件</th><th>状態</th><th>操作</th></tr></thead><tbody>';
+                    let html = '<div class="table-responsive"><table class="table table-bordered table-hover align-middle">';
+                    html += '<thead class="table-dark"><tr><th>Icon</th><th>名前 (難易度)</th><th>称号</th><th>条件</th><th>状態</th><th>操作</th></tr></thead><tbody>';
 
-                enemies.forEach(enemy => {
-                    // 画像パスの生成 (DB経由のURLを使用)
-                    const iconPath = enemy.icon_url ? enemy.icon_url : (enemy.icon_image ? `/static/images/rpg/${enemy.icon_image}` : '/static/images/boss_alexander.png');
+                    enemies.forEach(enemy => {
+                        // 画像パスの生成 (DB経由のURLを使用)
+                        const iconPath = enemy.icon_url ? enemy.icon_url : (enemy.icon_image ? `/static/images/rpg/${enemy.icon_image}` : '/static/images/boss_alexander.png');
 
-                    html += `<tr>
+                        html += `<tr>
                         <td class="text-center"><img src="${iconPath}" style="width:50px; height:50px; object-fit:contain;"></td>
                         <td><strong>${enemy.name}</strong> <span class="text-warning">★${enemy.difficulty}</span></td>
                         <td>${enemy.badge_name}</td>
@@ -698,548 +701,551 @@
                             </button>
                         </td>
                     </tr>`;
+                    });
+
+                    html += '</tbody></table></div>';
+                    container.innerHTML = html;
                 });
-
-                html += '</tbody></table></div>';
-                container.innerHTML = html;
-            });
-    }
-
-    // 編集モーダルを開く
-    function openEditRpgEnemyModal(enemy) {
-        const modalElement = document.getElementById('editRpgEnemyModal');
-        const modal = new bootstrap.Modal(modalElement);
-        const form = document.getElementById('editRpgEnemyForm');
-
-        // フォームに値をセット
-        form.action = `/admin/rpg/enemies/edit/${enemy.id}`; // フォームのactionを動的に設定
-        form.elements['name'].value = enemy.name;
-        form.elements['difficulty'].value = enemy.difficulty;
-        form.elements['badge_name'].value = enemy.badge_name;
-        form.elements['description'].value = enemy.description || '';
-        form.elements['intro_dialogue'].value = enemy.intro_dialogue || '';
-        form.elements['defeat_dialogue'].value = enemy.defeat_dialogue || '';
-        form.elements['time_limit'].value = enemy.time_limit;
-        form.elements['clear_correct_count'].value = enemy.clear_correct_count;
-        form.elements['clear_max_mistakes'].value = enemy.clear_max_mistakes;
-        form.elements['display_order'].value = enemy.display_order;
-        form.elements['appearance_required_score'].value = enemy.appearance_required_score;
-
-        // チェックボックス
-        form.elements['is_active'].checked = enemy.is_active;
-
-        // バッジアイコンクラス (画像アップロードはリセット)
-        form.elements['badge_icon_class'].value = enemy.badge_image && !enemy.badge_image.includes('/') ? enemy.badge_image : '';
-
-        // 既存の画像プレビューを更新 (もしあれば)
-        const currentIconPreview = document.getElementById('currentEditIconImage');
-        if (currentIconPreview) {
-            currentIconPreview.src = enemy.icon_url ? enemy.icon_url : (enemy.icon_image ? `/static/images/rpg/${enemy.icon_image}` : '/static/images/boss_alexander.png');
-            currentIconPreview.style.display = 'block';
         }
-        // Defeated Preview
-        const currentDefeatedPreview = document.getElementById('currentEditDefeatedImage');
-        if (currentDefeatedPreview) {
-            if (enemy.defeated_image) {
-                currentDefeatedPreview.src = enemy.defeated_url ? enemy.defeated_url : `/static/images/rpg/${enemy.defeated_image}`;
-                currentDefeatedPreview.style.display = 'block';
-            } else {
-                currentDefeatedPreview.style.display = 'none';
+
+        // 編集モーダルを開く
+        function openEditRpgEnemyModal(enemy) {
+            const modalElement = document.getElementById('editRpgEnemyModal');
+            const modal = new bootstrap.Modal(modalElement);
+            const form = document.getElementById('editRpgEnemyForm');
+
+            // フォームに値をセット
+            form.action = `/admin/rpg/enemies/edit/${enemy.id}`; // フォームのactionを動的に設定
+            form.elements['name'].value = enemy.name;
+            form.elements['difficulty'].value = enemy.difficulty;
+            form.elements['badge_name'].value = enemy.badge_name;
+            form.elements['description'].value = enemy.description || '';
+            form.elements['intro_dialogue'].value = enemy.intro_dialogue || '';
+            form.elements['defeat_dialogue'].value = enemy.defeat_dialogue || '';
+            form.elements['time_limit'].value = enemy.time_limit;
+            form.elements['clear_correct_count'].value = enemy.clear_correct_count;
+            form.elements['clear_max_mistakes'].value = enemy.clear_max_mistakes;
+            form.elements['display_order'].value = enemy.display_order;
+            form.elements['appearance_required_score'].value = enemy.appearance_required_score;
+
+            // チェックボックス
+            form.elements['is_active'].checked = enemy.is_active;
+
+            // バッジアイコンクラス (画像アップロードはリセット)
+            form.elements['badge_icon_class'].value = enemy.badge_image && !enemy.badge_image.includes('/') ? enemy.badge_image : '';
+
+            // 既存の画像プレビューを更新 (もしあれば)
+            const currentIconPreview = document.getElementById('currentEditIconImage');
+            if (currentIconPreview) {
+                currentIconPreview.src = enemy.icon_url ? enemy.icon_url : (enemy.icon_image ? `/static/images/rpg/${enemy.icon_image}` : '/static/images/boss_alexander.png');
+                currentIconPreview.style.display = 'block';
             }
-        }
-        const currentBadgePreview = document.getElementById('currentEditBadgeImage');
-        if (currentBadgePreview) {
-            if (enemy.badge_image && enemy.badge_image.includes('/')) { // 画像の場合
-                currentBadgePreview.src = enemy.badge_url ? enemy.badge_url : `/static/images/rpg/${enemy.badge_image}`;
-                currentBadgePreview.style.display = 'block';
-                document.getElementById('currentEditBadgeIconClass').style.display = 'none';
-            } else if (enemy.badge_image) { // FontAwesomeクラスの場合
-                document.getElementById('currentEditBadgeIconClass').className = `fas ${enemy.badge_image} fa-2x`;
-                document.getElementById('currentEditBadgeIconClass').style.display = 'inline-block';
-                currentBadgePreview.style.display = 'none';
-            } else {
-                currentBadgePreview.style.display = 'none';
-                document.getElementById('currentEditBadgeIconClass').style.display = 'none';
-            }
-        }
-
-        modal.show();
-    }
-
-    // 編集モーダルを閉じる
-    function closeEditRpgEnemyModal() {
-        const modalElement = document.getElementById('editRpgEnemyModal');
-        const modal = bootstrap.Modal.getInstance(modalElement);
-        if (modal) {
-            modal.hide();
-        }
-    }
-
-    function deleteRpgEnemy(id) {
-        if (!confirm('本当に削除しますか？この操作は取り消せません。')) return;
-
-        fetch(`/admin/rpg/enemies/delete/${id}`, { method: 'POST' })
-            .then(res => res.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    loadRpgEnemies();
+            // Defeated Preview
+            const currentDefeatedPreview = document.getElementById('currentEditDefeatedImage');
+            if (currentDefeatedPreview) {
+                if (enemy.defeated_image) {
+                    currentDefeatedPreview.src = enemy.defeated_url ? enemy.defeated_url : `/static/images/rpg/${enemy.defeated_image}`;
+                    currentDefeatedPreview.style.display = 'block';
                 } else {
-                    alert('削除失敗: ' + data.message);
+                    currentDefeatedPreview.style.display = 'none';
                 }
-            });
-    }
-</script>
+            }
+            const currentBadgePreview = document.getElementById('currentEditBadgeImage');
+            if (currentBadgePreview) {
+                if (enemy.badge_image && enemy.badge_image.includes('/')) { // 画像の場合
+                    currentBadgePreview.src = enemy.badge_url ? enemy.badge_url : `/static/images/rpg/${enemy.badge_image}`;
+                    currentBadgePreview.style.display = 'block';
+                    document.getElementById('currentEditBadgeIconClass').style.display = 'none';
+                } else if (enemy.badge_image) { // FontAwesomeクラスの場合
+                    document.getElementById('currentEditBadgeIconClass').className = `fas ${enemy.badge_image} fa-2x`;
+                    document.getElementById('currentEditBadgeIconClass').style.display = 'inline-block';
+                    currentBadgePreview.style.display = 'none';
+                } else {
+                    currentBadgePreview.style.display = 'none';
+                    document.getElementById('currentEditBadgeIconClass').style.display = 'none';
+                }
+            }
 
-<!-- 論述問題公開設定セクション -->
-<div class="admin-section">
-    <div class="section-header" data-bs-toggle="collapse" data-bs-target="#section-essay-visibility"
-        aria-expanded="false">
-        <h3><i class="fas fa-eye"></i> 論述問題公開設定 <i class="fas fa-chevron-down toggle-icon"></i></h3>
-    </div>
-    <div class="collapse" id="section-essay-visibility">
-        <div class="section-content">
-            <p>部屋ごとに章・問題タイプ別で論述問題の公開/非公開を設定できます。</p>
+            modal.show();
+        }
 
-            <!-- 部屋選択 -->
-            <div class="visibility-room-selector">
-                <div class="row align-items-center mb-3">
-                    <div class="col-md-4">
-                        <label for="visibilityRoomSelect" class="form-label">
-                            <i class="fas fa-door-open"></i> 設定対象の部屋
-                        </label>
-                        <select id="visibilityRoomSelect" class="form-select">
-                            <option value="">部屋を選択してください</option>
-                        </select>
-                    </div>
-                    <div class="col-md-8">
-                        <div class="btn-group" role="group">
-                            <button id="loadVisibilitySettings" class="btn btn-primary" disabled>
-                                <i class="fas fa-download"></i> 設定を読み込み
-                            </button>
-                            <button id="saveVisibilitySettings" class="btn btn-success" disabled>
-                                <i class="fas fa-save"></i> 設定を保存
-                            </button>
-                            <button id="resetVisibilitySettings" class="btn btn-warning" disabled>
-                                <i class="fas fa-undo"></i> 全て公開にリセット
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
+        // 編集モーダルを閉じる
+        function closeEditRpgEnemyModal() {
+            const modalElement = document.getElementById('editRpgEnemyModal');
+            const modal = bootstrap.Modal.getInstance(modalElement);
+            if (modal) {
+                modal.hide();
+            }
+        }
 
-            <!-- 設定マトリックス -->
-            <div id="visibilityMatrix" class="visibility-matrix" style="display: none;">
-                <div class="matrix-header">
-                    <h4><i class="fas fa-eye"></i> 論述問題公開設定</h4>
-                    <p class="text-muted mb-3">
-                        <i class="fas fa-info-circle"></i>
-                        各セルをクリックして個別設定、「第○章」をクリックして章全体の一括設定ができます
-                    </p>
-                </div>
+        function deleteRpgEnemy(id) {
+            if (!confirm('本当に削除しますか？この操作は取り消せません。')) return;
 
-                <!-- Grid Container -->
-                <div id="visibilityGrid" class="visibility-grid">
-                    <!-- ヘッダー行 -->
-                    <div class="grid-header grid-cell-chapter">章</div>
-                    <div class="grid-header grid-cell-type">タイプA</div>
-                    <div class="grid-header grid-cell-type">タイプB</div>
-                    <div class="grid-header grid-cell-type">タイプC</div>
-                    <div class="grid-header grid-cell-type">タイプD</div>
+            fetch(`/admin/rpg/enemies/delete/${id}`, { method: 'POST' })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        loadRpgEnemies();
+                    } else {
+                        alert('削除失敗: ' + data.message);
+                    }
+                });
+        }
+    </script>
 
-                    <!-- データ行はJavaScriptで動的生成 -->
-                </div>
-
-                <!-- 保存ボタンのみ -->
-                <div class="save-section mt-3 text-center">
-                    <button type="button" class="btn btn-primary btn-lg" onclick="saveVisibilitySettings()">
-                        <i class="fas fa-save"></i> 設定を保存
-                    </button>
-                </div>
-            </div>
-
-            <!-- 状態表示 -->
-            <div id="visibilityStatus" class="mt-3"></div>
+    <!-- 論述問題公開設定セクション -->
+    <div class="admin-section">
+        <div class="section-header" data-bs-toggle="collapse" data-bs-target="#section-essay-visibility"
+            aria-expanded="false">
+            <h3><i class="fas fa-eye"></i> 論述問題公開設定 <i class="fas fa-chevron-down toggle-icon"></i></h3>
         </div>
-    </div>
-</div>
+        <div class="collapse" id="section-essay-visibility">
+            <div class="section-content">
+                <p>部屋ごとに章・問題タイプ別で論述問題の公開/非公開を設定できます。</p>
 
-<!-- 論述問題集管理セクション　-->
-<div class="admin-section">
-    <div class="section-header" data-bs-toggle="collapse" data-bs-target="#section-essay-management"
-        aria-expanded="false">
-        <h3><i class="fas fa-edit"></i> 論述問題集管理 <i class="fas fa-chevron-down toggle-icon"></i></h3>
-    </div>
-    <div class="collapse" id="section-essay-management">
-        <div class="section-content">
-            <p>論述問題の登録・管理・インポートを行います。</p>
-            <!-- 論述問題CSV一括インポート -->
-            <div class="csv-import-section">
-                <h4><i class="fas fa-upload"></i> CSV一括インポート</h4>
-
-                <!-- CSVテンプレート説明 -->
-                <div class="csv-template-section">
-                    <h5><i class="fas fa-download"></i> 論述問題CSVテンプレート</h5>
-                    <p>正しい形式の論述問題CSVファイルを作成するためのテンプレートです。</p>
-
-                    <div class="template-format">
-                        <strong>CSVフォーマット:</strong><br>
-                        <code>chapter,type,university,year,question,answer,answer_length,enabled</code><br><br>
-
-                        <strong>各列の説明:</strong><br>
-                        • <strong>chapter</strong>: 章番号（例: 1, 2, com）<br>
-                        • <strong>type</strong>: 問題タイプ（A: 200字以上, B: 100-150字, C: 50-75字, D: 30字程度）<br>
-                        • <strong>university</strong>: 出題大学名（任意）<br>
-                        • <strong>year</strong>: 出題年度（任意）<br>
-                        • <strong>question</strong>: 問題文（必須）<br>
-                        • <strong>answer</strong>: 模範解答（任意）<br>
-                        • <strong>answer_length</strong>: 解答文字数（自動計算されるため任意）<br>
-                        • <strong>enabled</strong>: 有効フラグ（1: 有効, 0: 無効）
-                    </div>
-
-                    <button class="btn btn-outline-info btn-sm" onclick="downloadEssayTemplate()">
-                        <i class="fas fa-file-csv"></i> 論述問題CSVテンプレートをダウンロード
-                    </button>
-
-                    <a href="{{ url_for('admin_essay_download_csv') }}" class="btn btn-outline-primary btn-sm ms-2">
-                        <i class="fas fa-file-download"></i> 登録済み問題をCSVでダウンロード
-                    </a>
-                </div>
-
-                <!-- CSVアップロードフォーム -->
-                <form id="essayUploadForm" enctype="multipart/form-data" class="csv-upload-form">
-                    <div class="upload-area">
-                        <div class="file-input-wrapper">
-                            <label for="essay_csv_file" class="file-input-label">
-                                <i class="fas fa-cloud-upload-alt"></i>
-                                <span>CSVファイルを選択</span>
+                <!-- 部屋選択 -->
+                <div class="visibility-room-selector">
+                    <div class="row align-items-center mb-3">
+                        <div class="col-md-4">
+                            <label for="visibilityRoomSelect" class="form-label">
+                                <i class="fas fa-door-open"></i> 設定対象の部屋
                             </label>
-                            <input type="file" id="essay_csv_file" name="file" accept=".csv" required>
-                            <small class="form-text text-muted">UTF-8またはShift_JISエンコーディングのCSVファイルを選択してください</small>
+                            <select id="visibilityRoomSelect" class="form-select">
+                                <option value="">部屋を選択してください</option>
+                            </select>
                         </div>
-
-                        <div class="upload-options">
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="replaceExisting"
-                                    name="replace_existing">
-                                <label class="form-check-label" for="replaceExisting">
-                                    <i class="fas fa-exclamation-triangle text-warning"></i>
-                                    既存の問題を置き換える（注意：全ての論述問題が削除されます）
-                                </label>
+                        <div class="col-md-8">
+                            <div class="btn-group" role="group">
+                                <button id="loadVisibilitySettings" class="btn btn-primary" disabled>
+                                    <i class="fas fa-download"></i> 設定を読み込み
+                                </button>
+                                <button id="saveVisibilitySettings" class="btn btn-success" disabled>
+                                    <i class="fas fa-save"></i> 設定を保存
+                                </button>
+                                <button id="resetVisibilitySettings" class="btn btn-warning" disabled>
+                                    <i class="fas fa-undo"></i> 全て公開にリセット
+                                </button>
                             </div>
                         </div>
+                    </div>
+                </div>
 
-                        <button type="submit" class="btn btn-success btn-upload">
-                            <i class="fas fa-upload"></i>
-                            <span>論述問題CSV一括インポート</span>
+                <!-- 設定マトリックス -->
+                <div id="visibilityMatrix" class="visibility-matrix" style="display: none;">
+                    <div class="matrix-header">
+                        <h4><i class="fas fa-eye"></i> 論述問題公開設定</h4>
+                        <p class="text-muted mb-3">
+                            <i class="fas fa-info-circle"></i>
+                            各セルをクリックして個別設定、「第○章」をクリックして章全体の一括設定ができます
+                        </p>
+                    </div>
+
+                    <!-- Grid Container -->
+                    <div id="visibilityGrid" class="visibility-grid">
+                        <!-- ヘッダー行 -->
+                        <div class="grid-header grid-cell-chapter">章</div>
+                        <div class="grid-header grid-cell-type">タイプA</div>
+                        <div class="grid-header grid-cell-type">タイプB</div>
+                        <div class="grid-header grid-cell-type">タイプC</div>
+                        <div class="grid-header grid-cell-type">タイプD</div>
+
+                        <!-- データ行はJavaScriptで動的生成 -->
+                    </div>
+
+                    <!-- 保存ボタンのみ -->
+                    <div class="save-section mt-3 text-center">
+                        <button type="button" class="btn btn-primary btn-lg" onclick="saveVisibilitySettings()">
+                            <i class="fas fa-save"></i> 設定を保存
                         </button>
                     </div>
-                </form>
+                </div>
+
+                <!-- 状態表示 -->
+                <div id="visibilityStatus" class="mt-3"></div>
             </div>
+        </div>
+    </div>
 
-            <!-- 個別論述問題登録 -->
-            <div class="essay-form-section">
-                <h4><i class="fas fa-plus-circle"></i> 個別論述問題登録</h4>
+    <!-- 論述問題集管理セクション　-->
+    <div class="admin-section">
+        <div class="section-header" data-bs-toggle="collapse" data-bs-target="#section-essay-management"
+            aria-expanded="false">
+            <h3><i class="fas fa-edit"></i> 論述問題集管理 <i class="fas fa-chevron-down toggle-icon"></i></h3>
+        </div>
+        <div class="collapse" id="section-essay-management">
+            <div class="section-content">
+                <p>論述問題の登録・管理・インポートを行います。</p>
+                <!-- 論述問題CSV一括インポート -->
+                <div class="csv-import-section">
+                    <h4><i class="fas fa-upload"></i> CSV一括インポート</h4>
 
-                <div class="essay-form-container">
-                    <form id="newEssayProblemForm" class="essay-registration-form" enctype="multipart/form-data">
-                        <div class="essay-form-grid">
-                            <!-- 章・タイプ行 -->
-                            <div class="essay-input-group">
-                                <label for="new_essay_chapter">
-                                    <i class="fas fa-bookmark"></i> 章
+                    <!-- CSVテンプレート説明 -->
+                    <div class="csv-template-section">
+                        <h5><i class="fas fa-download"></i> 論述問題CSVテンプレート</h5>
+                        <p>正しい形式の論述問題CSVファイルを作成するためのテンプレートです。</p>
+
+                        <div class="template-format">
+                            <strong>CSVフォーマット:</strong><br>
+                            <code>chapter,type,university,year,question,answer,answer_length,enabled</code><br><br>
+
+                            <strong>各列の説明:</strong><br>
+                            • <strong>chapter</strong>: 章番号（例: 1, 2, com）<br>
+                            • <strong>type</strong>: 問題タイプ（A: 200字以上, B: 100-150字, C: 50-75字, D: 30字程度）<br>
+                            • <strong>university</strong>: 出題大学名（任意）<br>
+                            • <strong>year</strong>: 出題年度（任意）<br>
+                            • <strong>question</strong>: 問題文（必須）<br>
+                            • <strong>answer</strong>: 模範解答（任意）<br>
+                            • <strong>answer_length</strong>: 解答文字数（自動計算されるため任意）<br>
+                            • <strong>enabled</strong>: 有効フラグ（1: 有効, 0: 無効）
+                        </div>
+
+                        <button class="btn btn-outline-info btn-sm" onclick="downloadEssayTemplate()">
+                            <i class="fas fa-file-csv"></i> 論述問題CSVテンプレートをダウンロード
+                        </button>
+
+                        <a href="{{ url_for('admin_essay_download_csv') }}" class="btn btn-outline-primary btn-sm ms-2">
+                            <i class="fas fa-file-download"></i> 登録済み問題をCSVでダウンロード
+                        </a>
+                    </div>
+
+                    <!-- CSVアップロードフォーム -->
+                    <form id="essayUploadForm" enctype="multipart/form-data" class="csv-upload-form">
+                        <div class="upload-area">
+                            <div class="file-input-wrapper">
+                                <label for="essay_csv_file" class="file-input-label">
+                                    <i class="fas fa-cloud-upload-alt"></i>
+                                    <span>CSVファイルを選択</span>
                                 </label>
-                                <input type="text" id="new_essay_chapter" name="chapter" placeholder="例: 1, 2, com"
-                                    required>
-                                <small class="essay-help-text">数字または「com」（総合問題）を入力</small>
+                                <input type="file" id="essay_csv_file" name="file" accept=".csv" required>
+                                <small class="form-text text-muted">UTF-8またはShift_JISエンコーディングのCSVファイルを選択してください</small>
                             </div>
 
-                            <div class="essay-input-group">
-                                <label for="new_essay_type">
-                                    <i class="fas fa-tag"></i> タイプ
-                                </label>
-                                <select id="new_essay_type" name="type" required>
-                                    <option value="">選択してください</option>
-                                    <option value="A">タイプA (200字以上)</option>
-                                    <option value="B">タイプB (100-150字程度)</option>
-                                    <option value="C">タイプC (50-75字程度)</option>
-                                    <option value="D">タイプD (30字程度)</option>
-                                </select>
-                                <small class="essay-help-text">問題の文字数規模を選択</small>
-                            </div>
-
-                            <!-- 大学・年度行 -->
-                            <div class="essay-input-group">
-                                <label for="new_essay_university">
-                                    <i class="fas fa-university"></i> 大学名
-                                </label>
-                                <input type="text" id="new_essay_university" name="university" placeholder="例: 東京大学">
-                                <small class="essay-help-text">出題大学名（任意）</small>
-                            </div>
-
-                            <div class="essay-input-group">
-                                <label for="new_essay_year">
-                                    <i class="fas fa-calendar-alt"></i> 年度
-                                </label>
-                                <input type="number" id="new_essay_year" name="year" placeholder="2024" min="2000"
-                                    max="2030">
-                                <small class="essay-help-text">出題年度（任意）</small>
-                            </div>
-
-                            <!-- 問題文（全幅） -->
-                            <div class="essay-input-group essay-form-full-width">
-                                <label for="new_essay_question">
-                                    <i class="fas fa-question-circle"></i> 問題文
-                                </label>
-                                <textarea id="new_essay_question" name="question" class="essay-question-input"
-                                    placeholder="問題文を入力してください..." required></textarea>
-                                <small class="essay-help-text">出題する問題の内容を詳しく記入</small>
-                            </div>
-                            <!-- 問題画像アップロード -->
-                            <div class="essay-input-group essay-form-full-width">
-                                <label for="new_essay_image">
-                                    <i class="fas fa-image"></i> 問題画像（グラフ・地図等）
-                                </label>
-                                <input type="file" id="new_essay_image" name="image" accept="image/*"
-                                    onchange="previewImage(this)">
-                                <div id="imagePreview" class="mt-2"></div>
-                                <small class="essay-help-text">JPG、PNG、GIF形式の画像ファイル（任意）</small>
-                            </div>
-                            <!-- 解答（全幅） -->
-                            <div class="essay-input-group essay-form-full-width">
-                                <label for="new_essay_answer">
-                                    <i class="fas fa-lightbulb"></i> 模範解答
-                                </label>
-                                <div class="textarea-wrapper">
-                                    <textarea id="new_essay_answer" name="answer" class="essay-answer-input"
-                                        placeholder="模範解答を入力してください..."
-                                        oninput="updateAnswerCharCount('new_essay_answer', 'newAnswerCharCount')"></textarea>
-                                    <div class="char-counter" id="newAnswerCharCount">0字</div>
+                            <div class="upload-options">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="replaceExisting"
+                                        name="replace_existing">
+                                    <label class="form-check-label" for="replaceExisting">
+                                        <i class="fas fa-exclamation-triangle text-warning"></i>
+                                        既存の問題を置き換える（注意：全ての論述問題が削除されます）
+                                    </label>
                                 </div>
-                                <small class="essay-help-text">参考となる解答例（任意）</small>
                             </div>
-                        </div>
 
-                        <!-- 有効化チェックボックス -->
-                        <div class="essay-checkbox-group">
-                            <input type="checkbox" id="new_essay_enabled" name="enabled" checked>
-                            <label for="new_essay_enabled">
-                                <i class="fas fa-check-circle"></i> 有効にする
-                            </label>
-                        </div>
-
-                        <!-- 送信ボタン -->
-                        <button type="submit" class="essay-submit-btn">
-                            <i class="fas fa-plus"></i>
-                            <span class="btn-text">論述問題を追加</span>
-                        </button>
-                    </form>
-                </div>
-            </div>
-
-            <!-- 論述問題一覧・管理 -->
-            <div class="essay-management-section">
-                <h4><i class="fas fa-list"></i> 論述問題一覧・管理</h4>
-
-                <!-- フィルター -->
-                <div class="essay-filter-section">
-                    <div class="row">
-                        <div class="col-md-3">
-                            <label for="essayChapterFilter">章でフィルター:</label>
-                            <select id="essayChapterFilter" class="form-control" onchange="filterEssayProblems()">
-                                <option value="">全ての章</option>
-                                <option value="1">第1章</option>
-                                <option value="2">第2章</option>
-                                <option value="3">第3章</option>
-                                <option value="4">第4章</option>
-                                <option value="5">第5章</option>
-                                <option value="com">総合問題</option>
-                            </select>
-                        </div>
-                        <div class="col-md-3">
-                            <label for="essayTypeFilter">タイプでフィルター:</label>
-                            <select id="essayTypeFilter" class="form-control" onchange="filterEssayProblems()">
-                                <option value="">全てのタイプ</option>
-                                <option value="A">タイプA</option>
-                                <option value="B">タイプB</option>
-                                <option value="C">タイプC</option>
-                                <option value="D">タイプD</option>
-                            </select>
-                        </div>
-                        <div class="col-md-6">
-                            <label for="essaySearch">キーワード検索:</label>
-                            <input type="text" id="essaySearch" class="form-control" placeholder="問題文や大学名で検索（3文字以上）...">
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 問題一覧 -->
-                <div id="essay-problems-container">
-                    <div class="text-center text-muted p-4">
-                        <i class="fas fa-search fa-2x mb-3"></i><br>
-                        <strong>検索条件を指定してください</strong><br>
-                        <small>章、タイプ、またはキーワードを入力すると問題一覧が表示されます</small>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- ユーザー統計管理セクション -->
-<div class="admin-section">
-    <div class="section-header" data-bs-toggle="collapse" data-bs-target="#section-user-stats" aria-expanded="false">
-        <h3><i class="fas fa-chart-bar"></i> ユーザー統計管理 <i class="fas fa-chevron-down toggle-icon"></i></h3>
-    </div>
-    <div class="collapse" id="section-user-stats">
-        <div class="section-content">
-            <p>事前計算されたユーザー統計の状態確認・修復を行います。</p>
-
-            <!-- 統計状態確認 -->
-            <div class="admin-panel"
-                style="background-color: #e8f5e8; border-left: 5px solid #28a745; margin-bottom: 20px;">
-                <h4>📈 統計データ状態確認</h4>
-                <p>ユーザー統計の整合性と最新性を確認します。<br>
-                    <strong>推奨：</strong>新しいユーザーを追加した後や、データに不整合がある場合に実行してください。
-                </p>
-
-                <div style="margin-top: 15px;">
-                    <button type="button" class="btn btn-info" onclick="checkUserStats()">
-                        <i class="fas fa-chart-line"></i> 📊 統計状態を確認
-                    </button>
-
-                    <button type="button" class="btn btn-success" onclick="repairUserStats()"
-                        style="margin-left: 10px;">
-                        <i class="fas fa-tools"></i> 🔧 統計データを修復
-                    </button>
-
-                    <button type="button" class="btn btn-warning" onclick="initializeAllStats()"
-                        style="margin-left: 10px;">
-                        <i class="fas fa-sync-alt"></i> 🔄 全統計を強制再初期化
-                    </button>
-                </div>
-            </div>
-
-            <!-- 統計確認結果表示エリア -->
-            <div id="statsCheckResult" style="margin-top: 15px; display: none;">
-                <h5>📊 統計状態確認結果</h5>
-                <div id="statsCheckContent"
-                    style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; border: 1px solid #dee2e6;">
-                    <!-- 確認結果がここに表示されます -->
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- データベース管理セクション -->
-<div class="admin-section">
-    <div class="section-header" data-bs-toggle="collapse" data-bs-target="#section-database-management"
-        aria-expanded="false">
-        <h3><i class="fas fa-database"></i> データベース管理 <i class="fas fa-chevron-down toggle-icon"></i></h3>
-    </div>
-    <div class="collapse" id="section-database-management">
-        <div class="section-content">
-            <p>学習履歴データの整合性確認とデータクリーンアップを行います。</p>
-
-            <!-- 孤立したトークンのクリーンアップ -->
-            <div class="admin-panel"
-                style="background-color: #fff3cd; border-left: 5px solid #ffc107; margin-bottom: 20px;">
-                <h4>🧹 孤立データのクリーンアップ</h4>
-                <p>削除されたユーザーに関連する古いパスワードリセットトークンを削除します。<br>
-                    <strong>推奨：</strong>ユーザー削除後やメンテナンス時に実行してください。
-                </p>
-
-                <div style="margin-top: 15px;">
-                    <button type="button" class="btn btn-warning" onclick="cleanupOrphanedTokens()">
-                        <i class="fas fa-broom"></i> 🧹 孤立したトークンを削除
-                    </button>
-
-                    <button type="button" class="btn btn-info" onclick="checkDatabaseStatus()"
-                        style="margin-left: 10px;">
-                        <i class="fas fa-search"></i> 📊 データベース状態確認
-                    </button>
-                </div>
-            </div>
-
-            <div class="admin-panel"
-                style="background-color: #fff8e1; border-left: 5px solid #ff9800; margin-bottom: 20px;">
-                <h4>🗑️ ID不一致履歴の削除</h4>
-                <p>現在の問題データと一致しない古い学習履歴を削除します。<br>
-                    <strong>用途：</strong>問題文修正後に古いIDの履歴を削除する場合に使用。<br>
-                    <strong>⚠️ 注意：</strong>削除された履歴は復元できません。
-                </p>
-
-                <div style="margin-top: 15px;">
-
-                    <button type="button" class="btn btn-warning" onclick="cleanInvalidHistory()"
-                        style="margin-left: 10px;">
-                        <i class="fas fa-trash-alt"></i> 🗑️ 無効履歴を削除
-                    </button>
-                </div>
-
-                <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #ddd;">
-                    <h5>🔍 特定ユーザーのデバッグ</h5>
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="input-group">
-                                <input type="text" id="debugUsername" class="form-control" placeholder="ユーザー名を入力">
-
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <button type="button" class="btn btn-danger btn-sm" onclick="forceCleanSpecificUser()">
-                                <i class="fas fa-exclamation-triangle"></i> 強制削除
+                            <button type="submit" class="btn btn-success btn-upload">
+                                <i class="fas fa-upload"></i>
+                                <span>論述問題CSV一括インポート</span>
                             </button>
-                            <small class="text-muted d-block">※上記でユーザー名を入力後に使用</small>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- 個別論述問題登録 -->
+                <div class="essay-form-section">
+                    <h4><i class="fas fa-plus-circle"></i> 個別論述問題登録</h4>
+
+                    <div class="essay-form-container">
+                        <form id="newEssayProblemForm" class="essay-registration-form" enctype="multipart/form-data">
+                            <div class="essay-form-grid">
+                                <!-- 章・タイプ行 -->
+                                <div class="essay-input-group">
+                                    <label for="new_essay_chapter">
+                                        <i class="fas fa-bookmark"></i> 章
+                                    </label>
+                                    <input type="text" id="new_essay_chapter" name="chapter" placeholder="例: 1, 2, com"
+                                        required>
+                                    <small class="essay-help-text">数字または「com」（総合問題）を入力</small>
+                                </div>
+
+                                <div class="essay-input-group">
+                                    <label for="new_essay_type">
+                                        <i class="fas fa-tag"></i> タイプ
+                                    </label>
+                                    <select id="new_essay_type" name="type" required>
+                                        <option value="">選択してください</option>
+                                        <option value="A">タイプA (200字以上)</option>
+                                        <option value="B">タイプB (100-150字程度)</option>
+                                        <option value="C">タイプC (50-75字程度)</option>
+                                        <option value="D">タイプD (30字程度)</option>
+                                    </select>
+                                    <small class="essay-help-text">問題の文字数規模を選択</small>
+                                </div>
+
+                                <!-- 大学・年度行 -->
+                                <div class="essay-input-group">
+                                    <label for="new_essay_university">
+                                        <i class="fas fa-university"></i> 大学名
+                                    </label>
+                                    <input type="text" id="new_essay_university" name="university"
+                                        placeholder="例: 東京大学">
+                                    <small class="essay-help-text">出題大学名（任意）</small>
+                                </div>
+
+                                <div class="essay-input-group">
+                                    <label for="new_essay_year">
+                                        <i class="fas fa-calendar-alt"></i> 年度
+                                    </label>
+                                    <input type="number" id="new_essay_year" name="year" placeholder="2024" min="2000"
+                                        max="2030">
+                                    <small class="essay-help-text">出題年度（任意）</small>
+                                </div>
+
+                                <!-- 問題文（全幅） -->
+                                <div class="essay-input-group essay-form-full-width">
+                                    <label for="new_essay_question">
+                                        <i class="fas fa-question-circle"></i> 問題文
+                                    </label>
+                                    <textarea id="new_essay_question" name="question" class="essay-question-input"
+                                        placeholder="問題文を入力してください..." required></textarea>
+                                    <small class="essay-help-text">出題する問題の内容を詳しく記入</small>
+                                </div>
+                                <!-- 問題画像アップロード -->
+                                <div class="essay-input-group essay-form-full-width">
+                                    <label for="new_essay_image">
+                                        <i class="fas fa-image"></i> 問題画像（グラフ・地図等）
+                                    </label>
+                                    <input type="file" id="new_essay_image" name="image" accept="image/*"
+                                        onchange="previewImage(this)">
+                                    <div id="imagePreview" class="mt-2"></div>
+                                    <small class="essay-help-text">JPG、PNG、GIF形式の画像ファイル（任意）</small>
+                                </div>
+                                <!-- 解答（全幅） -->
+                                <div class="essay-input-group essay-form-full-width">
+                                    <label for="new_essay_answer">
+                                        <i class="fas fa-lightbulb"></i> 模範解答
+                                    </label>
+                                    <div class="textarea-wrapper">
+                                        <textarea id="new_essay_answer" name="answer" class="essay-answer-input"
+                                            placeholder="模範解答を入力してください..."
+                                            oninput="updateAnswerCharCount('new_essay_answer', 'newAnswerCharCount')"></textarea>
+                                        <div class="char-counter" id="newAnswerCharCount">0字</div>
+                                    </div>
+                                    <small class="essay-help-text">参考となる解答例（任意）</small>
+                                </div>
+                            </div>
+
+                            <!-- 有効化チェックボックス -->
+                            <div class="essay-checkbox-group">
+                                <input type="checkbox" id="new_essay_enabled" name="enabled" checked>
+                                <label for="new_essay_enabled">
+                                    <i class="fas fa-check-circle"></i> 有効にする
+                                </label>
+                            </div>
+
+                            <!-- 送信ボタン -->
+                            <button type="submit" class="essay-submit-btn">
+                                <i class="fas fa-plus"></i>
+                                <span class="btn-text">論述問題を追加</span>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- 論述問題一覧・管理 -->
+                <div class="essay-management-section">
+                    <h4><i class="fas fa-list"></i> 論述問題一覧・管理</h4>
+
+                    <!-- フィルター -->
+                    <div class="essay-filter-section">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <label for="essayChapterFilter">章でフィルター:</label>
+                                <select id="essayChapterFilter" class="form-control" onchange="filterEssayProblems()">
+                                    <option value="">全ての章</option>
+                                    <option value="1">第1章</option>
+                                    <option value="2">第2章</option>
+                                    <option value="3">第3章</option>
+                                    <option value="4">第4章</option>
+                                    <option value="5">第5章</option>
+                                    <option value="com">総合問題</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label for="essayTypeFilter">タイプでフィルター:</label>
+                                <select id="essayTypeFilter" class="form-control" onchange="filterEssayProblems()">
+                                    <option value="">全てのタイプ</option>
+                                    <option value="A">タイプA</option>
+                                    <option value="B">タイプB</option>
+                                    <option value="C">タイプC</option>
+                                    <option value="D">タイプD</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="essaySearch">キーワード検索:</label>
+                                <input type="text" id="essaySearch" class="form-control"
+                                    placeholder="問題文や大学名で検索（3文字以上）...">
+                            </div>
                         </div>
                     </div>
-                </div>
 
-                <!-- 無効履歴分析結果表示エリア -->
-                <div id="invalidHistoryAnalysisResult" style="margin-top: 15px; display: none;">
-                    <h5>📊 無効履歴分析結果</h5>
-                    <div id="invalidAnalysisContent"
-                        style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; border: 1px solid #dee2e6;">
-                        <!-- 分析結果がここに表示されます -->
+                    <!-- 問題一覧 -->
+                    <div id="essay-problems-container">
+                        <div class="text-center text-muted p-4">
+                            <i class="fas fa-search fa-2x mb-3"></i><br>
+                            <strong>検索条件を指定してください</strong><br>
+                            <small>章、タイプ、またはキーワードを入力すると問題一覧が表示されます</small>
+                        </div>
                     </div>
-                </div>
-
-                <!-- デバッグ結果表示エリア -->
-                <div id="userDebugResult" style="margin-top: 15px; display: none;">
-                    <h5>🔍 ユーザーデバッグ結果</h5>
-                    <div id="debugContent"
-                        style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; border: 1px solid #dee2e6;">
-                        <!-- デバッグ結果がここに表示されます -->
-                    </div>
-                </div>
-            </div>
-
-            <!-- 全データ修正（従来機能・バックアップ用） -->
-            <div class="admin-panel"
-                style="background-color: #ffebee; border-left: 5px solid #f44336; margin-top: 20px;">
-                <h4>⚠️ 全データ修正（バックアップ用）</h4>
-                <p>全ユーザーの学習履歴を強制的に新しいID形式に統一します。<br>
-                    <strong>⚠️ 注意：</strong>この操作は全ユーザーの学習履歴に影響し、元に戻せません。<br>
-                    <strong>推奨：</strong>通常は上記の「ID不一致問題のみ修正」を使用してください。
-                </p>
-
-                <div style="margin-top: 15px;">
-                    <form action="{{ url_for('admin_fix_all_data_legacy') }}" method="POST" style="display: inline;"
-                        onsubmit="return confirm('全ユーザーデータを修正しますか？\n\n⚠️ この操作は元に戻せません。\n⚠️ すべての学習履歴が新しい形式に変換されます。\n⚠️ 通常は「ID不一致問題のみ修正」で十分です。\n\n本当に実行しますか？')">
-                        <button type="submit" class="btn btn-danger">
-                            <i class="fas fa-exclamation-triangle"></i> ⚠️ 全データ強制修正（非推奨）
-                        </button>
-                    </form>
-
-                    <a href="{{ url_for('admin_debug_progress') }}" class="btn btn-info" target="_blank"
-                        style="margin-left: 10px;">
-                        <i class="fas fa-chart-line"></i> 📊 修正前の状態確認
-                    </a>
                 </div>
             </div>
         </div>
     </div>
-</div>
+
+    <!-- ユーザー統計管理セクション -->
+    <div class="admin-section">
+        <div class="section-header" data-bs-toggle="collapse" data-bs-target="#section-user-stats"
+            aria-expanded="false">
+            <h3><i class="fas fa-chart-bar"></i> ユーザー統計管理 <i class="fas fa-chevron-down toggle-icon"></i></h3>
+        </div>
+        <div class="collapse" id="section-user-stats">
+            <div class="section-content">
+                <p>事前計算されたユーザー統計の状態確認・修復を行います。</p>
+
+                <!-- 統計状態確認 -->
+                <div class="admin-panel"
+                    style="background-color: #e8f5e8; border-left: 5px solid #28a745; margin-bottom: 20px;">
+                    <h4>📈 統計データ状態確認</h4>
+                    <p>ユーザー統計の整合性と最新性を確認します。<br>
+                        <strong>推奨：</strong>新しいユーザーを追加した後や、データに不整合がある場合に実行してください。
+                    </p>
+
+                    <div style="margin-top: 15px;">
+                        <button type="button" class="btn btn-info" onclick="checkUserStats()">
+                            <i class="fas fa-chart-line"></i> 📊 統計状態を確認
+                        </button>
+
+                        <button type="button" class="btn btn-success" onclick="repairUserStats()"
+                            style="margin-left: 10px;">
+                            <i class="fas fa-tools"></i> 🔧 統計データを修復
+                        </button>
+
+                        <button type="button" class="btn btn-warning" onclick="initializeAllStats()"
+                            style="margin-left: 10px;">
+                            <i class="fas fa-sync-alt"></i> 🔄 全統計を強制再初期化
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 統計確認結果表示エリア -->
+                <div id="statsCheckResult" style="margin-top: 15px; display: none;">
+                    <h5>📊 統計状態確認結果</h5>
+                    <div id="statsCheckContent"
+                        style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; border: 1px solid #dee2e6;">
+                        <!-- 確認結果がここに表示されます -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- データベース管理セクション -->
+    <div class="admin-section">
+        <div class="section-header" data-bs-toggle="collapse" data-bs-target="#section-database-management"
+            aria-expanded="false">
+            <h3><i class="fas fa-database"></i> データベース管理 <i class="fas fa-chevron-down toggle-icon"></i></h3>
+        </div>
+        <div class="collapse" id="section-database-management">
+            <div class="section-content">
+                <p>学習履歴データの整合性確認とデータクリーンアップを行います。</p>
+
+                <!-- 孤立したトークンのクリーンアップ -->
+                <div class="admin-panel"
+                    style="background-color: #fff3cd; border-left: 5px solid #ffc107; margin-bottom: 20px;">
+                    <h4>🧹 孤立データのクリーンアップ</h4>
+                    <p>削除されたユーザーに関連する古いパスワードリセットトークンを削除します。<br>
+                        <strong>推奨：</strong>ユーザー削除後やメンテナンス時に実行してください。
+                    </p>
+
+                    <div style="margin-top: 15px;">
+                        <button type="button" class="btn btn-warning" onclick="cleanupOrphanedTokens()">
+                            <i class="fas fa-broom"></i> 🧹 孤立したトークンを削除
+                        </button>
+
+                        <button type="button" class="btn btn-info" onclick="checkDatabaseStatus()"
+                            style="margin-left: 10px;">
+                            <i class="fas fa-search"></i> 📊 データベース状態確認
+                        </button>
+                    </div>
+                </div>
+
+                <div class="admin-panel"
+                    style="background-color: #fff8e1; border-left: 5px solid #ff9800; margin-bottom: 20px;">
+                    <h4>🗑️ ID不一致履歴の削除</h4>
+                    <p>現在の問題データと一致しない古い学習履歴を削除します。<br>
+                        <strong>用途：</strong>問題文修正後に古いIDの履歴を削除する場合に使用。<br>
+                        <strong>⚠️ 注意：</strong>削除された履歴は復元できません。
+                    </p>
+
+                    <div style="margin-top: 15px;">
+
+                        <button type="button" class="btn btn-warning" onclick="cleanInvalidHistory()"
+                            style="margin-left: 10px;">
+                            <i class="fas fa-trash-alt"></i> 🗑️ 無効履歴を削除
+                        </button>
+                    </div>
+
+                    <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #ddd;">
+                        <h5>🔍 特定ユーザーのデバッグ</h5>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="input-group">
+                                    <input type="text" id="debugUsername" class="form-control" placeholder="ユーザー名を入力">
+
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <button type="button" class="btn btn-danger btn-sm" onclick="forceCleanSpecificUser()">
+                                    <i class="fas fa-exclamation-triangle"></i> 強制削除
+                                </button>
+                                <small class="text-muted d-block">※上記でユーザー名を入力後に使用</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 無効履歴分析結果表示エリア -->
+                    <div id="invalidHistoryAnalysisResult" style="margin-top: 15px; display: none;">
+                        <h5>📊 無効履歴分析結果</h5>
+                        <div id="invalidAnalysisContent"
+                            style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; border: 1px solid #dee2e6;">
+                            <!-- 分析結果がここに表示されます -->
+                        </div>
+                    </div>
+
+                    <!-- デバッグ結果表示エリア -->
+                    <div id="userDebugResult" style="margin-top: 15px; display: none;">
+                        <h5>🔍 ユーザーデバッグ結果</h5>
+                        <div id="debugContent"
+                            style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; border: 1px solid #dee2e6;">
+                            <!-- デバッグ結果がここに表示されます -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 全データ修正（従来機能・バックアップ用） -->
+                <div class="admin-panel"
+                    style="background-color: #ffebee; border-left: 5px solid #f44336; margin-top: 20px;">
+                    <h4>⚠️ 全データ修正（バックアップ用）</h4>
+                    <p>全ユーザーの学習履歴を強制的に新しいID形式に統一します。<br>
+                        <strong>⚠️ 注意：</strong>この操作は全ユーザーの学習履歴に影響し、元に戻せません。<br>
+                        <strong>推奨：</strong>通常は上記の「ID不一致問題のみ修正」を使用してください。
+                    </p>
+
+                    <div style="margin-top: 15px;">
+                        <form action="{{ url_for('admin_fix_all_data_legacy') }}" method="POST" style="display: inline;"
+                            onsubmit="return confirm('全ユーザーデータを修正しますか？\n\n⚠️ この操作は元に戻せません。\n⚠️ すべての学習履歴が新しい形式に変換されます。\n⚠️ 通常は「ID不一致問題のみ修正」で十分です。\n\n本当に実行しますか？')">
+                            <button type="submit" class="btn btn-danger">
+                                <i class="fas fa-exclamation-triangle"></i> ⚠️ 全データ強制修正（非推奨）
+                            </button>
+                        </form>
+
+                        <a href="{{ url_for('admin_debug_progress') }}" class="btn btn-info" target="_blank"
+                            style="margin-left: 10px;">
+                            <i class="fas fa-chart-line"></i> 📊 修正前の状態確認
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <!-- Edit RPG Enemy Modal -->
