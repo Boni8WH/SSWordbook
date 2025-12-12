@@ -13358,22 +13358,24 @@ def status():
     all_badges = []
     
     for enemy in enemies:
-        is_earned = enemy.id in cleared_set
+        # Check both int and str to be robust
+        is_earned = enemy.id in cleared_set or str(enemy.id) in cleared_set
         
         # アイコンのパス調整
-        # Priority: Defeated Image (討伐後画像) > Badge Image (称号アイコン) > Fallback
-        badge_icon_source = enemy.defeated_image if enemy.defeated_image else enemy.badge_image
-        badge_icon = badge_icon_source if badge_icon_source else 'fas fa-medal'
+        # Priority: Defeated Image (討伐後画像) > Badge Image (称号アイコン)
+        # 修正: serve_rpg_image経由のURLを使用する
+        badge_icon_url = url_for('serve_rpg_image', enemy_id=enemy.id, image_type='badge') if enemy.badge_image else None
+        defeated_icon_url = url_for('serve_rpg_image', enemy_id=enemy.id, image_type='defeated') if enemy.defeated_image else None
         
-        final_badge_icon = badge_icon
-        if not badge_icon.startswith('fa') and not badge_icon.startswith('http') and not badge_icon.startswith('/'):
-             final_badge_icon = f"/static/images/rpg/{badge_icon}"
+        final_badge_icon = defeated_icon_url if enemy.defeated_image else (badge_icon_url if enemy.badge_image else 'fas fa-medal')
+        
+        # FontAwesomeクラスの場合のフォールバック (badge_imageが 'fa-' で始まる場合など)
+        if enemy.badge_image and not enemy.badge_image.startswith('http') and not enemy.badge_image.startswith('/') and not '.' in enemy.badge_image and ' ' in enemy.badge_image:
+             # FAクラスとみなす (簡易判定)
+             final_badge_icon = enemy.badge_image
 
         # ボスアイコンも同様
-        boss_icon = enemy.icon_image if enemy.icon_image else 'None'
-        final_boss_icon = boss_icon
-        if boss_icon and boss_icon != 'None' and not boss_icon.startswith('http') and not boss_icon.startswith('/'):
-            final_boss_icon = f"/static/images/rpg/{boss_icon}"
+        final_boss_icon = url_for('serve_rpg_image', enemy_id=enemy.id, image_type='icon') if enemy.icon_image else 'None'
 
         all_badges.append({
             'name': enemy.badge_name,
@@ -13384,22 +13386,6 @@ def status():
             'boss_icon': final_boss_icon,
             'boss_description': enemy.description # モーダル表示用（テンプレート変数を合わせる必要あり）
         })
-        # Note: テンプレートのonclickで `badge.description` を渡しているが、これはモーダルの説明文になる。
-        # Step 408の変更を見ると:
-        # onclick="showMonsterDetail('{{ badge.name }}', '{{ badge.description }}', ...)"
-        # カードテキストは:
-        # {{ badge.description if badge.earned else '未獲得' }}
-        # 問題: カードテキストとモーダルテキストを分けたいが、テンプレートは `badge.description` を両方に使っている。
-        # テンプレートを修正するのは面倒（またreplace_file_contentが必要）。
-        # ここでは `description` に `enemy.description` (豆知識) を入れることにする。
-        # カードテキストが長くなるかもしれないが、それが「豆知識」ならカード内でも見えて良いのでは？
-        # あるいは、テンプレートで `badge.boss_description` を使うように修正すべきか？
-        # ユーザー要望: "statusの画面で、討伐した敵の情報を見られる...豆知識です"
-        # カードには短い説明、クリックで詳細（豆知識）が自然。
-        # しかしテンプレート修正コストを避けるため、一旦 `description` に豆知識を入れる。
-        # もしカードからはみ出るならCSSで省略される（現状のCSS次第だが）。
-        # よし、`description` = `enemy.description` にしよう。
-        
         all_badges[-1]['description'] = enemy.description if enemy.description else f"{enemy.name}のデータ"
 
     # 既存のボーナスなど
