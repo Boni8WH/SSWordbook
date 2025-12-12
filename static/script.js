@@ -3374,13 +3374,12 @@ function finishRpgGame(isWin) {
         title.style.color = isWin ? "#f1c40f" : "#e74c3c";
     }
 
-    if (isWin) {
-        if (winContent) winContent.classList.remove('hidden');
-        if (loseContent) loseContent.classList.add('hidden');
-    } else {
-        if (winContent) winContent.classList.add('hidden');
-        if (loseContent) loseContent.classList.remove('hidden');
-    }
+    // Hide content initially to prevent flickering
+    if (winContent) winContent.classList.add('hidden');
+    if (loseContent) loseContent.classList.add('hidden');
+
+    // Show Loading or just wait
+    // (Optional: Add a spinner if delay is long, but for now just wait)
 
     // Send result
     fetch('/api/rpg/result', {
@@ -3410,10 +3409,25 @@ function finishRpgGame(isWin) {
                             if (winDialog) winDialog.textContent = `"${data.defeat_dialogue}"`;
                         }
                     }
+                    // Show Win Content AFTER data population
+                    if (winContent) winContent.classList.remove('hidden');
                 } else {
                     // Lose
                     checkRpgStatus(); // Hide banner since it's now cooldown
+                    // Show Lose Content
+                    if (loseContent) loseContent.classList.remove('hidden');
                 }
+            } else {
+                console.error('RPG Result Error:', data.message);
+                // Fallback: Show content anyway if error?
+                if (isWin && winContent) winContent.classList.remove('hidden');
+                if (!isWin && loseContent) loseContent.classList.remove('hidden');
             }
+        })
+        .catch(err => {
+            console.error('RPG Result Network Error:', err);
+            // Fallback
+            if (isWin && winContent) winContent.classList.remove('hidden');
+            if (!isWin && loseContent) loseContent.classList.remove('hidden');
         });
 }
