@@ -4924,6 +4924,7 @@ a.nav-link.btn.change-username-button:hover,
     color: #7f8c8d;
     font-style: italic;
 }
+
 /* =========================================
    RPG Mode Styles (Chronicle Quest)
    ========================================= */
@@ -5015,7 +5016,7 @@ a.nav-link.btn.change-username-button:hover,
     color: white;
     overflow: hidden;
     position: relative;
-    box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);
     max-height: 90vh;
     overflow-y: auto;
 }
@@ -5033,6 +5034,7 @@ a.nav-link.btn.change-username-button:hover,
 .rpg-header {
     margin-bottom: 20px;
 }
+
 .mission-tag {
     background: #e74c3c;
     padding: 2px 8px;
@@ -5041,6 +5043,7 @@ a.nav-link.btn.change-username-button:hover,
     font-weight: bold;
     letter-spacing: 1px;
 }
+
 .rpg-title {
     margin: 10px 0 0;
     font-size: 1.5rem;
@@ -5070,20 +5073,41 @@ a.nav-link.btn.change-username-button:hover,
     border: 2px solid #f1c40f;
     flex-shrink: 0;
 }
-.boss-img { width: 100%; height: 100%; object-fit: cover; }
-.boss-shadow { font-size: 2rem; color: #7f8c8d; }
 
-.boss-info { text-align: left; }
-.boss-info h3 { margin: 0; font-size: 1.2rem; color: #f1c40f; }
-.difficulty-stars { color: #f1c40f; font-size: 0.9rem; }
+.boss-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.boss-shadow {
+    font-size: 2rem;
+    color: #7f8c8d;
+}
+
+.boss-info {
+    text-align: left;
+}
+
+.boss-info h3 {
+    margin: 0;
+    font-size: 1.2rem;
+    color: #f1c40f;
+}
+
+.difficulty-stars {
+    color: #f1c40f;
+    font-size: 0.9rem;
+}
 
 .mission-details {
     width: 100%;
-    background: rgba(255,255,255,0.05);
+    background: rgba(255, 255, 255, 0.05);
     border-radius: 8px;
     padding: 15px;
     margin-bottom: 20px;
 }
+
 .rule-item {
     display: flex;
     align-items: center;
@@ -5092,7 +5116,10 @@ a.nav-link.btn.change-username-button:hover,
     font-size: 0.9rem;
     color: #bdc3c7;
 }
-.rule-item.warning { color: #e74c3c; }
+
+.rule-item.warning {
+    color: #e74c3c;
+}
 
 /* Buttons */
 .rpg-actions {
@@ -5100,6 +5127,7 @@ a.nav-link.btn.change-username-button:hover,
     gap: 10px;
     width: 100%;
 }
+
 .btn-rpg-primary {
     flex: 2;
     background: #e74c3c;
@@ -5110,6 +5138,7 @@ a.nav-link.btn.change-username-button:hover,
     font-weight: bold;
     font-size: 1rem;
 }
+
 .btn-rpg-secondary {
     flex: 1;
     background: transparent;
@@ -5124,12 +5153,14 @@ a.nav-link.btn.change-username-button:hover,
     width: 100%;
     margin-bottom: 20px;
 }
+
 .timer-container {
     display: flex;
     align-items: center;
     gap: 10px;
     margin-bottom: 10px;
 }
+
 .timer-bar-bg {
     flex: 1;
     height: 8px;
@@ -5137,6 +5168,7 @@ a.nav-link.btn.change-username-button:hover,
     border-radius: 4px;
     overflow: hidden;
 }
+
 .timer-bar-fill {
     height: 100%;
     background: #2ecc71;
@@ -5150,7 +5182,14 @@ a.nav-link.btn.change-username-button:hover,
     gap: 5px;
     align-items: stretch;
 }
-.hp-label { font-size: 0.8rem; font-weight: bold; color: #e74c3c; text-align: left;}
+
+.hp-label {
+    font-size: 0.8rem;
+    font-weight: bold;
+    color: #e74c3c;
+    text-align: left;
+}
+
 .hp-bar-bg {
     height: 15px;
     background: #34495e;
@@ -5158,11 +5197,12 @@ a.nav-link.btn.change-username-button:hover,
     overflow: hidden;
     border: 1px solid #c0392b;
 }
+
 .hp-bar-fill {
     height: 100%;
     background: #e74c3c;
     width: 100%;
-    box-shadow: inset 0 2px 0 rgba(255,255,255,0.3);
+    box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.3);
     transition: width 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
@@ -5170,6 +5210,7 @@ a.nav-link.btn.change-username-button:hover,
     width: 100%;
     margin-bottom: 20px;
 }
+
 .boss-avatar-battle {
     width: 100px;
     height: 100px;
@@ -5178,15 +5219,16 @@ a.nav-link.btn.change-username-button:hover,
     border-radius: 50%;
     overflow: visible;
 }
+
 .boss-img-small {
     width: 100%;
     height: 100%;
     object-fit: contain;
-    filter: drop-shadow(0 5px 15px rgba(0,0,0,0.5));
+    filter: drop-shadow(0 5px 15px rgba(0, 0, 0, 0.5));
 }
 
 .rpg-question-box {
-    background: rgba(255,255,255,0.1);
+    background: rgba(255, 255, 255, 0.1);
     padding: 15px;
     border-radius: 8px;
     min-height: 80px;
@@ -5203,6 +5245,7 @@ a.nav-link.btn.change-username-button:hover,
     gap: 10px;
     width: 100%;
 }
+
 .rpg-choice-btn {
     background: #34495e;
     color: white;
@@ -5213,9 +5256,18 @@ a.nav-link.btn.change-username-button:hover,
     min-height: 60px;
     transition: background 0.2s;
 }
-.rpg-choice-btn:active { background: #2c3e50; }
-.rpg-choice-btn.correct { background: #27ae60 !important; }
-.rpg-choice-btn.incorrect { background: #c0392b !important; }
+
+.rpg-choice-btn:active {
+    background: #2c3e50;
+}
+
+.rpg-choice-btn.correct {
+    background: #27ae60 !important;
+}
+
+.rpg-choice-btn.incorrect {
+    background: #c0392b !important;
+}
 
 /* Damage Effect */
 .damage-text {
@@ -5233,28 +5285,84 @@ a.nav-link.btn.change-username-button:hover,
 }
 
 /* Animations */
-@keyframes spin { 100% { transform: rotate(360deg); } }
-@keyframes blink { 50% { opacity: 0.5; } }
-@keyframes floatUp {
-    0% { transform: translate(-50%, -50%) scale(0.5); opacity: 1; }
-    50% { transform: translate(-50%, -80%) scale(1.5); opacity: 1; }
-    100% { transform: translate(-50%, -100%) scale(1.2); opacity: 0; }
-}
-@keyframes shake {
-    0% { transform: translate(1px, 1px) rotate(0deg); }
-    10% { transform: translate(-1px, -2px) rotate(-1deg); }
-    20% { transform: translate(-3px, 0px) rotate(1deg); }
-    30% { transform: translate(3px, 2px) rotate(0deg); }
-    40% { transform: translate(1px, -1px) rotate(1deg); }
-    50% { transform: translate(-1px, 2px) rotate(-1deg); }
-    60% { transform: translate(-3px, 1px) rotate(0deg); }
-    70% { transform: translate(3px, 1px) rotate(-1deg); }
-    80% { transform: translate(-1px, -1px) rotate(1deg); }
-    90% { transform: translate(1px, 2px) rotate(0deg); }
-    100% { transform: translate(1px, -2px) rotate(-1deg); }
+@keyframes spin {
+    100% {
+        transform: rotate(360deg);
+    }
 }
 
-.shake-anim { animation: shake 0.5s; }
+@keyframes blink {
+    50% {
+        opacity: 0.5;
+    }
+}
+
+@keyframes floatUp {
+    0% {
+        transform: translate(-50%, -50%) scale(0.5);
+        opacity: 1;
+    }
+
+    50% {
+        transform: translate(-50%, -80%) scale(1.5);
+        opacity: 1;
+    }
+
+    100% {
+        transform: translate(-50%, -100%) scale(1.2);
+        opacity: 0;
+    }
+}
+
+@keyframes shake {
+    0% {
+        transform: translate(1px, 1px) rotate(0deg);
+    }
+
+    10% {
+        transform: translate(-1px, -2px) rotate(-1deg);
+    }
+
+    20% {
+        transform: translate(-3px, 0px) rotate(1deg);
+    }
+
+    30% {
+        transform: translate(3px, 2px) rotate(0deg);
+    }
+
+    40% {
+        transform: translate(1px, -1px) rotate(1deg);
+    }
+
+    50% {
+        transform: translate(-1px, 2px) rotate(-1deg);
+    }
+
+    60% {
+        transform: translate(-3px, 1px) rotate(0deg);
+    }
+
+    70% {
+        transform: translate(3px, 1px) rotate(-1deg);
+    }
+
+    80% {
+        transform: translate(-1px, -1px) rotate(1deg);
+    }
+
+    90% {
+        transform: translate(1px, 2px) rotate(0deg);
+    }
+
+    100% {
+        transform: translate(1px, -2px) rotate(-1deg);
+    }
+}
+
+.shake-anim {
+    animation: shake 0.5s;
+}
 
 /* Result Screen */
 .reward-box {
@@ -5264,19 +5372,41 @@ a.nav-link.btn.change-username-button:hover,
     margin: 20px 0;
     width: 100%;
 }
+
 .reward-row {
     display: flex;
     align-items: center;
     gap: 15px;
     margin-bottom: 15px;
     padding-bottom: 10px;
-    border-bottom: 1px solid rgba(255,255,255,0.1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
-.reward-row:last-child { border: 0; margin: 0; }
-.reward-icon { font-size: 2rem; }
-.reward-info { display: flex; flex-direction: column; text-align: left; }
-.reward-label { font-size: 0.8rem; color: #bdc3c7; }
-.reward-value { font-size: 1.1rem; color: #f1c40f; font-weight: bold; }
+
+.reward-row:last-child {
+    border: 0;
+    margin: 0;
+}
+
+.reward-icon {
+    font-size: 2rem;
+}
+
+.reward-info {
+    display: flex;
+    flex-direction: column;
+    text-align: left;
+}
+
+.reward-label {
+    font-size: 0.8rem;
+    color: #bdc3c7;
+}
+
+.reward-value {
+    font-size: 1.1rem;
+    color: #f1c40f;
+    font-weight: bold;
+}
 
 .lose-message {
     padding: 30px;
@@ -5286,6 +5416,7 @@ a.nav-link.btn.change-username-button:hover,
     color: #e74c3c;
     margin-bottom: 20px;
 }
+
 .cooldown-notice {
     font-size: 0.9rem;
     margin-top: 10px;
@@ -5296,5 +5427,157 @@ a.nav-link.btn.change-username-button:hover,
     .rpg-choices-grid {
         grid-template-columns: 1fr;
     }
-    .rpg-choice-btn { min-height: 50px; }
+
+    .rpg-choice-btn {
+        min-height: 50px;
+    }
+}
+
+/* Boss Icon Fix: Background Transparency simulation */
+.boss-img {
+    mix-blend-mode: multiply;
+    /* 白背景を透過 */
+    display: block;
+    /* Absolute Positioning to cover everything */
+    position: relative;
+    z-index: 2;
+    /* Image on top */
+    margin: 0 auto;
+}
+
+.boss-img-small {
+    mix-blend-mode: multiply;
+}
+
+/* Boss Visual Container Adjustment for centering */
+.boss-visual {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+    padding: 0;
+    /* Remove padding to avoid shifting */
+    background: radial-gradient(circle, #fff 0%, #f0f0f0 100%);
+    /* 背景を少し明るくしてmultiplyを活かす */
+    border-radius: 50%;
+    width: 200px;
+    height: 200px;
+    margin: 0 auto;
+    overflow: hidden;
+    /* はみ出し防止 */
+    box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.1);
+}
+
+/* Fallback Shadow (The ? mark) */
+.boss-shadow {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 5rem;
+    color: #bdc3c7;
+    z-index: 1;
+    /* Behind image */
+    font-weight: bold;
+}
+
+/* Ensure image fits nicely */
+.boss-img {
+    max-width: 90%;
+    max-height: 90%;
+    object-fit: contain;
+}
+
+/* Battle Boss Avatar */
+.boss-avatar-battle {
+    width: 120px;
+    height: 120px;
+    margin: 0 auto 10px;
+    position: relative;
+    /* 背景透過効果のため */
+    border-radius: 50%;
+    background: radial-gradient(circle, #fff 0%, #eee 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.boss-img-small {
+    max-width: 90%;
+    max-height: 90%;
+    object-fit: contain;
+}
+/* =======================================
+   RPG Status Badge Styles
+   ======================================= */
+.badge-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    justify-content: center; /* Center badges if few */
+}
+
+/* Base style for mobile (default) - likely col-4 or col-6 equivalent */
+.badge-card {
+    background: #fff;
+    border: 1px solid #eee;
+    border-radius: 8px;
+    padding: 10px;
+    text-align: center;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    transition: transform 0.2s;
+    /* Default Bootstrap col logic handles width usually, but we enforce max-width for PC */
+}
+
+.badge-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+}
+
+.badge-icon-med {
+    font-size: 2.5em;
+    margin-bottom: 10px;
+    color: #bdc3c7; /* Default gray for unearned */
+    display: block;
+}
+
+.badge-name {
+    font-weight: bold;
+    font-size: 0.9em;
+    color: #7f8c8d;
+    margin-bottom: 5px;
+    display: block;
+}
+
+.badge-desc {
+    font-size: 0.75em;
+    color: #95a5a6;
+    line-height: 1.2;
+}
+
+/* Earned State */
+.badge-card.earned {
+    border-color: #f1c40f;
+    background: linear-gradient(to bottom right, #fff, #fffcf0);
+}
+
+.badge-card.earned .badge-icon-med {
+    color: #f1c40f; 
+    filter: drop-shadow(0 2px 4px rgba(243, 156, 18, 0.4));
+}
+
+.badge-card.earned .badge-name {
+    color: #d35400;
+}
+
+/* Desktop sizing fix */
+@media (min-width: 992px) {
+    .badge-card-wrapper {
+        flex: 0 0 18%; /* 5 items per row approx */
+        max-width: 180px; 
+    }
+    
+    .badge-icon-med {
+        font-size: 2.0em; /* Slightly smaller icon on desktop to reduce height */
+    }
 }
