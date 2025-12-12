@@ -13400,21 +13400,7 @@ def status():
                          cleared_count=cleared_count)
 
 
-if __name__ == '__main__':
 
-    try:
-        # サーバー起動
-        port = int(os.environ.get('PORT', 5001))
-        debug_mode = os.environ.get('RENDER') != 'true'
-        
-        logger.info(f"🌐 サーバーを起動します: http://0.0.0.0:{port}")
-        
-        app.run(host='0.0.0.0', port=port, debug=debug_mode)
-        
-    except Exception as e:
-        logger.error(f"💥 起動失敗: {e}")
-        import traceback
-        traceback.print_exc()
 
 @app.route('/admin/delete_room', methods=['POST'])
 def admin_delete_room():
@@ -14187,6 +14173,7 @@ def admin_delete_room_score():
     except Exception as e:
         db.session.rollback()
         return jsonify({'status': 'error', 'message': str(e)}), 500
+
 # ========================================================================
 # RPG Enemy Management Routes
 # ========================================================================
@@ -14305,15 +14292,15 @@ def admin_add_rpg_enemy():
         new_enemy = RpgEnemy(
             name=name,
             icon_image=icon_filename,
-            icon_image_content=icon_content,      # 🆕
-            icon_image_mimetype=icon_mimetype,    # 🆕
+            icon_image_content=icon_content,
+            icon_image_mimetype=icon_mimetype,
             badge_name=request.form.get('badge_name', 'Unknown Badge'),
             badge_image=badge_filename_or_class,
-            badge_image_content=badge_content,    # 🆕
-            badge_image_mimetype=badge_mimetype,  # 🆕
-            defeated_image=defeated_filename,     # 🆕
-            defeated_image_content=defeated_content, # 🆕
-            defeated_image_mimetype=defeated_mimetype, # 🆕
+            badge_image_content=badge_content,
+            badge_image_mimetype=badge_mimetype,
+            defeated_image=defeated_filename,
+            defeated_image_content=defeated_content,
+            defeated_image_mimetype=defeated_mimetype,
             difficulty=int(request.form.get('difficulty', 1)),
             description=request.form.get('description'),
             intro_dialogue=request.form.get('intro_dialogue'),
@@ -14513,3 +14500,55 @@ def admin_edit_rpg_enemy(enemy_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'status': 'error', 'message': str(e)}), 500
+
+# === Auto Migration ===
+def check_and_migrate_rpg_columns():
+    """Ensure rpg_enemy table has defeated_image columns."""
+    from sqlalchemy import text, inspect
+    with app.app_context():
+        try:
+            inspector = inspect(db.engine)
+            if not inspector.has_table('rpg_enemy'):
+                return
+            
+            columns = [c['name'] for c in inspector.get_columns('rpg_enemy')]
+            
+            with db.engine.connect() as conn:
+                if 'defeated_image' not in columns:
+                    print("Migrating: Adding defeated_image column")
+                    conn.execute(text("ALTER TABLE rpg_enemy ADD COLUMN defeated_image VARCHAR(255)"))
+                
+                if 'defeated_image_mimetype' not in columns:
+                    print("Migrating: Adding defeated_image_mimetype column")
+                    conn.execute(text("ALTER TABLE rpg_enemy ADD COLUMN defeated_image_mimetype VARCHAR(50)"))
+
+                if 'defeated_image_content' not in columns:
+                    print("Migrating: Adding defeated_image_content column")
+                    # Check dialect
+                    if db.engine.dialect.name == 'postgresql':
+                        conn.execute(text("ALTER TABLE rpg_enemy ADD COLUMN defeated_image_content BYTEA"))
+                    else:
+                        conn.execute(text("ALTER TABLE rpg_enemy ADD COLUMN defeated_image_content BLOB"))
+                
+                conn.commit()
+                print("Migration check completed.")
+        except Exception as e:
+            print(f"Migration check failed: {e}")
+
+# Run migration check on startup
+check_and_migrate_rpg_columns()
+
+if __name__ == '__main__':
+    try:
+        # サーバー起動
+        port = int(os.environ.get('PORT', 5001))
+        debug_mode = os.environ.get('RENDER') != 'true'
+        
+        logger.info(f"🌐 サーバーを起動します: http://0.0.0.0:{port}")
+        
+        app.run(host='0.0.0.0', port=port, debug=debug_mode)
+        
+    except Exception as e:
+        logger.error(f"💥 起動失敗: {e}")
+        import traceback
+        traceback.print_exc()
