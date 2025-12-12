@@ -328,26 +328,33 @@ class RpgEnemy(db.Model):
     __tablename__ = 'rpg_enemy'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
-    icon_image = db.Column(db.String(255), nullable=True)  # 画像ファイル名
-    badge_name = db.Column(db.String(100), nullable=False)
-    badge_image = db.Column(db.String(255), nullable=True) # 画像ファイル名 or FontAwesomeクラス
-    difficulty = db.Column(db.Integer, default=1, nullable=False) # 星の数 1-5
-    description = db.Column(db.Text, nullable=True)
-    intro_dialogue = db.Column(db.Text, nullable=True)
-    defeat_dialogue = db.Column(db.Text, nullable=True)
+    
+    # 画像関連 (ファイル名/URL + DB保存用バイナリ)
+    icon_image = db.Column(db.String(255)) # ファイル名またはURL
+    icon_image_content = db.Column(db.LargeBinary) # 🆕 DB保存用
+    icon_image_mimetype = db.Column(db.String(50)) # 🆕 MIMEタイプ
+    
+    badge_name = db.Column(db.String(100))
+    badge_image = db.Column(db.String(255)) # ファイル名またはFAクラス
+    badge_image_content = db.Column(db.LargeBinary) # 🆕 DB保存用
+    badge_image_mimetype = db.Column(db.String(50)) # 🆕 MIMEタイプ
+    
+    difficulty = db.Column(db.Integer, default=1)
+    description = db.Column(db.Text)
+    intro_dialogue = db.Column(db.Text)
+    defeat_dialogue = db.Column(db.Text)
     
     # クリア条件
-    time_limit = db.Column(db.Integer, default=60, nullable=False) # 秒
-    clear_correct_count = db.Column(db.Integer, default=10, nullable=False)
-    clear_max_mistakes = db.Column(db.Integer, default=2, nullable=False)
+    time_limit = db.Column(db.Integer, default=60)
+    clear_correct_count = db.Column(db.Integer, default=10)
+    clear_max_mistakes = db.Column(db.Integer, default=2)
     
-    # 管理用
-    is_active = db.Column(db.Boolean, default=True, nullable=False)
-    display_order = db.Column(db.Integer, default=0, nullable=False)
+    is_active = db.Column(db.Boolean, default=True)
+    display_order = db.Column(db.Integer, default=0)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))
     
     # 出現条件 (NEW)
-    appearance_required_score = db.Column(db.Integer, default=0, nullable=False) # 出現に必要な累計スコア
+    appearance_required_score = db.Column(db.Integer, default=0)
 
     def to_dict(self):
         return {
@@ -365,8 +372,48 @@ class RpgEnemy(db.Model):
             'clear_max_mistakes': self.clear_max_mistakes,
             'is_active': self.is_active,
             'display_order': self.display_order,
-            'appearance_required_score': self.appearance_required_score
+            'appearance_required_score': self.appearance_required_score,
+            # 🆕 画像配信用URL
+            'icon_url': url_for('serve_rpg_image', enemy_id=self.id, image_type='icon'),
+            'badge_url': url_for('serve_rpg_image', enemy_id=self.id, image_type='badge')
         }
+
+# Helper to determine database type for migrations
+def _is_postgres():
+    return db.engine.dialect.name == 'postgresql'
+
+def _add_rpg_image_columns_safe():
+    """RpgEnemyテーブルに画像保存用カラムを追加（安全版）"""
+    try:
+        with db.engine.connect() as conn:
+            inspector = inspect(db.engine)
+            columns = [col['name'] for col in inspector.get_columns('rpg_enemy')]
+            
+            is_postgres = _is_postgres()
+
+            if 'icon_image_content' not in columns:
+                print("🔄 RpgEnemy: icon_image_contentを追加")
+                col_type = "BYTEA" if is_postgres else "BLOB"
+                conn.execute(text(f"ALTER TABLE rpg_enemy ADD COLUMN icon_image_content {col_type}"))
+                
+            if 'icon_image_mimetype' not in columns:
+                print("🔄 RpgEnemy: icon_image_mimetypeを追加")
+                conn.execute(text("ALTER TABLE rpg_enemy ADD COLUMN icon_image_mimetype VARCHAR(50)"))
+
+            if 'badge_image_content' not in columns:
+                print("🔄 RpgEnemy: badge_image_contentを追加")
+                col_type = "BYTEA" if is_postgres else "BLOB"
+                conn.execute(text(f"ALTER TABLE rpg_enemy ADD COLUMN badge_image_content {col_type}"))
+
+            if 'badge_image_mimetype' not in columns:
+                print("🔄 RpgEnemy: badge_image_mimetypeを追加")
+                conn.execute(text("ALTER TABLE rpg_enemy ADD COLUMN badge_image_mimetype VARCHAR(50)"))
+                
+            conn.commit()
+            print("✅ RpgEnemyカラム追加完了")
+            
+    except Exception as e:
+        print(f"⚠️ RpgEnemy migration warning: {e}")
 
 def _add_score_column_to_rpg_enemy():
     """RpgEnemyテーブルにappearance_required_scoreカラムを追加するマイグレーション関数"""
@@ -2449,6 +2496,7 @@ def create_tables_and_admin_user():
             try:
                 # ★マイグレーション実行
                 _add_logo_columns_to_app_info()
+                _add_rpg_image_columns_safe() # 🆕
                 
                 app_info = AppInfo.get_current_info()
                 logger.info("✅ アプリ情報を確認/作成しました")
@@ -2461,6 +2509,57 @@ def create_tables_and_admin_user():
     except Exception as e:
         logger.error(f"❌ データベース初期化エラー: {e}")
         raise
+
+@app.route('/api/rpg/image/<int:enemy_id>/<string:image_type>')
+def serve_rpg_image(enemy_id, image_type):
+    """
+    RPG敵キャラの画像（アイコン/バッジ）をDBから配信する
+    image_type: 'icon' or 'badge'
+    """
+    try:
+        enemy = RpgEnemy.query.get(enemy_id)
+        if not enemy:
+            return "", 404
+            
+        content = None
+        mimetype = None
+        filename = None
+        
+        if image_type == 'icon':
+            content = enemy.icon_image_content
+            mimetype = enemy.icon_image_mimetype
+            filename = enemy.icon_image
+        elif image_type == 'badge':
+            content = enemy.badge_image_content
+            mimetype = enemy.badge_image_mimetype
+            filename = enemy.badge_image
+        else:
+            return "", 400
+            
+        # 1. DBにバイナリがあればそれを返す
+        if content:
+            response = make_response(content)
+            response.headers.set('Content-Type', mimetype or 'image/png')
+            # キャッシュ制御 (任意)
+            response.headers.set('Cache-Control', 'public, max-age=3600')
+            return response
+            
+        # 2. DBになければ、従来のファイルパス/URLを確認
+        # filenameがURL(http...)ならリダイレクト
+        if filename and (filename.startswith('http://') or filename.startswith('https://')):
+            return redirect(filename)
+            
+        # 3. ローカルファイルの場合 (static/images/rpg/)
+        if filename:
+            # セキュリティのためファイル名のみ抽出
+            secure_name = secure_filename(os.path.basename(filename))
+            return redirect(url_for('static', filename=f'images/rpg/{secure_name}'))
+            
+        return "", 404
+        
+    except Exception as e:
+        print(f"Error serving RPG image: {e}")
+        return "", 500
 
 def create_essay_visibility_table_auto():
     """essay_visibility_settingテーブルを自動作成"""
@@ -12986,7 +13085,7 @@ def get_rpg_status():
         'is_cleared': False,
         'current_stage': target_boss.id,
         'boss_name': target_boss.name,
-        'boss_icon': target_boss.icon_image,
+        'boss_icon': url_for('serve_rpg_image', enemy_id=target_boss.id, image_type='icon'), # 🆕 DB経由のURLに変更
         'current_score': balance_score
     })
 
@@ -14066,46 +14165,60 @@ def get_user_total_score(user_id):
 @app.route('/admin/rpg/enemies/add', methods=['POST'])
 @admin_required
 def admin_add_rpg_enemy():
-    """RPG敵キャラ追加"""
+    """RPG敵キャラ追加（DB保存対応版）"""
     try:
         # フォームデータの取得
         name = request.form.get('name')
         if not name:
             return jsonify({'status': 'error', 'message': '名前は必須です'}), 400
             
-        # 画像アップロード処理 (S3優先)
+        # 画像アップロード処理
         icon_file = request.files.get('icon_image')
         badge_file = request.files.get('badge_image')
         
         icon_filename = None
+        icon_content = None
+        icon_mimetype = None
+        
         if icon_file and icon_file.filename:
             filename = secure_filename(icon_file.filename)
             unique_filename = f"rpg_enemy_{int(time.time())}_{filename}"
+            icon_mimetype = icon_file.mimetype
             
+            # DB保存用にデータを読み込む
+            icon_file.seek(0)
+            icon_content = icon_file.read()
+            
+            # フォールバック用にローカル保存（またはS3）
             # S3へアップロード
+            icon_file.seek(0) # 巻き戻し
             s3_url = upload_image_to_s3(icon_file, unique_filename, folder='rpg_images')
+            
             if s3_url:
-                icon_filename = unique_filename # S3の場合もファイル名を保存し、表示時にURL生成するか、URLそのものを保存するか検討。
-                # RpgEnemyモデルは `icon_image` (String 255) なので、S3の場合はフルURLでもファイル名でも良いが、
-                # 既存のロジック(statuc/images/...)と互換性を持たせるため、
-                # ここでは「ファイル名」を保存し、表示側で「http」で始まる場合はそのまま、そうでなければstaticからと判定するのが良いかも。
-                # ただし `upload_image_to_s3` はFull URLを返す。
-                # モデルの `icon_image` にFull URLを入れても良い。
                 icon_filename = s3_url # Full URL
             else:
-                # S3失敗/未設定時はローカル保存 (開発環境用)
+                # ローカル保存
                 upload_dir = os.path.join(app.root_path, 'static', 'images', 'rpg')
                 os.makedirs(upload_dir, exist_ok=True)
-                icon_file.seek(0) # S3アップロードで読み込まれている可能性があるため巻き戻し
+                icon_file.seek(0)
                 icon_file.save(os.path.join(upload_dir, unique_filename))
                 icon_filename = unique_filename
 
         badge_filename_or_class = request.form.get('badge_icon_class') # FontAwesomeの場合
+        badge_content = None
+        badge_mimetype = None
+        
         if badge_file and badge_file.filename:
             filename = secure_filename(badge_file.filename)
             unique_filename = f"rpg_badge_{int(time.time())}_{filename}"
+            badge_mimetype = badge_file.mimetype
+            
+            # DB保存用
+            badge_file.seek(0)
+            badge_content = badge_file.read()
             
             # S3へアップロード
+            badge_file.seek(0)
             s3_url = upload_image_to_s3(badge_file, unique_filename, folder='rpg_images')
             if s3_url:
                 badge_filename_or_class = s3_url # Full URL
@@ -14121,8 +14234,12 @@ def admin_add_rpg_enemy():
         new_enemy = RpgEnemy(
             name=name,
             icon_image=icon_filename,
+            icon_image_content=icon_content,      # 🆕
+            icon_image_mimetype=icon_mimetype,    # 🆕
             badge_name=request.form.get('badge_name', 'Unknown Badge'),
             badge_image=badge_filename_or_class,
+            badge_image_content=badge_content,    # 🆕
+            badge_image_mimetype=badge_mimetype,  # 🆕
             difficulty=int(request.form.get('difficulty', 1)),
             description=request.form.get('description'),
             intro_dialogue=request.form.get('intro_dialogue'),
