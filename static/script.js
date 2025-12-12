@@ -3119,7 +3119,7 @@ function openRpgIntro() {
             const shadow = img.parentElement.querySelector('.boss-shadow');
             if (shadow) shadow.style.display = 'none';
         };
-        img.src = "/static/images/boss_alexander.png";
+        // img.src assignment removed to rely on checkRpgStatus
     }
 }
 
