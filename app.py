@@ -12959,30 +12959,19 @@ def get_rpg_status():
     user_id = session['user_id']
     user_stats = UserStats.query.filter_by(user_id=user_id).first()
     
-    # 総合スコア1000未満なら非公開（開発中は緩和してもいいが仕様通りにする）
     balance_score = user_stats.balance_score if user_stats else 0
-    if balance_score < 1000:
-         return jsonify({'available': False, 'reason': 'score_low', 'current_score': balance_score})
+    # Removed hardcoded check for < 1000. RPG availability now depends on boss availability.
          
     rpg_state = RpgState.query.filter_by(user_id=user_id).first()
     
-    # クールダウンチェック
-    now = datetime.now(JST)
+    # クールタイム判定
     is_cooldown = False
     next_challenge_time = None
     
-    if rpg_state and rpg_state.last_challenge_at:
-        last_challenge = rpg_state.last_challenge_at.replace(tzinfo=JST) if rpg_state.last_challenge_at.tzinfo is None else rpg_state.last_challenge_at
-        
-        # 最後に挑戦した日の「次の朝7時」を計算
-        if last_challenge.hour < 7:
-            target_time = last_challenge.replace(hour=7, minute=0, second=0, microsecond=0)
-        else:
-            target_time = (last_challenge + timedelta(days=1)).replace(hour=7, minute=0, second=0, microsecond=0)
-            
-        if now < target_time:
+    if rpg_state and rpg_state.next_challenge_time:
+        if rpg_state.next_challenge_time > datetime.now(JST):
             is_cooldown = True
-            next_challenge_time = target_time.isoformat()
+            next_challenge_time = rpg_state.next_challenge_time.strftime('%Y-%m-%d %H:%M:%S')
             
     # 現在のボスを判定
     target_boss = get_current_boss(user_id, rpg_state)
@@ -13002,28 +12991,37 @@ def get_rpg_status():
     })
 
 def get_current_boss(user_id, rpg_state=None):
-    """ユーザーの状況に合わせて出現すべきボスを決定する"""
+    """
+    ユーザーの現在のスコアに基づいて出現すべきボスを判定する
+    """
     if not rpg_state:
         rpg_state = RpgState.query.filter_by(user_id=user_id).first()
         
-    total_score = get_user_total_score(user_id)
+    # use balance_score instead of monthly total score
+    user_stats = UserStats.query.filter_by(user_id=user_id).first()
+    current_score = user_stats.balance_score if user_stats else 0
+    
     cleared_stages = set(rpg_state.cleared_stages) if rpg_state else set()
     
-    # 有効かつスコア条件を満たす敵を取得
+    # 条件1: 有効(is_active)であること
+    # 条件2: 出現必要スコアを満たしていること (balance_score >= appearance_required_score)
     candidates = RpgEnemy.query.filter(
         RpgEnemy.is_active == True,
-        RpgEnemy.appearance_required_score <= total_score
+        RpgEnemy.appearance_required_score <= current_score
     ).order_by(RpgEnemy.display_order).all()
     
     if not candidates:
         return None
         
-    # 未クリアの最初の敵を探す
+    # 未クリアのボスの中で、diplay_order順に最初のボスを選択
     for enemy in candidates:
-        if enemy.id not in cleared_stages:
-            return enemy
+        if str(enemy.id) not in cleared_stages: # cleared_stages stores string IDs in JSON usually
+            # int/str mismatch check
+            if enemy.id not in cleared_stages and str(enemy.id) not in cleared_stages:
+                return enemy
             
-    # 全てクリア済みの場合は、候補の中からランダム（リプレイ）
+    # 全てクリア済みの場合は、候補の中からランダム（またはリプレイモード）
+    # ここではランダムに1体返す
     return random.choice(candidates)
 
 @app.route('/api/rpg/start', methods=['POST'])
