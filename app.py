@@ -13063,13 +13063,22 @@ def get_rpg_status():
          
     rpg_state = RpgState.query.filter_by(user_id=user_id).first()
     
-    # クールタイム判定
-    is_cooldown = False
-    next_challenge_time = None
-    
     if rpg_state and rpg_state.last_challenge_at:
-        # 12 hours cooldown from last challenge
-        cooldown_end = rpg_state.last_challenge_at + timedelta(hours=12)
+        last_challenge_at = rpg_state.last_challenge_at
+        if last_challenge_at.tzinfo is None:
+            last_challenge_at = JST.localize(last_challenge_at)
+            
+        # 翌朝7時までクールダウン
+        base_date = last_challenge_at.date()
+        target_7am_naive = datetime.combine(base_date, datetime.min.time()) + timedelta(hours=7)
+        # Assuming JST is pytz timezone, sanitize use of localize
+        target_7am = JST.localize(target_7am_naive)
+        
+        if last_challenge_at >= target_7am:
+            target_7am += timedelta(days=1)
+            
+        cooldown_end = target_7am
+        
         if cooldown_end > datetime.now(JST):
             is_cooldown = True
             next_challenge_time = cooldown_end.strftime('%Y-%m-%d %H:%M:%S')
