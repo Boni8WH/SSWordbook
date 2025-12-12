@@ -14335,7 +14335,6 @@ def admin_add_rpg_enemy():
             clear_correct_count=int(request.form.get('clear_correct_count', 10)),
             clear_max_mistakes=int(request.form.get('clear_max_mistakes', 2)),
             is_active=request.form.get('is_active') == 'true',
-            is_active=request.form.get('is_active') == 'true',
             display_order=final_display_order,
             appearance_required_score=appearance_score,
             is_manual_order=is_manual
