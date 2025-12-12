@@ -13120,6 +13120,10 @@ def get_rpg_status():
         'boss_name': target_boss.name,
         'boss_icon': url_for('serve_rpg_image', enemy_id=target_boss.id, image_type='icon'), # 🆕 DB経由のURLに変更
         'difficulty': target_boss.difficulty, # 🆕 難易度を追加
+        'intro_dialogue': target_boss.intro_dialogue, # 🆕 登場セリフ
+        'time_limit': target_boss.time_limit,
+        'clear_correct_count': target_boss.clear_correct_count,
+        'clear_max_mistakes': target_boss.clear_max_mistakes,
         'current_score': balance_score
     })
 
@@ -13301,7 +13305,11 @@ def submit_rpg_result():
         UserStats.get_or_create(user_id).update_stats()
         db.session.commit()
         
-        return jsonify({'status': 'success', 'new_clear': new_clear, 'reward': {'bonus_percent': 0.5, 'badge': '征服王'}})
+        return jsonify({'status': 'success', 
+                        'new_clear': new_clear, 
+                        'reward': {'bonus_percent': 0.5, 'badge': enemy.badge_name if enemy else '征服王'},
+                        'defeat_dialogue': enemy.defeat_dialogue if enemy else '見事だ...'
+        })
         
     else:
         # 敗北処理
