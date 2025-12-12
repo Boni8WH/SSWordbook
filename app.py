@@ -13067,27 +13067,34 @@ def get_rpg_status():
     is_cooldown = False
     next_challenge_time = None
     
-    if rpg_state and rpg_state.next_challenge_time:
-        if rpg_state.next_challenge_time > datetime.now(JST):
+    if rpg_state and rpg_state.last_challenge_at:
+        # 12 hours cooldown from last challenge
+        cooldown_end = rpg_state.last_challenge_at + timedelta(hours=12)
+        if cooldown_end > datetime.now(JST):
             is_cooldown = True
-            next_challenge_time = rpg_state.next_challenge_time.strftime('%Y-%m-%d %H:%M:%S')
+            next_challenge_time = cooldown_end.strftime('%Y-%m-%d %H:%M:%S')
             
     # 現在のボスを判定
     target_boss = get_current_boss(user_id, rpg_state)
+    print(f"DEBUG_RPG: user={user_id}, score={balance_score}, target={target_boss}, cooldown={is_cooldown}")
     
     # ターゲットが存在し、かつ未クリアのボスの場合はクールダウンを無視して挑戦可能にする（新ボス追加時の遡及対応）
     if target_boss:
         # get_current_bossは未クリアのボスがいればそれを優先して返す仕様
         # 実際に未クリアかどうか確認（念のため）
         cleared_ids = set(rpg_state.cleared_stages) if rpg_state else set()
+        print(f"DEBUG_RPG: cleared={cleared_ids}, target_id={target_boss.id}")
+        
         # id is int, cleared_stages stores strings usually? Let's handle both.
         is_cleared = str(target_boss.id) in cleared_ids or target_boss.id in cleared_ids
         
         if not is_cleared:
+            print("DEBUG_RPG: New boss detected, ignoring cooldown")
             is_cooldown = False
             next_challenge_time = None
     
     if not target_boss:
+        print("DEBUG_RPG: No target boss found")
         return jsonify({'available': False, 'reason': 'no_boss_found', 'current_score': balance_score})
     
     return jsonify({
@@ -14261,7 +14268,7 @@ def admin_add_rpg_enemy():
             clear_correct_count=int(request.form.get('clear_correct_count', 10)),
             clear_max_mistakes=int(request.form.get('clear_max_mistakes', 2)),
             is_active=request.form.get('is_active') == 'true',
-            display_order=int(request.form.get('display_order', 1000)),
+            display_order=int(request.form.get('display_order', 1)),
             appearance_required_score=int(request.form.get('appearance_required_score', 0))
         )
         
