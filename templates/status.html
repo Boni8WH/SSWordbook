@@ -42,39 +42,45 @@
         <h3 class="badges-title">獲得した称号</h3>
 
         <!-- Badges Grid -->
-        <h4 class="mt-4 mb-3 text-center" style="color: #2c3e50; font-weight: bold;">
-            <i class="fas fa-medal text-warning me-2"></i>獲得バッジコレクション
+        <h4 class="mt-4 mb-3 text-center"
+            style="color: #f1c40f; font-weight: bold; text-shadow: 0 0 5px rgba(0,0,0,0.5);">
+            <i class="fas fa-medal me-2"></i>獲得バッジコレクション
         </h4>
 
         <div class="badge-grid">
             {% for badge in earned_badges %}
             <div class="badge-card-wrapper">
-                <div class="badge-card {{ 'earned' if badge.earned else '' }}">
-                    {% if badge.image and '/' in badge.image %}
-                    <!-- 画像の場合 -->
-                    <img src="{{ badge.image }}" alt="{{ badge.name }}" class="boss-img-small mb-2"
-                        style="max-height: 60px;">
-                    {% elif badge.image %}
-                    <!-- FAクラスの場合 -->
-                    <i class="{{ badge.image }} badge-icon-med"></i>
+                {% if badge.earned %}
+                <!-- Earned: Show Boss Icon and Clickable -->
+                <div class="badge-card earned" style="cursor: pointer;"
+                    onclick="showMonsterDetail('{{ badge.name }}', '{{ badge.description }}', '{{ badge.boss_name }}', '{{ badge.boss_icon }}')">
+
+                    {% if badge.boss_icon and badge.boss_icon != 'None' %}
+                    <img src="{{ badge.boss_icon }}" alt="{{ badge.name }}" class="boss-img-small mb-2"
+                        style="max-height: 80px; border-radius: 50%; border: 2px solid #f1c40f;">
                     {% else %}
-                    <!-- デフォルト -->
-                    <i class="fas fa-question-circle badge-icon-med"></i>
+                    <i class="{{ badge.icon }} badge-icon-med" style="color: #f1c40f;"></i>
                     {% endif %}
 
-                    <span class="badge-name">{{ badge.name }}</span>
-                    <p class="badge-desc">{{ badge.description }}</p>
-
-                    {% if not badge.earned %}
-                    <div class="mt-2">
-                        <span class="badge bg-secondary" style="font-size: 0.7em;">未獲得</span>
-                    </div>
-                    {% else %}
+                    <span class="badge-name" style="color: #f1c40f;">{{ badge.name }}</span>
+                    <!-- Description hidden in card, shown in modal -->
                     <div class="mt-2">
                         <span class="badge bg-warning text-dark" style="font-size: 0.7em;">GET!</span>
                     </div>
-                    {% endif %}
                 </div>
+                {% else %}
+                <!-- Not Earned: Show ? -->
+                <div class="badge-card locked" style="opacity: 0.6;">
+                    <i class="fas fa-question badge-icon-med"
+                        style="color: #95a5a6; font-size: 3rem; margin: 15px 0;"></i>
+
+                    <span class="badge-name" style="color: #95a5a6;">???</span>
+
+                    <div class="mt-2">
+                        <span class="badge bg-secondary" style="font-size: 0.7em;">未獲得</span>
+                    </div>
+                </div>
+                {% endif %}
             </div>
             {% endfor %}
         </div>
