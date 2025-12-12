@@ -679,8 +679,8 @@
                     html += '<thead class="table-dark"><tr><th>Icon</th><th>名前 (難易度)</th><th>称号</th><th>条件</th><th>状態</th><th>操作</th></tr></thead><tbody>';
 
                     enemies.forEach(enemy => {
-                        // 画像パスの生成（簡易）
-                        const iconPath = enemy.icon_image ? `/static/images/rpg/${enemy.icon_image}` : '/static/images/boss_alexander.png'; // デフォルト仮
+                        // 画像パスの生成 (DB経由のURLを使用)
+                        const iconPath = enemy.icon_url ? enemy.icon_url : (enemy.icon_image ? `/static/images/rpg/${enemy.icon_image}` : '/static/images/boss_alexander.png');
 
                         html += `<tr>
                         <td class="text-center"><img src="${iconPath}" style="width:50px; height:50px; object-fit:contain;"></td>
@@ -688,8 +688,13 @@
                         <td>${enemy.badge_name}</td>
                         <td><small>制限${enemy.time_limit}秒 / 正解${enemy.clear_correct_count} / ミス${enemy.clear_max_mistakes}まで</small></td>
                         <td>${enemy.is_active ? '<span class="badge bg-success">有効</span>' : '<span class="badge bg-secondary">無効</span>'}</td>
-                        <td>
-                            <button class="btn btn-sm btn-outline-danger" onclick="deleteRpgEnemy(${enemy.id})">削除</button>
+                        <td class="text-nowrap">
+                            <button class="btn btn-sm btn-outline-primary me-1" onclick='openEditRpgEnemyModal(${JSON.stringify(enemy)})'>
+                                <i class="fas fa-edit"></i> 編集
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger" onclick="deleteRpgEnemy(${enemy.id})">
+                                <i class="fas fa-trash"></i> 削除
+                            </button>
                         </td>
                     </tr>`;
                     });
@@ -697,6 +702,66 @@
                     html += '</tbody></table></div>';
                     container.innerHTML = html;
                 });
+        }
+
+        // 編集モーダルを開く
+        function openEditRpgEnemyModal(enemy) {
+            const modalElement = document.getElementById('editRpgEnemyModal');
+            const modal = new bootstrap.Modal(modalElement);
+            const form = document.getElementById('editRpgEnemyForm');
+
+            // フォームに値をセット
+            form.action = `/admin/rpg/enemies/edit/${enemy.id}`; // フォームのactionを動的に設定
+            form.elements['name'].value = enemy.name;
+            form.elements['difficulty'].value = enemy.difficulty;
+            form.elements['badge_name'].value = enemy.badge_name;
+            form.elements['description'].value = enemy.description || '';
+            form.elements['intro_dialogue'].value = enemy.intro_dialogue || '';
+            form.elements['defeat_dialogue'].value = enemy.defeat_dialogue || '';
+            form.elements['time_limit'].value = enemy.time_limit;
+            form.elements['clear_correct_count'].value = enemy.clear_correct_count;
+            form.elements['clear_max_mistakes'].value = enemy.clear_max_mistakes;
+            form.elements['display_order'].value = enemy.display_order;
+            form.elements['appearance_required_score'].value = enemy.appearance_required_score;
+
+            // チェックボックス
+            form.elements['is_active'].checked = enemy.is_active;
+
+            // バッジアイコンクラス (画像アップロードはリセット)
+            form.elements['badge_icon_class'].value = enemy.badge_image && !enemy.badge_image.includes('/') ? enemy.badge_image : '';
+
+            // 既存の画像プレビューを更新 (もしあれば)
+            const currentIconPreview = document.getElementById('currentEditIconImage');
+            if (currentIconPreview) {
+                currentIconPreview.src = enemy.icon_url ? enemy.icon_url : (enemy.icon_image ? `/static/images/rpg/${enemy.icon_image}` : '/static/images/boss_alexander.png');
+                currentIconPreview.style.display = 'block';
+            }
+            const currentBadgePreview = document.getElementById('currentEditBadgeImage');
+            if (currentBadgePreview) {
+                if (enemy.badge_image && enemy.badge_image.includes('/')) { // 画像の場合
+                    currentBadgePreview.src = enemy.badge_url ? enemy.badge_url : `/static/images/rpg/${enemy.badge_image}`;
+                    currentBadgePreview.style.display = 'block';
+                    document.getElementById('currentEditBadgeIconClass').style.display = 'none';
+                } else if (enemy.badge_image) { // FontAwesomeクラスの場合
+                    document.getElementById('currentEditBadgeIconClass').className = `fas ${enemy.badge_image} fa-2x`;
+                    document.getElementById('currentEditBadgeIconClass').style.display = 'inline-block';
+                    currentBadgePreview.style.display = 'none';
+                } else {
+                    currentBadgePreview.style.display = 'none';
+                    document.getElementById('currentEditBadgeIconClass').style.display = 'none';
+                }
+            }
+
+            modal.show();
+        }
+
+        // 編集モーダルを閉じる
+        function closeEditRpgEnemyModal() {
+            const modalElement = document.getElementById('editRpgEnemyModal');
+            const modal = bootstrap.Modal.getInstance(modalElement);
+            if (modal) {
+                modal.hide();
+            }
         }
 
         function deleteRpgEnemy(id) {
@@ -1168,6 +1233,151 @@
         </div>
     </div>
 </div>
+
+<!-- Edit RPG Enemy Modal -->
+<div class="modal fade" id="editRpgEnemyModal" tabindex="-1" aria-labelledby="editRpgEnemyModalLabel"
+    aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editRpgEnemyModalLabel">敵キャラ情報の編集</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editRpgEnemyForm" method="POST" enctype="multipart/form-data"
+                    onsubmit="handleEditRpgEnemy(event)">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="edit_name" class="form-label">キャラクター名</label>
+                            <input type="text" class="form-control" name="name" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="edit_difficulty" class="form-label">難易度 (★)</label>
+                            <input type="number" class="form-control" name="difficulty" min="1" max="5" value="1">
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">アイコン画像 (変更する場合のみ)</label>
+                            <input type="file" class="form-control" name="icon_image" accept="image/*">
+                            <div class="mt-2 text-center">
+                                <span class="text-muted small">現在の画像:</span>
+                                <img id="currentEditIconImage" src="" alt="Icon Preview"
+                                    style="height: 50px; display: none; margin: 0 auto;">
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label for="edit_badge_name" class="form-label">獲得バッジ名</label>
+                            <input type="text" class="form-control" name="badge_name" required>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">バッジ画像 (変更する場合のみ)</label>
+                            <input type="file" class="form-control" name="badge_image" accept="image/*">
+                            <div class="mt-2">
+                                <label class="form-label small">またはFontAwesomeクラス</label>
+                                <input type="text" class="form-control form-control-sm" name="badge_icon_class"
+                                    placeholder="fa-solid fa-dragon">
+                            </div>
+                            <div class="mt-2 text-center">
+                                <span class="text-muted small">現在の画像:</span>
+                                <img id="currentEditBadgeImage" src="" alt="Badge Preview"
+                                    style="height: 50px; display: none; margin: 0 auto;">
+                                <i id="currentEditBadgeIconClass" style="display: none;"></i>
+                            </div>
+                        </div>
+
+                        <div class="col-12">
+                            <label for="edit_description" class="form-label">説明文</label>
+                            <textarea class="form-control" name="description" rows="2"></textarea>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label for="edit_intro_dialogue" class="form-label">登場時セリフ</label>
+                            <textarea class="form-control" name="intro_dialogue" rows="2"></textarea>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="edit_defeat_dialogue" class="form-label">撃破時セリフ</label>
+                            <textarea class="form-control" name="defeat_dialogue" rows="2"></textarea>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label for="edit_time_limit" class="form-label">制限時間(秒)</label>
+                            <input type="number" class="form-control" name="time_limit" value="60">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="edit_clear_correct_count" class="form-label">クリア正解数</label>
+                            <input type="number" class="form-control" name="clear_correct_count" value="10">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="edit_clear_max_mistakes" class="form-label">許容ミス数</label>
+                            <input type="number" class="form-control" name="clear_max_mistakes" value="2">
+                        </div>
+
+                        <div class="col-md-6">
+                            <label for="edit_display_order" class="form-label">表示順 (小さい順)</label>
+                            <input type="number" class="form-control" name="display_order" value="0">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="edit_appearance_required_score" class="form-label">出現必要スコア</label>
+                            <input type="number" class="form-control" name="appearance_required_score" value="0">
+                        </div>
+
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="is_active" id="edit_is_active"
+                                    value="true">
+                                <label class="form-check-label" for="edit_is_active">
+                                    有効にする (無効にするとボーナス剥奪等の影響が出ます)
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer mt-3">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+                        <button type="submit" class="btn btn-primary">変更を保存</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    async function handleEditRpgEnemy(event) {
+        event.preventDefault();
+        if (!confirm('変更を保存しますか？\\n※無効化する場合、関連するボーナスが剥奪される可能性があります。')) return;
+
+        const form = event.target;
+        const formData = new FormData(form);
+
+        // チェックボックスの値処理
+        if (!form.elements['is_active'].checked) {
+            formData.set('is_active', 'false');
+        } else {
+            formData.set('is_active', 'true');
+        }
+
+        try {
+            const response = await fetch(form.action, {
+                method: 'POST',
+                body: formData
+            });
+            const result = await response.json();
+
+            if (result.status === 'success') {
+                alert(result.message);
+                closeEditRpgEnemyModal();
+                loadRpgEnemies(); // リスト再読み込み
+            } else {
+                alert('エラー: ' + result.message);
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('通信エラーが発生しました');
+        }
+    }
+</script>
 
 <!-- リセット確認フォーム（非表示） -->
 <form id="resetForm" action="{{ url_for('admin_app_info_reset') }}" method="POST" style="display: none;">
