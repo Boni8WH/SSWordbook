@@ -3093,6 +3093,14 @@ function checkRpgStatus() {
                         bossImgEl.src = iconUrl;
                     }
                 }
+
+                // Update Difficulty Stars
+                if (data.difficulty) {
+                    const starsEl = document.querySelector('.difficulty-stars');
+                    if (starsEl) {
+                        starsEl.textContent = '★'.repeat(data.difficulty);
+                    }
+                }
             } else {
                 if (banner) banner.classList.add('hidden');
             }
