@@ -137,6 +137,16 @@ class User(db.Model):
     notification_time = db.Column(db.String(5), default="21:00", nullable=False)
     push_subscription = db.Column(JSONEncodedDict, nullable=True)
 
+    # RPG称号
+    equipped_rpg_enemy_id = db.Column(db.Integer, db.ForeignKey('rpg_enemy.id'), nullable=True)
+    equipped_rpg_enemy = db.relationship('RpgEnemy')
+
+    def get_display_name(self):
+        """称号付きの名前を取得"""
+        if self.equipped_rpg_enemy and self.equipped_rpg_enemy.badge_name:
+            return f"【{self.equipped_rpg_enemy.badge_name}】{self.username}"
+        return self.username
+
     def set_room_password(self, password): self._room_password_hash = generate_password_hash(password)
     def check_room_password(self, password): return check_password_hash(self._room_password_hash, password)
     def set_individual_password(self, password): self._individual_password_hash = generate_password_hash(password)
@@ -537,6 +547,22 @@ def _add_notification_columns_to_user():
                 raise e
     except Exception as e:
         print(f"⚠️ Userマイグレーションエラー (全体): {e}")
+
+def _add_equipped_title_column_to_user():
+    """Userテーブルにequipped_rpg_enemy_idカラムを追加するマイグレーション関数"""
+    try:
+        with db.engine.connect() as conn:
+            # カラムの存在を確認
+            try:
+                conn.execute(text("SELECT equipped_rpg_enemy_id FROM \"user\" LIMIT 1"))
+            except Exception:
+                print("🔄 User: equipped_rpg_enemy_idカラムを追加します...")
+                conn.execute(text("ALTER TABLE \"user\" ADD COLUMN equipped_rpg_enemy_id INTEGER REFERENCES rpg_enemy(id)"))
+                conn.commit()
+                print("✅ User: equipped_rpg_enemy_idカラム追加完了")
+    except Exception as e:
+        print(f"⚠️ Userマイグレーションエラー (equipped_rpg_enemy_id): {e}")
+
 
 # ====================================================================
 # 通知機能関連
@@ -1198,8 +1224,15 @@ def get_app_info_dict(user_id=None, username=None, room_number=None):
         app_info = AppInfo.get_current_info()
         info_dict = app_info.to_dict()
         
+        # 称号付きの名前に変更
+        display_username = username
+        if user_id:
+            user = User.query.get(user_id)
+            if user:
+                display_username = user.get_display_name()
+
         info_dict['isLoggedIn'] = user_id is not None
-        info_dict['username'] = username
+        info_dict['username'] = display_username
         info_dict['roomNumber'] = room_number
         info_dict['schoolName'] = getattr(app_info, 'school_name', '〇〇高校')
         
@@ -1286,7 +1319,7 @@ def get_monthly_ranking(room_number, user_id, year, month):
     for i, score_entry in enumerate(all_monthly_scores, 1):
         rank_data = {
             'rank': i,
-            'username': score_entry.user.username,
+            'username': score_entry.user.get_display_name(), # 称号付きに変更
             'score': score_entry.total_score
         }
         if i <= 5:
@@ -2456,6 +2489,7 @@ def create_tables_and_admin_user():
             _create_rpg_enemy_table()
             _seed_initial_rpg_enemy() # 確実に初期データを投入
             _add_score_column_to_rpg_enemy() # NEW
+            _add_equipped_title_column_to_user() # 🆕 追加
             
             # 管理者ユーザー確認/作成
             try:
@@ -4920,7 +4954,7 @@ def api_admin_daily_ranking(room_number, year, month, day):
             for i, result in enumerate(results, 1):
                 daily_ranking.append({
                     'rank': i,
-                    'username': result.user.username,
+                    'username': result.user.get_display_name(),
                     'student_id': result.user.student_id,
                     'score': result.score,
                     'time': f"{(result.time_taken_ms / 1000):.2f}秒"
@@ -9210,6 +9244,13 @@ def inject_app_info():
         # セッション情報を取得
         user_id = session.get('user_id')
         username = session.get('username')
+        
+        # 称号付きの名前に更新
+        if user_id:
+            user = User.query.get(user_id)
+            if user:
+                username = user.get_display_name()
+                
         room_number = session.get('room_number')
         is_admin = session.get('admin_logged_in', False)
         
