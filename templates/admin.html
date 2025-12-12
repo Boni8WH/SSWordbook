@@ -613,8 +613,21 @@
                                 <input type="number" class="form-control" name="clear_max_mistakes" value="2">
                             </div>
                             <div class="col-md-3 mb-3">
-                                <label class="form-label">出現必要スコア</label>
-                                <input type="number" class="form-control" name="appearance_required_score" value="0">
+                                <label class="form-label">出現必要スコア (Min 1000)</label>
+                                <input type="number" class="form-control" name="appearance_required_score" value="1000"
+                                    min="1000">
+                            </div>
+                        </div>
+
+                        <div class="mb-3 p-3 border rounded bg-light">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="is_manual_order" value="true"
+                                    id="addIsManualOrder" onchange="toggleManualOrder('add')">
+                                <label class="form-check-label" for="addIsManualOrder">優先表示順を手動設定する</label>
+                            </div>
+                            <div id="addDisplayOrderGroup" style="display: none; margin-top: 10px;">
+                                <label class="form-label">表示順 (小さい数字が先)</label>
+                                <input type="number" class="form-control" name="display_order" value="0">
                             </div>
                         </div>
 
@@ -642,6 +655,15 @@
 
     <!-- スクリプト: RPG管理機能 -->
     <script>
+        // Toggle Manual Order Input
+        function toggleManualOrder(prefix) {
+            const checkbox = document.getElementById(prefix + 'IsManualOrder');
+            const group = document.getElementById(prefix + 'DisplayOrderGroup');
+            if (checkbox && group) {
+                group.style.display = checkbox.checked ? 'block' : 'none';
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', function () {
             loadRpgEnemies();
 
@@ -730,6 +752,12 @@
 
             // チェックボックス
             form.elements['is_active'].checked = enemy.is_active;
+
+            // Manual Order
+            if (form.elements['is_manual_order']) {
+                form.elements['is_manual_order'].checked = enemy.is_manual_order || false;
+                toggleManualOrder('edit');
+            }
 
             // バッジアイコンクラス (画像アップロードはリセット)
             form.elements['badge_icon_class'].value = enemy.badge_image && !enemy.badge_image.includes('/') ? enemy.badge_image : '';
@@ -1338,12 +1366,21 @@
                         </div>
 
                         <div class="col-md-6">
-                            <label for="edit_display_order" class="form-label">表示順 (小さい順)</label>
-                            <input type="number" class="form-control" name="display_order" value="0">
+                            <label for="edit_appearance_required_score" class="form-label">出現必要スコア (Min 1000)</label>
+                            <input type="number" class="form-control" name="appearance_required_score" value="1000"
+                                min="1000">
                         </div>
-                        <div class="col-md-6">
-                            <label for="edit_appearance_required_score" class="form-label">出現必要スコア</label>
-                            <input type="number" class="form-control" name="appearance_required_score" value="0">
+                        <div class="col-md-12 mt-3">
+                            <div class="form-check p-3 border rounded bg-light">
+                                <input class="form-check-input" type="checkbox" name="is_manual_order"
+                                    id="editIsManualOrder" value="true" onchange="toggleManualOrder('edit')">
+                                <label class="form-check-label" for="editIsManualOrder">優先表示順を手動設定する</label>
+
+                                <div id="editDisplayOrderGroup" style="display: none; margin-top: 10px;">
+                                    <label for="edit_display_order" class="form-label">表示順 (小さい数字が先)</label>
+                                    <input type="number" class="form-control" name="display_order" value="0">
+                                </div>
+                            </div>
                         </div>
 
                         <div class="col-12">
