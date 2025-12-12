@@ -14479,20 +14479,30 @@ def admin_edit_rpg_enemy(enemy_id):
         enemy.clear_correct_count = int(request.form.get('clear_correct_count', 10))
         enemy.clear_max_mistakes = int(request.form.get('clear_max_mistakes', 2))
         enemy.is_active = new_is_active
-        enemy.is_active = new_is_active
+        # enemy.is_active = new_is_active # Removed duplicate
         enemy.display_order = final_display_order
         enemy.appearance_required_score = appearance_score
         enemy.is_manual_order = is_manual
         
         # 画像更新処理
+        print(f"DEBUG_UPLOAD: Processing Edit for Enemy ID {enemy_id}")
         icon_file = request.files.get('icon_image')
+        
+        if icon_file:
+            print(f"DEBUG_UPLOAD: Icon File Present. Filename: {icon_file.filename}")
+        else:
+            print("DEBUG_UPLOAD: No Icon File in request.files")
+
         if icon_file and icon_file.filename:
             filename = secure_filename(icon_file.filename)
             unique_filename = f"rpg_enemy_{int(time.time())}_{filename}"
             
             # DB保存用にデータを読み込む
             icon_file.seek(0)
-            enemy.icon_image_content = icon_file.read()
+            content = icon_file.read()
+            print(f"DEBUG_UPLOAD: Read content. Size: {len(content)} bytes")
+            
+            enemy.icon_image_content = content
             enemy.icon_image_mimetype = icon_file.mimetype
             
             # S3/Local保存
@@ -14500,12 +14510,14 @@ def admin_edit_rpg_enemy(enemy_id):
             s3_url = upload_image_to_s3(icon_file, unique_filename, folder='rpg_images')
             if s3_url:
                 enemy.icon_image = s3_url
+                print(f"DEBUG_UPLOAD: Uploaded to S3: {s3_url}")
             else:
                 upload_dir = os.path.join(app.root_path, 'static', 'images', 'rpg')
                 os.makedirs(upload_dir, exist_ok=True)
                 icon_file.seek(0)
                 icon_file.save(os.path.join(upload_dir, unique_filename))
                 enemy.icon_image = unique_filename
+                print(f"DEBUG_UPLOAD: Saved to Local: {unique_filename}")
 
         badge_file = request.files.get('badge_image')
         badge_icon_class = request.form.get('badge_icon_class')
