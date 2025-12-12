@@ -55,12 +55,21 @@
                 <div class="badge-card earned" style="cursor: pointer;"
                     onclick="showMonsterDetail('{{ badge.name }}', '{{ badge.description }}', '{{ badge.boss_name }}', '{{ badge.boss_icon }}')">
 
-                    {% if badge.boss_icon and badge.boss_icon != 'None' %}
-                    <img src="{{ badge.boss_icon }}" alt="{{ badge.name }}" class="boss-img-small mb-2"
-                        style="max-height: 80px; border-radius: 50%; border: 2px solid #f1c40f;">
-                    {% else %}
-                    <i class="{{ badge.icon }} badge-icon-med" style="color: #f1c40f;"></i>
-                    {% endif %}
+                    <div class="badge-icon-area">
+                        {% if badge.icon and ('/' in badge.icon or 'http' in badge.icon) %}
+                        <!-- Badge Image (After Defeat Icon) -->
+                        <img src="{{ badge.icon }}" alt="{{ badge.name }}">
+                        {% elif badge.boss_icon and badge.boss_icon != 'None' %}
+                        <!-- Fallback to Boss Icon if Badge is FA or missing but we prefer image? 
+                             No, User wants separate icon. If Badge is FA, show FA. 
+                             But if Badge IS missing (default), app.py sets it to 'fas fa-medal'.
+                             So badge.icon is never empty.
+                             We should trust badge.icon. -->
+                        <i class="{{ badge.icon }}" style="color: #f1c40f;"></i>
+                        {% else %}
+                        <i class="fas fa-medal" style="color: #f1c40f;"></i>
+                        {% endif %}
+                    </div>
 
                     <span class="badge-name" style="color: #f1c40f;">{{ badge.name }}</span>
                     <!-- Description hidden in card, shown in modal -->
@@ -71,8 +80,9 @@
                 {% else %}
                 <!-- Not Earned: Show ? -->
                 <div class="badge-card locked" style="opacity: 0.6;">
-                    <i class="fas fa-question badge-icon-med"
-                        style="color: #95a5a6; font-size: 3rem; margin: 15px 0;"></i>
+                    <div class="badge-icon-area">
+                        <i class="fas fa-question" style="color: #95a5a6;"></i>
+                    </div>
 
                     <span class="badge-name" style="color: #95a5a6;">???</span>
 
