@@ -3101,6 +3101,27 @@ function checkRpgStatus() {
                         starsEl.textContent = '★'.repeat(data.difficulty);
                     }
                 }
+
+                // Update Dialogue & Rules
+                if (data.intro_dialogue) {
+                    const dialogEl = document.getElementById('rpgIntroDialog');
+                    if (dialogEl) dialogEl.textContent = `"${data.intro_dialogue}"`;
+                }
+
+                if (data.time_limit) {
+                    const timeEl = document.getElementById('rpgRuleTime');
+                    if (timeEl) timeEl.textContent = `制限時間 ${data.time_limit}秒`;
+                }
+
+                if (data.clear_correct_count) {
+                    const condEl = document.getElementById('rpgRuleCondition');
+                    if (condEl) condEl.textContent = `合格ライン ${data.clear_correct_count}問正解`;
+                }
+
+                if (data.clear_max_mistakes !== undefined) {
+                    const mistEl = document.getElementById('rpgRuleMistake');
+                    if (mistEl) mistEl.textContent = `${data.clear_max_mistakes + 1}ミスで即終了`;
+                }
             } else {
                 if (banner) banner.classList.add('hidden');
             }
@@ -3381,6 +3402,11 @@ function finishRpgGame(isWin) {
                         // Check if new clear
                         if (data.new_clear) {
                             // Play sound or bigger celebration
+                        }
+
+                        if (data.defeat_dialogue) {
+                            const winDialog = document.getElementById('rpgWinDialogue');
+                            if (winDialog) winDialog.textContent = `"${data.defeat_dialogue}"`;
                         }
                     }
                 } else {
