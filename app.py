@@ -13385,6 +13385,37 @@ def submit_rpg_result():
         db.session.commit()
         return jsonify({'status': 'success', 'message': 'Failed. Cooldown started.'})
 
+@app.route('/api/rpg/equip_title', methods=['POST'])
+def equip_rpg_title():
+    if 'user_id' not in session:
+        return jsonify({'status': 'error', 'message': 'Not logged in'}), 401
+    
+    user_id = session['user_id']
+    data = request.json
+    enemy_id = data.get('enemy_id')
+    
+    if not enemy_id:
+        return jsonify({'status': 'error', 'message': 'Enemy ID is required'}), 400
+        
+    # Check if user has cleared this enemy
+    rpg_state = RpgState.query.filter_by(user_id=user_id).first()
+    cleared_set = set(rpg_state.cleared_stages) if rpg_state and rpg_state.cleared_stages else set()
+    
+    # Check both int and str to be robust
+    if enemy_id not in cleared_set and str(enemy_id) not in cleared_set:
+         return jsonify({'status': 'error', 'message': 'You have not defeated this enemy yet'}), 403
+
+    # Get the enemy to confirm existence
+    enemy = RpgEnemy.query.get(enemy_id)
+    if not enemy:
+        return jsonify({'status': 'error', 'message': 'Enemy not found'}), 404
+        
+    user = User.query.get(user_id)
+    user.equipped_rpg_enemy_id = enemy_id
+    db.session.commit()
+    
+    return jsonify({'status': 'success', 'message': f'Title equipped: {enemy.badge_name}'})
+
 @app.route('/status')
 def status():
     if 'user_id' not in session:
