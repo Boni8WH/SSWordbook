@@ -54,7 +54,7 @@
                 <!-- Earned: Show Boss Icon and Clickable -->
                 <!-- Earned: Show Boss Icon and Clickable -->
                 <div class="badge-card earned" style="cursor: pointer;"
-                    onclick="showMonsterDetail('{{ badge.name }}', '{{ badge.description }}', '{{ badge.boss_name }}', '{{ badge.defeated_icon }}')">
+                    onclick="showMonsterDetail('{{ badge.name }}', '{{ badge.description }}', '{{ badge.boss_name }}', '{{ badge.defeated_icon }}', '{{ badge.id }}')">
 
                     <div class="badge-icon-area">
                         {% if badge.icon and ('/' in badge.icon or 'http' in badge.icon) %}
@@ -126,7 +126,11 @@
                 <p id="monsterDetailDesc" class="px-3" style="line-height: 1.8; color: #ccc;">Description goes here...
                 </p>
             </div>
-            <div class="modal-footer border-top-0 justify-content-center">
+            <div class="modal-footer border-top-0 justify-content-center flex-column">
+                <button type="button" class="btn btn-warning mb-2 w-75" id="equipTitleBtn" onclick="equipTitle()">
+                    <i class="fas fa-crown me-2"></i>この称号をつける
+                </button>
+                <div id="equipMessage" class="text-success small mb-2" style="height: 20px;"></div>
                 <button type="button" class="btn btn-outline-light btn-sm" data-bs-dismiss="modal">閉じる</button>
             </div>
         </div>
@@ -138,7 +142,11 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-    function showMonsterDetail(badgeName, badgeDesc, bossName, bossIcon) {
+    let currentEnemyId = null;
+
+    function showMonsterDetail(badgeName, badgeDesc, bossName, bossIcon, enemyId) {
+        currentEnemyId = enemyId;
+        document.getElementById('equipMessage').textContent = ''; // Reset message
         document.getElementById('monsterDetailTitle').textContent = bossName || 'Unknown Monster';
         document.getElementById('monsterDetailBadge').textContent = badgeName;
         document.getElementById('monsterDetailDesc').textContent = badgeDesc || '情報がありません。';
@@ -156,6 +164,46 @@
 
         var myModal = new bootstrap.Modal(document.getElementById('monsterDetailModal'));
         myModal.show();
+        var myModal = new bootstrap.Modal(document.getElementById('monsterDetailModal'));
+        myModal.show();
+    }
+
+    function equipTitle() {
+        if (!currentEnemyId) return;
+
+        const btn = document.getElementById('equipTitleBtn');
+        const msg = document.getElementById('equipMessage');
+
+        btn.disabled = true;
+
+        fetch('/api/rpg/equip_title', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ enemy_id: currentEnemyId })
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    msg.textContent = '称号を装備しました！';
+                    msg.className = 'text-success small mb-2';
+                    // 短時間後にリロードして反映
+                    setTimeout(() => {
+                        location.reload();
+                    }, 1000);
+                } else {
+                    msg.textContent = data.message;
+                    msg.className = 'text-danger small mb-2';
+                    btn.disabled = false;
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                msg.textContent = 'エラーが発生しました';
+                msg.className = 'text-danger small mb-2';
+                btn.disabled = false;
+            });
     }
 </script>
 
