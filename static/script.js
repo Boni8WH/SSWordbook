@@ -3091,7 +3091,15 @@ function checkRpgStatus() {
                             iconUrl = '/static/images/rpg/' + iconUrl;
                         }
                         // Cache busting
-                        bossImgEl.src = iconUrl + '?t=' + new Date().getTime();
+                        const finalUrl = iconUrl + '?t=' + new Date().getTime();
+
+                        // Pre-load logic to handle shadow
+                        bossImgEl.onload = () => {
+                            const shadow = bossImgEl.parentElement.querySelector('.boss-shadow');
+                            if (shadow) shadow.style.display = 'none';
+                            bossImgEl.style.display = 'block';
+                        };
+                        bossImgEl.src = finalUrl;
                     }
                 }
 
