@@ -3197,7 +3197,10 @@ function startRpgGame() {
                     // Let's explicitly say: `${rpgMaxMistakes + 1}ミスで終了`
 
                     // Update Image
-                    let iconUrl = data.boss_info.icon_image;
+                    // 修正: 永続化された画像URL(icon_url)を優先して使用
+                    let iconUrl = data.boss_info.icon_url || data.boss_info.icon_image;
+
+                    // フォールバック: URLでない場合のみ静的パスを付与 (互換性維持)
                     if (iconUrl && !iconUrl.startsWith('http') && !iconUrl.startsWith('/')) {
                         iconUrl = '/static/images/rpg/' + iconUrl;
                     }
