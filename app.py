@@ -338,6 +338,11 @@ class RpgEnemy(db.Model):
     badge_image = db.Column(db.String(255)) # ファイル名またはFAクラス
     badge_image_content = db.Column(db.LargeBinary) # 🆕 DB保存用
     badge_image_mimetype = db.Column(db.String(50)) # 🆕 MIMEタイプ
+
+    # 討伐後画像 (Status画面用)
+    defeated_image = db.Column(db.String(255)) 
+    defeated_image_content = db.Column(db.LargeBinary)
+    defeated_image_mimetype = db.Column(db.String(50))
     
     difficulty = db.Column(db.Integer, default=1)
     description = db.Column(db.Text)
@@ -375,7 +380,8 @@ class RpgEnemy(db.Model):
             'appearance_required_score': self.appearance_required_score,
             # 🆕 画像配信用URL
             'icon_url': url_for('serve_rpg_image', enemy_id=self.id, image_type='icon'),
-            'badge_url': url_for('serve_rpg_image', enemy_id=self.id, image_type='badge')
+            'badge_url': url_for('serve_rpg_image', enemy_id=self.id, image_type='badge'),
+            'defeated_url': url_for('serve_rpg_image', enemy_id=self.id, image_type='defeated')
         }
 
 # Helper to determine database type for migrations
@@ -2533,6 +2539,10 @@ def serve_rpg_image(enemy_id, image_type):
             content = enemy.badge_image_content
             mimetype = enemy.badge_image_mimetype
             filename = enemy.badge_image
+        elif image_type == 'defeated':
+            content = enemy.defeated_image_content
+            mimetype = enemy.defeated_image_mimetype
+            filename = enemy.defeated_image
         else:
             return "", 400
             
@@ -13337,16 +13347,9 @@ def status():
         is_earned = enemy.id in cleared_set
         
         # アイコンのパス調整
-        badge_icon = enemy.badge_image if enemy.badge_image else 'fas fa-medal'
-        # ファルパスの場合（S3 URLでない場合）、static/images/rpg/ を付与するかどうかはテンプレート側で判断、
-        # あるいはここでフルパスにするか。
-        # admin_add_rpg_enemyでは、ファイル名のみ保存している（ローカルの場合）。
-        # S3の場合はURLそのものを保存している可能性がある（実装による）。
-        # テンプレートは `badge.icon` をそのまま `src` に入れている（FA以外）。
-        # `status.html` の実装: 
-        # {% else %} <img src="{{ badge.icon }}" ...>
-        # したがって、ここでローカルファイルの場合は `/static/images/rpg/` を付加する必要がある。
-        # ただし、httpで始まる場合はそのまま。
+        # Priority: Defeated Image (討伐後画像) > Badge Image (称号アイコン) > Fallback
+        badge_icon_source = enemy.defeated_image if enemy.defeated_image else enemy.badge_image
+        badge_icon = badge_icon_source if badge_icon_source else 'fas fa-medal'
         
         final_badge_icon = badge_icon
         if not badge_icon.startswith('fa') and not badge_icon.startswith('http') and not badge_icon.startswith('/'):
@@ -14273,6 +14276,31 @@ def admin_add_rpg_enemy():
                 badge_file.save(os.path.join(upload_dir, unique_filename))
                 badge_filename_or_class = unique_filename # ローカルファイル名
             
+        # Defeated Image
+        defeated_file = request.files.get('defeated_image')
+        defeated_filename = None
+        defeated_content = None
+        defeated_mimetype = None
+        
+        if defeated_file and defeated_file.filename:
+            filename = secure_filename(defeated_file.filename)
+            unique_filename = f"rpg_defeated_{int(time.time())}_{filename}"
+            defeated_mimetype = defeated_file.mimetype
+            
+            defeated_file.seek(0)
+            defeated_content = defeated_file.read()
+            
+            defeated_file.seek(0)
+            s3_url = upload_image_to_s3(defeated_file, unique_filename, folder='rpg_images')
+            if s3_url:
+                defeated_filename = s3_url
+            else:
+                upload_dir = os.path.join(app.root_path, 'static', 'images', 'rpg')
+                os.makedirs(upload_dir, exist_ok=True)
+                defeated_file.seek(0)
+                defeated_file.save(os.path.join(upload_dir, unique_filename))
+                defeated_filename = unique_filename
+
         # 新規作成
         new_enemy = RpgEnemy(
             name=name,
@@ -14283,6 +14311,9 @@ def admin_add_rpg_enemy():
             badge_image=badge_filename_or_class,
             badge_image_content=badge_content,    # 🆕
             badge_image_mimetype=badge_mimetype,  # 🆕
+            defeated_image=defeated_filename,     # 🆕
+            defeated_image_content=defeated_content, # 🆕
+            defeated_image_mimetype=defeated_mimetype, # 🆕
             difficulty=int(request.form.get('difficulty', 1)),
             description=request.form.get('description'),
             intro_dialogue=request.form.get('intro_dialogue'),
@@ -14454,6 +14485,27 @@ def admin_edit_rpg_enemy(enemy_id):
                 enemy.badge_image = unique_filename
         elif badge_icon_class:
             enemy.badge_image = badge_icon_class
+
+        # Defeated Image update
+        defeated_file = request.files.get('defeated_image')
+        if defeated_file and defeated_file.filename:
+            filename = secure_filename(defeated_file.filename)
+            unique_filename = f"rpg_defeated_{int(time.time())}_{filename}"
+            
+            defeated_file.seek(0)
+            enemy.defeated_image_content = defeated_file.read()
+            enemy.defeated_image_mimetype = defeated_file.mimetype
+            
+            defeated_file.seek(0)
+            s3_url = upload_image_to_s3(defeated_file, unique_filename, folder='rpg_images')
+            if s3_url:
+                enemy.defeated_image = s3_url
+            else:
+                upload_dir = os.path.join(app.root_path, 'static', 'images', 'rpg')
+                os.makedirs(upload_dir, exist_ok=True)
+                defeated_file.seek(0)
+                defeated_file.save(os.path.join(upload_dir, unique_filename))
+                enemy.defeated_image = unique_filename
             
         db.session.commit()
         return jsonify({'status': 'success', 'message': '敵キャラ情報を更新しました', 'enemy': enemy.to_dict()})
