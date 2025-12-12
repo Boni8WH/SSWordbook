@@ -360,6 +360,7 @@ class RpgEnemy(db.Model):
     
     # 出現条件 (NEW)
     appearance_required_score = db.Column(db.Integer, default=0)
+    is_manual_order = db.Column(db.Boolean, default=False) # 🆕 手動表示順を使用するかどうか
 
     def to_dict(self):
         return {
@@ -378,6 +379,7 @@ class RpgEnemy(db.Model):
             'is_active': self.is_active,
             'display_order': self.display_order,
             'appearance_required_score': self.appearance_required_score,
+            'is_manual_order': self.is_manual_order,
             'defeated_image': self.defeated_image,
             # 🆕 画像配信用URL
             'icon_url': url_for('serve_rpg_image', enemy_id=self.id, image_type='icon'),
@@ -14181,7 +14183,14 @@ def admin_delete_room_score():
 def admin_rpg_enemies():
     """RPG敵キャラ一覧（JSONで返すか、admin.htmlの一部としてレンダリングするか検討）"""
     # admin.html内のセクションとして機能させるため、JSON APIとして提供し、JSで描画するパタンが良い
-    enemies = RpgEnemy.query.order_by(RpgEnemy.display_order).all()
+    from sqlalchemy import case
+    enemies = RpgEnemy.query.order_by(
+        RpgEnemy.is_manual_order.asc(),
+        case(
+            (RpgEnemy.is_manual_order == True, RpgEnemy.display_order),
+            else_=RpgEnemy.appearance_required_score
+        ).asc()
+    ).all()
     return jsonify([e.to_dict() for e in enemies])
 
 def get_user_total_score(user_id):
@@ -14202,6 +14211,25 @@ def admin_add_rpg_enemy():
         name = request.form.get('name')
         if not name:
             return jsonify({'status': 'error', 'message': '名前は必須です'}), 400
+
+        # === Validation & Ordering Logic ===
+        appearance_score = int(request.form.get('appearance_required_score', 0))
+        is_manual = request.form.get('is_manual_order') == 'true'
+        manual_order = int(request.form.get('display_order', 0))
+        
+        # 1. Unique Score Check
+        if RpgEnemy.query.filter_by(appearance_required_score=appearance_score).first():
+             return jsonify({'status': 'error', 'message': f'出現スコア {appearance_score} は既に他のボスで使用されています'}), 400
+
+        # 2. Determine Display Order
+        if is_manual:
+             # Manual Order Uniqueness
+             if RpgEnemy.query.filter_by(is_manual_order=True, display_order=manual_order).first():
+                 return jsonify({'status': 'error', 'message': f'表示順 {manual_order} は既に他の手動設定ボスで使用されています'}), 400
+             final_display_order = manual_order
+        else:
+             final_display_order = appearance_score
+
             
         # 画像アップロード処理
         icon_file = request.files.get('icon_image')
@@ -14307,8 +14335,10 @@ def admin_add_rpg_enemy():
             clear_correct_count=int(request.form.get('clear_correct_count', 10)),
             clear_max_mistakes=int(request.form.get('clear_max_mistakes', 2)),
             is_active=request.form.get('is_active') == 'true',
-            display_order=int(request.form.get('display_order', 1)),
-            appearance_required_score=int(request.form.get('appearance_required_score', 0))
+            is_active=request.form.get('is_active') == 'true',
+            display_order=final_display_order,
+            appearance_required_score=appearance_score,
+            is_manual_order=is_manual
         )
         
         db.session.add(new_enemy)
@@ -14401,6 +14431,26 @@ def admin_edit_rpg_enemy(enemy_id):
         if not name:
             return jsonify({'status': 'error', 'message': '名前は必須です'}), 400
             
+        # === Validation & Ordering Logic ===
+        appearance_score = int(request.form.get('appearance_required_score', 0))
+        is_manual = request.form.get('is_manual_order') == 'true'
+        manual_order = int(request.form.get('display_order', 0))
+        
+        # 1. Unique Score Check (Exclude self)
+        existing_score_enemy = RpgEnemy.query.filter_by(appearance_required_score=appearance_score).first()
+        if existing_score_enemy and existing_score_enemy.id != enemy_id:
+             return jsonify({'status': 'error', 'message': f'出現スコア {appearance_score} は既に他のボスで使用されています'}), 400
+
+        # 2. Determine Display Order
+        if is_manual:
+             # Manual Order Uniqueness (Exclude self)
+             existing_order_enemy = RpgEnemy.query.filter_by(is_manual_order=True, display_order=manual_order).first()
+             if existing_order_enemy and existing_order_enemy.id != enemy_id:
+                 return jsonify({'status': 'error', 'message': f'表示順 {manual_order} は既に他の手動設定ボスで使用されています'}), 400
+             final_display_order = manual_order
+        else:
+             final_display_order = appearance_score
+            
         current_is_active = enemy.is_active
         new_is_active = request.form.get('is_active') == 'true'
         
@@ -14419,8 +14469,10 @@ def admin_edit_rpg_enemy(enemy_id):
         enemy.clear_correct_count = int(request.form.get('clear_correct_count', 10))
         enemy.clear_max_mistakes = int(request.form.get('clear_max_mistakes', 2))
         enemy.is_active = new_is_active
-        enemy.display_order = int(request.form.get('display_order', 0))
-        enemy.appearance_required_score = int(request.form.get('appearance_required_score', 0))
+        enemy.is_active = new_is_active
+        enemy.display_order = final_display_order
+        enemy.appearance_required_score = appearance_score
+        enemy.is_manual_order = is_manual
         
         # 画像更新処理
         icon_file = request.files.get('icon_image')
@@ -14527,6 +14579,13 @@ def check_and_migrate_rpg_columns():
                         conn.execute(text("ALTER TABLE rpg_enemy ADD COLUMN defeated_image_content BYTEA"))
                     else:
                         conn.execute(text("ALTER TABLE rpg_enemy ADD COLUMN defeated_image_content BLOB"))
+                
+                if 'is_manual_order' not in columns:
+                    print("Migrating: Adding is_manual_order column")
+                    if db.engine.dialect.name == 'postgresql':
+                        conn.execute(text("ALTER TABLE rpg_enemy ADD COLUMN is_manual_order BOOLEAN DEFAULT FALSE"))
+                    else:
+                        conn.execute(text("ALTER TABLE rpg_enemy ADD COLUMN is_manual_order BOOLEAN DEFAULT 0"))
                 
                 conn.commit()
                 print("Migration check completed.")
