@@ -13075,11 +13075,24 @@ def get_rpg_status():
     # 現在のボスを判定
     target_boss = get_current_boss(user_id, rpg_state)
     
+    # ターゲットが存在し、かつ未クリアのボスの場合はクールダウンを無視して挑戦可能にする（新ボス追加時の遡及対応）
+    if target_boss:
+        # get_current_bossは未クリアのボスがいればそれを優先して返す仕様
+        # 実際に未クリアかどうか確認（念のため）
+        cleared_ids = set(rpg_state.cleared_stages) if rpg_state else set()
+        # id is int, cleared_stages stores strings usually? Let's handle both.
+        is_cleared = str(target_boss.id) in cleared_ids or target_boss.id in cleared_ids
+        
+        if not is_cleared:
+            is_cooldown = False
+            next_challenge_time = None
+    
     if not target_boss:
         return jsonify({'available': False, 'reason': 'no_boss_found', 'current_score': balance_score})
     
     return jsonify({
-        'available': True,
+        'available': True, # is_cooldownがFalseになればTrue扱い（フロントエンドの仕様依存だが、available自体は1000点チェック用だった）
+        # フロントエンドは available && !is_cooldown && !is_cleared でバナーを出す
         'is_cooldown': is_cooldown,
         'next_challenge_time': next_challenge_time,
         'is_cleared': False,
@@ -14248,7 +14261,7 @@ def admin_add_rpg_enemy():
             clear_correct_count=int(request.form.get('clear_correct_count', 10)),
             clear_max_mistakes=int(request.form.get('clear_max_mistakes', 2)),
             is_active=request.form.get('is_active') == 'true',
-            display_order=int(request.form.get('display_order', 0)),
+            display_order=int(request.form.get('display_order', 1000)),
             appearance_required_score=int(request.form.get('appearance_required_score', 0))
         )
         
@@ -14260,6 +14273,55 @@ def admin_add_rpg_enemy():
         db.session.rollback()
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
+def _revoke_rpg_progress(enemy_id, badge_name):
+    """
+    指定された敵キャラの討伐履歴、バッジ、ボーナスを全ユーザーから削除・再計算する
+    enemy_id: 削除/無効化する敵のID
+    badge_name: 削除するバッジ名
+    """
+    try:
+        # 全てのRPG進行状況を取得
+        all_states = RpgState.query.all()
+        affected_count = 0
+        
+        target_id_str = str(enemy_id)
+        
+        for state in all_states:
+            changed = False
+            
+            # 1. クリア履歴から削除
+            cleared_list = list(state.cleared_stages) if state.cleared_stages else []
+            # IDはintかstrか混在の可能性あり
+            new_cleared = [cid for cid in cleared_list if str(cid) != target_id_str]
+            
+            if len(new_cleared) != len(cleared_list):
+                state.cleared_stages = new_cleared
+                changed = True
+                
+            # 2. バッジ削除
+            badges_list = list(state.earned_badges) if state.earned_badges else []
+            if badge_name and badge_name in badges_list:
+                badges_list.remove(badge_name)
+                state.earned_badges = badges_list
+                changed = True
+                
+            # 3. ボーナス再計算
+            if changed:
+                # ボーナスロジック: クリア数 * 0.5% (最大10%)
+                new_bonus = min(10.0, len(new_cleared) * 0.5)
+                state.permanent_bonus_percent = new_bonus
+                affected_count += 1
+                
+        db.session.commit()
+        print(f"🔄 Revoked RPG progress for enemy {enemy_id}. Affected users: {affected_count}")
+        return True
+        
+    except Exception as e:
+        print(f"❌ Error revoking RPG progress: {e}")
+        # ここでのロールバックは呼び出し元に任せるか検討だが、個別にコミットしているためここで処理
+        db.session.rollback()
+        return False
+
 @app.route('/admin/rpg/enemies/delete/<int:enemy_id>', methods=['POST'])
 @admin_required
 def admin_delete_rpg_enemy(enemy_id):
@@ -14269,9 +14331,103 @@ def admin_delete_rpg_enemy(enemy_id):
         if not enemy:
             return jsonify({'status': 'error', 'message': '指定された敵キャラが見つかりません'}), 404
             
+        # ★ ボーナス剥奪処理
+        _revoke_rpg_progress(enemy.id, enemy.badge_name)
+            
         db.session.delete(enemy)
         db.session.commit()
-        return jsonify({'status': 'success', 'message': '敵キャラを削除しました'})
+        return jsonify({'status': 'success', 'message': '敵キャラを削除し、関連するユーザースコアを再計算しました'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/admin/rpg/enemies/edit/<int:enemy_id>', methods=['POST'])
+@admin_required
+def admin_edit_rpg_enemy(enemy_id):
+    """RPG敵キャラ編集"""
+    try:
+        enemy = RpgEnemy.query.get(enemy_id)
+        if not enemy:
+            return jsonify({'status': 'error', 'message': '指定された敵キャラが見つかりません'}), 404
+            
+        # フォームデータの取得
+        name = request.form.get('name')
+        if not name:
+            return jsonify({'status': 'error', 'message': '名前は必須です'}), 400
+            
+        current_is_active = enemy.is_active
+        new_is_active = request.form.get('is_active') == 'true'
+        
+        # ★ 無効化された場合、ボーナス剥奪
+        if current_is_active and not new_is_active:
+             _revoke_rpg_progress(enemy.id, enemy.badge_name)
+             
+        # 基本情報の更新
+        enemy.name = name
+        enemy.badge_name = request.form.get('badge_name', 'Unknown Badge')
+        enemy.difficulty = int(request.form.get('difficulty', 1))
+        enemy.description = request.form.get('description')
+        enemy.intro_dialogue = request.form.get('intro_dialogue')
+        enemy.defeat_dialogue = request.form.get('defeat_dialogue')
+        enemy.time_limit = int(request.form.get('time_limit', 60))
+        enemy.clear_correct_count = int(request.form.get('clear_correct_count', 10))
+        enemy.clear_max_mistakes = int(request.form.get('clear_max_mistakes', 2))
+        enemy.is_active = new_is_active
+        enemy.display_order = int(request.form.get('display_order', 0))
+        enemy.appearance_required_score = int(request.form.get('appearance_required_score', 0))
+        
+        # 画像更新処理
+        icon_file = request.files.get('icon_image')
+        if icon_file and icon_file.filename:
+            filename = secure_filename(icon_file.filename)
+            unique_filename = f"rpg_enemy_{int(time.time())}_{filename}"
+            
+            # DB保存用にデータを読み込む
+            icon_file.seek(0)
+            enemy.icon_image_content = icon_file.read()
+            enemy.icon_image_mimetype = icon_file.mimetype
+            
+            # S3/Local保存
+            icon_file.seek(0)
+            s3_url = upload_image_to_s3(icon_file, unique_filename, folder='rpg_images')
+            if s3_url:
+                enemy.icon_image = s3_url
+            else:
+                upload_dir = os.path.join(app.root_path, 'static', 'images', 'rpg')
+                os.makedirs(upload_dir, exist_ok=True)
+                icon_file.seek(0)
+                icon_file.save(os.path.join(upload_dir, unique_filename))
+                enemy.icon_image = unique_filename
+
+        badge_file = request.files.get('badge_image')
+        badge_icon_class = request.form.get('badge_icon_class')
+        
+        if badge_file and badge_file.filename:
+            filename = secure_filename(badge_file.filename)
+            unique_filename = f"rpg_badge_{int(time.time())}_{filename}"
+            
+            # DB保存用
+            badge_file.seek(0)
+            enemy.badge_image_content = badge_file.read()
+            enemy.badge_image_mimetype = badge_file.mimetype
+            
+            # S3/Local
+            badge_file.seek(0)
+            s3_url = upload_image_to_s3(badge_file, unique_filename, folder='rpg_images')
+            if s3_url:
+                enemy.badge_image = s3_url
+            else:
+                upload_dir = os.path.join(app.root_path, 'static', 'images', 'rpg')
+                os.makedirs(upload_dir, exist_ok=True)
+                badge_file.seek(0)
+                badge_file.save(os.path.join(upload_dir, unique_filename))
+                enemy.badge_image = unique_filename
+        elif badge_icon_class:
+            enemy.badge_image = badge_icon_class
+            
+        db.session.commit()
+        return jsonify({'status': 'success', 'message': '敵キャラ情報を更新しました', 'enemy': enemy.to_dict()})
+        
     except Exception as e:
         db.session.rollback()
         return jsonify({'status': 'error', 'message': str(e)}), 500
