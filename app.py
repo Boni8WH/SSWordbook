@@ -13430,7 +13430,8 @@ def status():
             'boss_icon': final_boss_icon,
             'boss_description': enemy.description,
             # 修正: 討伐後画像URL (Status Modal用)
-            'defeated_icon': defeated_icon_url if (defeated_icon_url and enemy.defeated_image) else final_boss_icon
+            'defeated_icon': defeated_icon_url if (defeated_icon_url and enemy.defeated_image) else final_boss_icon,
+            'id': enemy.id # 🆕 追加: フロントエンドで敵IDを参照するため
         })
         all_badges[-1]['description'] = enemy.description if enemy.description else f"{enemy.name}のデータ"
 
