@@ -2528,6 +2528,7 @@ def serve_rpg_image(enemy_id, image_type):
     try:
         enemy = RpgEnemy.query.get(enemy_id)
         if not enemy:
+            print(f"DEBUG: RPG Image - Enemy {enemy_id} not found")
             return "", 404
             
         content = None
@@ -2548,6 +2549,11 @@ def serve_rpg_image(enemy_id, image_type):
             filename = enemy.defeated_image
         else:
             return "", 400
+
+        print(f"DEBUG: RPG Image Request - ID: {enemy_id}, Type: {image_type}")
+        print(f"DEBUG: Content Size: {len(content) if content else 'None'}")
+        print(f"DEBUG: MimeType: {mimetype}")
+        print(f"DEBUG: Filename: {filename}")
             
         # 1. DBにバイナリがあればそれを返す
         if content:
@@ -2560,18 +2566,23 @@ def serve_rpg_image(enemy_id, image_type):
         # 2. DBになければ、従来のファイルパス/URLを確認
         # filenameがURL(http...)ならリダイレクト
         if filename and (filename.startswith('http://') or filename.startswith('https://')):
+            print("DEBUG: Redirecting to External URL")
             return redirect(filename)
             
         # 3. ローカルファイルの場合 (static/images/rpg/)
         if filename:
             # セキュリティのためファイル名のみ抽出
             secure_name = secure_filename(os.path.basename(filename))
+            print(f"DEBUG: Redirecting to Local Static: {secure_name}")
             return redirect(url_for('static', filename=f'images/rpg/{secure_name}'))
             
+        print("DEBUG: No content or filename found.")
         return "", 404
         
     except Exception as e:
         print(f"Error serving RPG image: {e}")
+        import traceback
+        traceback.print_exc()
         return "", 500
 
 def create_essay_visibility_table_auto():
