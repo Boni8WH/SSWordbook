@@ -378,6 +378,7 @@ class RpgEnemy(db.Model):
             'is_active': self.is_active,
             'display_order': self.display_order,
             'appearance_required_score': self.appearance_required_score,
+            'defeated_image': self.defeated_image,
             # 🆕 画像配信用URL
             'icon_url': url_for('serve_rpg_image', enemy_id=self.id, image_type='icon'),
             'badge_url': url_for('serve_rpg_image', enemy_id=self.id, image_type='badge'),
@@ -13398,9 +13399,6 @@ def status():
                          earned_badges=all_badges, # 変数名を変更
                          bonus_percent=bonus_percent, 
                          cleared_count=cleared_count)
-
-
-
 
 @app.route('/admin/delete_room', methods=['POST'])
 def admin_delete_room():
