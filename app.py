@@ -12987,17 +12987,17 @@ def get_rpg_status():
     # 現在のボスを判定
     target_boss = get_current_boss(user_id, rpg_state)
     
+    if not target_boss:
+        return jsonify({'available': False, 'reason': 'no_boss_found', 'current_score': balance_score})
+    
     return jsonify({
         'available': True,
         'is_cooldown': is_cooldown,
         'next_challenge_time': next_challenge_time,
-        'is_cleared': False, # 常に次のボス（未クリア）またはリプレイボスを表示するため False扱いにするか、
-                             # あるいは 全てクリアしたら True にするか。
-                             # ここでは「次に戦うボス」がいる限りは挑戦可能。
-                             # status画面でクリア済みかどうかは判断できる。
-        'current_stage': target_boss.id if target_boss else 1,
-        'boss_name': target_boss.name if target_boss else 'Unknown',
-        'boss_icon': target_boss.icon_image if target_boss else None,
+        'is_cleared': False,
+        'current_stage': target_boss.id,
+        'boss_name': target_boss.name,
+        'boss_icon': target_boss.icon_image,
         'current_score': balance_score
     })
 
