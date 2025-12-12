@@ -3090,7 +3090,8 @@ function checkRpgStatus() {
                         if (!iconUrl.startsWith('http') && !iconUrl.startsWith('/')) {
                             iconUrl = '/static/images/rpg/' + iconUrl;
                         }
-                        bossImgEl.src = iconUrl;
+                        // Cache busting
+                        bossImgEl.src = iconUrl + '?t=' + new Date().getTime();
                     }
                 }
 
