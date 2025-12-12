@@ -53,7 +53,7 @@
                 {% if badge.earned %}
                 <!-- Earned: Show Boss Icon and Clickable -->
                 <div class="badge-card earned" style="cursor: pointer;"
-                    onclick="showMonsterDetail('{{ badge.name }}', '{{ badge.description }}', '{{ badge.boss_name }}', '{{ badge.boss_icon }}')">
+                    onclick="showMonsterDetail('{{ badge.name }}', '{{ badge.description }}', '{{ badge.boss_name }}', '{{ badge.icon }}')">
 
                     <div class="badge-icon-area">
                         {% if badge.icon and ('/' in badge.icon or 'http' in badge.icon) %}
