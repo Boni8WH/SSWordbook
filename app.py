@@ -551,15 +551,18 @@ def _add_notification_columns_to_user():
 def _add_equipped_title_column_to_user():
     """Userテーブルにequipped_rpg_enemy_idカラムを追加するマイグレーション関数"""
     try:
-        with db.engine.connect() as conn:
-            # カラムの存在を確認
-            try:
-                conn.execute(text("SELECT equipped_rpg_enemy_id FROM \"user\" LIMIT 1"))
-            except Exception:
-                print("🔄 User: equipped_rpg_enemy_idカラムを追加します...")
-                conn.execute(text("ALTER TABLE \"user\" ADD COLUMN equipped_rpg_enemy_id INTEGER REFERENCES rpg_enemy(id)"))
-                conn.commit()
-                print("✅ User: equipped_rpg_enemy_idカラム追加完了")
+        inspector = inspect(db.engine)
+        columns = [col['name'] for col in inspector.get_columns('user')]
+        
+        if 'equipped_rpg_enemy_id' not in columns:
+            print("🔄 User: equipped_rpg_enemy_idカラムを追加します...")
+            with db.engine.connect() as conn:
+                with conn.begin(): # トランザクション
+                    conn.execute(text("ALTER TABLE \"user\" ADD COLUMN equipped_rpg_enemy_id INTEGER REFERENCES rpg_enemy(id)"))
+            print("✅ User: equipped_rpg_enemy_idカラム追加完了")
+        else:
+            print("✅ User: equipped_rpg_enemy_idカラムは既に存在します")
+            
     except Exception as e:
         print(f"⚠️ Userマイグレーションエラー (equipped_rpg_enemy_id): {e}")
 
