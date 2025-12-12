@@ -162,9 +162,12 @@
             iconImg.src = '/static/images/boss_alexander.png'; // Fallback
         }
 
-        var myModal = new bootstrap.Modal(document.getElementById('monsterDetailModal'));
-        myModal.show();
-        var myModal = new bootstrap.Modal(document.getElementById('monsterDetailModal'));
+        // Check if an instance already exists, if so, reuse it
+        var myModalEl = document.getElementById('monsterDetailModal');
+        var myModal = bootstrap.Modal.getInstance(myModalEl);
+        if (!myModal) {
+            myModal = new bootstrap.Modal(myModalEl);
+        }
         myModal.show();
     }
 
