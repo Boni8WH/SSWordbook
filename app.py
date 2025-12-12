@@ -13380,11 +13380,13 @@ def status():
         all_badges.append({
             'name': enemy.badge_name,
             'icon': final_badge_icon,
-            'description': f"{enemy.name}を討伐した証", # カード表示用
+            'description': enemy.description if enemy.description else f"{enemy.name}を討伐した証", # 修正: 豆知識を表示
             'earned': is_earned,
             'boss_name': enemy.name,
             'boss_icon': final_boss_icon,
-            'boss_description': enemy.description # モーダル表示用（テンプレート変数を合わせる必要あり）
+            'boss_description': enemy.description,
+            # 修正: 討伐後画像URL (Status Modal用)
+            'defeated_icon': defeated_icon_url if (defeated_icon_url and enemy.defeated_image) else final_boss_icon
         })
         all_badges[-1]['description'] = enemy.description if enemy.description else f"{enemy.name}のデータ"
 
