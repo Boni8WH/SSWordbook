@@ -3201,6 +3201,9 @@ function startRpgGame() {
                     if (iconUrl && !iconUrl.startsWith('http') && !iconUrl.startsWith('/')) {
                         iconUrl = '/static/images/rpg/' + iconUrl;
                     }
+                    // Cache busting
+                    if (iconUrl) iconUrl += '?t=' + new Date().getTime();
+
                     const introImg = document.getElementById('rpgBossImage');
                     if (introImg) introImg.src = iconUrl;
                 }
