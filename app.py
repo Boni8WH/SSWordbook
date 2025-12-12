@@ -13115,10 +13115,11 @@ def get_rpg_status():
         # フロントエンドは available && !is_cooldown && !is_cleared でバナーを出す
         'is_cooldown': is_cooldown,
         'next_challenge_time': next_challenge_time,
-        'is_cleared': False,
+        'is_cleared': is_cleared, # 🆕 実際のクリア状態を返す
         'current_stage': target_boss.id,
         'boss_name': target_boss.name,
         'boss_icon': url_for('serve_rpg_image', enemy_id=target_boss.id, image_type='icon'), # 🆕 DB経由のURLに変更
+        'difficulty': target_boss.difficulty, # 🆕 難易度を追加
         'current_score': balance_score
     })
 
@@ -13245,6 +13246,7 @@ def start_rpg_battle():
         
     return jsonify({
         'status': 'success',
+        'stage_id': target_boss.id, # 🆕 ステージIDをフロントエンドに渡す
         'problems': final_problems,
         'time_limit': target_boss.time_limit,
         'pass_score': target_boss.clear_correct_count,
