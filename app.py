@@ -13063,6 +13063,10 @@ def get_rpg_status():
          
     rpg_state = RpgState.query.filter_by(user_id=user_id).first()
     
+    # クールタイム判定
+    is_cooldown = False
+    next_challenge_time = None
+
     if rpg_state and rpg_state.last_challenge_at:
         last_challenge_at = rpg_state.last_challenge_at
         if last_challenge_at.tzinfo is None:
