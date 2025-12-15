@@ -1,0 +1,933 @@
+{% extends "base.html" %}
+{% block title %}冒険の記録 - {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="rpg-status-wrapper">
+    <div class="status-container">
+        <div class="status-header">
+            <h2 class="rpg-title">⚔️ 冒険の記録 ⚔️</h2>
+            <div class="rpg-subtitle-wrapper">
+                <p class="status-subtitle">{{ current_user.username }} の英雄譚</p>
+            </div>
+        </div>
+
+        <div class="rpg-dashboard-grid">
+            <!-- Left Column: Character Stats -->
+            <div class="rpg-stats-column">
+                <div class="rpg-stats-card">
+                    <div class="stats-header">
+                        <h3><i class="fas fa-id-card me-2"></i>ステータス</h3>
+                    </div>
+
+                    <div class="stat-row">
+                        <span class="stat-label">永続ボーナス</span>
+                        <span class="stat-value highlight">+{{ "%.1f"|format(bonus_percent) }}%</span>
+                    </div>
+                    <div class="stat-description-small">全てのスコア計算に加算</div>
+
+                    <div class="stat-separator"></div>
+
+                    <div class="stat-row">
+                        <span class="stat-label">討伐数</span>
+                        <span class="stat-value text-crimson">{{ cleared_count }} 体</span>
+                    </div>
+                    <div class="stat-description-small">倒したボスの数</div>
+
+                    <div class="stat-separator"></div>
+
+                    <div class="stat-row">
+                        <span class="stat-label">現在の称号</span>
+                        <span class="stat-value">{{ current_user.title_equipped if current_user.title_equipped else 'なし'
+                            }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column: Badges/Trophies -->
+            <div class="rpg-badges-column">
+                <div class="rpg-badges-area">
+                    <div class="badges-area-header">
+                        <h3><i class="fas fa-trophy me-2 text-gold"></i>獲得した称号</h3>
+                        <span class="badge-clear-count">Complete: {{ earned_badges|selectattr('earned')|list|length }} /
+                            {{ earned_badges|length }}</span>
+                    </div>
+
+                    <div class="badge-grid-wrapper">
+                        {% for badge in earned_badges %}
+                        <div class="rpg-badge-item-wrapper">
+                            {% if badge.earned %}
+                            <div class="rpg-badge-item earned"
+                                onclick="showMonsterDetail('{{ badge.name }}', '{{ badge.description }}', '{{ badge.boss_name }}', '{{ badge.defeated_icon }}', '{{ badge.id }}')"
+                                title="{{ badge.name }}">
+
+                                <div class="badge-icon-img-container">
+                                    {% if badge.defeated_icon and ('/' in badge.defeated_icon or 'http' in
+                                    badge.defeated_icon) %}
+                                    <img src="{{ badge.defeated_icon }}" alt="{{ badge.name }}" class="badge-icon-img">
+
+                                    {% elif badge.icon and ('/' in badge.icon or 'http' in badge.icon) %}
+                                    <img src="{{ badge.icon }}" alt="{{ badge.name }}" class="badge-icon-img">
+
+                                    {% elif badge.boss_icon and badge.boss_icon != 'None' %}
+                                    <i class="{{ badge.icon }}" class="badge-icon-fa"></i>
+                                    {% else %}
+                                    <i class="fas fa-medal badge-icon-fa"></i>
+                                    {% endif %}
+                                </div>
+
+                                <!-- Equipped Indicator -->
+                                {% if current_user.title_equipped == badge.badge_name %}
+                                <div class="equipped-indicator"><i class="fas fa-check"></i></div>
+                                {% endif %}
+                            </div>
+                            <div class="badge-name-label">{{ badge.name }}</div>
+                            {% else %}
+                            <!-- Locked: Use same container style but with lock icon -->
+                            <div class="rpg-badge-item earned" style="cursor: default;">
+                                <div class="badge-icon-img-container">
+                                    <i class="fas fa-lock badge-icon-fa" style="color: #7f8c8d; opacity: 0.5;"></i>
+                                </div>
+                            </div>
+                            <div class="badge-name-label locked">???</div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="text-center mt-5">
+            <a href="{{ url_for('progress_page') }}" class="rpg-btn-back">
+                <i class="fas fa-arrow-left me-2"></i> 進捗に戻る
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Monster Detail Modal -->
+<div class="modal fade" id="monsterDetailModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content"
+            style="background: rgba(20, 20, 30, 0.95); border: 2px solid #c5a059; color: #e0e0e0;">
+            <div class="modal-header border-bottom-0">
+                <h5 class="modal-title" style="font-family: 'Cinzel', serif; color: #f1c40f;" id="monsterDetailBadge">
+                    Monster Name</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                    aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center">
+                <div class="mb-3">
+                    <img id="monsterDetailIcon" src="" alt="Monster"
+                        class="img-fluid rounded-circle border border-warning p-1"
+                        style="width: 100px; height: 100px; object-fit: cover;">
+                </div>
+                <h4 id="monsterDetailTitle" class="text-warning mb-3" style="font-family: 'Cinzel', serif;">Badge Name
+                </h4>
+                <p id="monsterDetailDesc" class="px-3" style="line-height: 1.8; color: #ccc;">Description goes here...
+                </p>
+            </div>
+            <div class="modal-footer border-top-0 justify-content-center flex-column">
+                <div class="d-flex gap-2 w-75 mb-2">
+                    <button type="button" class="btn btn-warning flex-grow-1" id="equipTitleBtn" onclick="equipTitle()">
+                        <i class="fas fa-crown me-2"></i>称号装備
+                    </button>
+                    <button type="button" class="btn btn-danger flex-grow-1" id="rematchBtn" onclick="confirmRematch()">
+                        <i class="fas fa-swords me-2"></i>再戦
+                    </button>
+                </div>
+                <div id="equipMessage" class="text-success small mb-2" style="height: 20px;"></div>
+                <button type="button" class="btn btn-outline-light btn-sm" data-bs-dismiss="modal">閉じる</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- RPG Modal (Reused from index.html) -->
+<div id="rpgOverlay" class="rpg-overlay hidden">
+    <div class="rpg-modal-container">
+        <!-- Intro Screen -->
+        <div id="rpgIntroScreen" class="rpg-screen">
+            <div class="rpg-header">
+                <span class="mission-tag">REMATCH</span>
+                <h2 class="rpg-title">再戦モード</h2>
+            </div>
+
+            <div class="boss-preview-vertical">
+                <h3 id="rpgBossName" class="boss-name-large">BOSS NAME</h3>
+                <div class="boss-visual">
+                    <img src="" id="rpgBossImage" alt="Boss" class="boss-img" onerror="this.style.display='none'">
+                </div>
+                <div class="difficulty-stars-container">
+                    <div id="rpgDifficultyStars" class="difficulty-stars">★★★★★</div>
+                </div>
+            </div>
+
+            <p id="rpgIntroDialog"
+                style="font-style: italic; color: #bdc3c7; margin-bottom: 20px; text-align: center; padding: 0 10px;">
+                "..."
+            </p>
+
+            <div class="mission-details">
+                <div class="rule-item">
+                    <i class="fas fa-stopwatch"></i>
+                    <span id="rpgRuleTime">制限時間 60秒</span>
+                </div>
+                <div class="rule-item">
+                    <i class="fas fa-bullseye"></i>
+                    <span id="rpgRuleCondition">合格ライン 10問正解</span>
+                </div>
+                <div class="rule-item warning" style="color: #e74c3c;">
+                    <i class="fas fa-heart-broken"></i>
+                    <span id="rpgRuleMistake">3ミスで即終了</span>
+                </div>
+            </div>
+
+            <div class="rpg-actions">
+                <button id="btnRpgStart" class="btn-rpg-primary">BATTLE START</button>
+                <button id="btnRpgCancel" class="btn-rpg-secondary">撤退する</button>
+            </div>
+        </div>
+
+        <!-- Battle Screen -->
+        <div id="rpgBattleScreen" class="rpg-screen hidden">
+            <div class="battle-hud">
+                <div class="timer-container">
+                    <div class="timer-icon">⏱</div>
+                    <div class="timer-bar-bg">
+                        <div id="rpgTimerBar" class="timer-bar-fill"></div>
+                    </div>
+                </div>
+                <div class="boss-hp-container">
+                    <span class="hp-label">BOSS HP</span>
+                    <div class="hp-bar-bg">
+                        <div id="rpgBossHpBar" class="hp-bar-fill"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="battle-main">
+                <div class="boss-avatar-battle">
+                    <img src="" id="rpgBattleBossImage" class="boss-img-small">
+                    <!-- Damage effect overlay -->
+                    <div id="rpgDamageEffect" class="damage-text hidden">-1</div>
+                </div>
+                <div class="rpg-question-box">
+                    <p id="rpgQuestionText">Question...</p>
+                </div>
+            </div>
+
+            <div id="rpgChoicesContainer" class="rpg-choices-grid">
+                <!-- Choices generated by JS -->
+            </div>
+        </div>
+
+        <!-- Result Screen -->
+        <div id="rpgResultScreen" class="rpg-screen hidden">
+            <div class="result-header">
+                <h2 id="rpgResultTitle">MISSION CLEAR</h2>
+            </div>
+
+            <div id="rpgWinContent" class="hidden">
+                <p id="rpgWinDialogue"
+                    style="font-style: italic; color: #f1c40f; margin-bottom: 20px; text-align: center; font-size: 1.1em;">
+                    "..."
+                </p>
+                <!-- Rematch has no reward -->
+            </div>
+
+            <div id="rpgLoseContent" class="hidden">
+                <div class="lose-message">
+                    <p>知識の綻びがないか確認しよう</p>
+                </div>
+            </div>
+
+            <div class="rpg-actions">
+                <button id="btnRpgClose" class="btn-rpg-primary">閉じる</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- RPG Story Overlay (Reused) -->
+<div id="rpgStoryOverlay" class="rpg-overlay hidden" style="z-index: 2000;">
+    <div id="storyNoiseLayer" class="noise-layer hidden"></div>
+    <div id="storyLightLayer" class="light-layer hidden"></div>
+    <div class="story-stage">
+        <div id="storyEnemySilhouette" class="enemy-silhouette hidden">
+            <img src="/static/pergamon/alex.png" alt="Enemy Shadow">
+        </div>
+        <div id="storyCharacterContainer" class="character-container hidden">
+            <img id="storyPerImage" src="/static/pergamon/confusion.png" alt="Per" class="character-img">
+        </div>
+    </div>
+    <div id="storyDialogueBox" class="dialogue-box hidden">
+        <div class="dialogue-name-tag" id="storySpeakerName">ペル</div>
+        <div class="dialogue-text" id="storyText">...</div>
+        <div class="dialogue-arrow">▼</div>
+    </div>
+</div>
+
+<!-- Background Animation (Particles) -->
+<div id="particles-js" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1;"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    let currentEnemyId = null;
+    // Pass rematched_today_ids from backend
+    const rematchedTodayIds = {{ rematched_today_ids | tojson | safe }};
+
+    function showMonsterDetail(badgeName, badgeDesc, bossName, bossIcon, enemyId) {
+        currentEnemyId = enemyId;
+        document.getElementById('equipMessage').textContent = ''; // Reset message
+        document.getElementById('monsterDetailTitle').textContent = bossName || 'Unknown Monster';
+        document.getElementById('monsterDetailBadge').textContent = badgeName;
+        document.getElementById('monsterDetailDesc').textContent = badgeDesc || '情報がありません。';
+
+        const iconImg = document.getElementById('monsterDetailIcon');
+        if (bossIcon && bossIcon !== 'None') {
+            // Use the URL as-is - backend already provides cache-busting timestamps
+            iconImg.src = bossIcon;
+        } else {
+            iconImg.src = '/static/images/boss_alexander.png'; // Fallback
+        }
+
+        // Update Rematch Button State
+        const rematchBtn = document.getElementById('rematchBtn');
+        if (rematchBtn) {
+            // enemyId is string from attribute, keys in array might be int
+            const isRematched = rematchedTodayIds.includes(parseInt(enemyId));
+            if (isRematched) {
+                rematchBtn.disabled = true;
+                rematchBtn.innerHTML = '<i class="fas fa-check me-2"></i>本日再戦済み';
+                rematchBtn.classList.remove('btn-danger');
+                rematchBtn.classList.add('btn-secondary');
+            } else {
+                rematchBtn.disabled = false;
+                rematchBtn.innerHTML = '<i class="fas fa-swords me-2"></i>再戦';
+                rematchBtn.classList.remove('btn-secondary');
+                rematchBtn.classList.add('btn-danger');
+            }
+        }
+
+        // Check if an instance already exists, if so, reuse it
+        var myModalEl = document.getElementById('monsterDetailModal');
+        var myModal = bootstrap.Modal.getInstance(myModalEl);
+        if (!myModal) {
+            myModal = new bootstrap.Modal(myModalEl);
+        }
+        myModal.show();
+    }
+
+    function equipTitle() {
+        if (!currentEnemyId) return;
+
+        const btn = document.getElementById('equipTitleBtn');
+        const msg = document.getElementById('equipMessage');
+
+        btn.disabled = true;
+
+        fetch('/api/rpg/equip_title', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ enemy_id: currentEnemyId })
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    msg.textContent = '称号を装備しました！';
+                    msg.className = 'text-success small mb-2';
+                    // 短時間後にリロードして反映
+                    setTimeout(() => {
+                        location.reload();
+                    }, 1000);
+                } else {
+                    msg.textContent = data.message;
+                    msg.className = 'text-danger small mb-2';
+                    btn.disabled = false;
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                msg.textContent = 'エラーが発生しました';
+                msg.className = 'text-danger small mb-2';
+                btn.disabled = false;
+            });
+    }
+
+    function confirmRematch() {
+        if (!currentEnemyId) return;
+
+        const bossName = document.getElementById('monsterDetailTitle').textContent;
+        const enemyId = currentEnemyId;
+
+        window.showConfirmModal(
+            '再戦確認',
+            `${bossName}と再戦しますか？\n(1日1回まで)`,
+            function () {
+                // Hide monster detail modal
+                const myModalEl = document.getElementById('monsterDetailModal');
+                const myModal = bootstrap.Modal.getInstance(myModalEl);
+                if (myModal) myModal.hide();
+
+                // Fetch data to populate Intro Screen
+                fetch('/api/rpg/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ rematch_enemy_id: enemyId })
+                })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.status === 'success') {
+                            // Populate Intro Screen
+                            const boss = data.boss_info;
+                            if (boss) {
+                                document.getElementById('rpgBossName').textContent = boss.name;
+                                const img = document.getElementById('rpgBossImage');
+                                let iconUrl = boss.icon_url || boss.icon_image;
+                                // Add cache busting to prevent stale images
+                                if (iconUrl) {
+                                    iconUrl += (iconUrl.includes('?') ? '&' : '?') + 't=' + new Date().getTime();
+                                }
+                                img.src = iconUrl;
+                                img.style.display = 'block';
+
+                                // Update difficulty stars with special display for level 10
+                                const starsEl = document.getElementById('rpgDifficultyStars');
+                                if (starsEl && boss.difficulty) {
+                                    const tenStars = Math.floor(boss.difficulty / 10);
+                                    const normalStars = boss.difficulty % 10;
+                                    let html = '';
+                                    for (let i = 0; i < tenStars; i++) {
+                                        html += '<span style="color: #e74c3c; font-size: 1.2em;">✪</span>'; // Red star for 10
+                                    }
+                                    for (let i = 0; i < normalStars; i++) {
+                                        html += '★';
+                                    }
+                                    starsEl.innerHTML = html;
+                                }
+
+                                document.getElementById('rpgIntroDialog').textContent = `"${boss.intro_dialogue || '...'}"`;
+                            }
+
+                            document.getElementById('rpgRuleTime').textContent = `制限時間 ${data.time_limit}秒`;
+                            document.getElementById('rpgRuleCondition').textContent = `合格ライン ${data.pass_score}問正解`;
+                            document.getElementById('rpgRuleMistake').textContent = `${data.max_mistakes}ミスで即終了`;
+
+                            // Show Overlay
+                            const overlay = document.getElementById('rpgOverlay');
+                            overlay.classList.remove('hidden');
+                            document.getElementById('rpgIntroScreen').classList.remove('hidden');
+                            document.getElementById('rpgBattleScreen').classList.add('hidden');
+                            document.getElementById('rpgResultScreen').classList.add('hidden');
+
+                            // Update Start Button to call startRpgGame with enemyId
+                            const startBtn = document.getElementById('btnRpgStart');
+                            const newStartBtn = startBtn.cloneNode(true);
+                            startBtn.parentNode.replaceChild(newStartBtn, startBtn);
+
+                            newStartBtn.addEventListener('click', function () {
+                                startRpgGame(enemyId);
+                            });
+
+                            // Setup Cancel Button
+                            const cancelBtn = document.getElementById('btnRpgCancel');
+                            const newCancelBtn = cancelBtn.cloneNode(true);
+                            cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
+                            newCancelBtn.addEventListener('click', closeRpgModal);
+
+                            // Setup Close Button in Result Screen
+                            const closeBtn = document.getElementById('btnRpgClose');
+                            const newCloseBtn = closeBtn.cloneNode(true);
+                            closeBtn.parentNode.replaceChild(newCloseBtn, closeBtn);
+                            // Use handleRpgResultDismiss from script.js (global)
+                            newCloseBtn.addEventListener('click', handleRpgResultDismiss);
+
+                        } else {
+                            alert(data.message);
+                        }
+                    })
+                    .catch(err => {
+                        console.error(err);
+                        alert('通信エラーが発生しました');
+                    });
+            },
+            '再戦する',
+            'btn-danger'
+        );
+    }
+</script>
+
+<style>
+    /* Google Fonts for Fantasy usage */
+    @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Noto+Serif+JP:wght@400;700&display=swap');
+
+    .rpg-status-wrapper {
+        min-height: 100vh;
+        /* Dark gradient background */
+        background: radial-gradient(circle at center, #2c3e50 0%, #000000 100%);
+        padding: 40px 20px;
+        color: #ecf0f1;
+        font-family: 'Noto Serif JP', serif;
+    }
+
+    .status-container {
+        max-width: 900px;
+        margin: 0 auto;
+    }
+
+    .rpg-title {
+        font-family: 'Cinzel', serif;
+        font-size: 2.5rem;
+        color: #f1c40f;
+        text-shadow: 0 0 10px rgba(241, 196, 15, 0.5);
+        margin-bottom: 5px;
+        letter-spacing: 2px;
+    }
+
+    .rpg-subtitle {
+        font-style: italic;
+        color: #bdc3c7;
+        border-bottom: 1px solid #7f8c8d;
+        display: inline-block;
+        margin-bottom: 30px;
+        padding-bottom: 5px;
+    }
+
+    /* Stats Card (Left) */
+    .rpg-stats-card {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        padding: 20px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+    }
+
+    .stats-header {
+        border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        padding-bottom: 10px;
+        margin-bottom: 15px;
+    }
+
+    .stats-header h3 {
+        margin: 0;
+        font-size: 1.4rem;
+        color: #ecf0f1;
+    }
+
+    .stat-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 12px;
+        font-size: 1.1rem;
+    }
+
+    .stat-label {
+        color: #bdc3c7;
+    }
+
+    .stat-value {
+        font-weight: bold;
+        color: #fff;
+    }
+
+    .stat-value.highlight {
+        color: #f1c40f;
+    }
+
+    /* Badges Area (Right) */
+    .rpg-badges-area {
+        background: rgba(20, 20, 30, 0.85);
+        /* Increased opacity */
+        backdrop-filter: blur(5px);
+        /* Blur behind */
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        padding: 20px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+
+        /* Scalable: Scrollable area for many badges */
+        max-height: 70vh;
+        overflow-y: auto;
+
+        /* Custom Scrollbar */
+        scrollbar-width: thin;
+        scrollbar-color: #f1c40f rgba(0, 0, 0, 0.3);
+    }
+
+    /* Webkit Scrollbar Customization */
+    .rpg-badges-area::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    .rpg-badges-area::-webkit-scrollbar-track {
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 4px;
+    }
+
+    .rpg-badges-area::-webkit-scrollbar-thumb {
+        background-color: #555;
+        border-radius: 4px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .rpg-badges-area::-webkit-scrollbar-thumb:hover {
+        background-color: #f1c40f;
+    }
+
+    .badges-area-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        padding-bottom: 10px;
+    }
+
+    .badges-area-header h3 {
+        margin: 0;
+        font-size: 1.3rem;
+        color: #ecf0f1;
+    }
+
+    .badge-clear-count {
+        font-size: 0.9rem;
+        color: #95a5a6;
+    }
+
+    /* Badge Grid */
+    .badge-grid-wrapper {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+        gap: 15px;
+    }
+
+    .rpg-badge-item {
+        position: relative;
+        cursor: pointer;
+        transition: transform 0.2s, filter 0.2s;
+        aspect-ratio: 1/1;
+        width: 100%;
+        /* Force uniform size based on grid column */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1;
+        overflow: visible;
+        /* Allow pop-out */
+    }
+
+    /* Circular Background Layer */
+    .rpg-badge-item::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.05);
+        border: 2px solid transparent;
+        z-index: -1;
+        transition: all 0.3s;
+    }
+
+    /* Earned State Background */
+    .rpg-badge-item.earned::before {
+        background: rgba(10, 10, 20, 0.6);
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+    }
+
+    /* Locked State Background */
+    .rpg-badge-item.locked::before {
+        background: rgba(255, 255, 255, 0.1);
+    }
+
+    /* Hover Effect on Background */
+    .rpg-badge-item:hover::before {
+        border-color: rgba(255, 255, 255, 0.3);
+        background: rgba(255, 255, 255, 0.15);
+    }
+
+    /* Remove old direct styles if any remain */
+    .rpg-badge-item.earned,
+    .rpg-badge-item.locked {
+        background: transparent;
+        /* Move bg to pseudo */
+        box-shadow: none;
+    }
+
+    .rpg-badge-item:hover {
+        transform: scale(1.1);
+        border-color: rgba(255, 255, 255, 0.3);
+    }
+
+    .rpg-badge-item.locked {
+        background: rgba(255, 255, 255, 0.1);
+        /* Visible faint circle for locked */
+    }
+
+    .rpg-badge-item.locked i {
+        color: #7f8c8d;
+        opacity: 0.5;
+    }
+
+    .rpg-badge-item.locked img {
+        filter: brightness(0.2);
+        width: 70%;
+        /* Keep locked lock small inside */
+        height: 70%;
+    }
+
+    .badge-icon-img {
+        width: 135%;
+        /* Pop out! */
+        height: 135%;
+        object-fit: contain;
+        z-index: 2;
+        /* In front of circle */
+        filter: drop-shadow(0 5px 10px rgba(0, 0, 0, 0.6));
+        transition: transform 0.2s;
+    }
+
+    .badge-icon-fa {
+        font-size: 3rem;
+        color: #ffd700;
+        filter: drop-shadow(0 0 5px rgba(0, 0, 0, 0.5));
+        z-index: 2;
+    }
+
+    /* Stars for Difficulty */
+    .difficulty-stars {
+        color: #f1c40f;
+        font-size: 1.5rem;
+        margin-top: 5px;
+        line-height: 1;
+        letter-spacing: 2px;
+        word-break: break-all;
+        /* Ensure 10 stars wrap if needed, though usually fits */
+    }
+
+    /* Modal Styling Override for RPG feel */
+    .rpg-modal-content {
+        background: #1a1a1a;
+        color: #ecf0f1;
+        border: 1px solid #34495e;
+        box-shadow: 0 0 20px rgba(0, 0, 0, 0.8);
+    }
+
+    .rpg-modal-header {
+        border-bottom: 1px solid #34495e;
+    }
+
+    .rpg-modal-footer {
+        border-top: 1px solid #34495e;
+    }
+
+    .boss-detail-view {
+        text-align: center;
+    }
+
+    .boss-detail-img-container {
+        width: 150px;
+        height: 150px;
+        margin: 0 auto 20px;
+        border-radius: 50%;
+        overflow: hidden;
+        border: 3px solid #f1c40f;
+        box-shadow: 0 0 15px rgba(241, 196, 15, 0.3);
+        background: #000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .boss-detail-img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+    }
+
+    .boss-description-box {
+        background: rgba(255, 255, 255, 0.05);
+        padding: 15px;
+        border-radius: 5px;
+        text-align: left;
+        margin-top: 20px;
+        font-size: 0.95rem;
+        line-height: 1.6;
+        border-left: 3px solid #f1c40f;
+    }
+
+    /* Helper for equipped badge highlight */
+    .equipped-indicator {
+        position: absolute;
+        top: 0;
+        right: 0;
+        background: #e74c3c;
+        color: white;
+        border-radius: 50%;
+        width: 20px;
+        height: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 10px;
+        border: 1px solid #fff;
+    }
+
+
+
+    .status-header {
+        text-align: center;
+        margin-bottom: 40px;
+    }
+
+    /* Dashboard Grid Layout */
+    .rpg-dashboard-grid {
+        display: grid;
+        grid-template-columns: 320px 1fr;
+        gap: 30px;
+        align-items: start;
+    }
+
+    /* Stats Column (Desktop: Sticky) */
+    .rpg-stats-column {
+        position: sticky;
+        top: 20px;
+        z-index: 10;
+        /* Ensure it stays above if needed */
+    }
+
+    /* Stats Card & Badges Area Backgrounds - Darker for readability */
+    .rpg-stats-card,
+    .rpg-badges-area {
+        background: rgba(20, 20, 30, 0.85);
+        /* Increased opacity */
+        backdrop-filter: blur(5px);
+        /* Blur behind */
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        padding: 20px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+    }
+
+    @media (max-width: 900px) {
+        .rpg-dashboard-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .rpg-stats-column {
+            position: static;
+            /* Disable sticky on mobile */
+            margin-bottom: 20px;
+        }
+    }
+
+    .stat-description-small {
+        font-size: 0.8rem;
+        color: #7f8c8d;
+        margin-bottom: 10px;
+        padding-left: 2px;
+    }
+
+    .stat-separator {
+        height: 1px;
+        background: rgba(255, 255, 255, 0.1);
+        margin: 15px 0;
+    }
+
+    /* Badges Column Styles */
+    .rpg-badges-column {
+        min-width: 0;
+        /* Prevent grid blowout */
+    }
+
+    /* Badge Grid Wrapper override */
+    .badge-grid-wrapper {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+        /* Reverted to 90px */
+        gap: 20px;
+        padding: 10px;
+    }
+
+    .rpg-badge-item-wrapper {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .badge-name-label {
+        font-size: 0.75rem;
+        color: #f1c40f;
+        text-align: center;
+        line-height: 1.2;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        width: 100px;
+        /* Reverted to 100px */
+    }
+
+    .badge-name-label.locked {
+        color: #7f8c8d;
+    }
+
+    .badge-icon-img-container {
+        width: 100%;
+        height: 100%;
+        position: absolute;
+        top: 0;
+        left: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        pointer-events: none;
+        /* Let clicks pass to the circle if needed */
+    }
+
+    .badge-icon-img {
+        width: 135%;
+        height: 135%;
+        object-fit: contain;
+        z-index: 2;
+        filter: drop-shadow(0 5px 10px rgba(0, 0, 0, 0.6));
+        transition: transform 0.2s;
+    }
+
+    .badge-icon-fa {
+        font-size: 3rem;
+        color: #ffd700;
+        filter: drop-shadow(0 0 5px rgba(0, 0, 0, 0.5));
+    }
+
+    /* Fix for button back */
+    .rpg-btn-back {
+        background: transparent;
+        border: 2px solid #555;
+        color: #bdc3c7;
+        padding: 12px 30px;
+        font-family: 'Noto Serif JP', serif;
+        font-size: 1rem;
+        transition: all 0.3s;
+        border-radius: 4px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        text-decoration: none;
+        display: inline-block;
+    }
+
+    .rpg-btn-back:hover {
+        border-color: #f1c40f;
+        color: #f1c40f;
+        background: rgba(241, 196, 15, 0.1);
+        text-decoration: none;
+    }
+</style>
+{% endblock %}
+```

@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block title %}包括的ストレージ分析 - {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>🔍 包括的ストレージ分析</h2>
+    
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h5 class="card-title">推定データサイズ</h5>
+                    <h3 class="text-primary">{{ analysis.estimated_db_total_mb }}MB</h3>
+                    <small class="text-muted">（オーバーヘッド込み）</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h5 class="card-title">Render実際の使用量</h5>
+                    <h3 class="text-warning">{{ analysis.render_usage_mb }}MB</h3>
+                    <small class="text-muted">（8.36% of 1GB）</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h5 class="card-title">差分</h5>
+                    <h3 class="{% if analysis.difference_mb > 50 %}text-danger{% else %}text-info{% endif %}">
+                        {{ analysis.difference_mb }}MB
+                    </h3>
+                    <small class="text-muted">（アプリ本体など）</small>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- テーブル別詳細 -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h4>📊 テーブル別データサイズ</h4>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>テーブル</th>
+                            <th>レコード数</th>
+                            <th>サイズ</th>
+                            <th>詳細</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>ユーザー</strong></td>
+                            <td>{{ analysis.table_analysis.users.count }}</td>
+                            <td>{{ analysis.table_analysis.users.total_size_mb }}MB</td>
+                            <td>
+                                平均: {{ analysis.table_analysis.users.avg_size_kb }}KB/人<br>
+                                最大: {{ analysis.table_analysis.users.max_user }} ({{ analysis.table_analysis.users.max_size_kb }}KB)
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><strong>CSVファイル</strong></td>
+                            <td>{{ analysis.table_analysis.csv_files.count }}</td>
+                            <td>{{ analysis.table_analysis.csv_files.total_size_mb }}MB</td>
+                            <td>
+                                {% for file in analysis.table_analysis.csv_files.files %}
+                                {{ file.filename }}: {{ file.size_kb }}KB<br>
+                                {% endfor %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><strong>部屋設定</strong></td>
+                            <td>{{ analysis.table_analysis.room_settings.count }}</td>
+                            <td>{{ analysis.table_analysis.room_settings.total_size_kb }}KB</td>
+                            <td>設定データ</td>
+                        </tr>
+                        <tr>
+                            <td><strong>パスワードトークン</strong></td>
+                            <td>{{ analysis.table_analysis.password_tokens.count }}</td>
+                            <td>{{ analysis.table_analysis.password_tokens.total_size_kb }}KB</td>
+                            <td>一時的なトークン</td>
+                        </tr>
+                        <tr>
+                            <td><strong>アプリ情報</strong></td>
+                            <td>{{ analysis.table_analysis.app_info.count }}</td>
+                            <td>{{ analysis.table_analysis.app_info.total_size_kb }}KB</td>
+                            <td>メタデータ</td>
+                        </tr>
+                        <tr>
+                            <td><strong>ユーザー統計</strong></td>
+                            <td>{{ analysis.table_analysis.user_stats.count }}</td>
+                            <td>{{ analysis.table_analysis.user_stats.total_size_kb }}KB</td>
+                            <td>統計データ</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 差分の説明 -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h4>🤔 {{ analysis.difference_mb }}MBの差分の正体</h4>
+        </div>
+        <div class="card-body">
+            <p>推定データサイズと実際の使用量に差がある理由：</p>
+            <ul>
+                <li><strong>アプリケーション本体:</strong> Python実行ファイル、ライブラリ（Flask、SQLAlchemy等）</li>
+                <li><strong>Static/Templatesファイル:</strong> CSS、JavaScript、HTMLテンプレート</li>
+                <li><strong>データベースオーバーヘッド:</strong> インデックス、メタデータ、WALログ</li>
+                <li><strong>システムファイル:</strong> ログファイル、一時ファイル、キャッシュ</li>
+                <li><strong>Renderプラットフォーム:</strong> 実行環境、監視システムなど</li>
+            </ul>
+            
+            {% if analysis.difference_mb > 70 %}
+            <div class="alert alert-warning">
+                <strong>⚠️ 注意:</strong> 差分が70MB以上です。アプリ本体が大きくなっている可能性があります。
+            </div>
+            {% else %}
+            <div class="alert alert-success">
+                <strong>✅ 正常:</strong> 差分は正常範囲内です。
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <div class="text-center">
+        <a href="{{ url_for('admin_page') }}" class="btn btn-secondary">← 管理者ページに戻る</a>
+        <button type="button" onclick="location.reload()" class="btn btn-outline-info">🔄 再分析</button>
+        <button type="button" onclick="window.print()" class="btn btn-outline-primary">🖨️ 分析結果を印刷</button>
+    </div>
+</div>
+{% endblock %}

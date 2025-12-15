@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+{% block title %}データ整合性確認 - {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h2>📊 進捗データ整合性確認</h2>
+    
+    <div class="alert alert-info">
+        <strong>このページについて：</strong> 学習履歴データの整合性を確認し、問題ID生成の動作をテストします。
+    </div>
+
+    <!-- 概要統計 -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <h3>📈 概要統計</h3>
+            <div class="row">
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h5 class="card-title">{{ debug_info|length }}</h5>
+                            <p class="card-text">総ユーザー数</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h5 class="card-title">{{ debug_info|sum(attribute='total_history_entries') }}</h5>
+                            <p class="card-text">総学習履歴数</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h5 class="card-title">{{ debug_info|sum(attribute='matched_problems') }}</h5>
+                            <p class="card-text">マッチした問題数</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h5 class="card-title">{{ debug_info|sum(attribute='unmatched_problems') }}</h5>
+                            <p class="card-text">マッチしない問題数</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ユーザー別詳細データ -->
+    <div class="mb-4">
+        <h3>👥 ユーザー別データ状況</h3>
+        {% if debug_info %}
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th>ユーザー名</th>
+                        <th>部屋番号</th>
+                        <th>学習履歴数</th>
+                        <th>マッチする問題</th>
+                        <th>マッチしない問題</th>
+                        <th>苦手問題数</th>
+                        <th>データ整合性</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for info in debug_info %}
+                    <tr>
+                        <td><strong>{{ info.username }}</strong></td>
+                        <td><span class="badge bg-secondary">{{ info.room_number }}</span></td>
+                        <td>{{ info.total_history_entries }}</td>
+                        <td>
+                            <span class="text-success">{{ info.matched_problems }}</span>
+                        </td>
+                        <td>
+                            {% if info.unmatched_problems > 0 %}
+                                <span class="text-danger">{{ info.unmatched_problems }}</span>
+                            {% else %}
+                                <span class="text-muted">0</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ info.incorrect_words_count }}</td>
+                        <td>
+                            {% if info.unmatched_problems == 0 %}
+                                <span class="badge bg-success">✅ 正常</span>
+                            {% else %}
+                                <span class="badge bg-warning">⚠️ 要移行</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% if info.unmatched_problems > 0 and info.unmatched_list %}
+                    <tr class="table-light">
+                        <td colspan="7">
+                            <small class="text-muted">
+                                <strong>マッチしないID例:</strong> 
+                                {{ info.unmatched_list|join(', ') }}
+                                {% if info.unmatched_problems > 5 %}...他{{ info.unmatched_problems - 5 }}件{% endif %}
+                            </small>
+                        </td>
+                    </tr>
+                    {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="alert alert-warning">学習履歴を持つユーザーがいません。</div>
+        {% endif %}
+    </div>
+
+    <!-- 問題ID生成テスト -->
+    <div class="mb-4">
+        <h3>🔍 問題ID生成テスト</h3>
+        <p class="text-muted">JavaScript側とPython側で同じIDが生成されているかを確認します。</p>
+        
+        {% if id_test_results %}
+        <div class="table-responsive">
+            <table class="table table-bordered">
+                <thead class="table-light">
+                    <tr>
+                        <th>問題文</th>
+                        <th>章</th>
+                        <th>単元</th>
+                        <th>生成されたID</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for result in id_test_results %}
+                    <tr>
+                        <td>{{ result.question }}</td>
+                        <td>{{ result.chapter }}</td>
+                        <td>{{ result.number }}</td>
+                        <td><code>{{ result.generated_id }}</code></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="alert alert-warning">問題データがロードされていません。</div>
+        {% endif %}
+    </div>
+
+    <!-- アクションボタン -->
+    <div class="d-flex gap-2 mb-4">
+        <a href="{{ url_for('admin_page') }}" class="btn btn-primary">
+            <i class="fas fa-arrow-left"></i> 管理者ページに戻る
+        </a>
+        <button onclick="window.location.reload()" class="btn btn-outline-secondary">
+            <i class="fas fa-sync-alt"></i> 更新
+        </button>
+    </div>
+
+    <!-- 推奨アクション -->
+    {% set total_unmatched = debug_info|sum(attribute='unmatched_problems') %}
+    {% if total_unmatched > 0 %}
+    <div class="alert alert-warning">
+        <h5>🔧 推奨アクション</h5>
+        <p>{{ total_unmatched }}件のマッチしない学習履歴が検出されました。</p>
+        <p><strong>次の手順を実行してください：</strong></p>
+        <ol>
+            <li>管理者ページに戻る</li>
+            <li>「🔄 学習履歴データを移行」ボタンを実行</li>
+            <li>このページで再確認</li>
+        </ol>
+    </div>
+    {% else %}
+    <div class="alert alert-success">
+        <h5>✅ データ整合性確認完了</h5>
+        <p>すべての学習履歴が正しく関連付けられています。データ移行は不要です。</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

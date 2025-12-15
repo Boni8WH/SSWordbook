@@ -1,0 +1,273 @@
+{% extends "base.html" %}
+{% block title %}苦手問題一覧 - {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-crosshairs me-2"></i>苦手問題一覧</h2>
+        <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-1"></i>学習画面に戻る
+        </a>
+    </div>
+
+    <ul class="nav nav-tabs mb-4" id="weakProblemTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="my-weak-tab" data-bs-toggle="tab" data-bs-target="#my-weak"
+                type="button" role="tab" aria-controls="my-weak" aria-selected="true">
+                <i class="fas fa-user me-1"></i>自分の苦手問題
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="everyone-weak-tab" data-bs-toggle="tab" data-bs-target="#everyone-weak"
+                type="button" role="tab" aria-controls="everyone-weak" aria-selected="false">
+                <i class="fas fa-users me-1"></i>みんなの苦手問題
+            </button>
+        </li>
+    </ul>
+
+    <div class="tab-content" id="weakProblemTabContent">
+        <!-- 自分の苦手問題 -->
+        <div class="tab-pane fade show active" id="my-weak" role="tabpanel" aria-labelledby="my-weak-tab">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title mb-3">正答率ワースト20</h5>
+                    <p class="text-muted small">過去の全学習履歴から、正答率が低い順に20問を表示しています。<br>（<span
+                            class="badge bg-danger">苦手</span>バッジがついている問題は、現在「苦手問題モード」の出題対象です）</p>
+
+                    <div id="myWeakLoading" class="text-center py-4">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-2 text-muted">データを読み込み中...</p>
+                    </div>
+
+                    <div id="myWeakEmpty" class="alert alert-info hidden">
+                        まだ回答履歴がありません。
+                    </div>
+
+                    <ul id="myWeakList" class="list-group list-group-flush">
+                        <!-- JavaScriptで挿入 -->
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- みんなの苦手問題 -->
+        <div class="tab-pane fade" id="everyone-weak" role="tabpanel" aria-labelledby="everyone-weak-tab">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title mb-3">みんなの正答率ワースト20</h5>
+                    <p class="text-muted small">同じ部屋のメンバー全員の正答率を集計した、間違いやすい問題Top20です。<br>※Z問題（難関私大対策）は集計対象外です。</p>
+
+                    <div id="everyoneWeakLoading" class="text-center py-4">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-2 text-muted">集計データを読み込み中...</p>
+                    </div>
+
+                    <div id="everyoneWeakEmpty" class="alert alert-info hidden">
+                        集計データがありません。
+                    </div>
+
+                    <ul id="everyoneWeakList" class="list-group list-group-flush">
+                        <!-- JavaScriptで挿入 -->
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        loadMyWeakProblems();
+
+        // タブ切り替え時にデータをロード（初回のみ）
+        const everyoneTab = document.getElementById('everyone-weak-tab');
+        let everyoneLoaded = false;
+
+        everyoneTab.addEventListener('shown.bs.tab', function (event) {
+            if (!everyoneLoaded) {
+                loadEveryoneWeakProblems();
+                everyoneLoaded = true;
+            }
+        });
+    });
+
+    // 問題ID生成関数（script.jsと同じロジック）
+    function generateProblemId(word) {
+        try {
+            const chapter = String(word.chapter || '0').padStart(3, '0');
+            const number = String(word.number || '0').padStart(3, '0');
+            const question = String(word.question || '');
+            const answer = String(word.answer || '');
+
+            const questionClean = question.substring(0, 15).replace(/[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/g, '');
+            const answerClean = answer.substring(0, 10).replace(/[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/g, '');
+
+            return `${chapter}-${number}-${questionClean}-${answerClean}`;
+        } catch (error) {
+            console.error('ID生成エラー:', error);
+            return null;
+        }
+    }
+
+    function loadMyWeakProblems() {
+        const loading = document.getElementById('myWeakLoading');
+        const empty = document.getElementById('myWeakEmpty');
+        const list = document.getElementById('myWeakList');
+
+        Promise.all([
+            fetch('/api/load_quiz_progress').then(r => r.json()),
+            fetch('/api/word_data').then(r => r.json())
+        ]).then(([progressData, wordData]) => {
+            loading.classList.add('hidden');
+
+            if (progressData.status !== 'success' || !wordData) {
+                console.error('データ取得エラー');
+                return;
+            }
+
+            const problemHistory = progressData.problemHistory || {};
+            const incorrectWords = progressData.incorrectWords || [];
+
+            // wordDataが配列でない場合の対応
+            let words = Array.isArray(wordData) ? wordData : (wordData.word_data || []);
+
+            const allProblemsWithStats = [];
+
+            for (const [problemId, history] of Object.entries(problemHistory)) {
+                const correctAttempts = history.correct_attempts || 0;
+                const incorrectAttempts = history.incorrect_attempts || 0;
+                const totalAttempts = correctAttempts + incorrectAttempts;
+
+                if (totalAttempts > 0) {
+                    const accuracyRate = (correctAttempts / totalAttempts * 100);
+
+                    const originalWord = words.find(word => generateProblemId(word) === problemId);
+
+                    if (originalWord) {
+                        allProblemsWithStats.push({
+                            question: originalWord.question,
+                            answer: originalWord.answer,
+                            correctAttempts,
+                            incorrectAttempts,
+                            totalAttempts,
+                            accuracyRate,
+                            isCurrentlyWeak: incorrectWords.includes(problemId)
+                        });
+                    }
+                }
+            }
+
+            // ソート: 正答率低い順 -> 回答数多い順
+            allProblemsWithStats.sort((a, b) => {
+                if (a.accuracyRate !== b.accuracyRate) return a.accuracyRate - b.accuracyRate;
+                return b.totalAttempts - a.totalAttempts;
+            });
+
+            const top20 = allProblemsWithStats.slice(0, 20);
+
+            if (top20.length === 0) {
+                empty.classList.remove('hidden');
+            } else {
+                renderList(list, top20, true);
+            }
+        }).catch(err => {
+            console.error(err);
+            loading.classList.add('hidden');
+            empty.textContent = 'エラーが発生しました。';
+            empty.classList.remove('hidden');
+        });
+    }
+
+    function loadEveryoneWeakProblems() {
+        const loading = document.getElementById('everyoneWeakLoading');
+        const empty = document.getElementById('everyoneWeakEmpty');
+        const list = document.getElementById('everyoneWeakList');
+
+        fetch('/api/weak_problems_everyone')
+            .then(r => r.json())
+            .then(data => {
+                loading.classList.add('hidden');
+
+                if (data.status === 'success' && data.problems && data.problems.length > 0) {
+                    renderList(list, data.problems, false);
+                } else {
+                    empty.classList.remove('hidden');
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                loading.classList.add('hidden');
+                empty.textContent = 'エラーが発生しました。';
+                empty.classList.remove('hidden');
+            });
+    }
+
+    function renderList(container, items, isPersonal) {
+        container.innerHTML = '';
+        items.forEach((item, index) => {
+            const li = document.createElement('li');
+            li.className = 'list-group-item p-3';
+
+            const rankBadge = `<span class="badge bg-primary me-2">${index + 1}位</span>`;
+            const weakBadge = (isPersonal && item.isCurrentlyWeak) ?
+                `<span class="badge bg-danger ms-2">苦手</span>` : '';
+
+            const accuracyColor = item.accuracyRate >= 80 ? 'text-success' : 'text-danger';
+
+            li.innerHTML = `
+            <div class="d-flex justify-content-between align-items-start">
+                <div class="flex-grow-1">
+                    <div class="fw-bold mb-1">
+                        ${rankBadge}${item.question}${weakBadge}
+                    </div>
+                    <div class="text-muted small mb-2">
+                        <span class="answer-blur" onclick="this.classList.toggle('revealed')">
+                            ${item.answer}
+                        </span>
+                        <span class="ms-2 text-secondary" style="font-size: 0.8em;">(クリックで答えを表示)</span>
+                    </div>
+                </div>
+                <div class="text-end ms-3" style="min-width: 120px;">
+                    <div class="fw-bold ${accuracyColor}">
+                        正答率: ${item.accuracyRate.toFixed(1)}%
+                    </div>
+                    <div class="text-muted small">
+                        ${isPersonal ?
+                    `正解:${item.correctAttempts} / 不正解:${item.incorrectAttempts}` :
+                    `合計回答数: ${item.totalAttempts}回`}
+                    </div>
+                </div>
+            </div>
+        `;
+            container.appendChild(li);
+        });
+    }
+</script>
+
+<style>
+    .answer-blur {
+        filter: blur(4px);
+        cursor: pointer;
+        transition: filter 0.2s;
+        user-select: none;
+        background-color: #f0f0f0;
+        padding: 0 4px;
+        border-radius: 3px;
+    }
+
+    .answer-blur.revealed {
+        filter: none;
+        background-color: transparent;
+    }
+
+    .hidden {
+        display: none !important;
+    }
+</style>
+{% endblock %}
