@@ -1,0 +1,38 @@
+# render.yaml - データ永続化対応版
+services:
+  - type: web
+    name: sekaishi-app
+    env: python
+    plan: free
+    region: singapore
+    
+    buildCommand: |
+      pip install --upgrade pip &&
+      pip install -r requirements.txt
+    
+    startCommand: gunicorn --bind 0.0.0.0:$PORT --workers 2 --timeout 120 app:app
+    
+    envVars:
+      # データベース設定（重要）
+      - key: DATABASE_URL
+        fromDatabase:
+          name: world_history_postgres
+          property: connectionString
+      
+      # アプリケーション設定
+      - key: RESET_DATABASE
+        value: "false"
+      - key: RENDER
+        value: "true"
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      
+      # セキュリティ設定
+      - key: SECRET_KEY
+        generateValue: true
+
+# データベース設定
+databases:
+  - name: world_history_postgres
+    databaseName: world_history_db
+    user: world_history_user

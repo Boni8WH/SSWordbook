@@ -1,0 +1,21 @@
+
+    <!-- Generic Confirmation Modal (Global) -->
+    <div class="modal fade" id="genericConfirmModal" tabindex="-1" aria-labelledby="genericConfirmModalLabel"
+        aria-hidden="true" style="z-index: 1060;">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="genericConfirmTitle">確認</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="genericConfirmBody">
+                    <!-- Message goes here -->
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+                    <button type="button" class="btn btn-primary" id="genericConfirmBtn"
+                        onclick="executeGenericConfirm()">実行</button>
+                </div>
+            </div>
+        </div>
+    </div>

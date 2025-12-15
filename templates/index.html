@@ -1,0 +1,435 @@
+{% extends "base.html" %}
+{% block title %}学習モード - {{ app_name }}{% endblock %}
+
+{% block content %}
+<section class="selection-area">
+    <!-- RPG Trigger Banner -->
+    <div id="rpgTriggerBanner" class="rpg-banner hidden">
+        <div class="rpg-banner-content" onclick="openRpgIntro()">
+            <div class="pulse-ring"></div>
+            <span class="distortion-icon">🌀</span>
+            <div class="text-container">
+                <span class="alert-label">WARNING</span>
+                <span class="distortion-text">時空の歪みを検知しました</span>
+            </div>
+            <button class="btn-rpg-start">修正ミッションへ</button>
+        </div>
+    </div>
+
+    <div class="controls-area">
+
+        <div class="question-count-and-auth">
+            <div class="question-count-selection">
+                <h3>出題数を選択</h3>
+                <div class="radio-group">
+                    <label>
+                        <input type="radio" name="questionCount" value="10">
+                        <span>10問</span>
+                    </label>
+                    <label>
+                        <input type="radio" name="questionCount" value="20">
+                        <span>20問</span>
+                    </label>
+                    <label>
+                        <input type="radio" name="questionCount" value="50">
+                        <span>50問</span>
+                    </label>
+                    <label>
+                        <input type="radio" name="questionCount" value="all">
+                        <span>全問</span>
+                    </label>
+                    <label>
+                        <input type="radio" name="questionCount" value="incorrectOnly" id="incorrectOnlyRadio" {% if not
+                            session.get('user_id') %}disabled{% endif %}>
+                        <span>苦手問題</span>
+                    </label>
+                </div>
+                <!-- 未解答のみチェックボックス -->
+                <div class="checkbox-group" style="margin-top: 10px; display: flex; gap: 15px;">
+                    <label>
+                        <input type="checkbox" id="unsolvedOnlyCheckbox" {% if not session.get('user_id') %}disabled{%
+                            endif %}>
+                        <span>未解答のみ</span>
+                    </label>
+                    <label>
+                        <input type="checkbox" id="unmasteredOnlyCheckbox" {% if not session.get('user_id') %}disabled{%
+                            endif %}>
+                        <span>未マスターのみ</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <div class="range-selection-area">
+            <div class="section-header-with-action">
+                <h3>出題範囲を選択</h3>
+                <button id="openSearchButton" class="btn btn-sm btn-outline-secondary">
+                    <i class="fas fa-search"></i> 問題検索
+                </button>
+            </div>
+            <div class="chapters-container">
+                {% for chapter_num, chapter in chapter_data.items() %}
+                <div class="chapter-item" data-chapter-num="{{ chapter_num }}">
+                    <div class="chapter-header">
+                        <span class="chapter-title">{{ chapter.name }}</span>
+                        <div class="chapter-options">
+                            <button class="select-all-chapter-btn" data-chapter="{{ chapter_num }}"
+                                type="button">全て選択</button>
+                            <span class="toggle-icon">▶</span>
+                        </div>
+                    </div>
+                    <div class="unit-list">
+                        {% for unit_num, unit in chapter.units.items() %}
+                        {% if unit.enabled %}
+                        <div class="unit-item">
+                            <input type="checkbox" id="unit-{{ chapter_num }}-{{ unit_num }}" value="{{ unit_num }}"
+                                data-chapter="{{ chapter_num }}">
+                            <label for="unit-{{ chapter_num }}-{{ unit_num }}">
+                                {{ unit_num }}. {{ unit.categoryName }}
+                            </label>
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="bottom-controls">
+            <button id="startButton" class="btn btn-start">
+                <i class="fas fa-play"></i> 学習開始
+            </button>
+            <button id="resetSelectionButton" class="btn btn-reset">
+                <i class="fas fa-undo"></i> 選択リセット
+            </button>
+            <button id="dailyQuizButton" class="btn btn-daily">
+                <i class="fas fa-stopwatch"></i> 今日の10問
+            </button>
+            <a href="{{ url_for('weak_problems_page') }}" class="btn btn-weak" {% if not session.get('user_id')
+                %}style="display: none;" {% endif %}>
+                <i class="fas fa-crosshairs"></i> 苦手問題一覧
+            </a>
+            <a href="{{ url_for('essay_index') }}" class="btn btn-essay">
+                <i class="fas fa-edit"></i> 論述問題集
+            </a>
+        </div>
+    </div>
+</section>
+
+<section class="card-area hidden">
+    <div class="progress-bar-container">
+        <div id="progressBar" class="progress-bar"></div>
+        <span id="questionNumberDisplay" class="question-number-display"></span>
+    </div>
+    <div class="card">
+        <div class="question-content">
+            <p id="question"></p>
+        </div>
+        <div class="answer-content">
+            <p id="answer" class="hidden"></p>
+        </div>
+    </div>
+    <div class="card-buttons">
+        <button id="showAnswerButton" class="primary-button">答えを見る</button>
+        <button id="correctButton" class="correct-button hidden">正解</button>
+        <button id="incorrectButton" class="incorrect-button hidden">不正解</button>
+    </div>
+    <div class="back-to-selection-container">
+        <button id="backToSelectionFromCardButton" class="secondary-button">選択画面に戻る</button>
+    </div>
+</section>
+
+<section id="quizResult" class="quiz-result-area hidden">
+    <div id="quizResultContent">
+        <h2>学習結果</h2>
+        <p>出題数: <span id="totalQuestionsCount"></span>問</p>
+        <p>正解数: <span id="correctCount"></span>問</p>
+        <p>不正解数: <span id="incorrectCount"></span>問</p>
+        <p>正答率: <span id="accuracyRate"></span>%</p>
+        <p class="total-in-range">選択範囲の全問題数: <span id="selectedRangeTotalQuestions"></span>問</p>
+    </div>
+
+    <div id="incorrectWordList" class="incorrect-word-list hidden">
+        <h3>今回の不正解問題</h3>
+        <ul id="incorrectWordsContainer">
+        </ul>
+    </div>
+
+    <div id="recommendedEssaysSection" class="incorrect-word-list hidden" style="border-color: #3498db;">
+        <h3 style="color: #2980b9; border-color: #a9cce3;">
+            <i class="fas fa-edit"></i> 論述問題にチャレンジ！
+        </h3>
+        <ul id="recommendedEssaysContainer">
+        </ul>
+    </div>
+
+    <div class="result-buttons">
+        <button id="backToSelectionButton" class="secondary-button">選択画面に戻る</button>
+        <button id="restartQuizButton" class="primary-button">同じ条件で再学習</button>
+        <button id="shareXButton" class="share-button">Xでシェア</button>
+        <button id="downloadImageButton" class="share-button">画像でシェア</button>
+    </div>
+</section>
+
+<!-- 情報パネル -->
+<div class="info-icon" id="infoIcon">i</div>
+<div class="info-panel hidden" id="infoPanel">
+    <h3 id="appInfoTitle">アプリ情報</h3>
+
+    <!-- お知らせセクション -->
+    <div id="announcementsSection" style="margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 15px;">
+        <h4 style="font-size: 1.1em; color: #e67e22; margin-bottom: 10px;">
+            <i class="fas fa-bullhorn"></i> お知らせ
+        </h4>
+        <div id="announcementsList" style="max-height: 200px; overflow-y: auto;">
+            <p class="text-muted" style="font-size: 0.9em;">お知らせを読み込み中...</p>
+        </div>
+    </div>
+</div>
+
+<!-- 検索モーダル -->
+<div class="modal fade" id="searchModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-search"></i> 問題検索</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="input-group mb-3">
+                    <input type="text" id="searchInput" class="form-control" placeholder="キーワードを入力（例: アナーニ事件）">
+                    <button class="btn btn-primary" type="button" id="searchExecuteButton">検索</button>
+                </div>
+                <div id="searchResults" class="list-group" style="max-height: 400px; overflow-y: auto;">
+                    <!-- 検索結果がここに表示されます -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- RPG Modal -->
+<div id="rpgOverlay" class="rpg-overlay hidden">
+    <div class="rpg-modal-container">
+        <!-- Intro Screen -->
+        <div id="rpgIntroScreen" class="rpg-screen">
+            <div class="rpg-header">
+                <span class="mission-tag">MISSION</span>
+                <h2 class="rpg-title">時空の歪みを修正せよ</h2>
+            </div>
+
+            <div class="boss-preview-vertical">
+                <!-- 1. Name -->
+                <h3 id="rpgBossName" class="boss-name-large">BOSS NAME</h3>
+
+                <!-- 2. Visual -->
+                <div class="boss-visual">
+                    <!-- Boss Image Placeholder -->
+                    <img src="" id="rpgBossImage" alt="Boss" class="boss-img" onerror="this.style.display='none'">
+                    <!-- Fallback if no image -->
+                    <div class="boss-shadow">?</div>
+                </div>
+
+                <!-- 3. Difficulty Stars -->
+                <div class="difficulty-stars-container">
+                    <div id="rpgDifficultyStars" class="difficulty-stars">★★★★★</div>
+                </div>
+            </div>
+
+
+            <p id="rpgIntroDialog"
+                style="font-style: italic; color: #bdc3c7; margin-bottom: 20px; text-align: center; padding: 0 10px;">
+                "我は時空の覇者..."
+            </p>
+
+            <div class="mission-details">
+                <div class="rule-item">
+                    <i class="fas fa-stopwatch"></i>
+                    <span id="rpgRuleTime">制限時間 60秒</span>
+                </div>
+                <div class="rule-item">
+                    <i class="fas fa-bullseye"></i>
+                    <span id="rpgRuleCondition">合格ライン 10問正解</span>
+                </div>
+                <div class="rule-item warning" style="color: #e74c3c;">
+                    <i class="fas fa-heart-broken"></i>
+                    <span id="rpgRuleMistake">3ミスで即終了</span>
+                </div>
+            </div>
+
+            <div class="rpg-actions">
+                <button id="btnRpgStart" class="btn-rpg-primary">BATTLE START</button>
+                <button id="btnRpgCancel" class="btn-rpg-secondary">撤退する</button>
+            </div>
+        </div>
+
+        <!-- Battle Screen -->
+        <div id="rpgBattleScreen" class="rpg-screen hidden">
+            <div class="battle-hud">
+                <div class="timer-container">
+                    <div class="timer-icon">⏱</div>
+                    <div class="timer-bar-bg">
+                        <div id="rpgTimerBar" class="timer-bar-fill"></div>
+                    </div>
+                </div>
+                <div class="boss-hp-container">
+                    <span class="hp-label">BOSS HP</span>
+                    <div class="hp-bar-bg">
+                        <div id="rpgBossHpBar" class="hp-bar-fill"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="battle-main">
+                <div class="boss-avatar-battle">
+                    <img src="" id="rpgBattleBossImage" class="boss-img-small">
+                    <!-- Damage effect overlay -->
+                    <div id="rpgDamageEffect" class="damage-text hidden">-1</div>
+                </div>
+                <div class="rpg-question-box">
+                    <p id="rpgQuestionText">Question...</p>
+                </div>
+            </div>
+
+            <div id="rpgChoicesContainer" class="rpg-choices-grid">
+                <!-- Choices generated by JS -->
+            </div>
+        </div>
+
+        <!-- Result Screen -->
+        <div id="rpgResultScreen" class="rpg-screen hidden">
+            <div class="result-header">
+                <h2 id="rpgResultTitle">MISSION CLEAR</h2>
+            </div>
+
+            <div id="rpgWinContent" class="hidden">
+                <p id="rpgWinDialogue"
+                    style="font-style: italic; color: #f1c40f; margin-bottom: 20px; text-align: center; font-size: 1.1em;">
+                    "見事だ..."
+                </p>
+                <div class="reward-box">
+                    <h3>報酬獲得</h3>
+                    <div class="reward-row">
+                        <div class="reward-icon">🎖️</div>
+                        <div class="reward-info">
+                            <span class="reward-label">称号</span>
+                            <span class="reward-curr" id="rpgRewardBadgeName">Badge Name</span>
+                        </div>
+                    </div>
+                    <div class="reward-row">
+                        <span class="reward-icon">⚡</span>
+                        <div class="reward-info">
+                            <span class="reward-label">永続ボーナス</span>
+                            <span id="rpgRewardBonus" class="reward-value">Score +0.5%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="rpgLoseContent" class="hidden">
+                <div class="lose-message">
+                    <p>歴史の修正に失敗しました...</p>
+                    <p class="cooldown-notice">※エネルギー充填のため、翌朝7時まで再挑戦できません。</p>
+                </div>
+            </div>
+
+            <div class="rpg-actions">
+                <button id="btnRpgClose" class="btn-rpg-primary">戻る</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- RPG Story Overlay (Intro Event) -->
+<div id="rpgStoryOverlay" class="rpg-overlay hidden" style="z-index: 2000;">
+    <!-- Background Effects -->
+    <div id="storyNoiseLayer" class="noise-layer hidden"></div>
+    <div id="storyLightLayer" class="light-layer hidden"></div>
+
+    <!-- Character Area -->
+    <div class="story-stage">
+        <div id="storyEnemySilhouette" class="enemy-silhouette hidden">
+            <!-- Preload Alex.png. Parent has opacity: 0 so it's hidden until class 'show' is added. -->
+            <img src="/static/pergamon/alex.png" alt="Enemy Shadow">
+        </div>
+        <div id="storyCharacterContainer" class="character-container hidden">
+            <!-- Default to first frame to avoid pop-in, or transparent if logic handles it -->
+            <img id="storyPerImage" src="/static/pergamon/confusion.png" alt="Per" class="character-img">
+        </div>
+    </div>
+
+    <!-- Dialogue Box -->
+    <div id="storyDialogueBox" class="dialogue-box hidden">
+        <div class="dialogue-name-tag" id="storySpeakerName">ペル</div>
+        <div class="dialogue-text" id="storyText">...</div>
+        <div class="dialogue-arrow">▼</div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+    /* 苦手問題制限時のレイアウト調整 */
+    .weak-problem-warning {
+        animation: slideDown 0.4s ease-out;
+    }
+
+    @keyframes slideDown {
+        from {
+            opacity: 0;
+            transform: translateY(-20px);
+            max-height: 0;
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+            max-height: 300px;
+        }
+    }
+
+    /* 制限時のボタンエリア調整 */
+    .controls-area.restricted-mode {
+        padding-bottom: 20px;
+    }
+
+    .controls-area.restricted-mode .bottom-controls {
+        margin-top: 20px;
+        justify-content: center;
+    }
+
+    /* タブレット・モバイル対応 */
+    @media (max-width: 768px) {
+        .weak-problem-warning div {
+            padding: 15px !important;
+            margin: 15px 0 !important;
+            font-size: 0.95em;
+        }
+
+        .weak-problem-warning h4 {
+            font-size: 1.1em !important;
+        }
+
+        .weak-problem-warning p {
+            font-size: 1em !important;
+        }
+    }
+
+    /* クイズ中の通知用アニメーション */
+    @keyframes slideInRight {
+        from {
+            opacity: 0;
+            transform: translateX(100px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+
+    .quiz-time-notification {
+        transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+</style>
+{% endblock %}

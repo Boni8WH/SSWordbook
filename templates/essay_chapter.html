@@ -1,0 +1,710 @@
+{% extends "base.html" %}
+
+{% block title %}{{ chapter_name }} - 論述問題集{% endblock %}
+
+{% block head_extra %}
+<style>
+/* 基本スタイル */
+.essay-chapter-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+    background: #f8f9fa;
+    /* min-height削除 - フッター問題の原因 */
+}
+
+/* ヘッダー */
+.chapter-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 15px 20px; /* 縦方向をさらに削減 */
+    border-radius: 15px;
+    margin-bottom: 30px;
+    box-shadow: 0 5px 20px rgba(102, 126, 234, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+.breadcrumb {
+    font-size: 0.9rem;
+    margin-bottom: 15px;
+    opacity: 0.9;
+}
+
+.breadcrumb a {
+    color: white;
+    text-decoration: none;
+}
+
+.breadcrumb a:hover {
+    text-decoration: underline;
+}
+
+.breadcrumb i {
+    margin: 0 8px;
+}
+
+.chapter-title {
+    margin: 0;
+    font-size: 2rem;
+    font-weight: 700;
+    color: white; /* 黒色 → 白色に変更 */
+    flex: 1;
+    min-width: 200px;
+}
+
+.chapter-stats {
+    display: flex; /* grid → flex に変更して横並び */
+    gap: 20px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.stat-item {
+    background: rgba(255, 255, 255, 0.15);
+    padding: 8px 12px; /* より薄く、横長に */
+    border-radius: 8px;
+    backdrop-filter: blur(10px);
+    text-align: center;
+    min-width: 80px; /* 最小幅設定 */
+    font-size: 0.9rem;
+}
+
+.stat-item i {
+    margin-right: 6px;
+    opacity: 0.9;
+    font-size: 0.9rem;
+}
+
+/* フィルターセクション */
+.filter-section {
+    background: white;
+    padding: 20px;
+    border-radius: 12px;
+    margin-bottom: 30px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.filter-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+}
+
+.filter-item {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.filter-label {
+    font-weight: 600;
+    color: #2c3e50;
+    font-size: 0.9rem;
+}
+
+.filter-select {
+    padding: 10px 12px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    background: white;
+}
+
+/* タイプセクション */
+.type-section {
+    margin-bottom: 40px;
+}
+
+.type-header {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 20px;
+    padding: 15px 0;
+    /* border-bottomを削除 - これが横線問題の原因 */
+    /* border-bottom: 2px solid #e9ecef; */
+}
+
+.type-badge {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    min-width: 80px;
+    text-align: center;
+    /* 右側にボーダーを追加してセパレーターとして機能 */
+    margin-right: 15px;
+}
+
+.type-title {
+    margin: 0;
+    color: #2c3e50;
+    font-size: 1.4rem;
+    font-weight: 600;
+    /* 下部にのみボーダーを追加 */
+    border-bottom: 2px solid #e9ecef;
+    padding-bottom: 10px;
+    flex: 1;
+}
+
+/* 問題グリッド - さらなる改善 */
+.problems-grid {
+    display: grid;
+    /* グリッド列の設定を修正 */
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 20px;
+    /* カードを上部に揃える */
+    align-items: start;
+    /* 行の高さを内容に合わせて自動調整 */
+    grid-auto-rows: min-content;
+    /* グリッドコンテナの幅を明示的に設定 */
+    width: 100%;
+    max-width: 1200px;
+}
+
+/* 大画面での最適化 */
+@media (min-width: 1200px) {
+    .problems-grid {
+        /* 大画面では最大3列に制限 */
+        grid-template-columns: repeat(3, 1fr);
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+}
+
+@media (min-width: 768px) and (max-width: 1199px) {
+    .problems-grid {
+        /* 中画面では2列 */
+        grid-template-columns: repeat(2, 1fr);
+        max-width: 800px;
+        margin: 0 auto;
+    }
+}
+
+/* 問題カード */
+.problem-card-link {
+    text-decoration: none;
+    color: inherit;
+    display: block;
+    /* カード全体の高さを統一 */
+    height: 100%;
+}
+
+.problem-card {
+    background: white;
+    border: 1px solid #e9ecef;
+    border-radius: 12px;
+    padding: 20px;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    /* フレックスボックスでカード内容を整理 */
+    display: flex;
+    flex-direction: column;
+    /* カードの高さを100%に設定 */
+    height: 100%;
+    /* 最小高さを設定して統一感を出す */
+    min-height: 200px;
+    position: relative;
+}
+
+.problem-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 20px rgba(102, 126, 234, 0.15);
+    border-color: #667eea;
+}
+
+.problem-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 15px;
+    gap: 15px;
+}
+
+.university-year {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+}
+
+.university {
+    font-weight: 600;
+    color: #2c3e50;
+    font-size: 1.05rem;
+    line-height: 1.2;
+}
+
+.year {
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+
+/* 進捗インジケーター */
+.progress-indicators {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: flex-start;
+    justify-content: flex-end;
+    min-width: 120px;
+}
+
+.indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-align: center;
+    white-space: nowrap;
+    border: 1px solid transparent;
+}
+
+.indicator.viewed {
+    background: #e3f2fd;
+    color: #1565c0;
+    border-color: #bbdefb;
+}
+
+.indicator.understood {
+    background: #e8f5e8;
+    color: #2e7d32;
+    border-color: #c8e6c9;
+}
+
+.indicator.review {
+    background: #fff3e0;
+    color: #f57c00;
+    border-color: #ffcc02;
+}
+
+.indicator.difficulty {
+    background: #f3e5f5;
+    color: #7b1fa2;
+    border-color: #ce93d8;
+}
+
+/* 問題コンテンツ */
+.problem-content {
+    /* フレックスで残りスペースを埋める */
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.problem-preview {
+    margin-bottom: 15px;
+    line-height: 1.6;
+    color: #4a5568;
+    font-size: 0.95rem;
+    /* テキスト省略の改善 */
+    display: -webkit-box;
+    -webkit-line-clamp: 4;
+    line-clamp: 4;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    /* フレックスで成長させる */
+    flex-grow: 1;
+}
+
+/* 問題がない場合 */
+.no-problems {
+    text-align: center;
+    padding: 60px 20px;
+    color: #6c757d;
+}
+
+.no-problems i {
+    font-size: 3rem;
+    margin-bottom: 20px;
+    opacity: 0.3;
+}
+
+.no-problems h3 {
+    margin-bottom: 10px;
+    color: #495057;
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 768px) {
+    .essay-chapter-container {
+        padding: 10px;
+    }
+    
+    .chapter-header {
+        padding: 12px 15px;
+        margin-bottom: 20px;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+
+    .chapter-title {
+        font-size: 1.6rem;
+        width: 100%;
+    }
+    
+    .chapter-stats {
+        gap: 12px;
+        width: 100%;
+        justify-content: space-between;
+    }
+    
+    .filter-grid {
+        grid-template-columns: 1fr;
+        gap: 15px;
+    }
+    
+    .problems-grid {
+        /* モバイルでは1列 */
+        grid-template-columns: 1fr;
+        gap: 15px;
+    }
+    
+    .problem-card {
+        padding: 15px;
+        min-height: 180px;
+    }
+    
+    .indicator {
+        font-size: 0.7rem;
+        padding: 3px 6px;
+    }
+    
+    .problem-preview {
+        -webkit-line-clamp: 3;
+        line-clamp: 3;
+    }
+
+    .stat-item {
+        padding: 6px 8px;
+        font-size: 0.8rem;
+        min-width: 70px;
+        flex: 1;
+    }
+
+    .stat-item i {
+        font-size: 0.8rem;
+        margin-right: 4px;
+    }
+}
+
+@media (max-width: 480px) {
+    .chapter-header {
+        padding: 10px 12px;
+        margin-bottom: 15px;
+    }
+    
+    .chapter-title {
+        font-size: 1.4rem;
+    }
+    
+    .chapter-stats {
+        gap: 8px;
+    }
+    
+    .stat-item {
+        padding: 5px 6px;
+        font-size: 0.75rem;
+        min-width: 60px;
+    }
+    
+    .stat-item i {
+        font-size: 0.75rem;
+        margin-right: 3px;
+    }
+}
+
+/* ローディング状態のスタイル */
+.loading {
+    text-align: center;
+    padding: 40px;
+    color: #6c757d;
+}
+
+.loading i {
+    font-size: 2rem;
+    margin-bottom: 15px;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* フッター対応のための追加スタイル */
+.problems-section {
+    /* 最後のセクションに下部マージンを追加 */
+    margin-bottom: 40px;
+}
+
+.filter-year-range .year-range-inputs {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.filter-year-range .year-from,
+.filter-year-range .year-to {
+    flex: 1;
+    min-width: 0;
+}
+
+.year-separator {
+    color: #666;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+    .filter-year-range .year-range-inputs {
+        flex-direction: column;
+        gap: 4px;
+    }
+    
+    .year-separator {
+        display: none;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="essay-chapter-container">
+    <!-- ヘッダー -->
+    <div class="chapter-header">
+        <div class="breadcrumb">
+            <a href="{{ url_for('essay_index') }}">
+                <i class="fas fa-edit"></i> 論述問題集
+            </a>
+            <i class="fas fa-chevron-right"></i>
+            <span>{{ chapter_name }}</span>
+        </div>
+        
+        <h1 class="chapter-title">
+            <i class="fas fa-book"></i>
+            {{ chapter_name }}
+        </h1>
+        
+        <div class="chapter-stats">
+            <div class="stat-item">
+                <i class="fas fa-list"></i>
+                総問題数: {{ total_problems or problems|length }}問
+            </div>
+            <div class="stat-item">
+                <i class="fas fa-eye"></i>
+                閲覧済み: {{ viewed_problems or 0 }}問
+            </div>
+            <div class="stat-item">
+                <i class="fas fa-check-circle"></i>
+                理解済み: {{ understood_problems or 0 }}問
+            </div>
+            <div class="stat-item">
+                <i class="fas fa-percentage"></i>
+                進捗率: {{ progress_rate or 0 }}%
+            </div>
+        </div>
+    </div>
+
+    <!-- フィルター -->
+    <div class="filter-section">
+        <div class="filter-grid">
+            <div class="filter-item">
+                <label class="filter-label">タイプで絞り込み</label>
+                <select class="filter-select" id="typeFilter">
+                    <option value="">すべてのタイプ</option>
+                    <option value="A" {{ 'selected' if current_filters.type == 'A' }}>タイプA (200字以上)</option>
+                    <option value="B" {{ 'selected' if current_filters.type == 'B' }}>タイプB (100-150字程度)</option>
+                    <option value="C" {{ 'selected' if current_filters.type == 'C' }}>タイプC (50-75字程度)</option>
+                    <option value="D" {{ 'selected' if current_filters.type == 'D' }}>タイプD (30字程度)</option>
+                </select>
+            </div>
+            <div class="filter-item">
+                <label class="filter-label">大学で絞り込み</label>
+                <select class="filter-select" id="universityFilter">
+                    <option value="">すべての大学</option>
+                    {% if filter_data and filter_data.universities %}
+                        {% for university in filter_data.universities %}
+                        <option value="{{ university }}" {{ 'selected' if current_filters.university == university }}>{{ university }}</option>
+                        {% endfor %}
+                    {% endif %}
+                </select>
+            </div>
+            <div class="filter-item filter-year-range">
+                <label class="filter-label">年度で絞り込み</label>
+                <div class="year-range-inputs">
+                    <select class="filter-select year-from" id="yearFromFilter">
+                        <option value="">開始年度</option>
+                        {% if filter_data and filter_data.year_range %}
+                            {% for year in range(filter_data.year_range.min, filter_data.year_range.max + 1) %}
+                            <option value="{{ year }}" {{ 'selected' if current_filters.year_from == year }}>{{ year }}年</option>
+                            {% endfor %}
+                        {% endif %}
+                    </select>
+                    <span class="year-separator">〜</span>
+                    <select class="filter-select year-to" id="yearToFilter">
+                        <option value="">終了年度</option>
+                        {% if filter_data and filter_data.year_range %}
+                            {% for year in range(filter_data.year_range.min, filter_data.year_range.max + 1) %}
+                            <option value="{{ year }}" {{ 'selected' if current_filters.year_to == year }}>{{ year }}年</option>
+                            {% endfor %}
+                        {% endif %}
+                    </select>
+                </div>
+            </div>
+            <div class="filter-item">
+                <label class="filter-label">進捗状況</label>
+                <select class="filter-select" id="progressFilter">
+                    <option value="">すべて</option>
+                    <option value="viewed">閲覧済み</option>
+                    <option value="understood">理解済み</option>
+                    <option value="review">復習予定</option>
+                    <option value="unviewed">未閲覧</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <!-- 問題一覧 -->
+    <div class="problems-section">
+        {% if problems %}
+            <!-- まずタイプ別にグループ化 -->
+            {% set problem_groups = problems | groupby('type') %}
+            {% for type_name, type_problems in problem_groups %}
+                <div class="type-section">
+                    <div class="type-header">
+                        <div class="type-badge">
+                            タイプ{{ type_name }}
+                        </div>
+                        <h2 class="type-title">
+                            {% if type_name == 'A' %}200字以上
+                            {% elif type_name == 'B' %}100-150字程度
+                            {% elif type_name == 'C' %}50-75字程度
+                            {% elif type_name == 'D' %}30字程度
+                            {% endif %}
+                        </h2>
+                    </div>
+                    
+                    <div class="problems-grid">
+                        {% for problem in type_problems %}
+                            <!-- 個別問題カード -->
+                            <a href="{{ url_for('essay_problem', problem_id=problem.id) }}" class="problem-card-link">
+                                <div class="problem-card">
+                                    <div class="problem-header">
+                                        <div class="university-year">
+                                            <span class="university">{{ problem.university }}</span>
+                                            <span class="year">{{ problem.year }}年</span>
+                                        </div>
+                                        <div class="progress-indicators">
+                                            {% if problem.progress and problem.progress.viewed_answer %}
+                                                <span class="indicator viewed" title="解答閲覧済み">
+                                                    <i class="fas fa-eye"></i>
+                                                </span>
+                                            {% endif %}
+                                            {% if problem.progress and problem.progress.understood %}
+                                                <span class="indicator understood" title="理解済み">
+                                                    <i class="fas fa-check-circle"></i>
+                                                </span>
+                                            {% endif %}
+                                            {% if problem.progress and problem.progress.review_flag %}
+                                                <span class="indicator review" title="復習フラグ">
+                                                    <i class="fas fa-flag"></i>
+                                                </span>
+                                            {% endif %}
+                                            {% if problem.progress and problem.progress.difficulty_rating %}
+                                                <span class="indicator difficulty" title="難易度: {{ problem.progress.difficulty_rating }}/5">
+                                                    <i class="fas fa-star"></i>{{ problem.progress.difficulty_rating }}
+                                                </span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="problem-content">
+                                        <p class="problem-preview">{{ (problem.question[:150] + '...' if problem.question|length > 150 else problem.question) }}</p>
+                                    </div>
+                                </div>
+                            </a>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endfor %}
+        {% else %}
+            <div class="no-problems">
+                <i class="fas fa-info-circle"></i>
+                <h3>条件に合う問題が見つかりません</h3>
+                <p>フィルター条件を変更して再度検索してください。</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const typeFilter = document.getElementById('typeFilter');
+    const universityFilter = document.getElementById('universityFilter');
+    const yearFromFilter = document.getElementById('yearFromFilter');
+    const yearToFilter = document.getElementById('yearToFilter');
+    const progressFilter = document.getElementById('progressFilter');
+    
+    // フィルター変更時のイベント
+    function applyFilters() {
+        const params = new URLSearchParams();
+        
+        if (typeFilter.value) params.set('type', typeFilter.value);
+        if (universityFilter.value) params.set('university', universityFilter.value);
+        if (yearFromFilter.value) params.set('year_from', yearFromFilter.value);
+        if (yearToFilter.value) params.set('year_to', yearToFilter.value);
+        
+        const url = new URL(window.location);
+        url.search = params.toString();
+        window.location.href = url.toString();
+    }
+    
+    typeFilter.addEventListener('change', applyFilters);
+    universityFilter.addEventListener('change', applyFilters);
+    yearFromFilter.addEventListener('change', applyFilters);
+    yearToFilter.addEventListener('change', applyFilters);
+    
+    // 進捗フィルターは別途処理（JavaScriptで動的にフィルタリング）
+    progressFilter.addEventListener('change', function() {
+        const filterValue = this.value;
+        const problemCards = document.querySelectorAll('.problem-card-link');
+        
+        problemCards.forEach(card => {
+            const indicators = card.querySelectorAll('.indicator');
+            let show = true;
+            
+            if (filterValue === 'viewed') {
+                show = card.querySelector('.indicator.viewed') !== null;
+            } else if (filterValue === 'understood') {
+                show = card.querySelector('.indicator.understood') !== null;
+            } else if (filterValue === 'review') {
+                show = card.querySelector('.indicator.review') !== null;
+            } else if (filterValue === 'unviewed') {
+                show = card.querySelector('.indicator.viewed') === null;
+            }
+            
+            card.style.display = show ? 'block' : 'none';
+        });
+        
+        // 各タイプセクションで問題が0件の場合、セクション全体を非表示
+        document.querySelectorAll('.type-section').forEach(section => {
+            const visibleCards = section.querySelectorAll('.problem-card-link[style=""], .problem-card-link:not([style*="none"])');
+            section.style.display = visibleCards.length > 0 ? 'block' : 'none';
+        });
+    });
+});
+</script>
+{% endblock %}

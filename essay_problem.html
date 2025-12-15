@@ -1,0 +1,424 @@
+{% extends "base.html" %}
+{% block title %}{{ problem.university }} {{ problem.year }}年 - {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="essay-problem-container">
+    <!-- ヘッダー -->
+    <div class="problem-header">
+        <div class="breadcrumb">
+            <a href="{{ url_for('essay_index') }}">
+                <i class="fas fa-edit"></i> 論述問題集
+            </a>
+            <i class="fas fa-chevron-right"></i>
+            <a href="{{ url_for('essay_chapter', chapter=problem.chapter) }}">
+                {% if problem.chapter == 'com' %}総合問題{% else %}第{{ problem.chapter }}章{% endif %}
+            </a>
+            <i class="fas fa-chevron-right"></i>
+            <span>問題 {{ problem.id }}</span>
+        </div>
+        
+        <div class="problem-info">
+            <h1>{{ problem.university }} {{ problem.year }}年</h1>
+            <div class="problem-meta">
+                <span class="badge badge-type-{{ problem.type.lower() }}">
+                    タイプ{{ problem.type }}
+                    {% if problem.type == 'A' %}（200字以上）
+                    {% elif problem.type == 'B' %}（100-150字程度）
+                    {% elif problem.type == 'C' %}（50-75字程度）
+                    {% elif problem.type == 'D' %}（30字程度）
+                    {% endif %}
+                </span>
+                <span class="badge badge-secondary">{{ problem.answer_length }}字</span>
+            </div>
+        </div>
+        
+        <!-- ナビゲーション -->
+        <div class="problem-navigation">
+            {% if prev_problem %}
+            <a href="{{ url_for('essay_problem', problem_id=prev_problem.id) }}" class="btn btn-outline-secondary">
+                <i class="fas fa-chevron-left"></i> 前の問題
+            </a>
+            {% endif %}
+            
+            <a href="{{ url_for('essay_chapter', chapter=problem.chapter) }}" class="btn btn-outline-primary">
+                <i class="fas fa-list"></i> 一覧に戻る
+            </a>
+            
+            {% if next_problem %}
+            <a href="{{ url_for('essay_problem', problem_id=next_problem.id) }}" class="btn btn-outline-secondary">
+                次の問題 <i class="fas fa-chevron-right"></i>
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- 問題内容 -->
+    <div class="problem-content">
+        <div class="question-section">
+            <h3><i class="fas fa-question-circle"></i> 問題</h3>
+            <div class="question-text">
+                {{ problem.question|safe|replace('\n', '<br>')|replace('\r', '') }}
+            </div>
+        </div>
+
+        <div class="answer-section">
+            <div class="answer-header">
+                <h3><i class="fas fa-lightbulb"></i> 模範解答</h3>
+                <button id="toggleAnswer" class="btn btn-primary" onclick="toggleAnswer()">
+                    <i class="fas fa-eye"></i> 解答を表示
+                </button>
+            </div>
+            
+            <div id="answerContent" class="answer-content" style="display: none;">
+                <div class="answer-text">
+                    {{ problem.answer|safe|replace('\n', '<br>')|replace('\r', '') }}
+                </div>
+                <div class="answer-meta">
+                    <small class="text-muted">文字数: {{ problem.answer_length }}字</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- 学習進捗 -->
+        <div class="progress-section">
+            <h3><i class="fas fa-chart-line"></i> 学習進捗</h3>
+            
+            <div class="progress-controls">
+                <div class="understanding-control">
+                    <label class="custom-checkbox">
+                        <input type="checkbox" id="understoodCheck" 
+                               {% if progress.understood %}checked{% endif %}
+                               onchange="updateUnderstanding()">
+                        <span class="checkmark"></span>
+                        理解した
+                    </label>
+                </div>
+                
+                <div class="difficulty-control">
+                    <label for="difficultyRating">難易度評価:</label>
+                    <select id="difficultyRating" onchange="updateDifficulty()">
+                        <option value="">選択してください</option>
+                        <option value="1" {% if progress.difficulty_rating == 1 %}selected{% endif %}>1 (易しい)</option>
+                        <option value="2" {% if progress.difficulty_rating == 2 %}selected{% endif %}>2</option>
+                        <option value="3" {% if progress.difficulty_rating == 3 %}selected{% endif %}>3 (普通)</option>
+                        <option value="4" {% if progress.difficulty_rating == 4 %}selected{% endif %}>4</option>
+                        <option value="5" {% if progress.difficulty_rating == 5 %}selected{% endif %}>5 (難しい)</option>
+                    </select>
+                </div>
+                
+                <div class="review-control">
+                    <label class="custom-checkbox">
+                        <input type="checkbox" id="reviewFlag" 
+                               {% if progress.review_flag %}checked{% endif %}
+                               onchange="updateReviewFlag()">
+                        <span class="checkmark"></span>
+                        復習フラグ
+                    </label>
+                </div>
+            </div>
+            
+            <div class="memo-section">
+                <label for="memoText">メモ:</label>
+                <textarea id="memoText" rows="3" placeholder="この問題について気づいたことや覚えておきたいことを記録しましょう..." onchange="updateMemo()">{{ progress.memo or '' }}</textarea>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- データを安全にJavaScriptに渡す -->
+<script id="problem-data" type="application/json">
+{
+    "problemId": {{ problem.id }},
+    "viewedAnswer": {% if progress.viewed_answer %}true{% else %}false{% endif %}
+}
+</script>
+
+<script>
+// データを安全に取得
+const problemData = JSON.parse(document.getElementById('problem-data').textContent);
+let answerVisible = problemData.viewedAnswer;
+
+function toggleAnswer() {
+    const content = document.getElementById('answerContent');
+    const button = document.getElementById('toggleAnswer');
+    
+    if (answerVisible) {
+        content.style.display = 'none';
+        button.innerHTML = '<i class="fas fa-eye"></i> 解答を表示';
+        answerVisible = false;
+    } else {
+        content.style.display = 'block';
+        button.innerHTML = '<i class="fas fa-eye-slash"></i> 解答を非表示';
+        answerVisible = true;
+        
+        // 初回表示時は進捗を更新
+        updateProgress({ viewed_answer: true });
+    }
+}
+
+function updateUnderstanding() {
+    const understood = document.getElementById('understoodCheck').checked;
+    updateProgress({ understood: understood });
+}
+
+function updateDifficulty() {
+    const rating = document.getElementById('difficultyRating').value;
+    updateProgress({ difficulty_rating: rating ? parseInt(rating) : null });
+}
+
+function updateReviewFlag() {
+    const flag = document.getElementById('reviewFlag').checked;
+    updateProgress({ review_flag: flag });
+}
+
+function updateMemo() {
+    const memo = document.getElementById('memoText').value;
+    updateProgress({ memo: memo });
+}
+
+function updateProgress(updates) {
+    fetch('/api/essay/progress/update', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            problem_id: problemData.problemId,
+            updates: updates
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status !== 'success') {
+            console.error('進捗更新エラー:', data.message);
+        }
+    })
+    .catch(error => {
+        console.error('進捗更新エラー:', error);
+    });
+}
+
+// 初期状態で解答が表示済みの場合
+document.addEventListener('DOMContentLoaded', function() {
+    if (problemData.viewedAnswer) {
+        toggleAnswer();
+    }
+});
+</script>
+
+<style>
+.essay-problem-container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.problem-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 30px;
+    border-radius: 15px;
+    margin-bottom: 30px;
+}
+
+.breadcrumb {
+    margin-bottom: 20px;
+    font-size: 0.9rem;
+}
+
+.breadcrumb a {
+    color: rgba(255,255,255,0.8);
+    text-decoration: none;
+}
+
+.breadcrumb a:hover {
+    color: white;
+}
+
+.breadcrumb i {
+    margin: 0 8px;
+    opacity: 0.6;
+}
+
+.problem-info h1 {
+    margin: 0 0 15px 0;
+    font-size: 2rem;
+    font-weight: 700;
+}
+
+.problem-meta {
+    margin-bottom: 20px;
+}
+
+.badge {
+    padding: 8px 12px;
+    border-radius: 20px;
+    font-weight: 600;
+    margin-right: 10px;
+}
+
+.badge-type-a { background: #dc3545; }
+.badge-type-b { background: #fd7e14; }
+.badge-type-c { background: #20c997; }
+.badge-type-d { background: #6f42c1; }
+.badge-secondary { background: #6c757d; }
+
+.problem-navigation {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+}
+
+.problem-content {
+    background: white;
+    border-radius: 15px;
+    padding: 30px;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+}
+
+.question-section,
+.answer-section,
+.progress-section {
+    margin-bottom: 40px;
+}
+
+.question-section h3,
+.answer-section h3,
+.progress-section h3 {
+    color: #2d3748;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.question-text,
+.answer-text {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 10px;
+    line-height: 1.8;
+    font-size: 1.1rem;
+}
+
+.answer-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.progress-controls {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.custom-checkbox {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    font-weight: 500;
+}
+
+.custom-checkbox input {
+    margin-right: 8px;
+}
+
+.memo-section textarea {
+    width: 100%;
+    padding: 15px;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 1rem;
+    line-height: 1.5;
+    resize: vertical;
+}
+
+.memo-section textarea:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+.btn {
+    padding: 10px 20px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.btn-primary {
+    background: #667eea;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #5a67d8;
+}
+
+.btn-outline-primary {
+    background: transparent;
+    color: #667eea;
+    border: 2px solid #667eea;
+}
+
+.btn-outline-primary:hover {
+    background: #667eea;
+    color: white;
+}
+
+.btn-outline-secondary {
+    background: transparent;
+    color: #6c757d;
+    border: 2px solid #6c757d;
+}
+
+.btn-outline-secondary:hover {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-outline-light {
+    background: rgba(255,255,255,0.2);
+    color: white;
+    border: 2px solid rgba(255,255,255,0.3);
+}
+
+.btn-outline-light:hover {
+    background: rgba(255,255,255,0.3);
+    color: white;
+}
+
+@media (max-width: 768px) {
+    .problem-header {
+        padding: 20px;
+    }
+    
+    .problem-info h1 {
+        font-size: 1.5rem;
+    }
+    
+    .problem-navigation {
+        flex-direction: column;
+    }
+    
+    .answer-header {
+        flex-direction: column;
+        gap: 15px;
+        align-items: stretch;
+    }
+    
+    .progress-controls {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+{% endblock %}

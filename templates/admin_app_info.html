@@ -1,0 +1,281 @@
+{% extends "base.html" %}
+{% block title %}アプリ情報管理 - {{ app_name }}{% endblock %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.css">
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <h3>✏️ アプリ情報編集</h3>
+            <form action="{{ url_for('admin_app_info') }}" method="POST" class="app-info-form"
+                enctype="multipart/form-data">
+
+                <!-- Logo Settings -->
+                <div class="row">
+                    <div class="col-md-12">
+                        <div class="mb-3">
+                            <label class="form-label">ロゴ設定:</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="logo_type" id="logo_type_text"
+                                    value="text" {% if app_info.logo_type=='text' or not app_info.logo_type %}checked{%
+                                    endif %}>
+                                <label class="form-check-label" for="logo_type_text">
+                                    アプリ名（テキスト）
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="logo_type" id="logo_type_image"
+                                    value="image" {% if app_info.logo_type=='image' %}checked{% endif %}>
+                                <label class="form-check-label" for="logo_type_image">
+                                    ロゴ画像
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6" id="app_name_field">
+                        <div class="mb-3">
+                            <label for="app_name" class="form-label">アプリ名:</label>
+                            <input type="text" id="app_name" name="app_name" class="form-control"
+                                value="{{ app_info.app_name }}" required maxlength="100" placeholder="例: 世界史単語帳">
+                            <div class="form-text">アプリのタイトルとして表示されます</div>
+                        </div>
+                    </div>
+                    <div class="col-md-6" id="logo_image_field" style="display: none;">
+                        <div class="mb-3">
+                            <label for="logo_image" class="form-label">ロゴ画像:</label>
+                            <input type="file" id="logo_image" name="logo_image" class="form-control" accept="image/*">
+                            <div class="form-text">1MB以下の画像（推奨: 横長、高さ40px程度）</div>
+                            {% if app_info.logo_image_filename %}
+                            <div class="mt-2">
+                                <img src="{{ get_logo_url(app_info.logo_image_filename) }}" alt="現在のロゴ"
+                                    style="max-height: 40px; background-color: #f8f9fa; padding: 5px; border-radius: 5px;">
+                                <small class="ms-2">現在のロゴ: {{ app_info.logo_image_filename }}</small>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="version" class="form-label">バージョン:</label>
+                            <input type="text" id="version" name="version" class="form-control"
+                                value="{{ app_info.version }}" required maxlength="20" placeholder="例: 1.2.0">
+                            <div class="form-text">バージョン番号（セマンティックバージョニング推奨）</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="contact_email" class="form-label">連絡先メール:</label>
+                            <input type="email" id="contact_email" name="contact_email" class="form-control"
+                                value="{{ app_info.contact_email }}" maxlength="100"
+                                placeholder="例: contact@example.com">
+                            <div class="form-text">問い合わせ先として表示（任意）</div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="school_name" class="form-label">ハッシュタグ:</label>
+                            <input type="text" id="school_name" name="school_name" class="form-control"
+                                value="{{ app_info.school_name }}" required maxlength="100" placeholder="例: 朋優学院">
+                            <div class="form-text">シェア時のハッシュタグに使用されます</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-12">
+                        <div class="mb-3">
+                            <label for="footer_text" class="form-label">フッターテキスト:</label>
+                            <input type="text" id="footer_text" name="footer_text" class="form-control"
+                                value="{{ app_info.footer_text }}" maxlength="200"
+                                placeholder="例: © 2025 学校名. All rights reserved.">
+                            <div class="form-text">ページ下部に表示されるテキスト（任意）</div>
+                        </div>
+                    </div>
+                </div>
+
+
+
+                <div class="d-flex gap-2 mb-4">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> 保存
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" onclick="window.location.reload()">
+                        <i class="fas fa-undo"></i> 変更を破棄
+                    </button>
+                    <button type="button" class="btn btn-warning" onclick="confirmReset()">
+                        <i class="fas fa-refresh"></i> デフォルトに戻す
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- アクションボタン -->
+    <div class="d-flex gap-2 mb-4">
+        <a href="{{ url_for('admin_page') }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> 管理者ページに戻る
+        </a>
+        <a href="{{ url_for('index') }}" class="btn btn-success" target="_blank">
+            <i class="fas fa-external-link-alt"></i> 実際の表示を確認
+        </a>
+    </div>
+
+    <!-- 変更履歴 -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <h3>📝 変更履歴</h3>
+            <div class="card">
+                <div class="card-body">
+                    <p><strong>最終更新:</strong> {{ app_info.updated_at.strftime('%Y年%m月%d日 %H:%M:%S') if
+                        app_info.updated_at else '不明' }}</p>
+                    <p><strong>更新者:</strong> {{ app_info.updated_by }}</p>
+                    <p><strong>作成日:</strong> {{ app_info.created_at.strftime('%Y年%m月%d日 %H:%M:%S') if
+                        app_info.created_at else '不明' }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Crop Modal -->
+<div class="modal fade" id="cropModal" tabindex="-1" aria-labelledby="cropModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="cropModalLabel">ロゴを切り抜き</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div>
+                    <img id="imageToCrop" src="" style="max-width: 100%;">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+                <button type="button" class="btn btn-primary" id="cropButton">切り抜いて保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Hidden input for crop data -->
+<input type="hidden" name="crop_data" id="crop_data">
+
+<!-- リセット確認フォーム（非表示） -->
+<form id="resetForm" action="{{ url_for('admin_app_info_reset') }}" method="POST" style="display: none;">
+</form>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const logoTypeText = document.getElementById('logo_type_text');
+        const logoTypeImage = document.getElementById('logo_type_image');
+        const appNameField = document.getElementById('app_name_field');
+        const logoImageField = document.getElementById('logo_image_field');
+        const logoImageInput = document.getElementById('logo_image');
+
+        const form = document.querySelector('.app-info-form');
+        const cropModalElement = document.getElementById('cropModal');
+        const cropModal = new bootstrap.Modal(cropModalElement);
+        const imageToCrop = document.getElementById('imageToCrop');
+        const cropButton = document.getElementById('cropButton');
+
+        let cropper;
+
+        function toggleLogoFields() {
+            if (logoTypeImage.checked) {
+                appNameField.style.display = 'none';
+                logoImageField.style.display = 'block';
+            } else {
+                appNameField.style.display = 'block';
+                logoImageField.style.display = 'none';
+            }
+        }
+
+        logoTypeText.addEventListener('change', toggleLogoFields);
+        logoTypeImage.addEventListener('change', toggleLogoFields);
+        toggleLogoFields();
+
+        logoImageInput.addEventListener('change', function (e) {
+            const files = e.target.files;
+            if (files && files.length > 0) {
+                const reader = new FileReader();
+                reader.onload = function (event) {
+                    imageToCrop.src = event.target.result;
+                    cropModal.show();
+                };
+                reader.readAsDataURL(files[0]);
+            }
+        });
+
+        cropModalElement.addEventListener('shown.bs.modal', function () {
+            if (cropper) {
+                cropper.destroy();
+            }
+            cropper = new Cropper(imageToCrop, {
+                viewMode: 1,
+            });
+        });
+
+        cropButton.addEventListener('click', function () {
+            if (cropper) {
+                const cropData = cropper.getData(true);
+                const cropDataInput = document.getElementById('crop_data');
+
+                // Set the crop data to the hidden input
+                cropDataInput.value = JSON.stringify({
+                    x: cropData.x,
+                    y: cropData.y,
+                    width: cropData.width,
+                    height: cropData.height
+                });
+
+                // Hide the modal and submit the main form
+                cropModal.hide();
+                form.submit();
+            }
+        });
+
+        form.addEventListener('submit', function (e) {
+            // Confirmation is now only for text submissions, as cropping has its own flow.
+            if (logoTypeText.checked) {
+                e.preventDefault();
+                showConfirmModal(
+                    'アプリ情報の更新',
+                    'アプリ情報を更新しますか？\n\n変更内容は即座にユーザーに反映されます。',
+                    () => {
+                        form.submit();
+                    },
+                    '更新',
+                    'btn-primary'
+                );
+            }
+        });
+    });
+
+    function confirmReset() {
+        showConfirmModal(
+            'デフォルトリセット',
+            'アプリ情報をデフォルト値にリセットしますか？\n\n⚠️ この操作は元に戻せません。',
+            () => {
+                document.getElementById('resetForm').submit();
+            },
+            'リセット',
+            'btn-warning'
+        );
+    }
+</script>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.js"></script>
+{% endblock %}

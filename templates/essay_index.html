@@ -1,0 +1,641 @@
+{% extends "base.html" %}
+{% block title %}論述問題集 - {{ app_name }}{% endblock %}
+
+{% block head_extra %}
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+    /* ベーススタイル */
+    .essay-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 15px;
+    }
+
+    .essay-header {
+        text-align: center;
+        margin-bottom: 30px;
+        padding: 25px 20px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 15px;
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+    }
+
+    .essay-header h1 {
+        margin: 0 0 15px 0;
+        font-size: clamp(1.8rem, 4vw, 2.5rem);
+        font-weight: 700;
+        line-height: 1.2;
+    }
+
+    .essay-description {
+        font-size: clamp(0.9rem, 2.5vw, 1.1rem);
+        margin-bottom: 20px;
+        opacity: 0.95;
+        line-height: 1.6;
+        text-align: left;
+    }
+
+    .back-to-main .btn {
+        background: rgba(255, 255, 255, 0.2);
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        color: white;
+        padding: 10px 20px;
+        border-radius: 25px;
+        transition: all 0.3s ease;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: clamp(0.85rem, 2vw, 1rem);
+    }
+
+    .back-to-main .btn:hover {
+        background: rgba(255, 255, 255, 0.3);
+        border-color: rgba(255, 255, 255, 0.5);
+        color: white;
+        transform: translateY(-2px);
+    }
+
+    /* 章グリッド */
+    .chapter-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 20px;
+        margin-bottom: 40px;
+    }
+
+    .chapter-card {
+        background: white;
+        border-radius: 15px;
+        padding: 20px;
+        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
+        border: 1px solid #e1e8ed;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .chapter-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+        border-color: #667eea;
+    }
+
+    .chapter-card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 15px;
+        padding-bottom: 15px;
+        border-bottom: 2px solid #f5f7fa;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    .chapter-title {
+        margin: 0;
+        font-size: clamp(1.1rem, 2.5vw, 1.3rem);
+        font-weight: 600;
+        color: #2d3748;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex: 1;
+        min-width: 0;
+    }
+
+    .chapter-title i {
+        color: #667eea;
+        font-size: 1.2em;
+    }
+
+    .problem-count .total-count {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-weight: 600;
+        font-size: clamp(0.8rem, 2vw, 0.9rem);
+        white-space: nowrap;
+    }
+
+    .progress-section {
+        margin-bottom: 15px;
+    }
+
+    .progress-stats {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 15px;
+        gap: 10px;
+    }
+
+    .stat-item {
+        text-align: center;
+        flex: 1;
+    }
+
+    .stat-label {
+        display: block;
+        font-size: clamp(0.75rem, 2vw, 0.85rem);
+        color: #718096;
+        margin-bottom: 5px;
+    }
+
+    .stat-value {
+        display: block;
+        font-size: clamp(1rem, 2.5vw, 1.2rem);
+        font-weight: 600;
+        color: #2d3748;
+    }
+
+    .stat-value.understood {
+        color: #38a169;
+    }
+
+    .progress-bar-container {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .progress-bar {
+        flex: 1;
+        height: 8px;
+        background: #e2e8f0;
+        border-radius: 4px;
+        overflow: hidden;
+    }
+
+    .progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #667eea, #764ba2);
+        transition: width 0.5s ease;
+        border-radius: 4px;
+    }
+
+    .progress-text {
+        font-size: clamp(0.8rem, 2vw, 0.9rem);
+        font-weight: 600;
+        color: #4a5568;
+        white-space: nowrap;
+    }
+
+    .chapter-card-footer {
+        text-align: center;
+        padding-top: 15px;
+        border-top: 1px solid #f1f5f9;
+    }
+
+    .enter-hint {
+        color: #667eea;
+        font-weight: 500;
+        font-size: clamp(0.85rem, 2vw, 0.9rem);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        opacity: 0.8;
+        transition: opacity 0.3s ease;
+    }
+
+    .chapter-card:hover .enter-hint {
+        opacity: 1;
+    }
+
+    /* 問題がない場合 */
+    .no-problems-message {
+        text-align: center;
+        padding: 40px 20px;
+        background: #f8f9fa;
+        border-radius: 15px;
+        border: 2px dashed #dee2e6;
+    }
+
+    .message-content i {
+        font-size: clamp(2.5rem, 6vw, 3rem);
+        color: #adb5bd;
+        margin-bottom: 20px;
+    }
+
+    .message-content h3 {
+        color: #6c757d;
+        margin: 15px 0 10px 0;
+        font-size: clamp(1.2rem, 3vw, 1.5rem);
+    }
+
+    .message-content p {
+        color: #6c757d;
+        margin-bottom: 20px;
+        font-size: clamp(0.9rem, 2.5vw, 1rem);
+    }
+
+    /* 学習のヒント */
+    .study-tips {
+        background: white;
+        border-radius: 15px;
+        padding: 25px 20px;
+        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
+        border: 1px solid #e1e8ed;
+    }
+
+    .study-tips h3 {
+        text-align: center;
+        margin-bottom: 25px;
+        color: #2d3748;
+        font-size: clamp(1.3rem, 3vw, 1.5rem);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+    }
+
+    .tips-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+    }
+
+    .tip-card {
+        text-align: center;
+        padding: 20px 15px;
+        background: #f8f9fa;
+        border-radius: 12px;
+        border: 1px solid #e9ecef;
+        transition: all 0.3s ease;
+    }
+
+    .tip-card:hover {
+        background: #e9ecef;
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+    }
+
+    .tip-card i {
+        font-size: clamp(1.8rem, 4vw, 2rem);
+        color: #667eea;
+        margin-bottom: 15px;
+    }
+
+    .tip-card h4 {
+        margin: 0 0 10px 0;
+        color: #2d3748;
+        font-size: clamp(1rem, 2.5vw, 1.1rem);
+    }
+
+    .tip-card p {
+        margin: 0;
+        color: #4a5568;
+        font-size: clamp(0.85rem, 2vw, 0.9rem);
+        line-height: 1.5;
+        text-align: left;
+    }
+
+    /* タブレット向け調整 */
+    @media (max-width: 1024px) and (min-width: 769px) {
+        .essay-container {
+            padding: 20px;
+        }
+
+        .chapter-grid {
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 25px;
+        }
+
+        .tips-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+
+    /* スマートフォン向け調整 */
+    @media (max-width: 768px) {
+        .essay-container {
+            padding: 10px;
+        }
+
+        .essay-header {
+            padding: 20px 15px;
+            margin-bottom: 20px;
+        }
+
+        .chapter-grid {
+            grid-template-columns: 1fr;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .chapter-card {
+            padding: 15px;
+        }
+
+        .chapter-card-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 10px;
+        }
+
+        .problem-count {
+            align-self: flex-end;
+        }
+
+        .progress-stats {
+            flex-direction: row;
+            justify-content: space-around;
+        }
+
+        .tips-grid {
+            grid-template-columns: 1fr;
+            gap: 15px;
+        }
+
+        .study-tips {
+            padding: 20px 15px;
+        }
+    }
+
+    /* 小さいスマートフォン向け */
+    @media (max-width: 480px) {
+        .essay-container {
+            padding: 8px;
+        }
+
+        .essay-header {
+            padding: 15px 10px;
+        }
+
+        .chapter-card {
+            padding: 12px;
+        }
+
+        .progress-stats {
+            gap: 5px;
+        }
+
+        .stat-item {
+            min-width: 0;
+        }
+
+        .progress-bar-container {
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .progress-text {
+            text-align: center;
+        }
+    }
+
+    /* 進捗バーを非表示にする */
+    .progress-bar-container {
+        display: none !important;
+    }
+
+    /* 進捗テキストも非表示にする */
+    .progress-text {
+        display: none !important;
+    }
+
+    /* 章カードのレイアウト調整（進捗バーがない場合） */
+    .chapter-card {
+        height: auto;
+        min-height: 120px;
+        /* 進捗バー分の高さを調整 */
+    }
+
+    .progress-section {
+        padding-bottom: 0;
+        /* 下部の余白を削除 */
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="essay-container">
+    <div class="essay-header">
+        <h1><i class="fas fa-edit"></i> 論述問題集</h1>
+        <p class="essay-description">
+            過去の入試問題から厳選された論述問題を章別に学習できます。<br>
+            各問題で「理解した」マークを付けて、学習進捗を管理しましょう。
+        </p>
+        <div class="back-to-main">
+            <button id="openEssaySearchButton" class="btn" style="margin-right: 10px;">
+                <i class="fas fa-search"></i> 問題検索
+            </button>
+            <a href="{{ url_for('index') }}" class="btn">
+                <i class="fas fa-arrow-left"></i> {{ app_name }}に戻る
+            </a>
+        </div>
+    </div>
+
+    <!-- 検索モーダル -->
+    <div class="modal fade" id="essaySearchModal" tabindex="-1" aria-hidden="true" style="color: #333;">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-search"></i> 論述問題検索</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="input-group mb-3">
+                        <input type="text" id="essaySearchInput" class="form-control"
+                            placeholder="キーワードを入力（例: サファヴィー朝/京都大学）">
+                        <button class="btn btn-primary" type="button" id="essaySearchExecuteButton">検索</button>
+                    </div>
+                    <div id="essaySearchResults" class="list-group" style="max-height: 400px; overflow-y: auto;">
+                        <!-- 検索結果がここに表示されます -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="chapter-grid">
+        {% for chapter_stat in chapter_stats %}
+        <div class="chapter-card" data-chapter-url="{{ url_for('essay_chapter', chapter=chapter_stat.chapter) }}">
+            <div class="chapter-card-header">
+                <h3 class="chapter-title">
+                    {% if chapter_stat.chapter == 'com' %}
+                    <i class="fas fa-star"></i> {{ chapter_stat.chapter_name }}
+                    {% else %}
+                    <i class="fas fa-book"></i> {{ chapter_stat.chapter_name }}
+                    {% endif %}
+                </h3>
+                <div class="problem-count">
+                    <span class="total-count">{{ chapter_stat.total_problems }}問</span>
+                </div>
+            </div>
+
+            <div class="progress-section">
+                <div class="progress-stats">
+                    <div class="stat-item">
+                        <span class="stat-label">閲覧済み</span>
+                        <span class="stat-value">{{ chapter_stat.viewed_problems }}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">理解済み</span>
+                        <span class="stat-value understood">{{ chapter_stat.understood_problems }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="chapter-card-footer">
+                <span class="enter-hint">
+                    <i class="fas fa-arrow-right"></i> クリックして問題一覧へ
+                </span>
+            </div>
+        </div>
+        {% endfor %}
+
+        {% if not chapter_stats %}
+        <div class="no-problems-message">
+            <div class="message-content">
+                <i class="fas fa-info-circle"></i>
+                <h3>論述問題がまだ登録されていません</h3>
+                <p>管理者によって問題が登録されるまでお待ちください。</p>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- 学習のヒント -->
+    <div class="study-tips">
+        <h3><i class="fas fa-lightbulb"></i> 学習のコツ</h3>
+        <div class="tips-grid">
+            <div class="tip-card">
+                <i class="fas fa-eye"></i>
+                <h4>まずは問題を読む</h4>
+                <p>解答を見る前に、自分なりに答えを考えてみましょう。</p>
+            </div>
+            <div class="tip-card">
+                <i class="fas fa-check-circle"></i>
+                <h4>理解度をマーク</h4>
+                <p>「理解した」ボタンで進捗を記録し、学習状況を把握しましょう。</p>
+            </div>
+            <div class="tip-card">
+                <i class="fas fa-sticky-note"></i>
+                <h4>メモを活用</h4>
+                <p>重要なポイントや覚えにくい内容はメモ機能を使って記録しましょう。</p>
+            </div>
+            <div class="tip-card">
+                <i class="fas fa-flag"></i>
+                <h4>復習フラグ</h4>
+                <p>後で見返したい問題には復習フラグを付けておきましょう。</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        console.log('📋 論述問題集ページ初期化開始');
+
+        // 章カードのクリックイベントを設定
+        const chapterCards = document.querySelectorAll('.chapter-card');
+        console.log('📁 見つかった章カード数:', chapterCards.length);
+
+        chapterCards.forEach((card, index) => {
+            const chapterUrl = card.getAttribute('data-chapter-url');
+
+            if (chapterUrl) {
+                // クリックイベントを追加
+                card.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    window.location.href = chapterUrl;
+                });
+
+                // キーボードでのアクセシビリティ
+                card.setAttribute('tabindex', '0');
+                card.addEventListener('keydown', function (e) {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        window.location.href = chapterUrl;
+                    }
+                });
+            }
+        });
+
+        // 検索機能
+        const openEssaySearchButton = document.getElementById('openEssaySearchButton');
+        const essaySearchExecuteButton = document.getElementById('essaySearchExecuteButton');
+        const essaySearchInput = document.getElementById('essaySearchInput');
+
+        if (openEssaySearchButton) {
+            openEssaySearchButton.addEventListener('click', () => {
+                const searchModal = new bootstrap.Modal(document.getElementById('essaySearchModal'));
+                searchModal.show();
+                setTimeout(() => {
+                    if (essaySearchInput) essaySearchInput.focus();
+                }, 500);
+            });
+        }
+
+        if (essaySearchExecuteButton) {
+            essaySearchExecuteButton.addEventListener('click', executeEssaySearch);
+        }
+
+        if (essaySearchInput) {
+            essaySearchInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    executeEssaySearch();
+                }
+            });
+        }
+
+        function executeEssaySearch() {
+            const searchInput = document.getElementById('essaySearchInput');
+            const searchResults = document.getElementById('essaySearchResults');
+
+            if (!searchInput || !searchResults) return;
+
+            const query = searchInput.value.trim();
+            if (!query) {
+                searchResults.innerHTML = '<div class="list-group-item text-muted">キーワードを入力してください</div>';
+                return;
+            }
+
+            searchResults.innerHTML = '<div class="list-group-item text-center"><i class="fas fa-spinner fa-spin"></i> 検索中...</div>';
+
+            fetch('/api/search_essays', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ query: query }),
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        if (data.results.length === 0) {
+                            searchResults.innerHTML = '<div class="list-group-item text-muted">該当する問題は見つかりませんでした</div>';
+                        } else {
+                            searchResults.innerHTML = '';
+                            data.results.forEach(essay => {
+                                const item = document.createElement('a');
+                                item.href = `/essay/problem/${essay.id}`;
+                                item.className = 'list-group-item list-group-item-action';
+                                item.innerHTML = `
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1">${essay.university} ${essay.year}年 (${essay.type})</h6>
+                                <small class="text-muted">${essay.chapter === 'com' ? '総合問題' : '第' + essay.chapter + '章'}</small>
+                            </div>
+                            <p class="mb-1">${essay.question_snippet}</p>
+                        `;
+                                searchResults.appendChild(item);
+                            });
+                        }
+                    } else {
+                        searchResults.innerHTML = '<div class="list-group-item text-danger">検索中にエラーが発生しました</div>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    searchResults.innerHTML = '<div class="list-group-item text-danger">通信エラーが発生しました</div>';
+                });
+        }
+
+        console.log('✅ 論述問題集ページ初期化完了');
+    });
+</script>
+{% endblock %}

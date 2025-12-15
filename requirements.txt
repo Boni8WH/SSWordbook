@@ -1,0 +1,18 @@
+# requirements.txt を修正
+Flask==3.0.3
+Flask-SQLAlchemy==3.0.5
+Flask-Mail==0.9.1
+Werkzeug==3.0.4
+pytz==2024.1
+SQLAlchemy==2.0.25
+
+# PostgreSQL対応
+psycopg2-binary==2.9.7
+
+# その他
+cryptography==41.0.7
+Pillow==10.1.0
+gunicorn==21.2.0
+boto3==1.34.0
+Flask-APScheduler==1.13.1
+pywebpush==2.1.2
