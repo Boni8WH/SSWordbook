@@ -3698,9 +3698,11 @@ const TYPE_SPEED = 30; // ms per char
 
 function checkAndPlayRpgIntro() {
     // 範囲選択画面にいるかチェック
-    fetch('/api/check_rpg_intro_eligibility')
+    const ts = new Date().getTime(); // 🆕 Cache busting
+    fetch('/api/check_rpg_intro_eligibility?t=' + ts)
         .then(response => response.json())
         .then(data => {
+            console.log("RPG Intro Check:", data); // 🆕 Debug logging
             if (data.eligible) {
                 // Set default scenario
                 playRpgIntroSequence(rpgIntroDefaultScenario);

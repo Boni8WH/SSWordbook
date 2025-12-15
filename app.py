@@ -670,7 +670,6 @@ def check_daily_quiz_reminders():
             # 今日のクイズ完了チェック
             today = (datetime.now(JST) - timedelta(hours=7)).date() # 7時間引いて日付区切り調整？（要確認）
             # シンプルにJSTの日付を使うなら: today = datetime.now(JST).date()
-            # 既存ロジックに従う
             
             daily_quiz = DailyQuiz.query.filter_by(date=today, room_number=user.room_number).first()
             
@@ -682,7 +681,7 @@ def check_daily_quiz_reminders():
                     send_push_notification(
                         user,
                         "今日の10問が未完です！",
-                        "毎日コツコツが大事だホー！",
+                        "毎日コツコツが大事",
                         url="/"
                     )
             else:
@@ -691,13 +690,9 @@ def check_daily_quiz_reminders():
                 send_push_notification(
                     user,
                     "今日の10問が未完です！",
-                    "毎日コツコツが大事だホー！",
+                    "毎日コツコツが大事",
                     url="/"
                 )
-
-
-
-
 
 class PasswordResetToken(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -780,6 +775,9 @@ class UserStats(db.Model):
                 )
                 db.session.add(stats)
                 db.session.flush()
+                # 新規作成時は即座に統計を計算する
+                stats.update_stats()
+                db.session.commit()
         return stats
 
     def update_stats(self, word_data=None, problem_id_map=None, parsed_max_enabled_unit_num=None):
