@@ -341,6 +341,10 @@
                                             data-user-id="{{ user.id }}" data-username="{{ user.username }}">
                                             <i class="fas fa-eraser"></i> スコア削除
                                         </button>
+                                        <button class="btn btn-info btn-sm reset-intro-btn" data-user-id="{{ user.id }}"
+                                            data-username="{{ user.username }}">
+                                            <i class="fas fa-undo"></i> Introリセット
+                                        </button>
                                     </td>
                                 </tr>
                                 {% endif %}
@@ -2167,10 +2171,9 @@
         // ========================================
 
         document.addEventListener('click', function (event) {
+            // ユーザー削除
             if (event.target.closest('.delete-user-btn')) {
                 event.preventDefault();
-                event.stopPropagation(); // Stop propagation for safety
-
                 const button = event.target.closest('.delete-user-btn');
                 const userId = button.getAttribute('data-user-id');
                 const username = button.getAttribute('data-username');
@@ -2179,6 +2182,30 @@
                     deleteUserSafe(button);
                 } else {
                     alert('❌ ユーザー情報の取得に失敗しました。');
+                }
+            }
+
+            // Introリセット
+            if (event.target.closest('.reset-intro-btn')) {
+                event.preventDefault();
+                const button = event.target.closest('.reset-intro-btn');
+                const userId = button.getAttribute('data-user-id');
+                const username = button.getAttribute('data-username');
+
+                if (userId && username) {
+                    showConfirmModal(
+                        'Introフラグリセット',
+                        `ユーザー「${username}」のRPG導入フラグをリセットしますか？\n\n再度ログインした際にRPGのイントロが表示されるようになります。`,
+                        () => {
+                            const form = document.createElement('form');
+                            form.method = 'POST';
+                            form.action = `/admin/reset_intro_flag/${userId}`;
+                            document.body.appendChild(form);
+                            form.submit();
+                        },
+                        'リセット',
+                        'btn-info'
+                    );
                 }
             }
         });

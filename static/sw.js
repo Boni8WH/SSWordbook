@@ -7,7 +7,7 @@ self.addEventListener('push', function (event) {
     const title = data.title || 'SSWordbook Notification';
     const options = {
         body: data.body || '新しい通知があります',
-        icon: '/static/NapoleonIcon.png',
+        icon: '/static/pergamon/normal.png',
         badge: '/static/NapoleonIcon.png',
         data: {
             url: data.url || '/'
