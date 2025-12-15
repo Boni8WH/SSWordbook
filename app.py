@@ -2534,6 +2534,7 @@ def create_tables_and_admin_user():
             # _seed_initial_rpg_enemy() # 確実に初期データを投入 - 無効化
             _add_score_column_to_rpg_enemy() # NEW
             _add_equipped_title_column_to_user() # 🆕 追加
+            _add_rpg_intro_seen_column_to_user() # 🆕 RPGイントロ表示フラグ追加（管理者ユーザークエリ前に実行必須）
             _create_rpg_rematch_history_table() # 🆕 再戦履歴テーブル作成
             
             # 管理者ユーザー確認/作成
@@ -14930,10 +14931,7 @@ def check_and_migrate_rpg_columns():
             print(f"Migration check failed: {e}")
 
 # Run migration check on startup
-# Run migration check on startup
 check_and_migrate_rpg_columns()
-with app.app_context():
-    _add_rpg_intro_seen_column_to_user()
 
 @app.route('/api/check_rpg_intro_eligibility', methods=['GET'])
 def check_rpg_intro_eligibility():
