@@ -8,7 +8,7 @@ self.addEventListener('push', function (event) {
     const options = {
         body: data.body || '新しい通知があります',
         icon: '/static/pergamon/normal_icon.png',
-        badge: '/static/NapoleonIcon.png',
+        badge: '/static/pergamon/normal_icon.png',
         data: {
             url: data.url || '/'
         }

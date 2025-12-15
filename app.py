@@ -13429,39 +13429,74 @@ def start_rpg_battle():
     
     # ボス決定
     rpg_state = RpgState.query.filter_by(user_id=user_id).first()
+    if not rpg_state:
+        rpg_state = RpgState(user_id=user_id)
+        db.session.add(rpg_state)
+        db.session.commit()
     
     rematch_enemy_id = request.json.get('rematch_enemy_id') if request.json else None
     target_boss = None
     is_rematch = False
 
+    # 日付判定ロジック（朝7時切り替え）
+    current_time = datetime.now(JST)
+    if current_time.hour < 7:
+         logic_date = (current_time - timedelta(days=1)).date()
+    else:
+         logic_date = current_time.date()
+
     if rematch_enemy_id:
-        # 再戦ロジック
-        current_time = datetime.now(JST)
-        # 朝7時切り替え: 7時前なら前日扱い
-        if current_time.hour < 7:
-             rematch_date = (current_time - timedelta(days=1)).date()
-        else:
-             rematch_date = current_time.date()
+        # === 再戦ロジック ===
+        is_rematch = True
         
-        if RpgRematchHistory.query.filter_by(user_id=user_id, enemy_id=rematch_enemy_id, rematch_date=rematch_date).first():
+        # 1. 既に今日挑戦済みかチェック
+        if RpgRematchHistory.query.filter_by(user_id=user_id, enemy_id=rematch_enemy_id, rematch_date=logic_date).first():
              return jsonify({'status': 'error', 'message': 'このボスとの再戦は1日1回までです（毎日7:00更新）'}), 403
              
         target_boss = RpgEnemy.query.get(rematch_enemy_id)
         if not target_boss:
              return jsonify({'status': 'error', 'message': 'ボスが見つかりません'}), 404
 
-        # 既に倒しているかチェック
+        # 2. 既に倒しているかチェック
         cleared_set = {int(x) for x in (rpg_state.cleared_stages or []) if str(x).isdigit()}
         if int(rematch_enemy_id) not in cleared_set:
-             return jsonify({'status': 'error', 'message': 'まだ倒していないボスです'}), 403
+             return jsonify({'status': 'error', 'message': 'まだ倒していないボスとは再戦できません'}), 403
         
-        is_rematch = True
+        # 3. ★ここで挑戦履歴を作成してしまう（リロード対策：即座に消費）
+        try:
+            new_history = RpgRematchHistory(user_id=user_id, enemy_id=rematch_enemy_id, rematch_date=logic_date)
+            db.session.add(new_history)
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'status': 'error', 'message': '再戦の開始処理に失敗しました。'}), 500
+
     else:
-        # 通常ロジック
+        # === 通常ボス戦 ===
+        # 1. 今日の挑戦権があるかチェック
+        if rpg_state.last_challenge_at:
+            last_challenge = rpg_state.last_challenge_at
+            if last_challenge.tzinfo is None:
+                last_challenge = JST.localize(last_challenge)
+            
+            # last_challengeのロジック日付を計算
+            if last_challenge.hour < 7:
+                last_logic_date = (last_challenge - timedelta(days=1)).date()
+            else:
+                last_logic_date = last_challenge.date()
+                
+            if last_logic_date == logic_date:
+                 return jsonify({'status': 'error', 'message': 'ストーリーボスの挑戦は1日1回までです（毎日7:00更新）。また明日来てください！'}), 403
+
         target_boss = get_current_boss(user_id, rpg_state)
+        
+        if target_boss:
+            # 2. ★ここで挑戦日時を更新してしまう（リロード対策：即座に消費）
+            rpg_state.last_challenge_at = current_time
+            db.session.commit()
     
     if not target_boss:
-        return jsonify({'status': 'error', 'message': '戦える敵がいません'}), 400
+        return jsonify({'status': 'error', 'message': '現在挑戦できるボスはいません。学習を進めてスコアを貯めましょう！'}), 404
         
     return jsonify({
         'status': 'success',
@@ -13471,7 +13506,7 @@ def start_rpg_battle():
         'pass_score': target_boss.clear_correct_count,
         'max_mistakes': target_boss.clear_max_mistakes,
         'boss_info': target_boss.to_dict(),
-        'is_rematch': is_rematch # 🆕 再戦フラグ
+        'is_rematch': is_rematch
     })
 
 @app.route('/api/rpg/result', methods=['POST'])
@@ -13568,9 +13603,7 @@ def submit_rpg_result():
         })
         
     else:
-        # 敗北処理
-        rpg_state.last_challenge_at = now
-        db.session.commit()
+        # 敗北処理（挑戦時間は開始時に記録済み）
         return jsonify({'status': 'success', 'message': 'Failed. Cooldown started.'})
 
 @app.route('/api/rpg/equip_title', methods=['POST'])
