@@ -7961,6 +7961,27 @@ def admin_reset_intro_flag(user_id):
         flash(f'フラグリセット中にエラーが発生しました: {str(e)}', 'danger')
         return redirect(url_for('admin_page'))
 
+@app.route('/admin/reset_intro_flag_all', methods=['POST'])
+def admin_reset_intro_flag_all():
+    """全ユーザーのRPG導入フラグをリセット"""
+    try:
+        if not session.get('admin_logged_in'):
+            flash('管理者権限がありません。', 'danger')
+            return redirect(url_for('login_page'))
+
+        # 全ユーザーのフラグをリセット
+        # adminユーザー（もしいるなら）を除外するかは要件次第だが、一律リセットで問題ないはず
+        User.query.update({User.rpg_intro_seen: False})
+        db.session.commit()
+        
+        flash('全ユーザーのRPG導入フラグをリセットしました。', 'success')
+        return redirect(url_for('admin_page'))
+
+    except Exception as e:
+        db.session.rollback()
+        flash(f'全ユーザーのリセット中にエラーが発生しました: {str(e)}', 'danger')
+        return redirect(url_for('admin_page'))
+
 @app.route('/admin/delete_user/<int:user_id>', methods=['POST'])
 def admin_delete_user(user_id):
     try:
