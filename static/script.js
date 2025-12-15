@@ -3645,7 +3645,7 @@ let activeScenario = []; // 🆕 Dynamic scenario
 const rpgIntroDefaultScenario = [
     {
         text: "ほ、ほわあぁ……目が回るのです……。\nようやく実体化できたのですホー！",
-        image: "confusion.png",
+        image: "trouble.png",
         action: "appear"
     },
     {
@@ -3670,7 +3670,7 @@ const rpgIntroDefaultScenario = [
     },
     {
         text: "あれは……アレクサンドロス大王！？\nいけません、あんな姿では本来の偉業が台無しですホー！",
-        image: "confusion.png",
+        image: "trouble.png",
         action: "show_enemy"
     },
     {
