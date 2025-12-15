@@ -297,6 +297,9 @@
                     <button type="button" id="bulkDeleteBtn" class="btn btn-danger" disabled>
                         <i class="fas fa-trash-alt"></i> 選択したユーザーを削除 (<span id="selectedUserCount">0</span>)
                     </button>
+                    <button type="button" class="btn btn-warning ms-2" onclick="confirmResetAllIntro()">
+                        <i class="fas fa-history"></i> 全員のIntroリセット
+                    </button>
                 </div>
                 <div class="scrollable-table-container">
                     <div class="table-responsive">
@@ -6630,6 +6633,22 @@
             .catch(error => {
                 console.error('Polling Error:', error);
             });
+    }
+    // 全ユーザーのIntroリセット確認
+    function confirmResetAllIntro() {
+        showConfirmModal(
+            '全ユーザーIntroリセット',
+            '全ユーザーのRPG導入フラグをリセットしますか？\n\n⚠️ この操作は全ユーザーに影響します。\n全員が次回ログイン時に再びRPGイントロを見ることになります。',
+            () => {
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = '/admin/reset_intro_flag_all';
+                document.body.appendChild(form);
+                form.submit();
+            },
+            '全員リセット',
+            'btn-warning'
+        );
     }
 </script>
 {% endblock %}
