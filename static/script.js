@@ -3901,15 +3901,60 @@ function updateIntroDialogueUI() {
 
             // DON'T Hide/Show Per here -> Smooth transition to center is handled by CSS
             // Just update text
-            startTypewriter(data.text, textDiv);
+            // Wait for image load if source is changing (though here we just set it above)
+            // Ideally we wait for perImg load event from line 3899, but we are inside a timeout.
+            // Let's attach the load listener right after setting src above if we want to be strict,
+            // but for this specific "distortion_end" sequence, the delay (1500ms) plus the transition might be enough.
+            // However, to be consistent with the user Request, let's wrap the startTypewriter.
+
+            // Since we set src at line 3899, it might be loading.
+            if (perImg.complete) {
+                startTypewriter(data.text, textDiv);
+            } else {
+                perImg.onload = () => {
+                    startTypewriter(data.text, textDiv);
+                    perImg.onload = null;
+                };
+                // Fallback in case of error or timeout logic could be added,
+                // but for simplicity we assume local assets load or cached.
+            }
 
         }, 1500);
 
         return;
     }
 
-    if (perImg) perImg.src = `/static/pergamon/${imgInfo}`;
-    startTypewriter(data.text, textDiv);
+    // if (perImg) perImg.src = `/static/pergamon/${imgInfo}`;
+    // startTypewriter(data.text, textDiv);
+
+    if (perImg) {
+        const newSrc = `/static/pergamon/${imgInfo}`;
+        // Check if URL is actually changing to avoid unnecessary load waits if same expression
+        // Note: src property is absolute URL, so strictly comparing with relative path might be tricky.
+        // But usually browsers handle `src = src` as a reload or no-op depending on cache.
+        // Let's check if the filename matches to avoid reload if possible,
+        // OR just rely on checking `perImg.complete` immediately after setting.
+
+        // If we set src, the browser starts loading.
+        perImg.src = newSrc;
+
+        if (perImg.complete) {
+            startTypewriter(data.text, textDiv);
+        } else {
+            // Show loading state? Or just wait (user request: "wait for image then text")
+            perImg.onload = () => {
+                startTypewriter(data.text, textDiv);
+                perImg.onload = null;
+            };
+            perImg.onerror = () => {
+                console.error("Failed to load image:", newSrc);
+                startTypewriter(data.text, textDiv); // Fallback: show text anyway
+                perImg.onerror = null;
+            };
+        }
+    } else {
+        startTypewriter(data.text, textDiv);
+    }
 
     // Ensure Per is validly shown (Essential fix)
     if (!charContainer.classList.contains('show')) {
