@@ -14990,9 +14990,9 @@ def check_rpg_intro_eligibility():
     if user.rpg_intro_seen:
         return jsonify({'eligible': False, 'reason': 'seen'})
         
-    # 統計情報の確認: UserStats.total_correct（累計正解数）を使用
+    # 統計情報の確認: UserStats.balance_score（累計スコア）を使用
     stats = UserStats.get_or_create(user.id)
-    total_score = stats.total_correct if stats else 0
+    total_score = stats.balance_score if stats else 0
     
     if total_score >= 1000:
         return jsonify({'eligible': True})

@@ -30,8 +30,8 @@ def reset_intro_flag(target):
                     # check score
                     from app import UserStats
                     stats = UserStats.query.filter_by(user_id=user.id).first()
-                    score = stats.total_correct if stats else 0
-                    print(f"   Current Score (total_correct): {score} (Requirement: 1000)")
+                    score = stats.balance_score if stats else 0
+                    print(f"   Current Score (balance_score): {score} (Requirement: 1000)")
                 else:
                     print(f"❌ User with ID {user_id} not found")
             except ValueError:
