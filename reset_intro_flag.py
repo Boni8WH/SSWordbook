@@ -26,6 +26,12 @@ def reset_intro_flag(target):
                     db.session.commit()
                     print(f"✅ Reset rpg_intro_seen for user {user.username} (ID: {user_id})")
                     print(f"   Current state: rpg_intro_seen = {user.rpg_intro_seen}")
+                    
+                    # check score
+                    from app import UserStats
+                    stats = UserStats.query.filter_by(user_id=user.id).first()
+                    score = stats.total_correct if stats else 0
+                    print(f"   Current Score (total_correct): {score} (Requirement: 1000)")
                 else:
                     print(f"❌ User with ID {user_id} not found")
             except ValueError:
