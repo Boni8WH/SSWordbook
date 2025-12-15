@@ -681,8 +681,8 @@ def check_daily_quiz_reminders():
                     # 未完了なら通知
                     send_push_notification(
                         user,
-                        "今日の10問が未完では？",
-                        "勝利は、わが迅速果敢な行動にあり",
+                        "今日の10問が未完です！",
+                        "毎日コツコツが大事だホー！",
                         url="/"
                     )
             else:
@@ -690,8 +690,8 @@ def check_daily_quiz_reminders():
                 print(f"DEBUG: Sending reminder to {user.username} (Quiz not generated yet)")
                 send_push_notification(
                     user,
-                    "今日の10問が未完では？",
-                    "勝利は、わが迅速果敢な行動にあり",
+                    "今日の10問が未完です！",
+                    "毎日コツコツが大事だホー！",
                     url="/"
                 )
 
@@ -5328,7 +5328,7 @@ def admin_add_announcement():
                     body_text = content[:40] + "..." if len(content) > 40 else content
                     send_push_notification(
                         user,
-                        f"ナポレオン「{title}」",
+                        f"ペル「{title}」",
                         body_text,
                         url=website_url
                     )
@@ -7936,6 +7936,30 @@ def authenticate_user(room_number, room_password, student_id, individual_passwor
             return user
     
     return None
+
+@app.route('/admin/reset_intro_flag/<int:user_id>', methods=['POST'])
+def admin_reset_intro_flag(user_id):
+    """ユーザーのRPG導入フラグをリセット"""
+    try:
+        if not session.get('admin_logged_in'):
+            flash('管理者権限がありません。', 'danger')
+            return redirect(url_for('login_page'))
+
+        user = User.query.get(user_id)
+        if not user:
+            flash(f'ユーザーID {user_id} が見つかりません。', 'danger')
+            return redirect(url_for('admin_page'))
+
+        user.rpg_intro_seen = False
+        db.session.commit()
+        
+        flash(f'ユーザー {user.username} のRPG導入フラグをリセットしました（再度イントロが表示されます）。', 'success')
+        return redirect(url_for('admin_page'))
+
+    except Exception as e:
+        db.session.rollback()
+        flash(f'フラグリセット中にエラーが発生しました: {str(e)}', 'danger')
+        return redirect(url_for('admin_page'))
 
 @app.route('/admin/delete_user/<int:user_id>', methods=['POST'])
 def admin_delete_user(user_id):
