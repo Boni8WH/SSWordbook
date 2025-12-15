@@ -1,3 +1,7 @@
+self.addEventListener('install', function (event) {
+    self.skipWaiting();
+});
+
 self.addEventListener('push', function (event) {
     let data = {};
     if (event.data) {
@@ -7,8 +11,8 @@ self.addEventListener('push', function (event) {
     const title = data.title || 'SSWordbook Notification';
     const options = {
         body: data.body || '新しい通知があります',
-        icon: '/static/pergamon/normal_icon.png',
-        badge: '/static/pergamon/normal_icon.png',
+        icon: '/static/pergamon/normal_icon.png?v=2',
+        badge: '/static/pergamon/normal_icon.png?v=2',
         data: {
             url: data.url || '/'
         }
