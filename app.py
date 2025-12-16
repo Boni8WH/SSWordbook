@@ -13698,7 +13698,12 @@ def status():
             'boss_description': enemy.description,
             # 修正: 討伐後画像URL (Status Modal用)
             'defeated_icon': defeated_icon_url if (defeated_icon_url and enemy.defeated_image) else final_boss_icon,
-            'id': enemy.id # 🆕 追加: フロントエンドで敵IDを参照するため
+            'id': enemy.id, # 🆕 追加: フロントエンドで敵IDを参照するため
+            'time_limit': enemy.time_limit, # 🆕 プレビュー用
+            'pass_score': enemy.clear_correct_count, # 🆕 プレビュー用
+            'max_mistakes': enemy.clear_max_mistakes, # 🆕 プレビュー用
+            'intro_dialogue': enemy.intro_dialogue, # 🆕 プレビュー用
+            'difficulty': enemy.difficulty # 🆕 プレビュー用
         })
         if enemy.description:
             # HTML属性破壊を防ぐため改行を置換
