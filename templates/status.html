@@ -326,6 +326,7 @@
     let currentEnemyId = null;
     // Pass rematched_today_ids from backend
     const rematchedTodayIds = {{ rematched_today_ids | tojson | safe }};
+    const allEnemiesData = {{ earned_badges | tojson | safe }};
 
     function showMonsterDetail(badgeName, badgeDesc, bossName, bossIcon, enemyId) {
         currentEnemyId = enemyId;
@@ -411,7 +412,13 @@
         if (!currentEnemyId) return;
 
         const bossName = document.getElementById('monsterDetailTitle').textContent;
-        const enemyId = currentEnemyId;
+        // currentEnemyId is string, find in allEnemiesData (ids might be int or str)
+        const enemyData = allEnemiesData.find(e => String(e.id) === String(currentEnemyId));
+
+        if (!enemyData) {
+            alert('ボスのデータが見つかりません');
+            return;
+        }
 
         window.showConfirmModal(
             '再戦確認',
@@ -422,87 +429,78 @@
                 const myModal = bootstrap.Modal.getInstance(myModalEl);
                 if (myModal) myModal.hide();
 
-                // Fetch data to populate Intro Screen
-                fetch('/api/rpg/start', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ rematch_enemy_id: enemyId })
-                })
-                    .then(res => res.json())
-                    .then(data => {
-                        if (data.status === 'success') {
-                            // Populate Intro Screen
-                            const boss = data.boss_info;
-                            if (boss) {
-                                document.getElementById('rpgBossName').textContent = boss.name;
-                                const img = document.getElementById('rpgBossImage');
-                                let iconUrl = boss.icon_url || boss.icon_image;
-                                // Add cache busting to prevent stale images
-                                if (iconUrl) {
-                                    iconUrl += (iconUrl.includes('?') ? '&' : '?') + 't=' + new Date().getTime();
-                                }
-                                img.src = iconUrl;
-                                img.style.display = 'block';
+                // Populate Intro Screen directly from enemyData
+                document.getElementById('rpgBossName').textContent = enemyData.boss_name;
+                const img = document.getElementById('rpgBossImage');
 
-                                // Update difficulty stars with special display for level 10
-                                const starsEl = document.getElementById('rpgDifficultyStars');
-                                if (starsEl && boss.difficulty) {
-                                    const tenStars = Math.floor(boss.difficulty / 10);
-                                    const normalStars = boss.difficulty % 10;
-                                    let html = '';
-                                    for (let i = 0; i < tenStars; i++) {
-                                        html += '<span style="color: #e74c3c; font-size: 1.2em;">✪</span>'; // Red star for 10
-                                    }
-                                    for (let i = 0; i < normalStars; i++) {
-                                        html += '★';
-                                    }
-                                    starsEl.innerHTML = html;
-                                }
+                // Construct Image URL
+                let iconUrl = enemyData.boss_icon; // Already has full path from app.py
+                if (!iconUrl) iconUrl = '/static/images/boss_alexander.png';
 
-                                document.getElementById('rpgIntroDialog').textContent = `"${boss.intro_dialogue || '...'}"`;
-                            }
+                // Add cache busting if needed, though app.py sends it
+                if (iconUrl && !iconUrl.includes('?')) {
+                    iconUrl += '?t=' + new Date().getTime();
+                }
+                img.src = iconUrl;
+                img.style.display = 'block';
 
-                            document.getElementById('rpgRuleTime').textContent = `制限時間 ${data.time_limit}秒`;
-                            document.getElementById('rpgRuleCondition').textContent = `合格ライン ${data.pass_score}問正解`;
-                            document.getElementById('rpgRuleMistake').textContent = `${data.max_mistakes}ミスで即終了`;
+                // Update difficulty stars
+                const starsEl = document.getElementById('rpgDifficultyStars');
+                if (starsEl && enemyData.difficulty) {
+                    const diff = enemyData.difficulty;
+                    const tenStars = Math.floor(diff / 10);
+                    const normalStars = diff % 10;
+                    let html = '';
+                    for (let i = 0; i < tenStars; i++) {
+                        html += '<span style="color: #e74c3c; font-size: 1.2em;">✪</span>';
+                    }
+                    for (let i = 0; i < normalStars; i++) {
+                        html += '★';
+                    }
+                    starsEl.innerHTML = html;
+                }
 
-                            // Show Overlay
-                            const overlay = document.getElementById('rpgOverlay');
-                            overlay.classList.remove('hidden');
-                            document.getElementById('rpgIntroScreen').classList.remove('hidden');
-                            document.getElementById('rpgBattleScreen').classList.add('hidden');
-                            document.getElementById('rpgResultScreen').classList.add('hidden');
+                document.getElementById('rpgIntroDialog').textContent = `"${enemyData.intro_dialogue || '...'}"`;
 
-                            // Update Start Button to call startRpgGame with enemyId
-                            const startBtn = document.getElementById('btnRpgStart');
-                            const newStartBtn = startBtn.cloneNode(true);
-                            startBtn.parentNode.replaceChild(newStartBtn, startBtn);
+                // Set Rules
+                // Default fallbacks if not present
+                const timeLimit = enemyData.time_limit || 60;
+                const passScore = enemyData.pass_score || 10;
+                const maxMistakes = (enemyData.max_mistakes !== undefined) ? enemyData.max_mistakes : 2;
 
-                            newStartBtn.addEventListener('click', function () {
-                                startRpgGame(enemyId);
-                            });
+                document.getElementById('rpgRuleTime').textContent = `制限時間 ${timeLimit}秒`;
+                document.getElementById('rpgRuleCondition').textContent = `合格ライン ${passScore}問正解`;
+                document.getElementById('rpgRuleMistake').textContent = `${maxMistakes + 1}ミスで即終了`; // 2ミスOK -> 3ミスOUT
 
-                            // Setup Cancel Button
-                            const cancelBtn = document.getElementById('btnRpgCancel');
-                            const newCancelBtn = cancelBtn.cloneNode(true);
-                            cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
-                            newCancelBtn.addEventListener('click', closeRpgModal);
+                // Show Overlay
+                const overlay = document.getElementById('rpgOverlay');
+                overlay.classList.remove('hidden');
+                document.getElementById('rpgIntroScreen').classList.remove('hidden');
+                document.getElementById('rpgBattleScreen').classList.add('hidden');
+                document.getElementById('rpgResultScreen').classList.add('hidden');
 
-                            // Setup Close Button in Result Screen
-                            const closeBtn = document.getElementById('btnRpgClose');
-                            const newCloseBtn = closeBtn.cloneNode(true);
-                            closeBtn.parentNode.replaceChild(newCloseBtn, closeBtn);
-                            // Use handleRpgResultDismiss from script.js (global)
-                            newCloseBtn.addEventListener('click', handleRpgResultDismiss);
+                // Update Start Button to call startRpgGame with enemyId
+                // This is where we finally hit the API
+                const startBtn = document.getElementById('btnRpgStart');
+                const newStartBtn = startBtn.cloneNode(true);
+                startBtn.parentNode.replaceChild(newStartBtn, startBtn);
 
-                        } else {
-                            alert(data.message);
-                        }
-                    })
-                    .catch(err => {
-                        console.error(err);
-                        alert('通信エラーが発生しました');
-                    });
+                newStartBtn.addEventListener('click', function () {
+                    // startRpgGame in script.js handles the POST /api/rpg/start
+                    startRpgGame(currentEnemyId);
+                });
+
+                // Setup Cancel Button
+                const cancelBtn = document.getElementById('btnRpgCancel');
+                const newCancelBtn = cancelBtn.cloneNode(true);
+                cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
+                newCancelBtn.addEventListener('click', closeRpgModal);
+
+                // Setup Close Button in Result Screen
+                const closeBtn = document.getElementById('btnRpgClose');
+                const newCloseBtn = closeBtn.cloneNode(true);
+                closeBtn.parentNode.replaceChild(newCloseBtn, closeBtn);
+                newCloseBtn.addEventListener('click', handleRpgResultDismiss);
             },
             '再戦する',
             'btn-danger'
