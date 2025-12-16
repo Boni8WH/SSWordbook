@@ -5,9 +5,21 @@
 <div class="rpg-status-wrapper">
     <div class="status-container">
         <div class="status-header">
-            <h2 class="rpg-title">⚔️ 冒険の記録 ⚔️</h2>
+            <div class="rpg-title-wrapper">
+                <h2 class="rpg-title">⚔️ 冒険の記録 ⚔️</h2>
+                <!-- Per Introduction Floating Icon (Desktop: Next to Title) -->
+                <div class="per-floating-icon d-none d-md-block" onclick="showPerIntro()">
+                    <img src="/static/pergamon/normal.png" alt="Per">
+                </div>
+            </div>
             <div class="rpg-subtitle-wrapper">
-                <p class="status-subtitle">{{ current_user.username }} の英雄譚</p>
+                <div class="mobile-subtitle-container" style="display: inline-block; position: relative;">
+                    <p class="status-subtitle">{{ current_user.username }} の英雄譚</p>
+                    <!-- Per Introduction Floating Icon (Mobile: Next to Subtitle) -->
+                    <div class="per-floating-icon-mobile d-block d-md-none" onclick="showPerIntro()">
+                        <img src="/static/pergamon/normal.png" alt="Per">
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -258,13 +270,51 @@
             <img src="/static/pergamon/alex.png" alt="Enemy Shadow">
         </div>
         <div id="storyCharacterContainer" class="character-container hidden">
-            <img id="storyPerImage" src="/static/pergamon/confusion.png" alt="Per" class="character-img">
+            <img id="storyPerImage" src="/static/pergamon/trouble.png" alt="Per" class="character-img">
         </div>
     </div>
     <div id="storyDialogueBox" class="dialogue-box hidden">
         <div class="dialogue-name-tag" id="storySpeakerName">ペル</div>
         <div class="dialogue-text" id="storyText">...</div>
         <div class="dialogue-arrow">▼</div>
+    </div>
+</div>
+
+
+
+<!-- Per Introduction Modal -->
+<div class="modal fade" id="perIntroModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content rpg-modal-content">
+            <div class="modal-header border-bottom-0">
+                <h5 class="modal-title rpg-title-small" style="font-size: 1.5rem;">✨ 知恵の館の精霊 ペル ✨</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                    aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center">
+                <div class="per-carousel-container">
+                    <button class="carousel-arrow left" onclick="prevPerImage()"><i
+                            class="fas fa-chevron-left"></i></button>
+                    <div class="per-image-wrapper">
+                        <img id="perIntroImage" src="/static/pergamon/normal.png" alt="Per" class="per-intro-img">
+                    </div>
+                    <button class="carousel-arrow right" onclick="nextPerImage()"><i
+                            class="fas fa-chevron-right"></i></button>
+                </div>
+
+                <div class="per-description-box mt-4">
+                    <p style="text-align: left; line-height: 1.8; color: #e0e0e0; margin-bottom: 0;">
+                        「知恵の館：バイトゥルヒクマ」の管理ナビゲーターを務める、ちいさな歴史書の精霊。<br>
+                        羊皮紙の生産で有名な古代都市ペルガモンで生まれた。<br>
+                        体は古い書物のページでできており、知識を何よりも愛している。<br>
+                        少し慌てん坊だが、歴史を救うマスターを一生懸命サポートする頼れる相棒。
+                    </p>
+                </div>
+            </div>
+            <div class="modal-footer border-top-0 justify-content-center">
+                <button type="button" class="btn btn-outline-light" data-bs-dismiss="modal">閉じる</button>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -457,6 +507,49 @@
             '再戦する',
             'btn-danger'
         );
+    }
+
+    // Per's Introduction Modal Logic
+    const perImages = [
+        'normal.png',
+        'joy.png',
+        'trouble.png',
+        'grief.png',
+        'caution.png',
+        'analysis.png'
+    ];
+    let currentPerImageIndex = 0;
+
+    function showPerIntro() {
+        // Reset to normal.png
+        currentPerImageIndex = 0;
+        updatePerImage();
+
+        const myModalEl = document.getElementById('perIntroModal');
+        const myModal = new bootstrap.Modal(myModalEl);
+        myModal.show();
+    }
+
+    function nextPerImage() {
+        currentPerImageIndex = (currentPerImageIndex + 1) % perImages.length;
+        updatePerImage();
+    }
+
+    function prevPerImage() {
+        currentPerImageIndex = (currentPerImageIndex - 1 + perImages.length) % perImages.length;
+        updatePerImage();
+    }
+
+    function updatePerImage() {
+        const imgPath = '/static/pergamon/' + perImages[currentPerImageIndex];
+        const imgEl = document.getElementById('perIntroImage');
+        imgEl.style.opacity = '0';
+        setTimeout(() => {
+            imgEl.src = imgPath;
+            imgEl.onload = () => {
+                imgEl.style.opacity = '1';
+            };
+        }, 200);
     }
 </script>
 
@@ -785,6 +878,11 @@
         margin-bottom: 40px;
     }
 
+    .rpg-title-wrapper {
+        display: inline-block;
+        position: relative;
+    }
+
     /* Dashboard Grid Layout */
     .rpg-dashboard-grid {
         display: grid;
@@ -799,6 +897,121 @@
         top: 20px;
         z-index: 10;
         /* Ensure it stays above if needed */
+    }
+
+    /* Per Floating Icon */
+    .per-floating-icon {
+        position: absolute;
+        top: -20px;
+        /* Adjust height relative to title */
+        right: -90px;
+        /* Place strictly to the right of the title width */
+        width: 80px;
+        height: 80px;
+        cursor: pointer;
+        z-index: 1000;
+        transition: transform 0.3s ease, filter 0.3s ease;
+        filter: drop-shadow(0 0 10px rgba(241, 196, 15, 0.5));
+        animation: float-bob 3s ease-in-out infinite;
+    }
+
+    .per-floating-icon:hover {
+        /* Pause animation on hover if desired, or just add scale */
+        transform: scale(1.15) rotate(-5deg);
+        filter: drop-shadow(0 0 15px rgba(241, 196, 15, 0.8));
+    }
+
+    @keyframes float-bob {
+
+        0%,
+        100% {
+            transform: translateY(0);
+        }
+
+        50% {
+            transform: translateY(-6px);
+        }
+    }
+
+    .per-floating-icon img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+    }
+
+    /* Mobile Icon Styling */
+    .per-floating-icon-mobile {
+        position: absolute;
+        top: -10px;
+        right: -60px;
+        width: 50px;
+        height: 50px;
+        cursor: pointer;
+        z-index: 1000;
+        animation: float-bob 3s ease-in-out infinite;
+    }
+
+    .per-floating-icon-mobile img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+    }
+
+    /* Per Modal Styles */
+    .rpg-title-small {
+        font-family: 'Cinzel', serif;
+        color: #f1c40f;
+        text-shadow: 0 0 5px rgba(241, 196, 15, 0.5);
+    }
+
+    .per-carousel-container {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 20px;
+        position: relative;
+    }
+
+    .per-image-wrapper {
+        width: 300px;
+        height: 300px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .per-intro-img {
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+        transition: opacity 0.2s ease;
+    }
+
+    .carousel-arrow {
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        color: #f1c40f;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+    .carousel-arrow:hover {
+        background: rgba(241, 196, 15, 0.2);
+        transform: scale(1.1);
+    }
+
+    .per-description-box {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        padding: 20px;
+        font-family: 'Noto Serif JP', serif;
     }
 
     /* Stats Card & Badges Area Backgrounds - Darker for readability */
