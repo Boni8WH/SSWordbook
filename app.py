@@ -6711,6 +6711,12 @@ def progress_page():
         word_data = load_word_data_for_room(current_user.room_number)
         print(f"部屋の単語データ数: {len(word_data)}")
         
+        # 高速化用: 問題IDから単語データへのマッピングを作成
+        word_map = {}
+        for word in word_data:
+            generated_id = get_problem_id(word)
+            word_map[generated_id] = word
+
         room_setting = RoomSetting.query.filter_by(room_number=current_user.room_number).first()
         max_enabled_unit_num_str = room_setting.max_enabled_unit_number if room_setting else "9999"
         parsed_max_enabled_unit_num = parse_unit_number(max_enabled_unit_num_str)
@@ -6756,13 +6762,8 @@ def progress_page():
         unmatched_problems = 0
         
         for problem_id, history in user_problem_history.items():
-            # 問題IDに対応する単語を検索
-            matched_word = None
-            for word in word_data:
-                generated_id = get_problem_id(word)
-                if generated_id == problem_id:
-                    matched_word = word
-                    break
+            # 高速 lookup
+            matched_word = word_map.get(problem_id)
 
             if matched_word:
                 matched_problems += 1
@@ -6772,7 +6773,7 @@ def progress_page():
                 is_word_enabled_in_csv = matched_word['enabled']
                 is_unit_enabled_by_room = parse_unit_number(unit_number) <= parsed_max_enabled_unit_num
 
-                if (is_word_enabled_in_csv and is_unit_enabled_by_room_setting and 
+                if (is_word_enabled_in_csv and is_unit_enabled_by_room and 
                     chapter_number in chapter_progress_summary and
                     unit_number in chapter_progress_summary[chapter_number]['units']):
                     
@@ -13363,7 +13364,6 @@ def start_rpg_battle():
     valid_problems = []
     
     # RoomSettingから有効な単元を取得
-    # RoomSettingから有効な単元を取得
     room_setting = RoomSetting.query.filter_by(room_number=room_number).first()
     
     for word in word_data:
@@ -13451,7 +13451,7 @@ def start_rpg_battle():
         
         # 1. 既に今日挑戦済みかチェック
         if RpgRematchHistory.query.filter_by(user_id=user_id, enemy_id=rematch_enemy_id, rematch_date=logic_date).first():
-             return jsonify({'status': 'error', 'message': 'このボスとの再戦は1日1回までです（毎日7:00更新）'}), 403
+             return jsonify({'status': 'error', 'message': 'ボスとの再戦は1日1回までです（毎日7:00更新）'}), 403
              
         target_boss = RpgEnemy.query.get(rematch_enemy_id)
         if not target_boss:
