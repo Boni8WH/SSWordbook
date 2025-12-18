@@ -1303,6 +1303,28 @@ VAPID_CLAIMS = {"sub": "mailto:admin@example.com"}
 # ===== SQLAlchemy初期化 =====
 db.init_app(app)
 
+# ==========================================
+# 起動時マイグレーション (Render/Gunicorn対応)
+# ==========================================
+with app.app_context():
+    try:
+        # データベース接続確認
+        db.engine.connect().close()
+        
+        # 必要なカラム追加を実行
+        # これらは __main__ ブロックだけでなく、ここで実行することで
+        # Gunicorn起動時にも確実に適用されるようにする
+        _add_manager_columns()
+        _add_updated_at_column_to_announcement()
+        
+        # 他の安全なマイグレーションも念のため実行
+        _add_logo_columns_to_app_info()
+        _add_rpg_image_columns_safe()
+        
+        logger.info("✅ Startup migrations completed successfully.")
+    except Exception as e:
+        logger.warning(f"⚠️ Startup migration warning: {e}")
+
 UPLOAD_FOLDER = 'uploads'
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
@@ -16042,8 +16064,7 @@ if __name__ == '__main__':
         
         logger.info(f"🌐 サーバーを起動します: http://0.0.0.0:{port}")
         
-        _add_manager_columns()
-        _add_updated_at_column_to_announcement()
+
         
         app.run(host='0.0.0.0', port=port, debug=debug_mode)
         
