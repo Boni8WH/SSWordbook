@@ -2,6 +2,12 @@ self.addEventListener('install', function (event) {
     self.skipWaiting();
 });
 
+
+self.addEventListener('fetch', function (event) {
+    // Basic pass-through to satisfy PWA requirements
+    // In a full offline-first app, caching logic would go here.
+});
+
 self.addEventListener('push', function (event) {
     let data = {};
     if (event.data) {
