@@ -7,12 +7,7 @@
     "theme_color": "#4a90e2",
     "icons": [
         {
-            "src": "/static/NapoleonIcon.png",
-            "sizes": "416x403",
-            "type": "image/png"
-        },
-        {
-            "src": "/static/NapoleonIcon.png",
+            "src": "/static/NapoleonLogo.png",
             "sizes": "512x512",
             "type": "image/png"
         },
