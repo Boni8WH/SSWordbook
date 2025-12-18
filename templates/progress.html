@@ -169,10 +169,9 @@
     }
 
     // ランキングデータの非同期読み込み
-    // ランキングデータの非同期読み込み（修正版）
     async function loadRankingData() {
         try {
-            console.log('🔄 ランキングデータを取得中...');
+
 
             // ローディング表示
             document.getElementById('ranking-loading').style.display = 'block';
@@ -194,8 +193,7 @@
             const data = await response.json();
 
             if (data.status === 'success') {
-                console.log(`📊 ランキングデータ取得成功: ${data.ranking_data.length}人分`);
-                console.log(`📋 表示制限: ${data.ranking_display_count}人`);
+
 
                 // グローバル変数に表示制限数を保存
                 window.rankingDisplayCount = data.ranking_display_count;
@@ -215,7 +213,7 @@
                 document.getElementById('current-user-stats').style.display = 'block';
                 document.getElementById('user-rank-section').style.display = 'block';
 
-                console.log('✅ ランキング表示完了');
+
 
             } else {
                 throw new Error(data.message || 'ランキングデータの取得に失敗しました');
@@ -336,7 +334,7 @@
 
     // ページ読み込み時にランキングデータを非同期取得
     document.addEventListener('DOMContentLoaded', function () {
-        console.log('📋 進捗ページ読み込み完了');
+
 
         // 章の進捗バーを設定
         document.querySelectorAll('.chapter-progress-bar').forEach(function (bar) {
@@ -354,11 +352,11 @@
             bar.style.width = Math.max(0, Math.min(100, percentage)) + '%';
         });
 
-        console.log('✅ 個人進捗表示完了');
+
 
         // ランキングデータを非同期で取得
         setTimeout(() => {
-            console.log('🔄 ランキングデータ読み込み開始...');
+
             loadRankingData();
         }, 100); // 100ms後に開始（画面描画完了を待つ）
     });

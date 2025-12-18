@@ -1504,7 +1504,7 @@
                                 document.body.appendChild(modalEl);
                                 // デバッグ用：閉じるイベントの追跡
                                 modalEl.addEventListener('hide.bs.modal', function (e) {
-                                    console.log(`🔒 Modal ${id} is hiding. Event type: ${e.type}`, e);
+
                                     // console.trace(); // 必要に応じて有効化
                                 });
                             }
@@ -3070,7 +3070,7 @@
         // 3. DOMContentLoaded イベントリスナー
         // ========================================
         document.addEventListener('DOMContentLoaded', function () {
-            console.log('🎯 DOMContentLoaded イベント発火！');
+
             // ========================================
             // 0. 一括削除機能
             // ========================================
@@ -3334,16 +3334,16 @@
             // 5. 部屋設定を自動読み込み & 保存ボタン初期化
             // ========================================
 
-            console.log('📍 Step 5 setup: setTimeout登録前');
+
             setTimeout(() => {
-                console.log('🔧 Step 5: 部屋設定初期化 開始');
+
                 if (typeof loadRoomSettings === 'function') {
                     loadRoomSettings();
                 }
 
                 // 既存のイベントリスナーを削除して新しいものに置き換え
                 const saveButtons = document.querySelectorAll('.save-room-setting-btn');
-                console.log(`📌 保存ボタン発見: ${saveButtons.length}個`);
+
 
                 saveButtons.forEach(button => {
                     button.replaceWith(button.cloneNode(true));
@@ -3351,9 +3351,9 @@
 
                 // 新しいイベントリスナーを追加
                 document.querySelectorAll('.save-room-setting-btn').forEach(button => {
-                    console.log('✅ 保存ボタンにイベントリスナー追加:', button.dataset.roomNumber);
+
                     button.addEventListener('click', function (event) {
-                        console.log('🖱️ 保存ボタンクリック:', this.dataset.roomNumber);
+
                         event.preventDefault(); // フォーム送信を防ぐ
                         const roomNumber = this.dataset.roomNumber;
                         const csvFileSelect = document.getElementById('csvFile_' + roomNumber);
@@ -5850,12 +5850,12 @@
         // ========================================
         // 今日の10問 再選考機能
         // ========================================
-        console.log('🎯 10問再選考イベントリスナー登録');
+
         document.addEventListener('click', function (event) {
             // クラス名 .regenerate-quiz-btn を持つボタンを探す
             const button = event.target.closest('.regenerate-quiz-btn');
             if (button) {
-                console.log('🖱️ 10問再選考ボタンクリック:', button.dataset.roomNumber);
+
                 const roomNumber = button.dataset.roomNumber;
 
                 showConfirmModal(
@@ -8012,7 +8012,7 @@
 
     <script>
         window.showInfoModal = function (title, message, type = 'info') {
-            console.log('showInfoModal called:', { title, message, type });
+
 
             const modalEl = document.getElementById('infoModal');
             const titleEl = document.getElementById('infoModalTitle');
@@ -8040,10 +8040,10 @@
                 }
             }
 
-            console.log('About to show modal');
+
             const modal = new bootstrap.Modal(modalEl);
             modal.show();
-            console.log('Modal show() called');
+
         };
 
         // URLパラメータのチェック
@@ -8051,7 +8051,7 @@
             // モーダルをbodyに移動して表示問題を修正
             const infoModal = document.getElementById('infoModal');
             if (infoModal && !infoModal.dataset.moved) {
-                console.log('Moving infoModal to body');
+
                 document.body.appendChild(infoModal);
                 infoModal.dataset.moved = 'true';
             }

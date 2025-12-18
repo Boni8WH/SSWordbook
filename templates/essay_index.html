@@ -529,11 +529,11 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function () {
-        console.log('📋 論述問題集ページ初期化開始');
+
 
         // 章カードのクリックイベントを設定
         const chapterCards = document.querySelectorAll('.chapter-card');
-        console.log('📁 見つかった章カード数:', chapterCards.length);
+
 
         chapterCards.forEach((card, index) => {
             const chapterUrl = card.getAttribute('data-chapter-url');
@@ -635,7 +635,7 @@
                 });
         }
 
-        console.log('✅ 論述問題集ページ初期化完了');
+
     });
 </script>
 {% endblock %}
