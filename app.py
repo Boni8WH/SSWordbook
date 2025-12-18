@@ -2125,6 +2125,13 @@ def migrate_database():
                         conn.commit()
                     print("✅ is_managerカラムを追加し、既存の担当者(ID:0)を移行しました。")
                 
+                if 'manager_auth_data' not in columns:
+                    print("🔧 manager_auth_dataカラムを追加します...")
+                    with db.engine.connect() as conn:
+                        conn.execute(text('ALTER TABLE "user" ADD COLUMN manager_auth_data TEXT'))
+                        conn.commit()
+                    print("✅ manager_auth_dataカラムを追加しました。")
+                
                 if 'username_changed_at' not in columns:
                     print("🔧 username_changed_atカラムを追加します...")
                     with db.engine.connect() as conn:
