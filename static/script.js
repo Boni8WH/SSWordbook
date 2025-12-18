@@ -4,7 +4,7 @@
 if (typeof window === 'undefined') {
     console.error("Error: 'window' object is undefined. This script might be running in a non-browser environment.");
 } else {
-    console.log("Window object is defined. Script is running in browser.");
+
 }
 
 // グローバル変数
@@ -271,30 +271,52 @@ function optimizeScrolling() {
 // 既存のID形式に合わせて修正
 
 // script.js の generateProblemId 関数を以下に置き換え
-
 // script.js の generateProblemId 関数を以下に置き換え
 
+// ★修正: 問題ID生成ロジックをPython側(app.py)と完全に一致させる
 function generateProblemId(word) {
-    /**
-     * 統一された問題ID生成（Python側と完全一致）
-     */
     try {
-        const chapter = String(word.chapter || '0').padStart(3, '0');
-        const number = String(word.number || '0').padStart(3, '0');
+        // Python: str(word.get('chapter', '0')).zfill(3)
+        // JS: String(...) -> Pythonのstr()相当
+        // もし入力が " 1 " の場合:
+        //   Python: " 1 ".zfill(3) -> " 1 " (長さ3なので変化なし)
+        //   JS:     " 1 ".padStart(3, '0') -> " 1 " (長さ3なので変化なし)
+        // もし入力が "1" の場合:
+        //   Python: "1".zfill(3) -> "001"
+        //   JS:     "1".padStart(3, '0') -> "001"
+        // ★重要: CSVのパース時にスペースが残っている可能性を考慮し、Trimしない（Python側もしていないため）
+        // ただし、もし不整合が起きるなら、Python/JS両方でTrimすべきだが、
+        // 既存の履歴との互換性を保つため、Pythonの挙動に合わせる。
+
+        const chapterStr = String(word.chapter !== undefined ? word.chapter : '0');
+        const numberStr = String(word.number !== undefined ? word.number : '0');
+
+        let chapter = chapterStr;
+        if (chapter.length < 3) {
+            chapter = chapter.padStart(3, '0');
+        }
+
+        let number = numberStr;
+        if (number.length < 3) {
+            number = number.padStart(3, '0');
+        }
+
         const question = String(word.question || '');
         const answer = String(word.answer || '');
 
-        // 問題文と答えから英数字と日本語文字のみ抽出（Python側と同じ処理）
+        // Python: re.sub(r'[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]', '', question[:15])
+        // JS: substring(0, 15) はPythonの [:15] と同じ挙動（文字数）
+        // ★Surrogate Pairの扱いが違う可能性があるが、まずはこのまま
+
         const questionClean = question.substring(0, 15).replace(/[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/g, '');
         const answerClean = answer.substring(0, 10).replace(/[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/g, '');
 
-        // 統一フォーマット: chapter-number-question-answer
         const problemId = `${chapter}-${number}-${questionClean}-${answerClean}`;
 
         return problemId;
 
-    } catch (error) {
-        console.error('ID生成エラー:', error);
+    } catch (e) {
+        console.error('ID Generation Error:', e);
         const chapter = String(word.chapter || '0').padStart(3, '0');
         const number = String(word.number || '0').padStart(3, '0');
         return `${chapter}-${number}-error`;
@@ -392,7 +414,7 @@ function saveRestrictionState() {
         restrictionReleased: restrictionReleased
     };
 
-    console.log('🔄 制限状態をサーバーに保存:', restrictionData);
+
 
     fetch('/api/update_restriction_state', {
         method: 'POST',
@@ -404,7 +426,7 @@ function saveRestrictionState() {
         .then(response => response.json())
         .then(data => {
             if (data.status === 'success') {
-                console.log('✅ 制限状態保存成功');
+
             } else {
                 console.error('❌ 制限状態保存失敗:', data.message);
                 flashMessage('制限状態の保存に失敗しました: ' + data.message, 'danger');
@@ -926,7 +948,6 @@ function getValidWeakProblemCount() {
     // ★修正: 重複を除外してカウント (Setを使用)
     const validWeakProblems = new Set(incorrectWords.filter(id => validProblemIds.has(id)));
 
-    console.log(`🔍 苦手問題カウント詳細: 全${incorrectWords.length}問中、有効(ユニーク)${validWeakProblems.size}問`);
     return validWeakProblems.size;
 }
 
@@ -1038,7 +1059,7 @@ function throttle(func, limit) {
             inThrottle = true;
             setTimeout(() => inThrottle = false, limit);
         } else {
-            console.log('⚠️ Notification throttled (ignored)');
+
         }
     }
 }
@@ -1049,7 +1070,7 @@ function flashMessage(message, category) {
     const now = Date.now();
     // 同じメッセージは1秒間表示しない（スロットリング）
     if (message === lastFlashMessage.text && (now - lastFlashMessage.time) < 1000) {
-        console.log('⚠️ Duplicate flash message ignored:', message);
+
         return;
     }
     lastFlashMessage.text = message;
@@ -1097,7 +1118,7 @@ let lastQuizSettings = {
 function startQuiz() {
     // ★重要：クイズ開始時に答えを見るボタンの状態を確実にリセット
     try {
-        console.log('📍 startQuiz called');
+
 
         isAnswerButtonDisabled = false;
         if (answerButtonTimeout) {
@@ -1110,7 +1131,7 @@ function startQuiz() {
             showAnswerButton.style.cursor = 'pointer';
             showAnswerButton.style.pointerEvents = 'auto';
         }
-        console.log('📍 クイズ開始 - 答えを見るボタンの状態をリセット');
+
 
         // ★修正：有効な苦手問題数を使用
         const weakProblemCount = getValidWeakProblemCount();
@@ -1120,7 +1141,7 @@ function startQuiz() {
         // ★修正：制限状態の判定をシンプルに
         const isCurrentlyRestricted = hasBeenRestricted && !restrictionReleased;
 
-        console.log(`startQuiz制限チェック: 有効苦手${weakProblemCount}問(全${rawWeakProblemCount}問), isCurrentlyRestricted=${isCurrentlyRestricted}`);
+
 
         // ★修正：制限中は苦手問題モード以外を明確に拒否
         // 未解答のみ・未マスターのみチェックボックスの状態も取得
@@ -1181,7 +1202,7 @@ function startQuiz() {
             totalSelectedRangeQuestions: 0
         };
 
-        console.log('🔄 クイズ設定初期化:', lastQuizSettings);
+
 
         if (!isIncorrectOnly) {
             // 選択された単元情報を保存
@@ -1195,16 +1216,14 @@ function startQuiz() {
 
         // ログ出力（デバッグ用）
         if (isIncorrectOnly) {
-            console.log(`\n🎯 苦手問題モード: ${quizQuestions.length}問候補`);
+
         } else {
-            console.log(`\n📚 通常モード: ${quizQuestions.length}問候補`);
+
         }
         lastQuizSettings.availableQuestions = [...quizQuestions]; // フィルタ後の問題を保存
         lastQuizSettings.totalSelectedRangeQuestions = quizQuestions.length;
 
-        console.log(`📊 選択範囲詳細:`);
-        console.log(`  選択単元数: ${lastQuizSettings.selectedUnits.length}`);
-        console.log(`  出題候補数: ${lastQuizSettings.totalSelectedRangeQuestions}問`);
+
         if (selectedQuestionCount !== 'incorrectOnly') {
             saveSelectionState();
         }
@@ -1239,26 +1258,14 @@ function startQuiz() {
         currentQuestionIndex = 0;
 
         // ★デバッグログ: 最初の問題をチェック
-        if (currentQuizData.length > 0) {
-            console.log('🔍 クイズ開始: 最初の問題データ', currentQuizData[0]);
-            console.log('   Question:', currentQuizData[0].question);
-            console.log('   Answer:', currentQuizData[0].answer);
-            console.log('   Question Type:', typeof currentQuizData[0].question);
-            console.log('   Question Length:', currentQuizData[0].question.length);
-            console.log('   Question CharCodes:', currentQuizData[0].question.split('').map(c => c.charCodeAt(0)));
-        }
+
 
         correctCount = 0;
         incorrectCount = 0;
         totalQuestions = currentQuizData.length;
         quizStartTime = Date.now();
 
-        console.log('✅ クイズ開始設定完了:', {
-            mode: lastQuizSettings.isIncorrectOnly ? '苦手問題' : (lastQuizSettings.isUnsolvedOnly ? '未解答' : (lastQuizSettings.isUnmasteredOnly ? '未マスター' : '通常')),
-            totalQuestions: totalQuestions,
-            totalSelectedRangeQuestions: lastQuizSettings.totalSelectedRangeQuestions,
-            availableQuestions: lastQuizSettings.availableQuestions.length
-        });
+
 
         // UIの切り替え
         if (selectionArea) selectionArea.classList.add('hidden');
@@ -1278,7 +1285,7 @@ function startQuiz() {
 
 
 function restartWeakProblemsQuiz() {
-    console.log('\n🎯 苦手問題モード専用再学習');
+
 
     // ★既存のお祝いメッセージがあれば削除
     const existingCelebration = document.querySelector('.no-weak-problems-celebration');
@@ -1292,8 +1299,8 @@ function restartWeakProblemsQuiz() {
         return incorrectWords.includes(wordIdentifier);
     });
 
-    console.log(`現在の苦手問題数: ${currentWeakProblems.length}`);
-    console.log(`前回の問題数: ${currentQuizData.length}`);
+
+
 
     if (currentWeakProblems.length === 0) {
         // 苦手問題がなくなった場合
@@ -1307,7 +1314,7 @@ function restartWeakProblemsQuiz() {
         return incorrectWords.includes(wordIdentifier);
     });
 
-    console.log(`前回の問題で依然苦手: ${stillWeakFromLastQuiz.length}問`);
+
 
     // ★改善メッセージを控えめに表示
     if (stillWeakFromLastQuiz.length < currentQuizData.length) {
@@ -1323,7 +1330,7 @@ function restartWeakProblemsQuiz() {
     totalQuestions = currentQuizData.length;
     quizStartTime = Date.now();
 
-    console.log(`✅ 新しい苦手問題セット: ${totalQuestions}問`);
+
 
     // UIの切り替え
     if (quizResultArea) quizResultArea.classList.add('hidden');
@@ -1345,7 +1352,7 @@ function showNoWeakProblemsMessage() {
     const existingCelebration = document.querySelector('.no-weak-problems-celebration');
     if (existingCelebration) {
         existingCelebration.remove();
-        console.log('🧹 既存のお祝いメッセージを削除しました');
+
     }
 
     // ★シンプルなデザインのメッセージを作成
@@ -1373,7 +1380,7 @@ function showNoWeakProblemsMessage() {
         }
     }
 
-    console.log('🎉 苦手問題完全克服のメッセージを表示しました');
+
 
     // ★フラッシュメッセージも表示
     flashMessage('🎉 すべての苦手問題を克服しました！', 'success');
@@ -1412,10 +1419,10 @@ function showNextQuestion() {
 
     if (currentQuestionIndex < totalQuestions) {
         const currentWord = currentQuizData[currentQuestionIndex];
-        console.log(`🔍 showNextQuestion: Index ${currentQuestionIndex}`, currentWord);
+
 
         if (questionElement) {
-            console.log('   Setting question text to:', currentWord.question);
+
             questionElement.textContent = currentWord.question;
             // 強制再描画
             questionElement.style.display = 'none';
@@ -1434,7 +1441,7 @@ function showNextQuestion() {
 function showAnswer() {
     // ★新機能：無効化中は処理を停止
     if (isAnswerButtonDisabled) {
-        console.log('答えを見るボタンは無効化中です');
+
         return;
     }
 
@@ -1721,7 +1728,7 @@ function updateUserStatsAsync() {
         .then(response => response.json())
         .then(data => {
             if (data.status === 'success') {
-                console.log('統計更新完了');
+
             }
         })
         .catch(error => {
@@ -1746,7 +1753,7 @@ function calculateAccurateRangeTotal() {
             return selectedUnitIds.has(`${word.chapter}-${word.number}`);
         }).length;
 
-        console.log(`🔍 再計算結果: ${rangeTotal}問 (選択単元: ${lastQuizSettings.selectedUnits.length}個)`);
+
         return rangeTotal;
     }
 
@@ -1847,7 +1854,7 @@ function backToSelectionScreen() {
 
     // ★重要：範囲選択画面に戻った時に制限状態を更新（少し遅延）
     setTimeout(() => {
-        console.log('📍 範囲選択画面に戻る - 制限状態を再確認');
+
         updateIncorrectOnlySelection();
 
         // ★条件付きリセット：制限解除されている場合のみUIをリセット
@@ -1855,11 +1862,11 @@ function backToSelectionScreen() {
         const currentWeakCount = getValidWeakProblemCount();
         const isCurrentlyRestricted = hasBeenRestricted && !restrictionReleased;
 
-        console.log(`🔍 backToSelection制限チェック: 苦手${currentWeakCount}問, 制限中=${isCurrentlyRestricted}`);
+
 
         // ★重要：制限解除済み、または制限が元々ない場合はUIをリセット
         if (!isCurrentlyRestricted) {
-            console.log('🔧 制限解除済みまたは制限なし - UIを強制リセット');
+
 
             // DOM要素を強制的にリセット
             const questionCountRadios = document.querySelectorAll('input[name="questionCount"]:not(#incorrectOnlyRadio)');
@@ -1890,7 +1897,7 @@ function backToSelectionScreen() {
             // 警告メッセージを削除
             removeWeakProblemWarning();
         } else if (isCurrentlyRestricted) {
-            console.log('🔒 制限継続中 - 制限状態を維持');
+
             // 制限中の場合は何もしない（updateIncorrectOnlySelectionが適切に処理）
         }
     }, 200);
@@ -1898,9 +1905,9 @@ function backToSelectionScreen() {
 
 function debugCelebrationMessages() {
     const celebrations = document.querySelectorAll('.no-weak-problems-celebration');
-    console.log(`現在のお祝いメッセージ数: ${celebrations.length}`);
+
     celebrations.forEach((element, index) => {
-        console.log(`${index + 1}. ${element.outerHTML.substring(0, 100)}...`);
+
     });
     return celebrations;
 }
@@ -1908,7 +1915,7 @@ function debugCelebrationMessages() {
 window.debugCelebrationMessages = debugCelebrationMessages;
 
 function restartQuiz() {
-    console.log('\n🔄 同じ条件で再学習開始');
+
 
     // 苦手問題モードの場合は専用処理
     if (lastQuizSettings.isIncorrectOnly) {
@@ -1917,7 +1924,7 @@ function restartQuiz() {
     }
 
     // 以下は通常モードの処理（既存のコード）
-    console.log('前回の設定:', lastQuizSettings);
+
 
     if (!lastQuizSettings.availableQuestions || lastQuizSettings.availableQuestions.length === 0) {
         console.warn('⚠️ 前回の設定が見つかりません。現在の問題セットで再開始します。');
@@ -1934,15 +1941,15 @@ function restartQuiz() {
         return;
     }
 
-    console.log('📚 通常モードで再学習');
-    console.log(`利用可能な問題数: ${lastQuizSettings.availableQuestions.length}`);
+
+
 
     // 前回と同じ範囲の全問題を取得
     let newQuizQuestions = [...lastQuizSettings.availableQuestions];
 
     // ★未解答モードの場合、学習済みの問題を除外する
     if (lastQuizSettings.isUnsolvedOnly) {
-        console.log('🔍 未解答モード：学習済みの問題を除外します');
+
         newQuizQuestions = newQuizQuestions.filter(word => {
             const wordIdentifier = generateProblemId(word);
             const history = problemHistory[wordIdentifier];
@@ -1959,7 +1966,7 @@ function restartQuiz() {
 
     // ★未マスターモードの場合、マスター済みの問題（80%以上）を除外する
     if (lastQuizSettings.isUnmasteredOnly) {
-        console.log('🔍 未マスターモード：高い正答率の問題を除外します');
+
         newQuizQuestions = newQuizQuestions.filter(word => {
             const wordIdentifier = generateProblemId(word);
             const history = problemHistory[wordIdentifier];
@@ -2000,7 +2007,7 @@ function restartQuiz() {
     totalQuestions = currentQuizData.length;
     quizStartTime = Date.now();
 
-    console.log(`✅ 新しい問題セット: ${totalQuestions}問`);
+
 
     // UIの切り替え
     if (quizResultArea) quizResultArea.classList.add('hidden');
@@ -2035,7 +2042,7 @@ function updateRestartButtonText() {
             explanationDiv.style.backgroundColor = '#fdf2f2';
         }
 
-        console.log('🎯 苦手問題モード用のボタンテキストに更新');
+
     } else if (lastQuizSettings.isUnsolvedOnly) {
         // 未解答モードの場合
         restartButton.innerHTML = '<i class="fas fa-redo"></i> 未解答問題で再学習';
@@ -2050,7 +2057,7 @@ function updateRestartButtonText() {
             explanationDiv.style.borderLeftColor = '#27ae60';
             explanationDiv.style.backgroundColor = '#eafaf1';
         }
-        console.log('🆕 未解答モード用のボタンテキストに更新');
+
     } else {
         // ★通常モードの場合
         restartButton.innerHTML = '<i class="fas fa-redo"></i> 同じ範囲から新しい問題で再学習';
@@ -2066,7 +2073,7 @@ function updateRestartButtonText() {
             explanationDiv.style.backgroundColor = '#e8f4fd';
         }
 
-        console.log('📚 通常モード用のボタンテキストに更新');
+
     }
 }
 
@@ -2089,7 +2096,7 @@ function resetRestartButtonToDefault() {
         explanationDiv.style.backgroundColor = '#e8f4fd';
     }
 
-    console.log('🔄 ボタンテキストをデフォルトにリセット');
+
 }
 
 function resetSelections() {
@@ -2176,26 +2183,7 @@ function saveQuizProgressToServer() {
 }
 
 function debugLastQuizSettings() {
-    console.log('\n=== 前回のクイズ設定 ===');
-    console.log('問題数設定:', lastQuizSettings.questionCount);
-    console.log('苦手問題モード:', lastQuizSettings.isIncorrectOnly);
-    console.log('選択された単元数:', lastQuizSettings.selectedUnits.length);
-    console.log('利用可能な問題数:', lastQuizSettings.availableQuestions.length);
 
-    if (lastQuizSettings.selectedUnits.length > 0) {
-        console.log('選択された単元:');
-        lastQuizSettings.selectedUnits.forEach(unit => {
-            console.log(`  第${unit.chapter}章 単元${unit.unit}`);
-        });
-    }
-
-    if (lastQuizSettings.availableQuestions.length > 0) {
-        console.log('利用可能な問題（最初の3問）:');
-        lastQuizSettings.availableQuestions.slice(0, 3).forEach((word, index) => {
-            console.log(`  ${index + 1}. "${word.question}"`);
-        });
-    }
-    console.log('========================\n');
 
     return lastQuizSettings;
 }
@@ -2204,36 +2192,7 @@ function debugLastQuizSettings() {
 window.debugLastQuizSettings = debugLastQuizSettings;
 
 function debugSelectionDetails() {
-    console.log('\n=== 選択範囲詳細確認 ===');
 
-    // 現在チェックされているチェックボックス
-    const checkedBoxes = document.querySelectorAll('.unit-item input[type="checkbox"]:checked');
-    console.log(`現在チェック済み: ${checkedBoxes.length}個`);
-
-    const currentlySelected = [];
-    checkedBoxes.forEach(checkbox => {
-        currentlySelected.push(`${checkbox.dataset.chapter}-${checkbox.value}`);
-    });
-
-    // 現在の選択に基づく問題数
-    const currentSelectionCount = word_data.filter(word => {
-        return currentlySelected.includes(`${word.chapter}-${word.number}`);
-    }).length;
-
-    console.log(`現在の選択による問題数: ${currentSelectionCount}問`);
-
-    // 保存された設定
-    console.log(`保存された選択範囲: ${lastQuizSettings.totalSelectedRangeQuestions}問`);
-    console.log(`保存された単元数: ${lastQuizSettings.selectedUnits?.length || 0}個`);
-
-    if (lastQuizSettings.selectedUnits) {
-        console.log('保存された単元一覧:');
-        lastQuizSettings.selectedUnits.forEach(unit => {
-            console.log(`  第${unit.chapter}章-単元${unit.unit}`);
-        });
-    }
-
-    console.log('============================\n');
 
     return {
         currentlyChecked: checkedBoxes.length,
@@ -2248,28 +2207,7 @@ window.debugSelectionDetails = debugSelectionDetails;
 
 // デバッグ用：現在の学習状況を表示する関数
 function debugCurrentProgress() {
-    console.log('\n=== 現在の学習状況 ===');
-    console.log(`学習履歴数: ${Object.keys(problemHistory).length}`);
-    console.log(`苦手問題数: ${incorrectWords.length}`);
 
-    // 回答数の多い順にソート
-    const sortedHistory = Object.entries(problemHistory)
-        .map(([id, history]) => ({
-            id,
-            totalAttempts: (history.correct_attempts || 0) + (history.incorrect_attempts || 0),
-            correct: history.correct_attempts || 0,
-            incorrect: history.incorrect_attempts || 0,
-            streak: history.correct_streak || 0
-        }))
-        .filter(item => item.totalAttempts > 0)
-        .sort((a, b) => b.totalAttempts - a.totalAttempts);
-
-    console.log(`実際に回答した問題数: ${sortedHistory.length}`);
-    console.log('上位5問:');
-    sortedHistory.slice(0, 5).forEach((item, index) => {
-        console.log(`  ${index + 1}. ID: ${item.id.substring(0, 20)}... (${item.totalAttempts}回: 正解${item.correct}, 不正解${item.incorrect}, 連続${item.streak})`);
-    });
-    console.log('========================\n');
 
     return sortedHistory;
 }
@@ -2434,11 +2372,7 @@ function shareOnX() {
             window.appInfoFromFlask.school_name ||
             schoolName;
     }
-    console.log('シェア情報:', {
-        appName: appName,
-        schoolName: schoolName,
-        appInfoFromFlask: window.appInfoFromFlask
-    });
+
 
     const text = `${appName}で学習しました！\n出題範囲：${selectedRangeTotal}問\n出題数：${total}問\n正解数：${correct}問\n正答率：${accuracy}%\n\n#${appName.replace(/\s/g, '')} ${schoolName}`;
     const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
@@ -2463,7 +2397,7 @@ function downloadQuizResultImage() {
 
     if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(hashtagText).then(() => {
-            console.log('ハッシュタグがクリップボードにコピーされました');
+
             flashMessage('ハッシュタグがクリップボードにコピーされました！', 'success');
         }).catch(err => {
             console.error('クリップボードへのコピーに失敗しました:', err);
@@ -2568,7 +2502,7 @@ function fallbackCopyToClipboard(text) {
     try {
         const successful = document.execCommand('copy');
         if (successful) {
-            console.log('フォールバック方式でハッシュタグがコピーされました');
+
             flashMessage('ハッシュタグがクリップボードにコピーされました！', 'success');
         } else {
             console.error('フォールバック方式でのコピーに失敗しました');
@@ -2744,19 +2678,14 @@ function removeWeakProblemWarning() {
 
 // デバッグ用：制限状態の確認
 function debugRestrictionState() {
-    console.log('\n=== 制限状態デバッグ ===');
-    console.log(`苦手問題数: ${incorrectWords.length}`);
-    console.log(`hasBeenRestricted: ${hasBeenRestricted}`);
-    console.log(`restrictionReleased: ${restrictionReleased}`);
-    console.log(`現在制限中?: ${hasBeenRestricted && !restrictionReleased}`);
-    console.log('========================\n');
+
 }
 
 // デバッグ用：制限状態を強制的にセット
 function setRestrictionState(hasBeenRestricted_val, restrictionReleased_val) {
     hasBeenRestricted = hasBeenRestricted_val;
     restrictionReleased = restrictionReleased_val;
-    console.log(`制限状態を設定: hasBeenRestricted=${hasBeenRestricted}, restrictionReleased=${restrictionReleased}`);
+
     updateIncorrectOnlySelection();
 }
 
@@ -2764,7 +2693,7 @@ function setRestrictionState(hasBeenRestricted_val, restrictionReleased_val) {
 function resetRestrictionState() {
     hasBeenRestricted = false;
     restrictionReleased = false;
-    console.log('制限状態をリセットしました');
+
     updateIncorrectOnlySelection();
 }
 
@@ -2790,7 +2719,7 @@ async function checkAndShowMonthlyResults() {
         } else if (data.status !== 'success') {
             console.error('未閲覧ランキングのチェックに失敗:', data.message);
         } else {
-            console.log('表示すべき前月のランキングはありません。');
+
         }
     } catch (error) {
         console.error('未閲覧ランキングの取得エラー:', error);
@@ -2900,50 +2829,13 @@ window.debugRestrictionState = debugRestrictionState;
 
 // グローバル関数として追加（開発者ツールで実行可能）
 window.investigateIdCollisions = function () {
-    console.log('🔍 === 問題ID衝突調査 ===');
 
-    const idMap = new Map();
-    const collisions = [];
-
-    word_data.forEach((word, index) => {
-        const currentId = generateProblemId(word);
-
-        if (idMap.has(currentId)) {
-            const existingWord = idMap.get(currentId);
-            collisions.push({
-                id: currentId,
-                word1: existingWord,
-                word2: word
-            });
-            console.log(`❌ ID衝突: ${currentId}`);
-            console.log(`  問題1: "${existingWord.question}" (${existingWord.chapter}-${existingWord.number})`);
-            console.log(`  問題2: "${word.question}" (${word.chapter}-${word.number})`);
-        } else {
-            idMap.set(currentId, word);
-        }
-    });
-
-    console.log(`\n📊 結果: ${collisions.length}件のID衝突`);
-    console.log(`総問題数: ${word_data.length}`);
-    console.log(`ユニークID数: ${idMap.size}`);
 
     return collisions;
 };
 
 window.checkWeakProblemsStatus = function () {
-    console.log('\n🔍 === 苦手問題状態確認 ===');
-    console.log(`苦手問題数: ${incorrectWords.length}`);
 
-    incorrectWords.forEach((problemId, index) => {
-        const word = word_data.find(w => generateProblemId(w) === problemId);
-        const history = problemHistory[problemId] || {};
-
-        console.log(`${index + 1}. ${problemId}`);
-        console.log(`   問題: ${word ? word.question : '見つからない'}`);
-        console.log(`   連続正解数: ${history.correct_streak || 0}`);
-        console.log(`   正解/不正解: ${history.correct_attempts || 0}/${history.incorrect_attempts || 0}`);
-    });
-    console.log('========================\n');
 };
 
 // グローバル関数として関数を公開（onclickから呼び出せるように）
@@ -3035,7 +2927,7 @@ function initNotificationSettings() {
                 // 修正: 既に権限がある場合は、バックグラウンドでSWを登録・更新してサーバーにキーを送る
                 // これにより、再ログイン時やデバイス変更時も自動で購読が復活する
                 if (data.enabled && Notification.permission === 'granted') {
-                    registerServiceWorker().catch(err => console.log('Auto-register SW failed:', err));
+                    registerServiceWorker().catch(err => console.error('Auto-register SW failed:', err));
                 }
             }
         })
@@ -3142,7 +3034,7 @@ async function registerServiceWorker() {
 
     try {
         const registration = await navigator.serviceWorker.register('/static/sw.js');
-        console.log('Service Worker registered');
+
 
         // VAPIDキー取得
         const keyRes = await fetch('/api/vapid_public_key');
@@ -3161,7 +3053,7 @@ async function registerServiceWorker() {
             body: JSON.stringify(subscription)
         });
 
-        console.log('Push subscription saved');
+
 
     } catch (error) {
         console.error('Service Worker Error:', error);
@@ -3370,7 +3262,7 @@ function finishRpgIntro() {
     // Mark as seen API (Harmless to call in rematch)
     fetch('/api/mark_rpg_intro_seen', { method: 'POST' })
         .then(res => res.json())
-        .then(data => console.log("Intro marked as seen", data));
+        .then(data => { });
 }
 
 let rpgIncorrectCount = 0; // 新規追加: ミス回数カウント
@@ -3733,7 +3625,7 @@ function checkAndPlayRpgIntro() {
     fetch('/api/check_rpg_intro_eligibility?t=' + ts)
         .then(response => response.json())
         .then(data => {
-            console.log("RPG Intro Check:", data); // 🆕 Debug logging
+
             if (data.eligible) {
                 // Set default scenario
                 playRpgIntroSequence(rpgIntroDefaultScenario);
@@ -4027,7 +3919,7 @@ function finishRpgIntro() {
     // Mark as seen API
     fetch('/api/mark_rpg_intro_seen', { method: 'POST' })
         .then(res => res.json())
-        .then(data => console.log("Intro marked as seen", data));
+        .then(data => { });
 }
 
 // Initialize check on load
