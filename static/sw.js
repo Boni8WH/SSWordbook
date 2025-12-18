@@ -17,7 +17,7 @@ self.addEventListener('push', function (event) {
     const title = data.title || 'SSWordbook Notification';
     const options = {
         body: data.body || '新しい通知があります',
-        icon: 'https://sswordbook.onrender.com/static/pergamon/normal_logo.png?v=8',
+        icon: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/50/Jacques-Louis_David_-_The_Emperor_Napoleon_in_His_Study_at_the_Tuileries_-_Google_Art_Project.jpg/512px-Jacques-Louis_David_-_The_Emperor_Napoleon_in_His_Study_at_the_Tuileries_-_Google_Art_Project.jpg',
         badge: 'https://sswordbook.onrender.com/static/NapoleonLogo.png?v=8',
         data: {
             url: data.url || '/'
