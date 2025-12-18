@@ -11,8 +11,8 @@ self.addEventListener('push', function (event) {
     const title = data.title || 'SSWordbook Notification';
     const options = {
         body: data.body || '新しい通知があります',
-        icon: '/static/pergamon/normal_logo.png?v=6',
-        badge: '/static/NapoleonIcon.png?v=6',
+        icon: self.location.origin + '/static/pergamon/normal_logo.png?v=7',
+        badge: self.location.origin + '/static/NapoleonIcon.png?v=7',
         data: {
             url: data.url || '/'
         }
