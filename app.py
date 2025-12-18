@@ -83,7 +83,7 @@ def upload_image_to_s3(file, filename, folder='essay_images', content_type='imag
         print(f"S3アップロードエラー: {e}")
         return None
 # ====================================================================
-# データベースモデル定義（models.pyから統合）
+# データベースモデル定義
 # ====================================================================
 
 from flask_sqlalchemy import SQLAlchemy
@@ -118,7 +118,7 @@ class User(db.Model):
     _individual_password_hash = db.Column(db.String(255), nullable=False)
 
     __table_args__ = (
-        db.UniqueConstraint('room_number', 'student_id', name='uq_room_student_id'),
+        # db.UniqueConstraint('room_number', 'student_id', name='uq_room_student_id'), # 削除: 同じ出席番号を許可
         db.UniqueConstraint('room_number', 'username', name='uq_room_username'),
     )
 
@@ -143,6 +143,12 @@ class User(db.Model):
 
     # RPG Intro Flag
     rpg_intro_seen = db.Column(db.Boolean, default=False, nullable=False)
+
+    # 🆕 担当者フラグ
+    is_manager = db.Column(db.Boolean, default=False, nullable=False)
+
+    # 担当者権限の永続化用 (JSON形式の文字列として保存: {"room_num": "hash", ...})
+    manager_auth_data = db.Column(db.Text, nullable=True)
 
     @property
     def title_equipped(self):
@@ -255,12 +261,26 @@ class RoomSetting(db.Model):
     max_enabled_unit_number = db.Column(db.String(50), default="9999", nullable=False)
     csv_filename = db.Column(db.String(100), default="words.csv", nullable=False)
     ranking_display_count = db.Column(db.Integer, default=10, nullable=False)
+    
+
+
     enabled_units = db.Column(db.Text, default="[]", nullable=False)  # JSON形式で単元リストを保存
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(JST), onupdate=lambda: datetime.now(JST))
 
     is_suspended = db.Column(db.Boolean, nullable=False, default=False)
     suspended_at = db.Column(db.DateTime, nullable=True)
+
+    # 🆕 管理者ページ用パスワードハッシュ
+    management_password_hash = db.Column(db.String(255), nullable=True)
+
+    def set_management_password(self, password):
+        self.management_password_hash = generate_password_hash(password)
+
+    def check_management_password(self, password):
+        if not self.management_password_hash:
+            return False
+        return check_password_hash(self.management_password_hash, password)
 
     def get_enabled_units(self):
         """有効な単元のリストを取得"""
@@ -287,6 +307,9 @@ class RoomCsvFile(db.Model):
     word_count = db.Column(db.Integer, default=0)
     upload_date = db.Column(db.DateTime, default=lambda: datetime.now(JST))
     description = db.Column(db.Text)
+    
+    # 🆕 アップロードした担当者 (User ID)
+    created_by_manager_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
     
     def __repr__(self):
         return f'<RoomCsvFile {self.filename} ({self.word_count} words)>'
@@ -597,6 +620,48 @@ def _add_rpg_intro_seen_column_to_user():
     except Exception as e:
         print(f"⚠️ Userマイグレーションエラー (rpg_intro_seen): {e}")
 
+def _add_manager_columns():
+    """担当者機能用のカラムを追加するマイグレーション関数"""
+    try:
+        inspector = inspect(db.engine)
+        
+        with db.engine.connect() as conn:
+            # 1. RoomSetting: management_password_hash
+            rs_columns = [c['name'] for c in inspector.get_columns('room_setting')]
+            if 'management_password_hash' not in rs_columns:
+                print("🔄 RoomSetting: management_password_hashカラムを追加します...")
+                conn.execute(text("ALTER TABLE room_setting ADD COLUMN management_password_hash VARCHAR(255)"))
+                conn.commit()
+                print("✅ RoomSetting: management_password_hashカラム追加完了")
+
+            # 2. RoomCsvFile: created_by_manager_id
+            rc_columns = [c['name'] for c in inspector.get_columns('room_csv_file')]
+            if 'created_by_manager_id' not in rc_columns:
+                print("🔄 RoomCsvFile: created_by_manager_idカラムを追加します...")
+                conn.execute(text("ALTER TABLE room_csv_file ADD COLUMN created_by_manager_id INTEGER REFERENCES \"user\"(id)"))
+                conn.commit()
+                print("✅ RoomCsvFile: created_by_manager_idカラム追加完了")
+
+            # 3. Announcement: created_by_manager_id
+            an_columns = [c['name'] for c in inspector.get_columns('announcements')]
+            if 'created_by_manager_id' not in an_columns:
+                print("🔄 Announcement: created_by_manager_idカラムを追加します...")
+                conn.execute(text("ALTER TABLE announcements ADD COLUMN created_by_manager_id INTEGER REFERENCES \"user\"(id)"))
+                conn.commit()
+                print("✅ Announcement: created_by_manager_idカラム追加完了")
+
+            # 4. CsvFileContent: created_by_manager_id
+            cf_columns = [c['name'] for c in inspector.get_columns('csv_file_content')]
+            if 'created_by_manager_id' not in cf_columns:
+                print("🔄 CsvFileContent: created_by_manager_idカラムを追加します...")
+                conn.execute(text("ALTER TABLE csv_file_content ADD COLUMN created_by_manager_id INTEGER REFERENCES \"user\"(id)"))
+                conn.commit()
+                print("✅ CsvFileContent: created_by_manager_idカラム追加完了")
+
+    except Exception as e:
+        print(f"⚠️ Managerカラムマイグレーションエラー: {e}")
+
+
 
 # ====================================================================
 # 通知機能関連
@@ -623,8 +688,6 @@ def _create_rpg_rematch_history_table():
             print("✅ rpg_rematch_historyテーブル作成完了")
     except Exception as e:
         print(f"⚠️ rpg_rematch_historyテーブル作成エラー: {e}")
-    except Exception as e:
-        print(f"⚠️ rpg_stateテーブル作成エラー: {e}")
 
 
 def send_push_notification(user, title, body, url="/"):
@@ -723,6 +786,9 @@ class CsvFileContent(db.Model):
     word_count = db.Column(db.Integer, default=0)
     upload_date = db.Column(db.DateTime, default=lambda: datetime.now(JST))
     
+    # 🆕 アップロードした担当者 (User ID)
+    created_by_manager_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+
     def get_csv_data(self):
         """CSV内容を辞書リストとして返す"""
         try:
@@ -791,6 +857,8 @@ class UserStats(db.Model):
             
             # 部屋の単語データを取得
             if word_data is None:
+                # 部屋番号を同期
+                self.room_number = user.room_number
                 word_data = load_word_data_for_room(user.room_number)
             
             # マップと設定が渡されていない場合はここで計算（単体呼び出し用）
@@ -1128,8 +1196,11 @@ class Announcement(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(200), nullable=False)
     content = db.Column(db.Text, nullable=False)
-    date = db.Column(db.DateTime, default=lambda: datetime.now(JST))
-    target_rooms = db.Column(db.String(200), nullable=True) # "all" or "101,102"
+    date = db.Column(db.DateTime, default=datetime.utcnow)
+    target_rooms = db.Column(db.String(500), default='all') # all, or "101,102"
+    
+    # 🆕 作成した担当者 (User ID)
+    created_by_manager_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
     is_active = db.Column(db.Boolean, default=True, nullable=False)
 
     def to_dict(self):
@@ -2043,6 +2114,16 @@ def migrate_database():
                         conn.execute(text('ALTER TABLE "user" ALTER COLUMN original_username SET NOT NULL'))
                         conn.commit()
                     print("✅ original_usernameカラムを追加しました。")
+
+                if 'is_manager' not in columns:
+                    print("🔧 is_managerカラムを追加します...")
+                    with db.engine.connect() as conn:
+                        conn.execute(text('ALTER TABLE "user" ADD COLUMN is_manager BOOLEAN DEFAULT FALSE'))
+                        # 既存の担当者（ID:0）をマネージャーとしてマーク
+                        conn.execute(text("UPDATE \"user\" SET is_manager = TRUE WHERE student_id = '0'"))
+                        conn.execute(text('ALTER TABLE "user" ALTER COLUMN is_manager SET NOT NULL'))
+                        conn.commit()
+                    print("✅ is_managerカラムを追加し、既存の担当者(ID:0)を移行しました。")
                 
                 if 'username_changed_at' not in columns:
                     print("🔧 username_changed_atカラムを追加します...")
@@ -2583,7 +2664,8 @@ def create_tables_and_admin_user():
             try:
                 # ★マイグレーション実行
                 _add_logo_columns_to_app_info()
-                _add_rpg_image_columns_safe() # 🆕
+                _add_rpg_image_columns_safe()
+                _add_manager_columns() # 🆕
                 
                 app_info = AppInfo.get_current_info()
                 logger.info("✅ アプリ情報を確認/作成しました")
@@ -3673,16 +3755,49 @@ def login_page():
             admin_username = request.form.get('admin_username')
             admin_password = request.form.get('admin_password')
 
+            # 1. スーパー管理者 (ADMIN部屋)
             admin_user = User.query.filter_by(room_number='ADMIN', username=admin_username).first()
             
             if admin_user and admin_user.check_individual_password(admin_password):
                 session['admin_logged_in'] = True
                 session['username'] = 'admin'
-                session['user_id'] = admin_user.id  # 管理者ユーザーのIDも保存
+                session['user_id'] = admin_user.id
+                # 管理者の場合は全権限
+                session.pop('manager_logged_in', None)
                 flash('管理者としてログインしました。', 'success')
                 return redirect(url_for('admin_page'))
-            else:
-                flash('管理者のユーザー名またはパスワードが間違っています。', 'danger')
+            
+            # 2. 担当者 (is_manager=True)
+            manager_user = User.query.filter_by(is_manager=True, username=admin_username).first()
+            if manager_user and manager_user.check_individual_password(admin_password):
+                 session['manager_logged_in'] = True
+                 session['username'] = manager_user.username
+                 session['user_id'] = manager_user.id
+                 session['room_number'] = manager_user.room_number  # 担当者の部屋番号を設定
+                 
+                 # 永続化された権限の復元
+                 auth_rooms = []
+                 if manager_user.manager_auth_data:
+                     try:
+                         import json
+                         auth_data = json.loads(manager_user.manager_auth_data)
+                         
+                         # 各部屋の権限を検証
+                         for room_num, stored_hash in auth_data.items():
+                             room_setting = RoomSetting.query.filter_by(room_number=room_num).first()
+                             # パスワードハッシュが一致する場合のみ権限を付与
+                             if room_setting and room_setting.management_password_hash == stored_hash:
+                                 auth_rooms.append(room_num)
+                     except Exception as e:
+                         print(f"Auth data parse error: {e}")
+                 
+                 session['manager_auth_rooms'] = auth_rooms
+                 session.pop('admin_logged_in', None)
+                 
+                 flash(f'担当者としてログインしました。現在 {len(auth_rooms)} 部屋の管理権限を持っています。', 'info')
+                 return redirect(url_for('admin_page'))
+
+            flash('管理者のユーザー名またはパスワードが間違っています。', 'danger')
         
         elif login_type == 'user':
             room_number = request.form.get('room_number')
@@ -3718,6 +3833,10 @@ def login_page():
                 if hasattr(user, 'is_first_login') and user.is_first_login:
                     flash('初回ログインです。パスワードを変更してください。', 'info')
                     return redirect(url_for('first_time_password_change'))
+                
+                # 担当者の場合は管理画面（認証）へ、生徒の場合はIndexへ
+                if user.is_manager:
+                     return redirect(url_for('manager_auth_page'))
                 else:
                     flash(f'ようこそ、{user.username}さん！', 'success')
                     return redirect(url_for('index'))
@@ -3725,7 +3844,333 @@ def login_page():
                 flash('ログイン情報が間違っています。', 'danger')
     
     context = get_template_context()
+    context = get_template_context()
     return render_template('login.html', **context)
+
+@app.route('/manager/auth', methods=['GET', 'POST'])
+def manager_auth_page():
+    return redirect(url_for('admin_page'))
+
+
+@app.route('/manager/dashboard')
+def manager_dashboard_page():
+    return redirect(url_for('admin_page'))
+
+
+    # ダッシュボード表示
+    
+    # 1. お知らせ (自室向け、または自分が作成したもの)
+    # 既存のロジックでは target_rooms='all' or '101' string match.
+    # 管理者が作成したものは 'all' にはしないはず (特定の部屋向け)
+    # 簡略化: 自分の部屋番号が含まれているもの + 自分が作成したもの
+    announcements = Announcement.query.filter(
+        (Announcement.target_rooms.contains(user.room_number)) |
+        (Announcement.created_by_manager_id == user.id)
+    ).order_by(Announcement.date.desc()).all()
+
+    # 2. CSVファイル (全て表示 + 自分がアップロードしたものを強調?)
+    # 簡略化: 全て表示して選択可能にする
+    csv_files = RoomCsvFile.query.order_by(RoomCsvFile.upload_date.desc()).all()
+    
+    # 3. 部屋設定 (現在の設定を取得)
+    room_setting = RoomSetting.query.filter_by(room_number=user.room_number).first()
+    if not room_setting:
+        # なければ作成
+        room_setting = RoomSetting(room_number=user.room_number)
+        db.session.add(room_setting)
+        db.session.commit()
+    
+    # 部屋の学習状況（章ごとの単元リスト）を取得
+    # 管理者用のload_raw_word_data_for_roomを流用またはload_word_data_for_roomから構築
+    # ここでは「設定画面」のためのデータ構造が必要（章 -> {単元: {名前...}}）
+    # 既存のヘルパー関数があれば使いたいが、load_word_data系は単語リストを返す。
+    # 構造化されたデータを作る必要がある。
+    
+    raw_word_data = load_raw_word_data_for_room(user.room_number)
+    chapter_data = {}
+    
+    for word in raw_word_data:
+        ch_num = str(word['chapter'])
+        u_num = str(word['number'])
+        
+        if ch_num not in chapter_data:
+            chapter_data[ch_num] = {'name': f"第{ch_num}章", 'units': {}}
+            if ch_num == 'S': chapter_data[ch_num]['name'] = "SP問題"
+            
+        if u_num not in chapter_data[ch_num]['units']:
+             chapter_data[ch_num]['units'][u_num] = {'categoryName': word.get('category', 'カテゴリーなし')}
+
+    # ソート
+    sorted_chapter_data = dict(sorted(chapter_data.items(), key=lambda item: (
+        item[0] == 'S', 
+        item[0] == 'Z', 
+        int(item[0]) if item[0].isdigit() else 999
+    )))
+    
+    for ch in sorted_chapter_data.values():
+        ch['units'] = dict(sorted(ch['units'].items(), key=lambda item: (
+            item[0] == 'S',
+            item[0] == 'Z',
+            parse_unit_number(item[0])
+        )))
+
+    context = get_template_context()
+    return render_template('manager_dashboard.html', 
+                           announcements=announcements,
+                           csv_files=csv_files,
+                           room_setting=room_setting,
+                           chapter_data=sorted_chapter_data,
+                           **context)
+
+@app.route('/manager/ranking')
+def manager_ranking_page():
+    """担当者用ランキングページ (管理者用ランキング画面を再利用)"""
+    if 'user_id' not in session:
+        return redirect(url_for('login_page'))
+    
+    # 担当者チェック
+    user = User.query.get(session['user_id'])
+    if not user or not user.is_manager:
+        flash('担当者権限がありません。', 'danger')
+        return redirect(url_for('index'))
+        
+    # セカンダリ認証チェック
+    if session.get('manager_room_verified') != user.room_number:
+        return redirect(url_for('manager_auth_page'))
+    
+    try:
+        # 管理者用テンプレートを再利用
+        context = get_template_context()
+        context['manager_mode'] = True
+        return render_template('admin_ranking.html', **context)
+        
+    except Exception as e:
+        print(f"Error in manager_ranking_page: {e}")
+        import traceback
+        traceback.print_exc()
+        flash('ランキングページの読み込み中にエラーが発生しました。', 'danger')
+        return redirect(url_for('manager_dashboard_page'))
+
+
+
+# --- Manager Actions ---
+
+@app.route('/manager/settings/update', methods=['POST'])
+def manager_update_settings():
+    if 'user_id' not in session or session.get('manager_room_verified') != session.get('room_number'):
+        return jsonify({'status': 'error', 'message': 'Unauthorized'}), 403
+    
+    try:
+        room_number = session['room_number']
+        room_setting = RoomSetting.query.filter_by(room_number=room_number).first()
+        
+        # CSV変更
+        if 'csv_filename' in request.form:
+            room_setting.csv_filename = request.form['csv_filename']
+            # CSVが変わったら詳細設定はリセットされる可能性が高いが、一旦そのまま
+            
+        # 単元設定変更 (JSONで受け取る想定)
+        if 'enabled_units_json' in request.form:
+             room_setting.enabled_units = request.form['enabled_units_json']
+             
+        db.session.commit()
+        flash('設定を更新しました。', 'success')
+        return redirect(url_for('manager_dashboard_page'))
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'更新エラー: {e}', 'danger')
+        return redirect(url_for('manager_dashboard_page'))
+
+@app.route('/manager/notice/add', methods=['POST'])
+def manager_add_notice():
+    if 'user_id' not in session or session.get('manager_room_verified') != session.get('room_number'):
+        return redirect(url_for('index'))
+        
+    try:
+        title = request.form['title']
+        content = request.form['content']
+        room_number = session['room_number']
+        
+        new_notice = Announcement(
+            title=title,
+            content=content,
+            target_rooms=room_number, # 自室のみ
+            created_by_manager_id=session['user_id'],
+            is_active=True
+        )
+        db.session.add(new_notice)
+        db.session.commit()
+        flash('お知らせを追加しました。', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'追加エラー: {e}', 'danger')
+        
+    return redirect(url_for('manager_dashboard_page'))
+
+@app.route('/manager/notice/delete/<int:notice_id>', methods=['POST'])
+def manager_delete_notice(notice_id):
+    if 'user_id' not in session or session.get('manager_room_verified') != session.get('room_number'):
+        return redirect(url_for('index'))
+    
+    notice = Announcement.query.get(notice_id)
+    if notice:
+        # 権限チェック: 自分の部屋宛て または 自分が作成したもの
+        if notice.target_rooms == session['room_number'] or notice.created_by_manager_id == session['user_id']:
+            notice.is_active = False # 論理削除
+            db.session.commit()
+            flash('お知らせを削除しました。', 'success')
+        else:
+            flash('削除権限がありません。', 'danger')
+    return redirect(url_for('manager_dashboard_page'))
+
+@app.route('/manager/settings/update_ajax', methods=['POST'])
+def manager_update_settings_ajax():
+    """Ajax logic for updating room settings (Manager)"""
+    if 'user_id' not in session or session.get('manager_room_verified') != session.get('room_number'):
+         return jsonify({'status': 'error', 'message': 'Unauthorized'}), 403
+    
+    try:
+        data = request.get_json()
+        room_number = session['room_number']
+        room_setting = RoomSetting.query.filter_by(room_number=room_number).first()
+        
+        if not room_setting:
+            room_setting = RoomSetting(room_number=room_number)
+            db.session.add(room_setting)
+
+        # 1. Update CSV if provided
+        if 'csv_filename' in data:
+            room_setting.csv_filename = data['csv_filename']
+            app.logger.info(f"Manager in Room {room_number} updated CSV to {data['csv_filename']}")
+            
+        # 2. Update enabled units if provided
+        if 'enabled_units' in data:
+            # Ensure it is stored as JSON string
+            room_setting.enabled_units = json.dumps(data['enabled_units'])
+            app.logger.info(f"Manager in Room {room_number} updated units: {len(data['enabled_units'])} units")
+            
+        db.session.commit()
+        return jsonify({'status': 'success', 'message': '設定を更新しました'})
+        
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Manager update setting error: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/manager/get_available_units')
+def manager_get_available_units():
+    """Get available units for the manager's room"""
+    if 'user_id' not in session or session.get('manager_room_verified') != session.get('room_number'):
+         return jsonify({'status': 'error', 'message': 'Unauthorized'}), 403
+    
+    try:
+        room_number = session['room_number']
+        # Load word data using same logic as admin
+        word_data = load_raw_word_data_for_room(room_number)
+        
+        # Extract units
+        units = set()
+        for word in word_data:
+            if word.get('enabled', True):
+                chapter = str(word.get('chapter', ''))
+                number = str(word.get('number', ''))
+                
+                if chapter == 'S':
+                    units.add('S')
+                elif number == 'Z':
+                    units.add('Z')
+                else:
+                    units.add(number)
+                    
+        sorted_units = sorted(list(units), key=lambda x: (
+            x == 'Z',
+            x == 'S',
+            parse_unit_number(x)
+        ))
+        
+        return jsonify({
+            'status': 'success',
+            'available_units': sorted_units
+        })
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/manager/get_room_setting')
+def manager_get_room_setting():
+    """Get current room settings for manager"""
+    if 'user_id' not in session or session.get('manager_room_verified') != session.get('room_number'):
+         return jsonify({'status': 'error', 'message': 'Unauthorized'}), 403
+    
+    try:
+        room_number = session['room_number']
+        room_setting = RoomSetting.query.filter_by(room_number=room_number).first()
+        
+        enabled_units = []
+        csv_filename = 'words.csv'
+        
+        if room_setting:
+            csv_filename = room_setting.csv_filename
+            enabled_units = room_setting.get_enabled_units() 
+            
+        return jsonify({
+            'status': 'success',
+            'csv_filename': csv_filename,
+            'enabled_units': enabled_units
+        })
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/manager/csv/upload', methods=['POST'])
+def manager_upload_csv():
+    if 'user_id' not in session or session.get('manager_room_verified') != session.get('room_number'):
+        return redirect(url_for('index'))
+    
+    # (既存のadmin_upload_csvロジックを流用・簡略化)
+    if 'file' not in request.files:
+        flash('ファイルがありません。', 'danger')
+        return redirect(url_for('manager_dashboard_page'))
+        
+    file = request.files['file']
+    if file.filename == '':
+        flash('ファイルが選択されていません。', 'danger')
+        return redirect(url_for('manager_dashboard_page'))
+
+    if file and file.filename.endswith('.csv'):
+        try:
+            # 既存チェック
+            existing = RoomCsvFile.query.filter_by(filename=file.filename).first()
+            if existing:
+                flash(f'同名のファイル({file.filename})が既に存在します。別名にしてください。', 'warning')
+                return redirect(url_for('manager_dashboard_page'))
+            
+            # 保存
+            save_path = os.path.join(ROOM_CSV_FOLDER, file.filename)
+            file.save(save_path)
+            
+            # 行数カウント等
+            with open(save_path, 'r', encoding='utf-8') as f:
+                 lines = f.readlines()
+                 word_count = sum(1 for line in lines if line.strip()) - 1 # header除外
+            
+            new_csv = RoomCsvFile(
+                filename=file.filename,
+                original_filename=file.filename,
+                file_size=os.path.getsize(save_path),
+                word_count=max(0, word_count),
+                description=request.form.get('description', ''),
+                created_by_manager_id=session['user_id']
+            )
+            db.session.add(new_csv)
+            db.session.commit()
+            flash(f'CSVファイル「{file.filename}」をアップロードしました。', 'success')
+            
+        except Exception as e:
+            flash(f'アップロードエラー: {e}', 'danger')
+    else:
+        flash('CSVファイルを選択してください。', 'danger')
+        
+    return redirect(url_for('manager_dashboard_page'))
 
 @app.route('/first_time_password_change', methods=['GET', 'POST'])
 def first_time_password_change():
@@ -3799,6 +4244,11 @@ def first_time_password_change():
                 db.session.commit()
                 
                 flash('パスワードが正常に変更されました。学習を開始できます。', 'success')
+                
+                # 担当者の場合は管理画面（認証）へ
+                if current_user.is_manager:
+                    return redirect(url_for('manager_auth_page'))
+                    
                 return redirect(url_for('index'))
                 
             except Exception as e:
@@ -3835,6 +4285,8 @@ def logout():
         session.pop('username', None)
         session.pop('room_number', None)
         session.pop('admin_logged_in', None)
+        session.pop('manager_logged_in', None)  # 担当者ログアウト
+        session.pop('manager_auth_rooms', None)  # 担当者の認証済み部屋リスト
         flash('ログアウトしました。', 'info')
         return redirect(url_for('login_page'))
     except Exception as e:
@@ -4431,18 +4883,22 @@ def is_mail_configured():
 
 
 @app.route('/admin/ranking')
+
 def admin_ranking_page():
-    """管理者用全員ランキング表示ページ"""
+    """管理者用全員ランキング表示ページ (担当者も利用可能)"""
     try:
-        if not session.get('admin_logged_in'):
+        is_admin = session.get('admin_logged_in')
+        is_manager = session.get('manager_logged_in')
+
+        if not is_admin and not is_manager:
             flash('管理者権限がありません。', 'danger')
             return redirect(url_for('login_page'))
 
         print("🏆 管理者用ランキングページ表示開始...")
 
         # テンプレートに必要な基本情報のみ渡す
-        # 実際のデータは Ajax で後から取得
         context = get_template_context()
+        context['manager_mode'] = is_manager
         
         return render_template('admin_ranking.html', **context)
         
@@ -4457,37 +4913,75 @@ def admin_ranking_page():
 def admin_get_available_units(room_number):
     """指定部屋で利用可能な単元一覧を取得（管理者用・フィルタリングなし）"""
     try:
+        # 権限チェック
         if not session.get('admin_logged_in'):
-            return jsonify(status='error', message='管理者権限がありません。'), 403
+            if not session.get('manager_logged_in'):
+                return jsonify(status='error', message='権限がありません。'), 403
+            # 担当者権限チェック
+            if str(room_number) not in session.get('manager_auth_rooms', []):
+                return jsonify(status='error', message='この部屋の権限がありません。'), 403
 
         # 管理者用：フィルタリングなしで部屋の単語データを取得
         word_data = load_raw_word_data_for_room(room_number)
         
-        # 単元一覧を抽出
-        units = set()
+        # 単元を章ごとにグループ化し、単元名も保持
+        units_by_chapter = {}
+        unit_names = {}  # 単元番号 -> 単元名のマッピング
+        chapters_set = set()
+        
         for word in word_data:
             if word['enabled']:
                 chapter = str(word['chapter'])
                 number = str(word['number'])
+                category = word.get('category', '')
                 
-                # S章とZ章は章レベルで管理
-                if chapter == 'S':
-                    units.add('S')
-                elif number == 'Z':
-                    units.add('Z')
+                # 単元名を保存（最初に見つかったものを使用）
+                if number not in unit_names:
+                    unit_names[number] = category
+                
+                # Z問題は特別扱い（章横断的）
+                if number == 'Z':
+                    if 'Z' not in units_by_chapter:
+                        units_by_chapter['Z'] = set()
+                    units_by_chapter['Z'].add('Z')
+                    chapters_set.add('Z')
+                # S章は章レベルで管理
+                elif chapter == 'S':
+                    if 'S' not in units_by_chapter:
+                        units_by_chapter['S'] = set()
+                    units_by_chapter['S'].add('S')
+                    chapters_set.add('S')
+                # 通常の単元
                 else:
-                    units.add(number)
+                    if chapter not in units_by_chapter:
+                        units_by_chapter[chapter] = set()
+                    units_by_chapter[chapter].add(number)
+                    chapters_set.add(chapter)
         
-        # ソートして返す（数字 → S → Z の順）
-        sorted_units = sorted(list(units), key=lambda x: (
+        # 各章の単元をソートし、番号と名前の情報を含める
+        unit_info_by_chapter = {}
+        for chapter in units_by_chapter:
+            sorted_units = sorted(
+                list(units_by_chapter[chapter]),
+                key=lambda x: parse_unit_number(x)
+            )
+            # 各単元の番号と名前を含む辞書のリストに変換
+            unit_info_by_chapter[chapter] = [
+                {'number': unit, 'name': unit_names.get(unit, '')}
+                for unit in sorted_units
+            ]
+        
+        # 章をソート（数字の章 → S → Z の順）
+        sorted_chapters = sorted(list(chapters_set), key=lambda x: (
             x == 'Z',  # Z を最後に
             x == 'S',  # S をその次に
-            parse_unit_number(x)  # 残りは数値順
+            parse_unit_number(x) if x not in ['S', 'Z'] else float('inf')
         ))
         
         return jsonify({
             'status': 'success',
-            'available_units': sorted_units,
+            'units_by_chapter': unit_info_by_chapter,
+            'chapters': sorted_chapters,
             'total_problems': len(word_data),
             'enabled_problems': len([w for w in word_data if w['enabled']])
         })
@@ -4537,10 +5031,13 @@ def api_admin_rooms():
 
 @app.route('/api/admin/room_ranking/<room_number>')
 def api_admin_room_ranking(room_number):
-    """管理者用：指定した部屋の全ユーザーランキングを取得"""
+    """管理者用：指定した部屋の全ユーザーランキングを取得 (担当者も利用可能)"""
     try:
-        if not session.get('admin_logged_in'):
-            return jsonify(status='error', message='管理者権限が必要です'), 403
+        is_admin = session.get('admin_logged_in')
+        if not is_admin:
+            auth_rooms = session.get('manager_auth_rooms', [])
+            if str(room_number) not in auth_rooms:
+                 return jsonify(status='error', message='この部屋のデータを閲覧する権限がありません'), 403
         
         print(f"\n=== 管理者用ランキング取得開始 (部屋: {room_number}) ===")
         start_time = time.time()
@@ -4609,8 +5106,9 @@ def api_admin_room_ranking(room_number):
                 print(f"⚠️ 統計データ同期エラー (無視して続行): {sync_error}")
                 db.session.rollback()
             # 事前計算された統計データを高速取得
-            room_stats = UserStats.query.filter_by(room_number=room_number)\
-                                        .join(User)\
+            # 事前計算された統計データを高速取得
+            room_stats = UserStats.query.join(User)\
+                                        .filter(User.room_number == room_number)\
                                         .filter(User.username != 'admin')\
                                         .order_by(UserStats.balance_score.desc(), UserStats.total_attempts.desc())\
                                         .all()
@@ -5272,32 +5770,73 @@ def get_announcements():
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/admin/announcements/add', methods=['POST'])
-@admin_required
 def admin_add_announcement():
+    if not session.get('admin_logged_in') and not session.get('manager_logged_in'):
+        flash('権限がありません。', 'danger')
+        return redirect(url_for('login_page'))
     try:
         title = request.form.get('title')
         content = request.form.get('content')
         # target_roomsは複数選択なのでgetlistで取得
         target_rooms_list = request.form.getlist('target_rooms')
         
-        # リストが空の場合はデフォルトでallにする（念のため）
         if not target_rooms_list:
             target_rooms = 'all'
         else:
-            # 'all'が含まれている場合は'all'のみにする、または他の選択肢があっても'all'扱いにする
             if 'all' in target_rooms_list:
                 target_rooms = 'all'
             else:
-                target_rooms = ','.join(target_rooms_list)
+                # 'all'が選択されていない場合は個別の部屋リストを使用
+                target_rooms = ",".join(target_rooms_list)
+
+        target_message = ""
         
+        manager_id = None
+        auth_rooms = []
+        if session.get('manager_logged_in'):
+            manager_id = session.get('user_id')
+            auth_rooms = session.get('manager_auth_rooms', [])
+        
+        # 最終的な target_rooms の確定と権限チェック
+        if target_rooms == 'all':
+            if session.get('manager_logged_in') and not session.get('admin_logged_in'):
+                # 担当者は自分の担当部屋のみ対象にする
+                # 担当部屋がない場合はエラー
+                if not auth_rooms:
+                    flash('担当している部屋がありません。', 'danger')
+                    return redirect(url_for('admin_page'))
+                    
+                target_rooms = ",".join(auth_rooms)
+                target_message = "（担当部屋全て）"
+            else:
+                target_rooms = 'all'
+                target_message = "（全員）"
+        else:
+            # 個別指定の場合（カンマ区切り文字列になっている）
+            selected_rooms = target_rooms.split(',')
+            
+            # 担当者の場合、権限チェック
+            if session.get('manager_logged_in') and not session.get('admin_logged_in'):
+                valid_rooms = [r for r in selected_rooms if r in auth_rooms]
+                if not valid_rooms:
+                    flash('権限のある部屋が選択されていません。', 'danger')
+                    return redirect(url_for('admin_page'))
+                target_rooms = ",".join(valid_rooms)
+            else:
+                # 管理者はそのまま
+                pass
+            
+            target_message = f"（対象: {target_rooms}）"
+
         if not title or not content:
             flash('タイトルと内容は必須です。', 'danger')
             return redirect(url_for('admin_page'))
             
         new_announcement = Announcement(
-            title=title,
-            content=content,
-            target_rooms=target_rooms
+            title=title, 
+            content=content, 
+            target_rooms=target_rooms,
+            created_by_manager_id=manager_id
         )
         db.session.add(new_announcement)
         db.session.commit()
@@ -5338,18 +5877,27 @@ def admin_add_announcement():
         except Exception as e:
             print(f"Error sending announcement push: {e}")
 
-        flash('お知らせを投稿しました', 'success')
-        return redirect(url_for('admin_page'))
+        # flash('お知らせを投稿しました', 'success') # モーダルで表示するためFlashは削除または維持でも良いが、重複を避けるなら削除
+        return redirect(url_for('admin_page', announcement_sent='true'))
     except Exception as e:
         db.session.rollback()
         flash(f'エラーが発生しました: {e}', 'danger')
         return redirect(url_for('admin_page'))
 
 @app.route('/admin/announcements/delete/<int:id>', methods=['POST'])
-@admin_required
 def admin_delete_announcement(id):
+    if not session.get('admin_logged_in') and not session.get('manager_logged_in'):
+        flash('権限がありません。', 'danger')
+        return redirect(url_for('login_page'))
     try:
         announcement = Announcement.query.get_or_404(id)
+        
+        # 権限チェック
+        if session.get('manager_logged_in') and not session.get('admin_logged_in'):
+            if announcement.created_by_manager_id != session.get('user_id'):
+                flash('他人が作成したお知らせは削除できません。', 'danger')
+                return redirect(url_for('admin_page'))
+
         db.session.delete(announcement)
         db.session.commit()
         flash('お知らせを削除しました。', 'success')
@@ -5360,14 +5908,23 @@ def admin_delete_announcement(id):
         return redirect(url_for('admin_page'))
 
 @app.route('/admin/announcements/toggle/<int:id>', methods=['POST'])
-@admin_required
 def admin_toggle_announcement(id):
+    if not session.get('admin_logged_in') and not session.get('manager_logged_in'):
+        flash('権限がありません。', 'danger')
+        return redirect(url_for('login_page'))
     try:
         announcement = Announcement.query.get_or_404(id)
+        
+        # 権限チェック
+        if session.get('manager_logged_in') and not session.get('admin_logged_in'):
+            if announcement.created_by_manager_id != session.get('user_id'):
+                flash('他人が作成したお知らせは変更できません。', 'danger')
+                return redirect(url_for('admin_page'))
+                
         announcement.is_active = not announcement.is_active
         db.session.commit()
-        status = '有効' if announcement.is_active else '無効'
-        flash(f'お知らせを{status}にしました。', 'success')
+        status = "表示" if announcement.is_active else "非表示"
+        flash(f'お知らせを{status}に切り替えました。', 'success')
         return redirect(url_for('admin_page'))
     except Exception as e:
         db.session.rollback()
@@ -6695,7 +7252,7 @@ def progress_page():
         if 'user_id' not in session:
             flash('進捗を確認するにはログインしてください。', 'info')
             return redirect(url_for('login_page'))
-
+        
         current_user = User.query.get(session['user_id'])
         if not current_user:
             flash('ユーザーが見つかりません。', 'danger')
@@ -6903,7 +7460,7 @@ def api_ranking_data():
             results = db.session.query(UserStats, RpgState)\
                                         .join(User, UserStats.user_id == User.id)\
                                         .outerjoin(RpgState, User.id == RpgState.user_id)\
-                                        .filter(UserStats.room_number == current_room_number)\
+                                        .filter(User.room_number == current_room_number)\
                                         .filter(User.username != 'admin')\
                                         .order_by(UserStats.balance_score.desc(), UserStats.total_attempts.desc())\
                                         .all()
@@ -7497,15 +8054,63 @@ def admin_force_create_user_stats():
 @app.route('/admin')
 def admin_page():
     try:
-        if not session.get('admin_logged_in'):
+        is_super_admin = session.get('admin_logged_in')
+        is_manager = session.get('manager_logged_in')
+
+        if not is_super_admin and not is_manager:
             flash('管理者権限がありません。', 'danger')
             return redirect(url_for('login_page'))
 
+
         print("🔍 管理者ページ表示開始...")
 
-        users = User.query.all()
-        room_settings = RoomSetting.query.all()
-        announcements = Announcement.query.order_by(Announcement.date.desc()).all()
+        # 権限に基づくデータフィルタリング
+        auth_rooms = []
+        if is_manager:
+            auth_rooms = session.get('manager_auth_rooms', [])
+            # 担当者は自分の担当部屋の設定のみ参照
+            all_room_settings = RoomSetting.query.all()
+            room_settings = [r for r in all_room_settings if r.room_number in auth_rooms]
+            
+            # 担当ユーザーのみ表示
+            all_users = User.query.all()
+            users = [u for u in all_users if u.room_number in auth_rooms]
+            
+            # お知らせ: 
+            # 1. 自分が作成したもの
+            # 2. 自分の担当部屋宛てのもの
+            # 3. 全員宛て (Admin作成のもの)
+            
+            all_announcements = Announcement.query.order_by(Announcement.date.desc()).all()
+            announcements = []
+            for ann in all_announcements:
+                # ターゲット確認
+                target_match = False
+                
+                # 自分が作成したものは無条件で表示
+                if ann.created_by_manager_id == session.get('user_id'):
+                    announcements.append(ann)
+                    continue
+                
+                # Adminが作成した 'all' は表示
+                if ann.target_rooms == 'all' and not ann.created_by_manager_id:
+                    announcements.append(ann)
+                    continue
+                
+                # 指定ターゲットに含まれているか
+                if ann.target_rooms and ann.target_rooms != 'all':
+                    targets = ann.target_rooms.split(',')
+                    for t in targets:
+                        if t.strip() in auth_rooms:
+                            announcements.append(ann)
+                            break
+
+        else:
+            # Super Admin
+            users = User.query.all()
+            room_settings = RoomSetting.query.all()
+            announcements = Announcement.query.order_by(Announcement.date.desc()).all()
+
         
         # 部屋設定のマッピングを作成
         room_max_unit_settings = {}
@@ -7591,11 +8196,16 @@ def admin_page():
                         recent_logins += 1
                 except:
                     pass
+
         
         context = get_template_context()
         
         template_context = {
+            'is_manager': is_manager,
+            'is_super_admin': is_super_admin,
+            'manager_auth_rooms': auth_rooms if is_manager else [],
             'users': user_list_with_details,
+
             'room_max_unit_settings': room_max_unit_settings,
             'room_csv_settings': room_csv_settings,
             'room_ranking_settings': room_ranking_settings,  # ★ランキング設定を追加
@@ -7854,6 +8464,59 @@ def initialize_essay_visibility(room_number):
         print(f"❌ 公開設定初期化エラー: {e}")
         return False
 
+@app.route('/admin/verify_room', methods=['POST'])
+def admin_verify_room_password():
+    if not session.get('manager_logged_in'):
+        return redirect(url_for('login_page'))
+        
+    password = request.form.get('room_password')
+    
+    # パスワードが一致する全ての部屋を探す
+    target_rooms = []
+    all_rooms = RoomSetting.query.all()
+    for room in all_rooms:
+        if room.check_management_password(password):
+            target_rooms.append(room.room_number)
+            
+    if target_rooms:
+        current_rooms = session.get('manager_auth_rooms', [])
+        # 重複を除いてマージ
+        updated_rooms = list(set(current_rooms + target_rooms))
+        session['manager_auth_rooms'] = updated_rooms
+        
+        # データベースに権限データを永続化
+        try:
+            user = User.query.get(session['user_id'])
+            if user:
+                import json
+                auth_data = {}
+                # 既存データの読み込み
+                if user.manager_auth_data:
+                    try:
+                        auth_data = json.loads(user.manager_auth_data)
+                    except:
+                        pass
+                
+                # パスワードの一致した部屋の現在のハッシュを保存
+                all_rooms = RoomSetting.query.all()
+                for room in all_rooms:
+                    if room.room_number in target_rooms:
+                        auth_data[room.room_number] = room.management_password_hash
+                
+                user.manager_auth_data = json.dumps(auth_data)
+                db.session.commit()
+                print(f"✅ Manager auth data saved for user {user.username}")
+        except Exception as e:
+            print(f"❌ Error saving manager auth data: {e}")
+            
+        flash(f'認証成功: {", ".join(target_rooms)} の管理権限を追加しました。', 'success')
+    else:
+        # パスワード不一致、または管理パスワードが設定されていない部屋
+        # (通常ユーザーの部屋パスワードとは異なる点に注意)
+        flash('パスワードが一致する部屋が見つかりませんでした。', 'danger')
+        
+    return redirect(url_for('admin_page'))
+
 @app.route('/admin/add_user', methods=['POST'])
 def admin_add_user():
     try:
@@ -7861,33 +8524,65 @@ def admin_add_user():
             flash('管理者権限がありません。', 'danger')
             return redirect(url_for('login_page'))
 
-        room_number = request.form.get('room_number', '').strip()
-        room_password = request.form.get('room_password')
-        student_id = request.form.get('student_id', '').strip()
-        individual_password = request.form.get('individual_password')
-        username = request.form.get('username', '').strip()
+        # 入力値取得 (共通部分移動)
+        # 担当者かどうかで分岐するため、ここでは取得のみ行う
 
-        if not all([room_number, room_password, student_id, individual_password, username]):
-            flash('すべての項目を入力してください。', 'danger')
-            return redirect(url_for('admin_page'))
 
-        # ユーザーの重複チェック（よりシンプルに）
+        # チェック移動のため削除
+
+        
+
+
+        # 担当者フラグ
+        is_manager_val = request.form.get('is_manager', 'false') 
+        is_manager = is_manager_val.lower() == 'true'
+
+        if is_manager:
+            # 担当者の場合：部屋番号不要、ID自動設定
+            username = request.form.get('username', '').strip()
+            individual_password = request.form.get('individual_password')
+            
+            if not username or not individual_password:
+                flash('担当者名とパスワードは必須です。', 'danger')
+                return redirect(url_for('admin_page'))
+            
+            room_number = 'MANAGER'
+            student_id = username # 一意性確保
+            room_password = 'MANAGER_NO_ACCESS' # ダミー
+        else:
+            # 通常ユーザー
+            room_number = request.form.get('room_number', '').strip()
+            room_password = request.form.get('room_password')
+            student_id = request.form.get('student_id', '').strip()
+            individual_password = request.form.get('individual_password')
+            username = request.form.get('username', '').strip()
+
+            if not all([room_number, room_password, student_id, individual_password, username]):
+                flash('すべての項目を入力してください。', 'danger')
+                return redirect(url_for('admin_page'))
+
+        # ユーザーの重複チェック
         existing_user = User.query.filter_by(
             room_number=room_number,
             student_id=student_id,
-        ).all()
+        ).first()
         
-        for user in existing_user:
-            if user.check_individual_password(individual_password):
-                flash(f'部屋{room_number}・出席番号{student_id}で同じ個別パスワードのアカウントが既に存在します。', 'danger')
-                return redirect(url_for('admin_page'))
+        if existing_user:
+            if is_manager:
+                flash(f'担当者 {username} は既に存在します。', 'warning')
+            elif student_id == '0':
+                 flash(f'部屋 {room_number} には既に担当者(ID:0)が登録されています。', 'warning')
+            else:
+                 flash(f'部屋 {room_number} ・出席番号 {student_id} のユーザーは既に存在します。', 'warning')
+            return redirect(url_for('admin_page'))
 
         new_user = User(
             room_number=room_number,
             student_id=student_id,
             username=username,
             original_username=username,
-            is_first_login=True
+            is_first_login=True,
+            is_manager=is_manager
         )
         new_user.set_room_password(room_password)
         new_user.set_individual_password(individual_password)
@@ -8063,11 +8758,19 @@ def admin_bulk_delete_users():
 
 # 部屋設定管理
 @app.route('/admin/get_room_setting', methods=['POST'])
-@admin_required # <- 追加
 def get_room_setting():
     room_number = request.json.get('room_number')
     if not room_number:
         return jsonify(status='error', message='部屋番号が必要です'), 400
+    
+    # 権限チェック
+    if not session.get('admin_logged_in'):
+        if not session.get('manager_logged_in'):
+             return jsonify(status='error', message='権限がありません'), 403
+        
+        # 担当者権限チェック
+        if str(room_number) not in session.get('manager_auth_rooms', []):
+            return jsonify(status='error', message='この部屋の設定を閲覧する権限がありません'), 403
     
     room_setting = RoomSetting.query.filter_by(room_number=room_number).first()
     if not room_setting:
@@ -8077,7 +8780,7 @@ def get_room_setting():
         'status': 'success',
         'csv_filename': room_setting.csv_filename,
         'enabled_units': room_setting.get_enabled_units(),
-        'max_enabled_unit_number': room_setting.max_enabled_unit_number # 追加
+        'max_enabled_unit_number': room_setting.max_enabled_unit_number
     })
 
 def admin_get_room_setting():
@@ -8186,96 +8889,85 @@ def get_csv_files():
 
 @app.route('/admin/update_room_units_setting', methods=['POST'])
 def admin_update_room_units_setting():
-    """部屋の有効単元設定を更新"""
     try:
-        if not session.get('admin_logged_in'):
-            return jsonify(status='error', message='管理者権限がありません。'), 403
-
-        data = request.get_json()
+        data = request.json
         room_number = data.get('room_number')
-        enabled_units = data.get('enabled_units', [])
+        enabled_units = data.get('enabled_units') # List of strings/ints
+        
+        # 1. 権限チェック
+        if not session.get('admin_logged_in'):
+            if not session.get('manager_logged_in'):
+                return jsonify(status='error', message='権限がありません'), 403
+            
+            # 担当者の場合、部屋権限チェック
+            if str(room_number) not in session.get('manager_auth_rooms', []):
+                return jsonify(status='error', message='この部屋の設定を変更する権限がありません'), 403
 
         if not room_number:
-            return jsonify(status='error', message='部屋番号が指定されていません。'), 400
-
+            return jsonify(status='error', message='部屋番号が必要です'), 400
+            
+        # 2. 設定保存
         room_setting = RoomSetting.query.filter_by(room_number=room_number).first()
-
-        # 空リストの場合は明示的に無効化マーカーを設定
-        # これにより、デフォルト（[] = 全有効）と区別する
-        if not enabled_units:
-            enabled_units = ["__DISABLED__"]
-
-        if room_setting:
-            room_setting.set_enabled_units(enabled_units)
-        else:
-            new_room_setting = RoomSetting(
-                room_number=room_number, 
-                enabled_units=json.dumps(enabled_units), 
-                csv_filename="words.csv"
-            )
-            db.session.add(new_room_setting)
+        if not room_setting:
+            room_setting = RoomSetting(room_number=room_number)
+            db.session.add(room_setting)
         
-        db.session.commit()
-        return jsonify(
-            status='success', 
-            message=f'部屋 {room_number} の単元設定を更新しました。',
-            enabled_units=enabled_units
-        )
-    except Exception as e:
-        print(f"Error in admin_update_room_units_setting: {e}")
-        return jsonify(status='error', message=str(e)), 500
-    
-@app.route('/admin/update_room_unit_setting', methods=['POST'])
-def admin_update_room_unit_setting():
-    try:
-        if not session.get('admin_logged_in'):
-            return jsonify(status='error', message='管理者権限がありません。'), 403
-
-        data = request.get_json()
-        room_number = data.get('room_number')
-        max_unit = data.get('max_unit')
-
-        if max_unit is None or max_unit == '':
-            max_unit_to_save = "9999"
-        else:
-            max_unit_to_save = str(max_unit)
-
-        if not room_number:
-            return jsonify(status='error', message='部屋番号が指定されていません。'), 400
-
-        room_setting = RoomSetting.query.filter_by(room_number=room_number).first()
-
-        if room_setting:
-            room_setting.max_enabled_unit_number = max_unit_to_save
-        else:
-            new_room_setting = RoomSetting(room_number=room_number, max_enabled_unit_number=max_unit_to_save, csv_filename="words.csv")
-            db.session.add(new_room_setting)
+        # enabled_unitsをJSONとして保存
+        # 安全のため、リストであることを確認
+        if not isinstance(enabled_units, list):
+            enabled_units = []
+            
+        # 文字列に統一
+        enabled_units = [str(u) for u in enabled_units]
         
+        room_setting.set_enabled_units(enabled_units)
         db.session.commit()
-        return jsonify(status='success', message=f'部屋 {room_number} の単元設定を {max_unit_to_save} に更新しました。')
+        
+        print(f"✅ 部屋{room_number}の有効単元を更新: {len(enabled_units)}個")
+        return jsonify(status='success', message=f'部屋{room_number}の単元設定を更新しました')
+
     except Exception as e:
-        print(f"Error in admin_update_room_unit_setting: {e}")
+        print(f"❌ 単元設定更新エラー: {e}")
+        db.session.rollback()
         return jsonify(status='error', message=str(e)), 500
 
 @app.route('/admin/update_room_csv_setting', methods=['POST'])
 def admin_update_room_csv_setting():
     try:
-        if not session.get('admin_logged_in'):
-            return jsonify(status='error', message='管理者権限がありません。'), 403
-
         data = request.get_json()
         room_number = data.get('room_number')
         csv_filename = data.get('csv_filename')
 
-        print(f"🔧 CSV設定更新リクエスト: 部屋{room_number} -> {csv_filename}")
-
-        if not room_number:
-            return jsonify(status='error', message='部屋番号が指定されていません。'), 400
-
+        # 1. 権限チェック
+        if not session.get('admin_logged_in'):
+            if not session.get('manager_logged_in'):
+                return jsonify(status='error', message='権限がありません'), 403
+            
+            # 担当者の場合、部屋権限チェック
+            if str(room_number) not in session.get('manager_auth_rooms', []):
+                return jsonify(status='error', message='この部屋の設定を変更する権限がありません'), 403
+        
+        if not room_number or not csv_filename:
+            return jsonify(status='error', message='部屋番号とCSVファイル名は必須です'), 400
+            
         if not csv_filename:
             csv_filename = "words.csv"
 
-        # 部屋設定を取得または作成
+        # 2. CSVファイルのアクセス権確認（担当者の場合）
+        if session.get('manager_logged_in') and not session.get('admin_logged_in'):
+             if csv_filename != "words.csv":
+                 csv_record = CsvFileContent.query.filter_by(filename=csv_filename).first()
+                 if not csv_record:
+                      # DBにない場合（words.csv以外のファイルシステムファイルは通常ないが）
+                      pass
+                 else:
+                      # 自分のファイル OR Admin(None) のファイルのみ許可
+                      if csv_record.created_by_manager_id and csv_record.created_by_manager_id != session.get('user_id'):
+                           return jsonify(status='error', message='このCSVファイルを使用する権限がありません'), 403
+
+        print(f"🔧 CSV設定更新リクエスト: 部屋{room_number} -> {csv_filename}")
+
+        # 3. 設定保存
         room_setting = RoomSetting.query.filter_by(room_number=room_number).first()
 
         if room_setting:
@@ -8304,13 +8996,11 @@ def admin_update_room_csv_setting():
             print(f"✅ 保存確認成功: 部屋{room_number} = {actual_filename}")
             
             if actual_filename != csv_filename:
-                print(f"⚠️ 保存値が異なります: 期待値={csv_filename}, 実際値={actual_filename}")
                 return jsonify(
                     status='error', 
                     message=f'設定の保存に失敗しました。期待値と実際値が異なります。'
                 ), 500
         else:
-            print(f"❌ 保存確認失敗: 部屋{room_number}の設定が見つかりません")
             return jsonify(status='error', message='設定の保存確認に失敗しました。'), 500
         
         return jsonify(
@@ -8421,9 +9111,13 @@ def admin_upload_room_csv():
     try:
         print("🔍 CSV アップロード開始（完全DB保存版）...")
         
+        # 権限チェック
+        manager_id = None
         if not session.get('admin_logged_in'):
-            flash('管理者権限がありません。', 'danger')
-            return redirect(url_for('admin_page'))
+            if not session.get('manager_logged_in'):
+                flash('権限がありません。', 'danger')
+                return redirect(url_for('admin_page'))
+            manager_id = session.get('user_id')
 
         if 'file' not in request.files:
             flash('ファイルが選択されていません。', 'danger')
@@ -8497,7 +9191,8 @@ def admin_upload_room_csv():
                     original_filename=original_filename,
                     content=content,
                     file_size=file_size,
-                    word_count=word_count
+                    word_count=word_count,
+                    created_by_manager_id=manager_id
                 )
                 db.session.add(csv_file_record)
             
@@ -8506,7 +9201,6 @@ def admin_upload_room_csv():
             file_size_kb = round(file_size / 1024, 1)
             flash(f'✅ CSVファイル "{filename}" をデータベースに保存しました', 'success')
             flash(f'📊 ファイル情報: {word_count}問, {file_size_kb}KB', 'info')
-            flash('💾 ファイルはデータベースに保存されているため、再デプロイ後も保持されます', 'info')
             
             print(f"✅ データベース保存完了: {filename}")
             
@@ -8530,13 +9224,26 @@ def admin_list_room_csv_files():
     try:
         print("🔍 CSV ファイル一覧取得開始（DB版）...")
         
-        if not session.get('admin_logged_in'):
-            return jsonify(status='error', message='管理者権限がありません。'), 403
+        is_admin = session.get('admin_logged_in')
+        is_manager = session.get('manager_logged_in')
+        
+        if not is_admin and not is_manager:
+            return jsonify(status='error', message='権限がありません。'), 403
 
         # ★重要：データベースからCSVファイル一覧を取得（ファイルシステムは使わない）
         csv_files_data = []
         try:
-            csv_records = CsvFileContent.query.filter(CsvFileContent.filename != 'words.csv').all()
+            query = CsvFileContent.query.filter(CsvFileContent.filename != 'words.csv')
+            
+            # 担当者の場合、自分アップロード OR Adminアップロード(created_by_manager_id is None) のみ
+            if is_manager and not is_admin:
+                 manager_id = session.get('user_id')
+                 query = query.filter(
+                     (CsvFileContent.created_by_manager_id == manager_id) |
+                     (CsvFileContent.created_by_manager_id == None)
+                 )
+            
+            csv_records = query.all()
             
             for record in csv_records:
                 csv_files_data.append({
@@ -8564,8 +9271,8 @@ def admin_list_room_csv_files():
 @app.route('/admin/delete_room_csv/<filename>', methods=['POST'])
 def admin_delete_room_csv(filename):
     try:
-        if not session.get('admin_logged_in'):
-            flash('管理者権限がありません。', 'danger')
+        if not session.get('admin_logged_in') and not session.get('manager_logged_in'):
+            flash('権限がありません。', 'danger')
             return redirect(url_for('admin_page'))
 
         filename = secure_filename(filename)
@@ -8573,6 +9280,13 @@ def admin_delete_room_csv(filename):
 
         # ★重要：データベースから削除（ファイルシステムは使わない）
         csv_record = CsvFileContent.query.filter_by(filename=filename).first()
+        
+        # 権限チェック（担当者は自分のファイルのみ削除可）
+        if session.get('manager_logged_in') and not session.get('admin_logged_in'):
+            if csv_record and csv_record.created_by_manager_id != session.get('user_id'):
+                flash('他人がアップロードしたCSVファイルは削除できません。', 'danger')
+                return redirect(url_for('admin_page'))
+        
         if csv_record:
             db.session.delete(csv_record)
             print(f"✅ データベースから削除: {filename}")
@@ -8878,7 +9592,8 @@ def download_room_settings_csv():
 
 @app.route('/admin/download_users_template_csv')
 def download_users_template_csv():
-    if not session.get('admin_logged_in'):
+    # 管理者または担当者のみアクセス可能
+    if not (session.get('admin_logged_in') or session.get('manager_logged_in')):
         flash('管理者権限がありません。', 'danger')
         return redirect(url_for('login_page'))
 
@@ -8909,7 +9624,8 @@ def download_users_template_csv():
 @app.route('/admin/download_csv_template')
 def download_csv_template():
     """部屋用CSVテンプレートダウンロード"""
-    if not session.get('admin_logged_in'):
+    # 管理者または担当者のみアクセス可能
+    if not (session.get('admin_logged_in') or session.get('manager_logged_in')):
         flash('管理者権限がありません。', 'danger')
         return redirect(url_for('login_page'))
 
@@ -9374,6 +10090,7 @@ def inject_app_info():
                 
         room_number = session.get('room_number')
         is_admin = session.get('admin_logged_in', False)
+        is_manager = session.get('manager_logged_in', False)
         
         return {
             'app_info': app_info,
@@ -9390,7 +10107,8 @@ def inject_app_info():
             'current_user_real_name': real_username, # 新規追加: 純粋なユーザー名
             'current_room_number': room_number,
             'is_logged_in': user_id is not None,
-            'is_admin_logged_in': is_admin
+            'is_admin_logged_in': is_admin,
+            'is_manager_logged_in': is_manager
         }
     except Exception as e:
         logger.error(f"Context processor error: {e}")
@@ -11476,7 +12194,8 @@ def admin_essay_upload_csv():
 @app.route('/admin/download_essay_template')
 def download_essay_template():
     """論述問題CSVテンプレートのダウンロード"""
-    if not session.get('admin_logged_in'):
+    # 管理者または担当者のみアクセス可能
+    if not (session.get('admin_logged_in') or session.get('manager_logged_in')):
         flash('管理者権限がありません。', 'danger')
         return redirect(url_for('login_page'))
 
@@ -12859,18 +13578,28 @@ def admin_fix_room_settings_attributes():
 # app.py に追加する管理者用全員ランキング機能
 @app.route('/api/rooms')
 def api_rooms():
-    """管理者用：全部屋の一覧を取得"""
+    """管理者用：全部屋の一覧を取得 (担当者も利用可能)"""
     try:
-        if not session.get('admin_logged_in'):
-            return jsonify(status='error', message='管理者権限が必要です'), 403
+        is_admin = session.get('admin_logged_in')
         
-        # 部屋別のユーザー数を集計
-        rooms_data = db.session.query(
+        if not is_admin and not session.get('manager_logged_in'):
+            return jsonify(status='error', message='権限が必要です'), 403
+        
+        query = db.session.query(
             User.room_number,
             db.func.count(User.id).label('user_count')
         ).filter(
             User.room_number != 'ADMIN'
-        ).group_by(User.room_number).all()
+        )
+        
+        # 担当者の場合は認証済み部屋のみに絞り込み
+        if not is_admin:
+             auth_rooms = session.get('manager_auth_rooms', [])
+             if not auth_rooms:
+                  return jsonify(status='success', rooms=[])
+             query = query.filter(User.room_number.in_(auth_rooms))
+             
+        rooms_data = query.group_by(User.room_number).all()
         
         rooms = []
         for room_data in rooms_data:
@@ -13782,12 +14511,19 @@ def admin_delete_room():
 @app.route('/admin/toggle_room_suspension', methods=['POST'])
 def admin_toggle_room_suspension():
     """管理者用：部屋の一時停止/再開機能"""
-    if not session.get('admin_logged_in'):
-        return jsonify({'status': 'error', 'message': '管理者権限が必要です'})
+    
+    # 権限チェック
+    if not session.get('admin_logged_in') and not session.get('manager_logged_in'):
+        return jsonify({'status': 'error', 'message': '権限が必要です'}), 401
     
     try:
         data = request.get_json()
         room_number = data.get('room_number')
+        
+        # 担当者の場合、部屋権限チェック
+        if session.get('manager_logged_in') and not session.get('admin_logged_in'):
+             if str(room_number) not in session.get('manager_auth_rooms', []):
+                 return jsonify({'status': 'error', 'message': 'この部屋の設定を変更する権限がありません'}), 403
         
         if not room_number:
             return jsonify({'status': 'error', 'message': '部屋番号が指定されていません'})
@@ -13825,6 +14561,55 @@ def admin_toggle_room_suspension():
         app.logger.error(f"部屋一時停止切り替えエラー: {str(e)}")
         return jsonify({'status': 'error', 'message': f'処理中にエラーが発生しました: {str(e)}'})
     
+@app.route('/admin/update_room_management_password', methods=['POST'])
+def update_room_management_password():
+    """管理者用：部屋の担当者パスワード更新機能"""
+    
+    # 権限チェック
+    if not session.get('admin_logged_in') and not session.get('manager_logged_in'):
+        return jsonify({'status': 'error', 'message': '権限が必要です'}), 401
+    
+    # リクエストデータ取得
+    data = request.get_json()
+    room_number = data.get('room_number')
+    
+    # 担当者の場合、部屋権限チェック
+    if session.get('manager_logged_in') and not session.get('admin_logged_in'):
+         if str(room_number) not in session.get('manager_auth_rooms', []):
+             return jsonify({'status': 'error', 'message': 'この部屋の設定を変更する権限がありません'}), 403
+    
+    try:
+        data = request.get_json()
+        room_number = data.get('room_number')
+        new_password = data.get('password')
+        
+        if not room_number:
+            return jsonify({'status': 'error', 'message': '部屋番号が指定されていません'}), 400
+            
+        # パスワードが空の場合は更新しない（成功として扱う）
+        if not new_password:
+             return jsonify({'status': 'success', 'message': 'パスワードは変更されませんでした'})
+        
+        # 部屋設定を取得
+        room_setting = RoomSetting.query.filter_by(room_number=room_number).first()
+        
+        if not room_setting:
+            # 部屋設定がない場合は作成（通常はあるはずだが安全のため）
+            room_setting = RoomSetting(room_number=room_number)
+            db.session.add(room_setting)
+            
+        # 管理パスワード更新 (RoomSettingモデルにメソッドがある)
+        room_setting.set_management_password(new_password)
+        db.session.commit()
+        
+        app.logger.info(f"部屋{room_number}の管理パスワードを更新しました")
+        return jsonify({'status': 'success', 'message': '管理パスワードを更新しました'})
+        
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"担当者パスワード更新エラー: {str(e)}")
+        return jsonify({'status': 'error', 'message': f'更新中にエラーが発生しました: {str(e)}'}), 500
+
 @app.route('/admin/upload_essay_image/<int:problem_id>', methods=['POST'])
 def upload_essay_image(problem_id):
     """論述問題の画像をアップロード（データベース保存）"""
@@ -14250,10 +15035,18 @@ def submit_daily_quiz():
         return jsonify({'status': 'error', 'message': '結果の保存中にサーバーエラーが発生しました。'}), 500
 
 @app.route('/admin/regenerate_daily_quiz', methods=['POST'])
-@admin_required
 def admin_regenerate_daily_quiz():
     """管理者用: 特定の部屋の「今日の10問」を再生成する (月間スコア集計トリガー付)"""
+    # 権限チェック
     room_number = request.json.get('room_number')
+    if not session.get('admin_logged_in'):
+        if not session.get('manager_logged_in'):
+            return jsonify({'status': 'error', 'message': '権限がありません'}), 403
+        
+        # 担当者権限チェック
+        if str(room_number) not in session.get('manager_auth_rooms', []):
+            return jsonify({'status': 'error', 'message': 'この部屋の操作権限がありません'}), 403
+
     if not room_number:
         return jsonify({'status': 'error', 'message': '部屋番号が必要です'}), 400
 

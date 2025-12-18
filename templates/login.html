@@ -11,7 +11,7 @@
 
         <form id="loginRegisterForm" action="{{ url_for('login_page') }}" method="POST" class="auth-form">
             <input type="hidden" name="login_type" value="user">
-            
+
             <div class="form-section">
                 <div class="input-group">
                     <label for="room_number">
@@ -19,26 +19,27 @@
                     </label>
                     <input type="text" id="room_number" name="room_number" required placeholder="例: 101">
                 </div>
-                
+
                 <div class="input-group">
                     <label for="room_password">
                         <i class="fas fa-key"></i> 入室パスワード
                     </label>
                     <input type="password" id="room_password" name="room_password" required placeholder="入室用パスワード">
                 </div>
-                
+
                 <div class="input-group">
                     <label for="student_id">
                         <i class="fas fa-id-card"></i> 出席番号
                     </label>
                     <input type="text" id="student_id" name="student_id" required placeholder="例: 23">
                 </div>
-                
+
                 <div class="input-group">
                     <label for="individual_password">
                         <i class="fas fa-lock"></i> 個別パスワード
                     </label>
-                    <input type="password" id="individual_password" name="individual_password" required placeholder="個人用パスワード">
+                    <input type="password" id="individual_password" name="individual_password" required
+                        placeholder="個人用パスワード">
                 </div>
                 <div class="remember-options">
                     <div class="form-check">
@@ -52,7 +53,7 @@
                         <label class="form-check-label" for="rememberInfo">
                             個別パス以外を記憶する
                         </label>
-                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -62,7 +63,7 @@
                 </button>
             </div>
         </form>
-        
+
         <!-- パスワード関連のリンク -->
         <div class="password-help-section">
             <div class="password-links">
@@ -80,23 +81,23 @@
         </div>
 
         <div class="admin-section">
-            <h3><i class="fas fa-user-shield"></i> 管理者ログイン</h3>
+            <h3><i class="fas fa-user-shield"></i> 管理者・担当者ログイン</h3>
             <form action="{{ url_for('login_page') }}" method="POST" class="auth-form">
                 <input type="hidden" name="login_type" value="admin">
-                
+
                 <div class="form-section">
                     <div class="input-group">
                         <label for="admin_username">
-                            <i class="fas fa-user-cog"></i> 管理者ユーザー名
+                            <i class="fas fa-user-cog"></i> 管理者・担当者ユーザー名
                         </label>
                         <input type="text" id="admin_username" name="admin_username" value="admin" required>
                     </div>
-                    
+
                     <div class="input-group">
                         <label for="admin_password">
-                            <i class="fas fa-shield-alt"></i> 管理者パスワード
+                            <i class="fas fa-shield-alt"></i> 管理者・担当者パスワード
                         </label>
-                        <input type="password" id="admin_password" name="admin_password" required placeholder="管理者パスワード">
+                        <input type="password" id="admin_password" name="admin_password" required placeholder="パスワード">
                     </div>
                 </div>
 
@@ -111,436 +112,443 @@
 </section>
 
 <style>
-/* 全体のレイアウト改善 */
-.auth-section {
-    min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    padding: 20px;
-}
-
-.auth-container {
-    background: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(10px);
-    padding: 40px;
-    border-radius: 20px;
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-    max-width: 480px;
-    width: 100%;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-/* ヘッダーセクション */
-.auth-header {
-    text-align: center;
-    margin-bottom: 30px;
-}
-
-.auth-header h2 {
-    color: #2c3e50;
-    font-size: 1.8rem;
-    font-weight: 700;
-    margin: 0 0 10px 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-}
-
-.auth-header h2 i {
-    color: #3498db;
-    font-size: 1.6rem;
-}
-
-.auth-message {
-    color: #7f8c8d;
-    font-size: 1rem;
-    margin: 0;
-    font-weight: 400;
-}
-
-/* フォームセクション */
-.form-section {
-    margin-bottom: 25px;
-}
-
-.input-group {
-    margin-bottom: 20px;
-}
-
-.input-group label {
-    display: block;
-    font-weight: 600;
-    color: #34495e;
-    margin-bottom: 8px;
-    font-size: 0.95rem;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.input-group label i {
-    color: #3498db;
-    width: 16px;
-    text-align: center;
-    font-size: 0.9rem;
-}
-
-.input-group input {
-    width: 100%;
-    padding: 12px 16px;
-    border: 2px solid #e9ecef;
-    border-radius: 10px;
-    font-size: 1rem;
-    transition: all 0.3s ease;
-    background: #fafbfc;
-    box-sizing: border-box;
-}
-
-.input-group input:focus {
-    border-color: #3498db;
-    background: #fff;
-    outline: none;
-    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
-    transform: translateY(-1px);
-}
-
-.input-group input::placeholder {
-    color: #a0a6b0;
-    font-style: italic;
-}
-
-/* ボタンスタイル */
-.button-group {
-    margin: 25px 0;
-}
-
-.primary-button, .admin-button {
-    width: 100%;
-    padding: 14px 20px;
-    border: none;
-    border-radius: 10px;
-    font-size: 1.1rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    text-decoration: none;
-}
-
-.primary-button {
-    background: linear-gradient(135deg, #3498db, #2980b9);
-    color: white;
-    box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
-}
-
-.primary-button:hover {
-    background: linear-gradient(135deg, #2980b9, #21618c);
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(52, 152, 219, 0.4);
-}
-
-.admin-button {
-    background: linear-gradient(135deg, #e67e22, #d35400);
-    color: white;
-    box-shadow: 0 4px 15px rgba(230, 126, 34, 0.3);
-}
-
-.admin-button:hover {
-    background: linear-gradient(135deg, #d35400, #ba4a00);
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(230, 126, 34, 0.4);
-}
-
-/* パスワードヘルプセクション */
-.password-help-section {
-    margin: 20px 0;
-    text-align: center;
-}
-
-.password-links {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 15px;
-    flex-wrap: wrap;
-}
-
-.password-link {
-    color: #3498db;
-    text-decoration: none;
-    font-weight: 500;
-    padding: 8px 12px;
-    border-radius: 8px;
-    transition: all 0.2s ease;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 0.9rem;
-    background: rgba(52, 152, 219, 0.05);
-}
-
-.password-link:hover {
-    background: rgba(52, 152, 219, 0.1);
-    transform: translateY(-1px);
-    text-decoration: none;
-}
-
-.password-link.forgot-password {
-    color: #e74c3c;
-    background: rgba(231, 76, 60, 0.05);
-}
-
-.password-link.forgot-password:hover {
-    background: rgba(231, 76, 60, 0.1);
-}
-
-.link-separator {
-    color: #bdc3c7;
-    font-weight: 300;
-}
-
-/* 区切り線 */
-.divider {
-    text-align: center;
-    margin: 30px 0;
-    position: relative;
-}
-
-.divider::before {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 0;
-    right: 0;
-    height: 1px;
-    background: linear-gradient(to right, transparent, #bdc3c7, transparent);
-}
-
-.divider span {
-    background: rgba(255, 255, 255, 0.95);
-    padding: 0 20px;
-    color: #7f8c8d;
-    font-size: 0.9rem;
-    font-weight: 500;
-}
-
-/* 管理者セクション */
-.admin-section {
-    background: rgba(52, 73, 94, 0.03);
-    padding: 25px;
-    border-radius: 15px;
-    border: 1px solid rgba(52, 73, 94, 0.1);
-}
-
-.admin-section h3 {
-    color: #34495e;
-    font-size: 1.3rem;
-    font-weight: 600;
-    margin: 0 0 20px 0;
-    text-align: center;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-}
-
-.admin-section h3 i {
-    color: #e67e22;
-}
-
-/* レスポンシブ対応 */
-@media (max-width: 480px) {
+    /* 全体のレイアウト改善 */
     .auth-section {
-        padding: 15px;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 20px;
     }
-    
+
     .auth-container {
-        padding: 25px 20px;
-        border-radius: 15px;
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        padding: 40px;
+        border-radius: 20px;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        max-width: 480px;
+        width: 100%;
+        border: 1px solid rgba(255, 255, 255, 0.2);
     }
-    
+
+    /* ヘッダーセクション */
+    .auth-header {
+        text-align: center;
+        margin-bottom: 30px;
+    }
+
     .auth-header h2 {
-        font-size: 1.5rem;
+        color: #2c3e50;
+        font-size: 1.8rem;
+        font-weight: 700;
+        margin: 0 0 10px 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
     }
-    
-    .password-links {
-        flex-direction: column;
+
+    .auth-header h2 i {
+        color: #3498db;
+        font-size: 1.6rem;
+    }
+
+    .auth-message {
+        color: #7f8c8d;
+        font-size: 1rem;
+        margin: 0;
+        font-weight: 400;
+    }
+
+    /* フォームセクション */
+    .form-section {
+        margin-bottom: 25px;
+    }
+
+    .input-group {
+        margin-bottom: 20px;
+    }
+
+    .input-group label {
+        display: block;
+        font-weight: 600;
+        color: #34495e;
+        margin-bottom: 8px;
+        font-size: 0.95rem;
+        display: flex;
+        align-items: center;
         gap: 8px;
     }
-    
-    .link-separator {
-        display: none;
+
+    .input-group label i {
+        color: #3498db;
+        width: 16px;
+        text-align: center;
+        font-size: 0.9rem;
     }
-    
-    .password-link {
+
+    .input-group input {
         width: 100%;
+        padding: 12px 16px;
+        border: 2px solid #e9ecef;
+        border-radius: 10px;
+        font-size: 1rem;
+        transition: all 0.3s ease;
+        background: #fafbfc;
+        box-sizing: border-box;
+    }
+
+    .input-group input:focus {
+        border-color: #3498db;
+        background: #fff;
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+        transform: translateY(-1px);
+    }
+
+    .input-group input::placeholder {
+        color: #a0a6b0;
+        font-style: italic;
+    }
+
+    /* ボタンスタイル */
+    .button-group {
+        margin: 25px 0;
+    }
+
+    .primary-button,
+    .admin-button {
+        width: 100%;
+        padding: 14px 20px;
+        border: none;
+        border-radius: 10px;
+        font-size: 1.1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
         justify-content: center;
-        padding: 10px 15px;
+        gap: 10px;
+        text-decoration: none;
     }
-    
+
+    .primary-button {
+        background: linear-gradient(135deg, #3498db, #2980b9);
+        color: white;
+        box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
+    }
+
+    .primary-button:hover {
+        background: linear-gradient(135deg, #2980b9, #21618c);
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(52, 152, 219, 0.4);
+    }
+
+    .admin-button {
+        background: linear-gradient(135deg, #e67e22, #d35400);
+        color: white;
+        box-shadow: 0 4px 15px rgba(230, 126, 34, 0.3);
+    }
+
+    .admin-button:hover {
+        background: linear-gradient(135deg, #d35400, #ba4a00);
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(230, 126, 34, 0.4);
+    }
+
+    /* パスワードヘルプセクション */
+    .password-help-section {
+        margin: 20px 0;
+        text-align: center;
+    }
+
+    .password-links {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 15px;
+        flex-wrap: wrap;
+    }
+
+    .password-link {
+        color: #3498db;
+        text-decoration: none;
+        font-weight: 500;
+        padding: 8px 12px;
+        border-radius: 8px;
+        transition: all 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.9rem;
+        background: rgba(52, 152, 219, 0.05);
+    }
+
+    .password-link:hover {
+        background: rgba(52, 152, 219, 0.1);
+        transform: translateY(-1px);
+        text-decoration: none;
+    }
+
+    .password-link.forgot-password {
+        color: #e74c3c;
+        background: rgba(231, 76, 60, 0.05);
+    }
+
+    .password-link.forgot-password:hover {
+        background: rgba(231, 76, 60, 0.1);
+    }
+
+    .link-separator {
+        color: #bdc3c7;
+        font-weight: 300;
+    }
+
+    /* 区切り線 */
+    .divider {
+        text-align: center;
+        margin: 30px 0;
+        position: relative;
+    }
+
+    .divider::before {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 0;
+        right: 0;
+        height: 1px;
+        background: linear-gradient(to right, transparent, #bdc3c7, transparent);
+    }
+
+    .divider span {
+        background: rgba(255, 255, 255, 0.95);
+        padding: 0 20px;
+        color: #7f8c8d;
+        font-size: 0.9rem;
+        font-weight: 500;
+    }
+
+    /* 管理者セクション */
     .admin-section {
-        padding: 20px 15px;
+        background: rgba(52, 73, 94, 0.03);
+        padding: 25px;
+        border-radius: 15px;
+        border: 1px solid rgba(52, 73, 94, 0.1);
     }
-}
 
-/* アニメーション */
-@keyframes fadeInUp {
-    from {
+    .admin-section h3 {
+        color: #34495e;
+        font-size: 1.3rem;
+        font-weight: 600;
+        margin: 0 0 20px 0;
+        text-align: center;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+    }
+
+    .admin-section h3 i {
+        color: #e67e22;
+    }
+
+    /* レスポンシブ対応 */
+    @media (max-width: 480px) {
+        .auth-section {
+            padding: 15px;
+        }
+
+        .auth-container {
+            padding: 25px 20px;
+            border-radius: 15px;
+        }
+
+        .auth-header h2 {
+            font-size: 1.5rem;
+        }
+
+        .password-links {
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .link-separator {
+            display: none;
+        }
+
+        .password-link {
+            width: 100%;
+            justify-content: center;
+            padding: 10px 15px;
+        }
+
+        .admin-section {
+            padding: 20px 15px;
+        }
+    }
+
+    /* アニメーション */
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(30px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .auth-container {
+        animation: fadeInUp 0.6s ease-out;
+    }
+
+    /* フォーカス時のアクセシビリティ */
+    .primary-button:focus,
+    .admin-button:focus,
+    .password-link:focus {
+        outline: 2px solid #3498db;
+        outline-offset: 2px;
+    }
+
+    .remember-options {
+        margin: 20px 0 15px 0;
+        text-align: left;
+    }
+
+    /* 各チェックボックスのコンテナ設定 */
+    .remember-options .form-check {
+        display: block;
+        position: relative;
+        padding-left: 35px;
+        /* カスタムチェックボックス用のスペース確保 */
+        margin-bottom: 15px;
+        cursor: pointer;
+        font-size: 1rem;
+        /* 文字サイズを少し大きく */
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
+    }
+
+    /* 1. 元のブラウザ標準チェックボックスを隠す */
+    .remember-options .form-check-input {
+        position: absolute;
         opacity: 0;
-        transform: translateY(30px);
+        cursor: pointer;
+        height: 0;
+        width: 0;
     }
-    to {
+
+    /* 2. カスタムチェックボックスの「枠」をlabelの前に作成 */
+    .remember-options .form-check-label::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 1px;
+        /* 位置を微調整 */
+        height: 22px;
+        width: 22px;
+        background-color: #f8f9fa;
+        border: 2px solid #ced4da;
+        border-radius: 5px;
+        transition: all 0.2s ease;
+    }
+
+    /* マウスが乗った時に枠の色を変更 */
+    .remember-options .form-check:hover .form-check-label::before {
+        border-color: #3498db;
+    }
+
+    /* 3. チェックが入った時の「枠」のスタイル（背景色を変更） */
+    .remember-options .form-check-input:checked~.form-check-label::before {
+        background-color: #3498db;
+        border-color: #2980b9;
+    }
+
+    /* 4. 「チェックマーク」を作成 (最初は非表示) */
+    .remember-options .form-check-label::after {
+        content: "";
+        position: absolute;
+        left: 8px;
+        top: 5px;
+        width: 7px;
+        height: 14px;
+        border: solid white;
+        border-width: 0 3px 3px 0;
+        -webkit-transform: rotate(45deg);
+        -ms-transform: rotate(45deg);
+        transform: rotate(45deg);
+        opacity: 0;
+        /* 最初は透明 */
+        transition: opacity 0.1s ease;
+    }
+
+    /* 5. チェックが入った時に「チェックマーク」を表示する */
+    .remember-options .form-check-input:checked~.form-check-label::after {
         opacity: 1;
-        transform: translateY(0);
+        /* 表示する */
     }
-}
-
-.auth-container {
-    animation: fadeInUp 0.6s ease-out;
-}
-
-/* フォーカス時のアクセシビリティ */
-.primary-button:focus,
-.admin-button:focus,
-.password-link:focus {
-    outline: 2px solid #3498db;
-    outline-offset: 2px;
-}
-
-.remember-options {
-    margin: 20px 0 15px 0;
-    text-align: left;
-}
-
-/* 各チェックボックスのコンテナ設定 */
-.remember-options .form-check {
-    display: block;
-    position: relative;
-    padding-left: 35px; /* カスタムチェックボックス用のスペース確保 */
-    margin-bottom: 15px;
-    cursor: pointer;
-    font-size: 1rem; /* 文字サイズを少し大きく */
-    -webkit-user-select: none;
-    -moz-user-select: none;
-    -ms-user-select: none;
-    user-select: none;
-}
-
-/* 1. 元のブラウザ標準チェックボックスを隠す */
-.remember-options .form-check-input {
-    position: absolute;
-    opacity: 0;
-    cursor: pointer;
-    height: 0;
-    width: 0;
-}
-
-/* 2. カスタムチェックボックスの「枠」をlabelの前に作成 */
-.remember-options .form-check-label::before {
-    content: "";
-    position: absolute;
-    left: 0;
-    top: 1px; /* 位置を微調整 */
-    height: 22px;
-    width: 22px;
-    background-color: #f8f9fa;
-    border: 2px solid #ced4da;
-    border-radius: 5px;
-    transition: all 0.2s ease;
-}
-
-/* マウスが乗った時に枠の色を変更 */
-.remember-options .form-check:hover .form-check-label::before {
-    border-color: #3498db;
-}
-
-/* 3. チェックが入った時の「枠」のスタイル（背景色を変更） */
-.remember-options .form-check-input:checked ~ .form-check-label::before {
-    background-color: #3498db;
-    border-color: #2980b9;
-}
-
-/* 4. 「チェックマーク」を作成 (最初は非表示) */
-.remember-options .form-check-label::after {
-    content: "";
-    position: absolute;
-    left: 8px;
-    top: 5px;
-    width: 7px;
-    height: 14px;
-    border: solid white;
-    border-width: 0 3px 3px 0;
-    -webkit-transform: rotate(45deg);
-    -ms-transform: rotate(45deg);
-    transform: rotate(45deg);
-    opacity: 0; /* 最初は透明 */
-    transition: opacity 0.1s ease;
-}
-
-/* 5. チェックが入った時に「チェックマーク」を表示する */
-.remember-options .form-check-input:checked ~ .form-check-label::after {
-    opacity: 1; /* 表示する */
-}
 </style>
 {% endblock %}
 
 {% block scripts %}
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    const rememberInfoCheckbox = document.getElementById('rememberInfo');
-    const loginForm = document.getElementById('loginRegisterForm');
+    document.addEventListener('DOMContentLoaded', function () {
+        const rememberInfoCheckbox = document.getElementById('rememberInfo');
+        const loginForm = document.getElementById('loginRegisterForm');
 
-    const roomNumberInput = document.getElementById('room_number');
-    const roomPasswordInput = document.getElementById('room_password');
-    const studentIdInput = document.getElementById('student_id');
-    
-    // 1. ページ読み込み時に記憶された情報を復元する
-    function loadRememberedInfo() {
-        try {
-            const rememberedData = localStorage.getItem('rememberedUserInfo');
-            if (rememberedData) {
-                const info = JSON.parse(rememberedData);
-                roomNumberInput.value = info.room || '';
-                roomPasswordInput.value = info.password || '';
-                studentIdInput.value = info.studentId || '';
-                rememberInfoCheckbox.checked = true;
-            }
-        } catch (e) {
-            console.error('記憶された情報の読み込みに失敗しました:', e);
-            localStorage.removeItem('rememberedUserInfo');
-        }
-    }
+        const roomNumberInput = document.getElementById('room_number');
+        const roomPasswordInput = document.getElementById('room_password');
+        const studentIdInput = document.getElementById('student_id');
 
-    // 2. フォーム送信時に入力情報を記憶または削除する
-    if (loginForm) {
-        loginForm.addEventListener('submit', function() {
-            if (rememberInfoCheckbox.checked) {
-                // チェックボックスがオンなら情報を保存
-                const infoToRemember = {
-                    room: roomNumberInput.value,
-                    password: roomPasswordInput.value,
-                    studentId: studentIdInput.value
-                };
-                try {
-                    localStorage.setItem('rememberedUserInfo', JSON.stringify(infoToRemember));
-                } catch (e) {
-                    console.error('情報の保存に失敗しました:', e);
+        // 1. ページ読み込み時に記憶された情報を復元する
+        function loadRememberedInfo() {
+            try {
+                const rememberedData = localStorage.getItem('rememberedUserInfo');
+                if (rememberedData) {
+                    const info = JSON.parse(rememberedData);
+                    roomNumberInput.value = info.room || '';
+                    roomPasswordInput.value = info.password || '';
+                    studentIdInput.value = info.studentId || '';
+                    rememberInfoCheckbox.checked = true;
                 }
-            } else {
-                // チェックボックスがオフなら情報を削除
+            } catch (e) {
+                console.error('記憶された情報の読み込みに失敗しました:', e);
                 localStorage.removeItem('rememberedUserInfo');
             }
-        });
-    }
+        }
 
-    // 初期読み込みを実行
-    loadRememberedInfo();
-});
+        // 2. フォーム送信時に入力情報を記憶または削除する
+        if (loginForm) {
+            loginForm.addEventListener('submit', function () {
+                if (rememberInfoCheckbox.checked) {
+                    // チェックボックスがオンなら情報を保存
+                    const infoToRemember = {
+                        room: roomNumberInput.value,
+                        password: roomPasswordInput.value,
+                        studentId: studentIdInput.value
+                    };
+                    try {
+                        localStorage.setItem('rememberedUserInfo', JSON.stringify(infoToRemember));
+                    } catch (e) {
+                        console.error('情報の保存に失敗しました:', e);
+                    }
+                } else {
+                    // チェックボックスがオフなら情報を削除
+                    localStorage.removeItem('rememberedUserInfo');
+                }
+            });
+        }
+
+        // 初期読み込みを実行
+        loadRememberedInfo();
+    });
 </script>
 {% endblock %}

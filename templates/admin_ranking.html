@@ -5,9 +5,15 @@
 <div class="ranking-container">
     <div class="ranking-header d-flex justify-content-between align-items-center mb-4">
         <div class="d-flex align-items-center">
+            {% if manager_mode %}
+            <a href="{{ url_for('admin_page') }}" class="btn btn-outline-secondary me-3">
+                <i class="fas fa-arrow-left"></i> 担当者ページに戻る
+            </a>
+            {% else %}
             <a href="{{ url_for('admin_page') }}" class="btn btn-outline-secondary me-3">
                 <i class="fas fa-arrow-left"></i> 管理者ページに戻る
             </a>
+            {% endif %}
             <h2 class="mb-0"><i class="fas fa-trophy text-warning"></i> 全員ランキング表示</h2>
         </div>
         <div class="header-actions">
