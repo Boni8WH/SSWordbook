@@ -7,7 +7,7 @@
     "theme_color": "#4a90e2",
     "icons": [
         {
-            "src": "/static/NapoleonLogo.png",
+            "src": "/static/NapoleonIcon.png",
             "sizes": "512x512",
             "type": "image/png",
             "purpose": "any maskable"
