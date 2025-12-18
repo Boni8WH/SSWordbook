@@ -3057,7 +3057,8 @@
                         // 選択された単元を取得
                         const selectedUnits = getSelectedUnits(roomNumber);
                         const csvFilename = csvFileSelect.value;
-                        const managerPassword = document.getElementById('managerPassword_' + roomNumber).value;
+                        const managerPasswordInput = document.getElementById('managerPassword_' + roomNumber);
+                        const managerPassword = managerPasswordInput ? managerPasswordInput.value : '';
 
                         // ボタンを無効化して重複実行を防ぐ
                         this.disabled = true;
@@ -3103,7 +3104,9 @@
                                     if (managerPassword) {
                                         msg += `\n・管理パスワード: 更新しました`;
                                         // 入力欄をクリア
-                                        document.getElementById('managerPassword_' + roomNumber).value = '';
+                                        if (managerPasswordInput) {
+                                            managerPasswordInput.value = '';
+                                        }
                                     }
                                     showInfoModal('保存完了', msg, 'success');
 
