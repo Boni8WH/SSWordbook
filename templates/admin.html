@@ -62,6 +62,12 @@
 
     .tab-pane {
         padding: 0;
+        width: 100%;
+    }
+
+    .tab-pane .card {
+        width: 100%;
+        max-width: none;
     }
 
     /* Mobile Responsive */
@@ -237,6 +243,182 @@
         .badge {
             font-size: 0.65rem;
             padding: 3px 6px;
+        }
+
+        /* ----------------------------------------------------
+           Mobile Layout Fixes (Max Width 576px) - UPDATED
+           ---------------------------------------------------- */
+
+        /* 1. Global Safe Width */
+        body,
+        html {
+            overflow-x: hidden;
+        }
+
+        .main-content-wrapper {
+            width: 100% !important;
+            padding: 10px !important;
+            overflow-x: hidden !important;
+        }
+
+        /* 2. Fix Panel Overflows */
+        .admin-panel,
+        .csv-import-section,
+        .csv-template-section,
+        .card,
+        .card-body {
+            width: 100% !important;
+            min-width: 0 !important;
+            max-width: 100% !important;
+            padding: 10px !important;
+            box-sizing: border-box !important;
+        }
+
+        /* 3. Room Settings Table -> Mobile Card View */
+        .room-setting-table {
+            min-width: 0 !important;
+            /* Override inline style */
+            display: block !important;
+            width: 100% !important;
+        }
+
+        .room-setting-table thead {
+            display: none !important;
+        }
+
+        .room-setting-table tbody,
+        .room-setting-table tr,
+        .room-setting-table td {
+            display: block !important;
+            width: 100% !important;
+        }
+
+        .room-setting-table tr {
+            margin-bottom: 20px;
+            border: 1px solid #ced4da;
+            border-radius: 8px;
+            background: #fff;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+            padding: 15px;
+        }
+
+        .room-setting-table td {
+            text-align: left;
+            padding: 8px 0;
+            border: none;
+            border-bottom: 1px dashed #eee;
+        }
+
+        .room-setting-table td:last-child {
+            border-bottom: none;
+        }
+
+        .room-setting-table td:first-child::before {
+            content: "部屋番号: ";
+            font-weight: bold;
+            color: #555;
+            display: inline-block;
+            margin-right: 5px;
+        }
+
+        /* 4. Unit Setting Container Buttons */
+        .unit-setting-container {
+            max-width: 100% !important;
+        }
+
+        .unit-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .unit-controls button {
+            width: 100%;
+            margin: 0 !important;
+        }
+
+        /* 5. Fix CSV Section Code Blocks & Buttons */
+        .csv-template-section pre,
+        .csv-template-section code {
+            white-space: pre-wrap !important;
+            word-wrap: break-word !important;
+            word-break: break-all !important;
+            max-width: 100% !important;
+            display: block;
+            font-size: 0.75rem;
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+        }
+
+        /* Buttons stack */
+        .csv-template-section .btn-group,
+        .csv-template-section .d-flex,
+        .csv-import-section .d-flex {
+            flex-direction: column !important;
+            width: 100% !important;
+            gap: 10px !important;
+        }
+
+        .csv-template-section .btn,
+        .csv-import-section .btn,
+        .csv-template-section a.btn {
+            width: 100% !important;
+            display: block;
+            margin: 0 !important;
+            white-space: normal !important;
+        }
+
+        /* 6. General Elements */
+        input,
+        select,
+        textarea {
+            max-width: 100% !important;
+        }
+
+        .btn-outline-primary+.btn-outline-primary {
+            margin-left: 0 !important;
+            margin-top: 5px;
+        }
+
+        /* Panel header adjust */
+        .admin-panel h4,
+        .csv-import-section h4 {
+            font-size: 1rem;
+            flex-wrap: wrap;
+        }
+
+        /* Fix CSVフォーマット code block */
+        .csv-template-section pre,
+        .csv-template-section code {
+            display: block;
+            padding: 8px;
+            background: #f5f5f5;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            line-height: 1.4;
+        }
+
+        /* Form elements full width */
+        .csv-template-section input,
+        .csv-template-section select,
+        .csv-import-section input,
+        .csv-import-section select {
+            width: 100% !important;
+            max-width: 100% !important;
+        }
+
+        /* Ul/li adjustments */
+        .csv-template-section ul,
+        .csv-import-section ul {
+            padding-left: 15px;
+            font-size: 0.8rem;
+        }
+
+        .csv-template-section li,
+        .csv-import-section li {
+            margin-bottom: 4px;
+            line-height: 1.4;
         }
     }
 
@@ -548,7 +730,7 @@
                                 <table class="table table-striped">
                                     <thead class="table-dark">
                                         <tr>
-                                            <th>日付</th>
+                                            <th>日付 / 更新</th>
                                             <th>タイトル</th>
                                             <th>対象</th>
                                             <th>状態</th>
@@ -558,7 +740,13 @@
                                     <tbody>
                                         {% for ann in announcements %}
                                         <tr>
-                                            <td>{{ ann.date | to_jst }}</td>
+                                            <td>
+                                                {{ ann.date | to_jst }}
+                                                {% if ann.updated_at %}
+                                                <br><small class="text-muted"><i class="fas fa-sync-alt"></i> {{
+                                                    ann.updated_at | to_jst }}</small>
+                                                {% endif %}
+                                            </td>
                                             <td>{{ ann.title }}</td>
                                             <td>
                                                 {% if ann.target_rooms == 'all' %}
@@ -575,6 +763,11 @@
                                                 {% endif %}
                                             </td>
                                             <td>
+                                                <button
+                                                    class="btn btn-sm btn-outline-primary me-1 btn-edit-announcement"
+                                                    data-announcement='{{ ann.to_dict() | tojson | safe }}'>
+                                                    <i class="fas fa-edit"></i> 編集
+                                                </button>
                                                 <form action="{{ url_for('admin_delete_announcement', id=ann.id) }}"
                                                     method="POST" style="display: inline;"
                                                     onsubmit="handleAnnouncementDelete(event)">
@@ -593,6 +786,122 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Edit Announcement Modal -->
+                <div class="modal fade" id="editAnnouncementModal" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <form id="editAnnouncementForm" method="POST">
+                                <div class="modal-header">
+                                    <h5 class="modal-title"><i class="fas fa-edit"></i> お知らせ編集</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"
+                                        aria-label="Close"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <div class="mb-3">
+                                        <label for="editAnnTitle" class="form-label">タイトル</label>
+                                        <input type="text" class="form-control" id="editAnnTitle" name="title" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="editAnnContent" class="form-label">内容</label>
+                                        <textarea class="form-control" id="editAnnContent" name="content" rows="4"
+                                            required></textarea>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="editAnnTarget" class="form-label">対象部屋</label>
+                                        <input type="text" id="editRoomSearchInput" class="form-control mb-2"
+                                            placeholder="部屋番号を検索..." onkeyup="filterEditRooms()"
+                                            onkeydown="if(event.key === 'Enter') { event.preventDefault(); return false; }">
+                                        <select class="form-select" id="editAnnTarget" name="target_rooms" multiple
+                                            size="5" required>
+                                            <option value="all">全員 (All)</option>
+                                            {% for room in room_settings %}
+                                            <option value="{{ room.room_number }}">{{ room.room_number }}</option>
+                                            {% endfor %}
+                                        </select>
+                                        <div class="form-text">PC: Ctrl/Cmd+クリックで複数選択</div>
+                                    </div>
+                                    <div class="mb-3 form-check">
+                                        <input type="checkbox" class="form-check-input" id="editAnnActive"
+                                            name="is_active">
+                                        <label class="form-check-label" for="editAnnActive">有効（ユーザーに表示）</label>
+                                    </div>
+                                    <div class="mb-3 form-check">
+                                        <input type="checkbox" class="form-check-input" id="editAnnNotification"
+                                            name="send_notification">
+                                        <label class="form-check-label" for="editAnnNotification">
+                                            <i class="fas fa-bell"></i> 更新通知を送る
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary"
+                                        data-bs-dismiss="modal">キャンセル</button>
+                                    <button type="submit" class="btn btn-primary">更新する</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <script>
+                    function filterEditRooms() {
+                        var input, filter, select, options, i, txtValue;
+                        input = document.getElementById("editRoomSearchInput");
+                        filter = input.value.toUpperCase();
+                        select = document.getElementById("editAnnTarget");
+                        options = select.getElementsByTagName("option");
+                        for (i = 0; i < options.length; i++) {
+                            txtValue = options[i].textContent || options[i].innerText;
+                            if (txtValue.toUpperCase().indexOf(filter) > -1) {
+                                options[i].style.display = "";
+                            } else {
+                                options[i].style.display = "none";
+                            }
+                        }
+                    }
+
+                    function openEditAnnouncementModal(id, data) {
+                        var form = document.getElementById('editAnnouncementForm');
+                        form.action = '/admin/announcements/edit/' + id;
+
+                        document.getElementById('editAnnTitle').value = data.title;
+                        document.getElementById('editAnnContent').value = data.content;
+                        document.getElementById('editAnnActive').checked = data.is_active;
+                        document.getElementById('editAnnNotification').checked = false; // Default off
+
+                        // Select target rooms
+                        var select = document.getElementById('editAnnTarget');
+                        var targets = [];
+                        if (data.target_rooms) {
+                            targets = data.target_rooms.split(',');
+                        }
+
+                        for (var i = 0; i < select.options.length; i++) {
+                            var opt = select.options[i];
+                            if (data.target_rooms === 'all' && opt.value === 'all') {
+                                opt.selected = true;
+                            } else if (targets.includes(opt.value)) {
+                                opt.selected = true;
+                            } else {
+                                opt.selected = false;
+                            }
+                        }
+
+                        var modal = new bootstrap.Modal(document.getElementById('editAnnouncementModal'));
+                        modal.show();
+                    }
+
+                    document.addEventListener('DOMContentLoaded', function () {
+                        var editButtons = document.querySelectorAll('.btn-edit-announcement');
+                        editButtons.forEach(function (btn) {
+                            btn.addEventListener('click', function () {
+                                var data = JSON.parse(this.getAttribute('data-announcement'));
+                                openEditAnnouncementModal(data.id, data);
+                            });
+                        });
+                    });
+                </script>
 
                 <!-- ユーザー管理セクション (Super Admin Only) -->
                 {% if not is_manager %}
@@ -5728,6 +6037,8 @@
             border-radius: 8px;
             margin-bottom: 20px;
             border: 1px solid #eee;
+            width: 100%;
+            box-sizing: border-box;
         }
 
         .admin-panel h4 {
@@ -6070,6 +6381,8 @@
             border: 1px solid #87ceeb;
             border-radius: 6px;
             border-left: 4px solid #17a2b8;
+            width: 100%;
+            box-sizing: border-box;
         }
 
         .flashes {
@@ -6270,6 +6583,8 @@
             padding: 20px;
             margin-bottom: 25px;
             border: 1px solid #81c784;
+            width: 100%;
+            box-sizing: border-box;
         }
 
         .csv-import-section h4 {

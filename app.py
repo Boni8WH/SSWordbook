@@ -661,6 +661,21 @@ def _add_manager_columns():
     except Exception as e:
         print(f"⚠️ Managerカラムマイグレーションエラー: {e}")
 
+def _add_updated_at_column_to_announcement():
+    """Announcementテーブルにupdated_atカラムを追加するマイグレーション関数"""
+    try:
+        inspector = inspect(db.engine)
+        columns = [c['name'] for c in inspector.get_columns('announcements')]
+        
+        if 'updated_at' not in columns:
+            print("🔄 Announcement: updated_atカラムを追加します...")
+            with db.engine.connect() as conn:
+                with conn.begin():
+                    conn.execute(text("ALTER TABLE announcements ADD COLUMN updated_at TIMESTAMP"))
+            print("✅ Announcement: updated_atカラム追加完了")
+    except Exception as e:
+        print(f"⚠️ Announcementマイグレーションエラー: {e}")
+
 
 
 # ====================================================================
@@ -1202,6 +1217,7 @@ class Announcement(db.Model):
     # 🆕 作成した担当者 (User ID)
     created_by_manager_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
     is_active = db.Column(db.Boolean, default=True, nullable=False)
+    updated_at = db.Column(db.DateTime, onupdate=datetime.utcnow)
 
     def to_dict(self):
         # 日時をJSTに変換して文字列化
@@ -1216,11 +1232,23 @@ class Announcement(db.Model):
         else:
             date_str = ''
 
+        # 更新日時をJSTに変換
+        u = self.updated_at
+        if u:
+            if u.tzinfo is None:
+                u = pytz.utc.localize(u).astimezone(JST)
+            else:
+                u = u.astimezone(JST)
+            updated_at_str = u.strftime('%Y-%m-%d %H:%M')
+        else:
+            updated_at_str = ''
+
         return {
             'id': self.id,
             'title': self.title,
             'content': self.content,
             'date': date_str,
+            'updated_at': updated_at_str,
             'target_rooms': self.target_rooms,
             'is_active': self.is_active
         }
@@ -5776,6 +5804,69 @@ def get_announcements():
         print(f"Error fetching announcements: {e}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
+@app.route('/announcements')
+def announcements_page():
+    """お知らせ一覧ページ"""
+    try:
+        page = request.args.get('page', 1, type=int)
+        per_page = 10
+        
+        user_id = session.get('user_id')
+        user_room = None
+        if user_id:
+            user = User.query.get(user_id)
+            if user:
+                user_room = user.room_number
+
+        # 全体向けまたは自室向けのお知らせを取得
+        query = Announcement.query.filter_by(is_active=True).order_by(Announcement.date.desc())
+        all_announcements = query.all()
+        
+        # フィルタリング
+        filtered_announcements = []
+        for ann in all_announcements:
+            targets = [t.strip() for t in (ann.target_rooms or 'all').split(',')]
+            if 'all' in targets:
+                filtered_announcements.append(ann) # テンプレートで使うのでオブジェクトのまま
+            elif user_room and user_room in targets:
+                filtered_announcements.append(ann)
+        
+        # ページネーション (Python側でリストをスライス)
+        total_items = len(filtered_announcements)
+        total_pages = math.ceil(total_items / per_page)
+        
+        # ページ番号の修正
+        if page < 1: page = 1
+        if page > total_pages and total_pages > 0: page = total_pages
+        
+        start_idx = (page - 1) * per_page
+        end_idx = start_idx + per_page
+        
+        current_page_announcements = filtered_announcements[start_idx:end_idx]
+        
+        # 表示用に辞書化せず、オブジェクトの属性としてアクセスさせるが、
+        # JST変換メソッドがないので、テンプレート側でフィルタを使うか、ここで変換済みデータを作るか。
+        # Announcementモデルに to_dict があるので、それを使うのが安全だが、
+        # テンプレートはオブジェクト用インターフェースになっている部分と混在に注意。
+        # テンプレート実装時: {{ announcement.date }} としている。
+        # モデルの date は UTC (datetime) の場合と JST の場合があるかもしれないが
+        # to_dict では JST に変換している。
+        # ここではテンプレートに渡すリストを辞書リストにするのが確実。
+        
+        display_announcements = []
+        for ann in current_page_announcements:
+            display_announcements.append(ann.to_dict())
+
+        return render_template('announcements.html', 
+                               announcements=display_announcements,
+                               current_page=page,
+                               total_pages=total_pages)
+
+    except Exception as e:
+        print(f"Error serving announcements page: {e}")
+        flash('お知らせページの読み込み中にエラーが発生しました。', 'danger')
+        return redirect(url_for('index'))
+
 @app.route('/admin/announcements/add', methods=['POST'])
 def admin_add_announcement():
     if not session.get('admin_logged_in') and not session.get('manager_logged_in'):
@@ -5890,6 +5981,94 @@ def admin_add_announcement():
         db.session.rollback()
         flash(f'エラーが発生しました: {e}', 'danger')
         return redirect(url_for('admin_page'))
+
+@app.route('/admin/announcements/edit/<int:announcement_id>', methods=['POST'])
+def admin_edit_announcement(announcement_id):
+    if not session.get('admin_logged_in') and not session.get('manager_logged_in'):
+        flash('権限がありません。', 'danger')
+        return redirect(url_for('login_page'))
+
+    announcement = Announcement.query.get_or_404(announcement_id)
+    
+    # 担当者の場合、権限チェック
+    if session.get('manager_logged_in') and not session.get('admin_logged_in'):
+        manager_id = session.get('user_id')
+        auth_rooms = session.get('manager_auth_rooms', [])
+        
+        if announcement.created_by_manager_id != manager_id and not session.get('admin_logged_in'):
+             current_targets = announcement.target_rooms.split(',')
+             if announcement.target_rooms == 'all':
+                 flash('全体へのお知らせは編集できません。', 'danger')
+                 return redirect(url_for('admin_page'))
+                 
+             for room in current_targets:
+                 if room not in auth_rooms:
+                     flash('権限のない部屋に対するお知らせは編集できません。', 'danger')
+                     return redirect(url_for('admin_page'))
+
+    title = request.form.get('title')
+    content = request.form.get('content')
+    is_active = request.form.get('is_active') == 'on' # Checkbox typically sends 'on'
+    send_notification = request.form.get('send_notification') == 'on'
+    
+    target_rooms_list = request.form.getlist('target_rooms')
+    if target_rooms_list:
+        if 'all' in target_rooms_list:
+            new_target_rooms = 'all'
+        else:
+            new_target_rooms = ",".join(target_rooms_list)
+            
+        if session.get('manager_logged_in') and not session.get('admin_logged_in'):
+             auth_rooms = session.get('manager_auth_rooms', [])
+             if new_target_rooms == 'all':
+                  new_target_rooms = ",".join(auth_rooms)
+             else:
+                 selected = new_target_rooms.split(',')
+                 valid = [r for r in selected if r in auth_rooms]
+                 if not valid:
+                     flash('権限のある部屋が選択されていません。', 'danger')
+                     return redirect(url_for('admin_page'))
+                 new_target_rooms = ",".join(valid)
+        
+        announcement.target_rooms = new_target_rooms
+
+    announcement.title = title
+    announcement.content = content
+    announcement.is_active = is_active
+    announcement.updated_at = datetime.utcnow()
+    
+    db.session.commit()
+    
+    if send_notification and announcement.is_active:
+         try:
+            # ターゲットユーザーを取得してpush通知
+            website_url = url_for('index', _external=True)
+            if announcement.target_rooms == "all":
+                users = User.query.filter(User.push_subscription.isnot(None)).all()
+            else:
+                target_room_list = [r.strip() for r in announcement.target_rooms.split(',')]
+                users = User.query.filter(
+                    User.room_number.in_(target_room_list),
+                    User.push_subscription.isnot(None)
+                ).all()
+
+            count = 0
+            for user in users:
+                if user.notification_enabled:
+                    body_text = content[:40] + "..." if len(content) > 40 else content
+                    send_push_notification(
+                        user,
+                        f"更新: ペル「{title}」",
+                        body_text,
+                        url=website_url
+                    )
+                    count += 1
+            print(f"DEBUG: Sent update notification to {count} users.")
+         except Exception as e:
+            print(f"Error sending update push: {e}")
+
+    flash('お知らせを更新しました。', 'success')
+    return redirect(url_for('admin_page'))
 
 @app.route('/admin/announcements/delete/<int:id>', methods=['POST'])
 def admin_delete_announcement(id):
@@ -15862,6 +16041,9 @@ if __name__ == '__main__':
         debug_mode = os.environ.get('RENDER') != 'true'
         
         logger.info(f"🌐 サーバーを起動します: http://0.0.0.0:{port}")
+        
+        _add_manager_columns()
+        _add_updated_at_column_to_announcement()
         
         app.run(host='0.0.0.0', port=port, debug=debug_mode)
         
