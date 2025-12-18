@@ -373,6 +373,7 @@ function loadUserData() {
 
                 setTimeout(() => {
                     updateIncorrectOnlySelection();
+                    updateSelectionTotalCount(); // カウント更新
                 }, 500);
             } else {
                 console.error('❌ ユーザーデータ読み込み失敗:', data.message);
@@ -444,6 +445,7 @@ function loadWordDataFromServer() {
                 }
                 // ★追加：データロード後に制限状態を再評価
                 updateIncorrectOnlySelection();
+                updateSelectionTotalCount(); // カウント更新
             }, 500);
 
         })
@@ -620,6 +622,7 @@ function loadSelectionState() {
 
     setTimeout(() => {
         initializeSelectAllButtons();
+        updateSelectionTotalCount(); // カウント更新
     }, 100);
 }
 
@@ -630,7 +633,7 @@ function updateIncorrectOnlySelection() {
     const incorrectOnlyRadio = document.getElementById('incorrectOnlyRadio');
     const chaptersContainer = document.querySelector('.chapters-container');
     const rangeSelectionArea = document.querySelector('.range-selection-area');
-    const rangeSelectionTitle = document.querySelector('.selection-area h3');
+    const rangeSelectionTitleText = document.getElementById('rangeSelectionTitleText');
     const questionCountRadios = document.querySelectorAll('input[name="questionCount"]:not(#incorrectOnlyRadio)');
 
     // ★修正：有効な苦手問題数を使用
@@ -700,9 +703,9 @@ function updateIncorrectOnlySelection() {
         if (rangeSelectionArea) {
             rangeSelectionArea.style.display = 'none';
         }
-        if (rangeSelectionTitle) {
-            rangeSelectionTitle.textContent = '出題数を選択（苦手問題モードでは無効）';
-            rangeSelectionTitle.style.color = '#95a5a6';
+        if (rangeSelectionTitleText) {
+            rangeSelectionTitleText.textContent = '出題数を選択（苦手問題モードでは無効）';
+            rangeSelectionTitleText.style.color = '#95a5a6';
         }
     } else {
         // 制限なし（通常モード）
@@ -719,9 +722,9 @@ function updateIncorrectOnlySelection() {
             chaptersContainer.style.opacity = '1';
             chaptersContainer.style.pointerEvents = 'auto';
         }
-        if (rangeSelectionTitle) {
-            rangeSelectionTitle.textContent = '出題数を選択';
-            rangeSelectionTitle.style.color = '#34495e';
+        if (rangeSelectionTitleText) {
+            rangeSelectionTitleText.textContent = '出題数を選択';
+            rangeSelectionTitleText.style.color = '#34495e';
         }
 
         const existingWarning = document.getElementById('weakProblemWarning');
@@ -789,7 +792,10 @@ function setupEventListeners() {
         }
 
         questionCountRadios.forEach(radio => {
-            radio.addEventListener('change', updateIncorrectOnlySelection);
+            radio.addEventListener('change', () => {
+                updateIncorrectOnlySelection();
+                updateSelectionTotalCount(); // カウント更新
+            });
         });
 
         // ★未解答のみ・未マスターのみの排他制御
@@ -801,12 +807,14 @@ function setupEventListeners() {
                 if (this.checked) {
                     unmasteredCheckbox.checked = false;
                 }
+                updateSelectionTotalCount(); // カウント更新
             });
 
             unmasteredCheckbox.addEventListener('change', function () {
                 if (this.checked) {
                     unsolvedCheckbox.checked = false;
                 }
+                updateSelectionTotalCount(); // カウント更新
             });
         }
 
@@ -831,6 +839,7 @@ function setupEventListeners() {
                     });
 
                     updateSelectAllButtonText(selectAllBtn, !allChecked);
+                    updateSelectionTotalCount(); // カウント更新
                     return;
                 }
 
@@ -868,6 +877,15 @@ function setupEventListeners() {
                             }, 100);
                         }
                     }
+                }
+            });
+        }
+
+        // 単元チェックボックスの変更イベント
+        if (chaptersContainer) {
+            chaptersContainer.addEventListener('change', (e) => {
+                if (e.target.type === 'checkbox' && e.target.closest('.unit-item')) {
+                    updateSelectionTotalCount();
                 }
             });
         }
@@ -927,6 +945,77 @@ function getSelectedQuestions() {
         const unitIdentifier = `${word.chapter}-${word.number}`;
         return selectedUnits.has(unitIdentifier);
     });
+}
+
+function getFilteredQuestions() {
+    let quizQuestions = [];
+    // 常にDOMから現在の状態を取得
+    const isIncorrectOnly = document.querySelector('input[name="questionCount"][value="incorrectOnly"]')?.checked;
+
+    // ★重要: チェックボックスの状態を直接取得
+    const unsolvedCheckbox = document.getElementById('unsolvedOnlyCheckbox');
+    const unmasteredCheckbox = document.getElementById('unmasteredOnlyCheckbox');
+
+    const isUnsolvedOnly = unsolvedCheckbox ? unsolvedCheckbox.checked : false;
+    const isUnmasteredOnly = unmasteredCheckbox ? unmasteredCheckbox.checked : false;
+
+    if (isIncorrectOnly) {
+        // 苦手問題モードの場合
+        quizQuestions = word_data.filter(word => {
+            const wordIdentifier = generateProblemId(word);
+            return incorrectWords.includes(wordIdentifier);
+        });
+    } else {
+        // 通常モード：選択された範囲から出題
+        quizQuestions = getSelectedQuestions();
+    }
+
+    // ★未マスターのみフィルタリング
+    if (isUnmasteredOnly) {
+        quizQuestions = quizQuestions.filter(word => {
+            const wordIdentifier = generateProblemId(word);
+            const history = problemHistory[wordIdentifier];
+
+            if (!history) return true; // 未解答
+
+            const correct = history.correct_attempts || 0;
+            const incorrect = history.incorrect_attempts || 0;
+            const total = correct + incorrect;
+
+            if (total === 0) return true; // 未解答
+
+            const accuracy = correct / total;
+            return accuracy < 0.8;
+        });
+    }
+
+    // ★未解答のみフィルタリング
+    if (isUnsolvedOnly) {
+        quizQuestions = quizQuestions.filter(word => {
+            const wordIdentifier = generateProblemId(word);
+            const history = problemHistory[wordIdentifier];
+            return !history || ((history.correct_attempts || 0) + (history.incorrect_attempts || 0) === 0);
+        });
+    }
+
+    // 空の問題を除外
+    quizQuestions = quizQuestions.filter(q => q.question && q.answer && q.question.trim() !== '' && q.answer.trim() !== '');
+
+    return quizQuestions;
+}
+
+function updateSelectionTotalCount() {
+    const countSpan = document.getElementById('selectionTotalCount');
+    if (!countSpan) return;
+
+    const questions = getFilteredQuestions();
+    const count = questions.length;
+
+    if (count > 0) {
+        countSpan.textContent = `(全${count}問)`;
+    } else {
+        countSpan.textContent = '(0問)';
+    }
 }
 
 function shuffleArray(array) {
@@ -1064,126 +1153,52 @@ function startQuiz() {
             }
         }
 
-        // 既存のstartQuiz処理を続行...
-        let quizQuestions = getSelectedQuestions(); // let に変更
+        // ★修正: getFilteredQuestionsで一括取得
+        let quizQuestions = getFilteredQuestions();
+        const isIncorrectOnly = (selectedQuestionCount === 'incorrectOnly');
 
         // 苦手問題モード・未解答モード・未マスターモードの場合は範囲選択チェックをスキップ
-        if (selectedQuestionCount !== 'incorrectOnly' && !isUnsolvedOnly && !isUnmasteredOnly && quizQuestions.length === 0) {
-            flashMessage('出題範囲を選択してください。', 'danger');
-            return;
+        // ただし通常モードの場合は、単元が選択されているか確認
+        if (!isIncorrectOnly) {
+            const rawSelected = getSelectedQuestions();
+            if (rawSelected.length === 0 && !isIncorrectOnly) {
+                // 通常モードで単元未選択の場合のチェック（UnsolvedOnlyなどがない場合）
+                if (!isUnsolvedOnly && !isUnmasteredOnly) {
+                    flashMessage('出題範囲を選択してください。', 'danger');
+                    return;
+                }
+            }
         }
 
         // ★最後のクイズ設定を確実に初期化
         lastQuizSettings = {
             questionCount: selectedQuestionCount,
-            isIncorrectOnly: (selectedQuestionCount === 'incorrectOnly'),
+            isIncorrectOnly: isIncorrectOnly,
             isUnsolvedOnly: isUnsolvedOnly,
             isUnmasteredOnly: isUnmasteredOnly,
             selectedUnits: [],
             availableQuestions: [],
-            totalSelectedRangeQuestions: 0  // ★新規追加：選択範囲の正確な問題数
+            totalSelectedRangeQuestions: 0
         };
 
         console.log('🔄 クイズ設定初期化:', lastQuizSettings);
 
-        if (selectedQuestionCount === 'incorrectOnly') {
-            console.log(`\n🎯 苦手問題モード開始`);
-            console.log(`苦手問題リスト (${incorrectWords.length}個):`, incorrectWords);
-
-            // 苦手問題IDに対応する実際の問題を抽出
-            quizQuestions = word_data.filter(word => {
-                const wordIdentifier = generateProblemId(word);
-                const isIncluded = incorrectWords.includes(wordIdentifier);
-
-                if (isIncluded) {
-                    console.log(`✓ 苦手問題: "${word.question}"`);
-                }
-
-                return isIncluded;
-            });
-
-            console.log(`抽出された苦手問題: ${quizQuestions.length}個`);
-
-            if (quizQuestions.length === 0) {
-                flashMessage('有効な苦手問題がありません。まずは通常の学習で問題に取り組んでください。', 'info');
-                return;
-            }
-
-            // 苦手問題の場合は利用可能な全問題として保存
-            lastQuizSettings.availableQuestions = [...quizQuestions];
-            lastQuizSettings.totalSelectedRangeQuestions = quizQuestions.length;  // ★苦手問題の総数
-
-        } else {
-            // 通常モード：選択された範囲から出題
-            console.log('\n📚 通常モード開始');
-
-            // ★重要：選択された単元情報を保存（getSelectedQuestions実行前に）
+        if (!isIncorrectOnly) {
+            // 選択された単元情報を保存
             document.querySelectorAll('.unit-item input[type="checkbox"]:checked').forEach(checkbox => {
                 lastQuizSettings.selectedUnits.push({
                     chapter: checkbox.dataset.chapter,
                     unit: checkbox.value
                 });
             });
-
-            // quizQuestions は getSelectedQuestions() で既に取得済み
-
         }
 
-        // ★未マスターのみフィルタリング
-        if (isUnmasteredOnly) {
-            console.log('🔍 未マスターのみフィルタリング適用');
-            const beforeCount = quizQuestions.length;
-
-            quizQuestions = quizQuestions.filter(word => {
-                const wordIdentifier = generateProblemId(word);
-                const history = problemHistory[wordIdentifier];
-
-                // 履歴がない (未解答) -> 対象
-                if (!history) return true;
-
-                const correct = history.correct_attempts || 0;
-                const incorrect = history.incorrect_attempts || 0;
-                const total = correct + incorrect;
-
-                // 未解答 -> 対象
-                if (total === 0) return true;
-
-                // 正答率80%未満 -> 対象 (未マスター)
-                const accuracy = correct / total;
-                return accuracy < 0.8;
-            });
-
-            console.log(`未マスターフィルタ: ${beforeCount}問 -> ${quizQuestions.length}問`);
-
-            if (quizQuestions.length === 0) {
-                flashMessage('選択範囲に未マスターの問題はありません。（全て80%以上の正答率です！）', 'success');
-                return;
-            }
+        // ログ出力（デバッグ用）
+        if (isIncorrectOnly) {
+            console.log(`\n🎯 苦手問題モード: ${quizQuestions.length}問候補`);
+        } else {
+            console.log(`\n📚 通常モード: ${quizQuestions.length}問候補`);
         }
-
-        // ★未解答のみフィルタリング
-        // 未マスターモードがOFFの場合、または未マスターモードと併用された場合（さらに絞り込み）
-        // ※仕様確認：未マスター(未解答含む) > 未解答 なので、両方ONなら未解答のみになるべき
-        // ここでは独立して動作するように実装し、両方ONなら積集合（つまり未解答のみ）になる
-        if (isUnsolvedOnly) {
-            console.log('🔍 未解答のみフィルタリング適用');
-            const beforeCount = quizQuestions.length;
-
-            quizQuestions = quizQuestions.filter(word => {
-                const wordIdentifier = generateProblemId(word);
-                const history = problemHistory[wordIdentifier];
-                // 履歴がない、または正解数+不正解数が0の場合
-                return !history || ((history.correct_attempts || 0) + (history.incorrect_attempts || 0) === 0);
-            });
-
-            console.log(`未解答フィルタ: ${beforeCount}問 -> ${quizQuestions.length}問`);
-
-            if (quizQuestions.length === 0) {
-                flashMessage('選択範囲に未解答の問題はありません。', 'info');
-                return;
-            }
-        }
-
         lastQuizSettings.availableQuestions = [...quizQuestions]; // フィルタ後の問題を保存
         lastQuizSettings.totalSelectedRangeQuestions = quizQuestions.length;
 
@@ -1195,6 +1210,7 @@ function startQuiz() {
         }
 
         // 問題数の制限（苦手問題モード以外）
+        // ※「全問」かつ「全問題数 > 出題数」の場合はシャッフルして制限
         if (selectedQuestionCount !== 'all' && selectedQuestionCount !== 'incorrectOnly') {
             const count = parseInt(selectedQuestionCount);
             if (quizQuestions.length > count) {
@@ -1203,12 +1219,17 @@ function startQuiz() {
         }
 
         if (quizQuestions.length === 0) {
-            flashMessage('選択された条件に合う問題がありませんでした。', 'danger');
+            // エラーメッセージの詳細化
+            if (isUnsolvedOnly) flashMessage('選択範囲に未解答の問題はありません。', 'info');
+            else if (isUnmasteredOnly) flashMessage('選択範囲に未マスターの問題はありません。', 'success');
+            else if (isIncorrectOnly) flashMessage('有効な苦手問題がありません。', 'info');
+            else flashMessage('選択された条件に合う問題がありませんでした。', 'danger');
             return;
         }
 
         // ★最終安全チェック：空の問題を除外
         quizQuestions = quizQuestions.filter(q => q.question && q.answer && q.question.trim() !== '' && q.answer.trim() !== '');
+
         if (quizQuestions.length === 0) {
             flashMessage('有効な問題が見つかりませんでした。', 'danger');
             return;
@@ -2308,13 +2329,23 @@ async function fetchAnnouncements() {
                     html += `
                         <details style="border: 1px solid #eee; border-radius: 6px; overflow: hidden; background-color: #fff;">
                             <summary style="padding: 10px; cursor: pointer; background-color: #f9f9f9; font-size: 0.95em; outline: none; list-style: none; display: flex; flex-direction: column;">
-                                <span style="font-size: 0.8em; color: #7f8c8d; margin-bottom: 2px;">${ann.date}</span>
+                                <span style="font-size: 0.8em; color: #7f8c8d; margin-bottom: 2px;">
+                                    ${ann.date}
+                                    ${ann.updated_at ? `<br><small class="text-muted" style="font-size: 0.9em;"><i class="fas fa-sync-alt" style="font-size: 0.9em;"></i> 更新: ${ann.updated_at}</small>` : ''}
+                                </span>
                                 <span style="font-weight: bold; color: #2c3e50;">${ann.title}</span>
                             </summary>
                             <div style="padding: 12px; font-size: 0.9em; color: #34495e; white-space: pre-wrap; border-top: 1px solid #eee; background-color: #fff;">${ann.content}</div>
                         </details>
                     `;
                 });
+                html += `
+                    <div style="text-align: right; margin-top: 10px; padding-right: 5px;">
+                        <a href="/announcements" class="text-decoration-none" style="font-size: 0.9em; color: #3498db; font-weight: bold;">
+                            <i class="fas fa-list-ul me-1"></i>過去のお知らせを見る
+                        </a>
+                    </div>
+                `;
                 html += '</div>';
                 announcementsList.innerHTML = html;
             }
