@@ -20,27 +20,35 @@
                 {% for announcement in announcements %}
                 <div class="accordion-item mb-3 shadow-sm border-0 rounded overflow-hidden">
                     <h2 class="accordion-header" id="heading{{ announcement.id }}">
-                        <button class="accordion-button {% if not loop.first %}collapsed{% endif %}" type="button"
-                            data-bs-toggle="collapse" data-bs-target="#collapse{{ announcement.id }}"
-                            aria-expanded="{{ 'true' if loop.first else 'false' }}"
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                            data-bs-target="#collapse{{ announcement.id }}" aria-expanded="false"
                             aria-controls="collapse{{ announcement.id }}">
                             <div class="d-flex flex-column w-100">
                                 <div class="d-flex justify-content-between align-items-center mb-1">
-                                    <small class="text-muted">
+                                    <small class="text-muted d-flex align-items-center flex-wrap">
                                         <i class="far fa-calendar-alt me-1"></i>{{ announcement.date }}
+                                        {% if announcement.is_new %}
+                                        {% if announcement.badge_type == 'update' %}
+                                        <span class="new-badge update">更新</span>
+                                        {% else %}
+                                        <span class="new-badge">NEW</span>
+                                        {% endif %}
+                                        {% endif %}
                                         {% if announcement.updated_at %}
-                                        <span class="ms-2 badge bg-light text-secondary border">
+                                        <div class="w-100"></div>
+                                        <span class="mt-1 badge bg-light text-secondary border">
                                             <i class="fas fa-sync-alt me-1"></i>更新: {{ announcement.updated_at }}
                                         </span>
                                         {% endif %}
                                     </small>
                                 </div>
-                                <span class="fw-bold text-dark">{{ announcement.title }}</span>
+                                <span class="fw-bold text-dark text-break">
+                                    {{ announcement.title }}
+                                </span>
                             </div>
                         </button>
                     </h2>
-                    <div id="collapse{{ announcement.id }}"
-                        class="accordion-collapse collapse {% if loop.first %}show{% endif %}"
+                    <div id="collapse{{ announcement.id }}" class="accordion-collapse collapse"
                         aria-labelledby="heading{{ announcement.id }}" data-bs-parent="#announcementsAccordion">
                         <div class="accordion-body bg-white text-secondary" style="white-space: pre-wrap;">{{
                             announcement.content }}</div>
@@ -120,4 +128,55 @@
         border-color: #e67e22;
     }
 </style>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const accordionElement = document.getElementById('announcementsAccordion');
+        if (!accordionElement) return;
+
+        // 詳細を開いたら既読APIを叩く
+        const detailsButtons = accordionElement.querySelectorAll('.accordion-button');
+        detailsButtons.forEach(button => {
+            button.addEventListener('click', function () {
+                if (this.classList.contains('collapsed')) {
+                    // 閉じた状態（これから開く）ではなく、Bootstrapの処理後に判定すべきだが、
+                    // click時点ではまだ開いていない。collapsedクラスが外れるのを待つか、
+                    // Bootstrapのイベントを使うのが良い。
+                }
+            });
+        });
+
+        // BootstrapのCollapseイベントを使用
+        const collapseElements = document.querySelectorAll('.accordion-collapse');
+        collapseElements.forEach(collapseEl => {
+            collapseEl.addEventListener('show.bs.collapse', function () {
+                // 対応するヘッダー内のバッジを探して削除
+                const headerId = this.getAttribute('aria-labelledby');
+                const header = document.getElementById(headerId);
+                if (header) {
+                    const badge = header.querySelector('.new-badge');
+                    if (badge) {
+                        badge.remove();
+
+                        // data-id属性からID取得（追加が必要）
+                        // 簡易的にDOM構造から取得も可能だが、IDを仕込むのが確実
+                        const annId = this.id.replace('collapse', '');
+
+                        // API呼び出し
+                        fetch(`/api/announcements/${annId}/read`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            }
+                        }).then(res => res.json())
+                            .then(data => {
+                                if (data.status !== 'success') console.error('Failed to mark read', data);
+                            })
+                            .catch(err => console.error("Error marking announcement read:", err));
+                    }
+                }
+            });
+        });
+    });
+</script>
 {% endblock %}

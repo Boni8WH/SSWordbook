@@ -1138,6 +1138,58 @@ hr {
     background-color: #e67e22;
 }
 
+/* 通知バッジ */
+.info-icon.has-new::after {
+    content: '';
+    position: absolute;
+    top: 0px;
+    right: 0px;
+    width: 12px;
+    height: 12px;
+    background-color: #e74c3c;
+    border: 2px solid #fff;
+    border-radius: 50%;
+    animation: pulse-red 2s infinite;
+}
+
+/* NEWバッジ */
+.new-badge {
+    background-color: #e74c3c;
+    color: white;
+    font-size: 0.65em;
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-weight: bold;
+    display: inline-block;
+    vertical-align: middle;
+    margin-left: 8px;
+    letter-spacing: 0.5px;
+    animation: fadeIn 0.5s ease-in;
+    line-height: 1.2;
+}
+
+.new-badge.update {
+    background-color: #e67e22;
+    /* 更新はオレンジ */
+}
+
+@keyframes pulse-red {
+    0% {
+        transform: scale(0.95);
+        box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.7);
+    }
+
+    70% {
+        transform: scale(1);
+        box-shadow: 0 0 0 6px rgba(231, 76, 60, 0);
+    }
+
+    100% {
+        transform: scale(0.95);
+        box-shadow: 0 0 0 0 rgba(231, 76, 60, 0);
+    }
+}
+
 .info-panel {
     position: fixed;
     bottom: 65px;
