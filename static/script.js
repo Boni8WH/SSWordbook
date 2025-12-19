@@ -337,7 +337,9 @@ document.addEventListener('DOMContentLoaded', () => {
         updateIncorrectOnlyRadio();
         loadUserData();
         loadWordDataFromServer();
+
         setupEventListeners();
+        checkAnnouncementStatus(); // 🆕 お知らせ状態チェック
 
         setTimeout(() => {
             loadSelectionState();
@@ -2167,17 +2169,50 @@ function toggleInfoPanel() {
     }
 }
 
-function openInfoPanel() {
+async function openInfoPanel() {
     if (infoPanel) {
         infoPanel.classList.remove('hidden');
 
-        // お知らせを取得して表示
-        fetchAnnouncements();
+        // お知らせを取得して表示 (awaitして確実にリストを表示)
+        await fetchAnnouncements();
+
+        // 🆕 未読バッジがあれば消して既読APIを叩く
+        if (infoIcon && infoIcon.classList.contains('has-new')) {
+            infoIcon.classList.remove('has-new');
+            markAnnouncementsAsViewed();
+        }
 
         // 外側クリックイベントを追加（少し遅延させて即座に閉じるのを防ぐ）
         setTimeout(() => {
             document.addEventListener('click', handleOutsideClick);
         }, 100);
+    }
+}
+
+// 🆕 お知らせ状態チェック関数
+async function checkAnnouncementStatus() {
+    if (!infoIcon) return;
+
+    try {
+        const response = await fetch('/api/announcements/status');
+        const data = await response.json();
+
+        if (data.status === 'success' && data.has_new) {
+            infoIcon.classList.add('has-new');
+        } else {
+            infoIcon.classList.remove('has-new');
+        }
+    } catch (error) {
+        console.error('お知らせ状態チェックエラー:', error);
+    }
+}
+
+// 🆕 お知らせ既読化関数
+async function markAnnouncementsAsViewed() {
+    try {
+        await fetch('/api/announcements/mark_viewed', { method: 'POST' });
+    } catch (error) {
+        console.error('お知らせ既読化エラー:', error);
     }
 }
 
@@ -2199,19 +2234,35 @@ async function fetchAnnouncements() {
                     // サーバーが "YYYY-MM-DD HH:MM:SS" 形式で返している場合、そのまま表示でOK
                     // 必要なら new Date(ann.date).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) など
 
+                    // NEWバッジのHTML
+                    // NEWバッジのHTML
+                    let badgeText = 'NEW';
+                    let badgeClass = 'new-badge';
+                    if (ann.badge_type === 'update') {
+                        badgeText = '更新';
+                        badgeClass += ' update';
+                    }
+                    const newBadgeHtml = ann.is_new ? `<span class="${badgeClass}">${badgeText}</span>` : '';
+
                     html += `
                         <details style="border: 1px solid #eee; border-radius: 6px; overflow: hidden; background-color: #fff;">
                             <summary style="padding: 10px; cursor: pointer; background-color: #f9f9f9; font-size: 0.95em; outline: none; list-style: none; display: flex; flex-direction: column;">
-                                <span style="font-size: 0.8em; color: #7f8c8d; margin-bottom: 2px;">
-                                    ${ann.date}
-                                    ${ann.updated_at ? `<br><small class="text-muted" style="font-size: 0.9em;"><i class="fas fa-sync-alt" style="font-size: 0.9em;"></i> 更新: ${ann.updated_at}</small>` : ''}
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <small class="text-muted d-flex align-items-center flex-wrap">
+                                        <i class="far fa-calendar-alt me-1"></i>${ann.date}
+                                        ${newBadgeHtml}
+                                        ${ann.updated_at ? `<div class="w-100"></div><small class="text-muted mt-1" style="font-size: 0.9em;"><i class="fas fa-sync-alt" style="font-size: 0.9em;"></i> 更新: ${ann.updated_at}</small>` : ''}
+                                    </small>
+                                </div>
+                                <span style="font-weight: bold; color: #2c3e50;">
+                                    ${ann.title}
                                 </span>
-                                <span style="font-weight: bold; color: #2c3e50;">${ann.title}</span>
                             </summary>
                             <div style="padding: 12px; font-size: 0.9em; color: #34495e; white-space: pre-wrap; border-top: 1px solid #eee; background-color: #fff;">${ann.content}</div>
                         </details>
                     `;
                 });
+
                 html += `
                     <div style="text-align: right; margin-top: 10px; padding-right: 5px;">
                         <a href="/announcements" class="text-decoration-none" style="font-size: 0.9em; color: #3498db; font-weight: bold;">
@@ -2221,6 +2272,29 @@ async function fetchAnnouncements() {
                 `;
                 html += '</div>';
                 announcementsList.innerHTML = html;
+
+                // イベントリスナー設定: 詳細を開いたら既読APIを叩く
+                const detailsElements = announcementsList.querySelectorAll('details');
+                detailsElements.forEach((details, index) => {
+                    const ann = data.announcements[index];
+                    details.addEventListener('toggle', function () {
+                        if (this.open) {
+                            // NEWバッジがあれば消す
+                            const badge = this.querySelector('.new-badge');
+                            if (badge) {
+                                badge.remove();
+
+                                // API呼び出し
+                                fetch(`/api/announcements/${ann.id}/read`, {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json'
+                                    }
+                                }).catch(err => console.error("Error marking announcement read:", err));
+                            }
+                        }
+                    });
+                });
             }
         } else {
             announcementsList.innerHTML = '<p class="text-danger" style="font-size: 0.9em;">お知らせの読み込みに失敗しました。</p>';

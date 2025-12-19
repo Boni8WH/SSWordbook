@@ -144,6 +144,9 @@ class User(db.Model):
     # RPG Intro Flag
     rpg_intro_seen = db.Column(db.Boolean, default=False, nullable=False)
 
+    # 🆕 お知らせ最終閲覧日時
+    last_announcement_viewed_at = db.Column(db.DateTime, nullable=True)
+
     # 🆕 担当者フラグ
     is_manager = db.Column(db.Boolean, default=False, nullable=False)
 
@@ -619,6 +622,24 @@ def _add_rpg_intro_seen_column_to_user():
             
     except Exception as e:
         print(f"⚠️ Userマイグレーションエラー (rpg_intro_seen): {e}")
+
+def _add_announcement_viewed_column_to_user():
+    """Userテーブルにlast_announcement_viewed_atカラムを追加するマイグレーション関数"""
+    try:
+        inspector = inspect(db.engine)
+        columns = [col['name'] for col in inspector.get_columns('user')]
+        
+        if 'last_announcement_viewed_at' not in columns:
+            print("🔄 User: last_announcement_viewed_atカラムを追加します...")
+            with db.engine.connect() as conn:
+                with conn.begin(): # トランザクション
+                    conn.execute(text("ALTER TABLE \"user\" ADD COLUMN last_announcement_viewed_at TIMESTAMP"))
+            print("✅ User: last_announcement_viewed_atカラム追加完了")
+        else:
+            print("✅ User: last_announcement_viewed_atカラムは既に存在します")
+            
+    except Exception as e:
+        print(f"⚠️ Userマイグレーションエラー (last_announcement_viewed_at): {e}")
 
 def _add_manager_columns():
     """担当者機能用のカラムを追加するマイグレーション関数"""
@@ -1252,6 +1273,32 @@ class Announcement(db.Model):
             'target_rooms': self.target_rooms,
             'is_active': self.is_active
         }
+
+class UserAnnouncementRead(db.Model):
+    """ユーザーごとのお知らせ既読状況を管理するテーブル"""
+    __tablename__ = 'user_announcement_reads'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    announcement_id = db.Column(db.Integer, db.ForeignKey('announcements.id'), nullable=False)
+    last_read_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        db.UniqueConstraint('user_id', 'announcement_id', name='unique_user_announcement_read'),
+    )
+
+def _create_user_announcement_reads_table():
+    """UserAnnouncementReadテーブルを作成するマイグレーション関数"""
+    try:
+        inspector = inspect(db.engine)
+        if 'user_announcement_reads' not in inspector.get_table_names():
+            print("🔄 Creating user_announcement_reads table...")
+            UserAnnouncementRead.__table__.create(db.engine)
+            print("✅ user_announcement_reads table created.")
+        else:
+            print("ℹ️ user_announcement_reads table already exists.")
+    except Exception as e:
+        print(f"⚠️ Error check/create user_announcement_reads table: {e}")
+
 
 # ===== メール設定 =====
 app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
@@ -2669,6 +2716,8 @@ def create_tables_and_admin_user():
             _add_score_column_to_rpg_enemy() # NEW
             _add_equipped_title_column_to_user() # 🆕 追加
             _add_rpg_intro_seen_column_to_user() # 🆕 RPGイントロ表示フラグ追加（管理者ユーザークエリ前に実行必須）
+            _add_announcement_viewed_column_to_user() # 🆕 お知らせ閲覧日時カラム追加
+            _create_user_announcement_reads_table() # 🆕 お知らせ個別既読テーブル作成
             _create_rpg_rematch_history_table() # 🆕 再戦履歴テーブル作成
             
             # 管理者ユーザー確認/作成
@@ -5809,12 +5858,53 @@ def get_announcements():
         all_announcements = query.order_by(Announcement.date.desc()).all()
         filtered_announcements = []
         
+        # ユーザーの最終閲覧日時（UTC or None） for the global dot logic, optional if we want to mix
+        # 個別既読状況を取得
+        read_map = {}
+        if user_id:
+             reads = UserAnnouncementRead.query.filter_by(user_id=user_id).all()
+             for r in reads:
+                 read_map[r.announcement_id] = r.last_read_at
+
         for ann in all_announcements:
             targets = [t.strip() for t in (ann.target_rooms or 'all').split(',')]
+            
+            should_include = False
             if 'all' in targets:
-                filtered_announcements.append(ann.to_dict())
+                should_include = True
             elif user_room and user_room in targets:
-                filtered_announcements.append(ann.to_dict())
+                should_include = True
+                
+            if should_include:
+                ann_dict = ann.to_dict()
+                
+                # バッジタイプの計算
+                # is_new: 未読かどうか（後方互換性のため残す）
+                # badge_type: 'new' | 'update' | None
+                is_new = False
+                badge_type = None
+                
+                if user_id:
+                    # まだ読んだ記録がない -> NEW
+                    if ann.id not in read_map:
+                         is_new = True
+                         badge_type = 'new'
+                    else:
+                         # 読んだ記録はあるが、その後更新された -> Update
+                         last_read = read_map[ann.id]
+                         updated_at = ann.updated_at
+                         
+                         if updated_at and last_read:
+                             if last_read.tzinfo: last_read = last_read.replace(tzinfo=None)
+                             if updated_at.tzinfo: updated_at = updated_at.replace(tzinfo=None)
+                             
+                             if updated_at > last_read:
+                                 is_new = True
+                                 badge_type = 'update'
+                
+                ann_dict['is_new'] = is_new
+                ann_dict['badge_type'] = badge_type
+                filtered_announcements.append(ann_dict)
             
             if len(filtered_announcements) >= 5:
                 break
@@ -5874,9 +5964,44 @@ def announcements_page():
         # to_dict では JST に変換している。
         # ここではテンプレートに渡すリストを辞書リストにするのが確実。
         
+        # 表示用に辞書化し、is_newフラグを付与
         display_announcements = []
+        
+        # 個別既読状況を取得 (現在のページ分のみで十分だが、シンプルに実装)
+        read_map = {}
+        if user_id:
+             reads = UserAnnouncementRead.query.filter_by(user_id=user_id).all()
+             for r in reads:
+                 read_map[r.announcement_id] = r.last_read_at
+
         for ann in current_page_announcements:
-            display_announcements.append(ann.to_dict())
+            d = ann.to_dict()
+            
+            # バッジタイプの計算
+            is_new = False
+            badge_type = None
+            
+            if user_id:
+                # まだ読んだ記録がない -> NEW
+                if ann.id not in read_map:
+                     is_new = True
+                     badge_type = 'new'
+                else:
+                     # 読んだ記録はあるが、その後更新された -> Update
+                     last_read = read_map[ann.id]
+                     updated_at = ann.updated_at
+                     
+                     if updated_at and last_read:
+                         if last_read.tzinfo: last_read = last_read.replace(tzinfo=None)
+                         if updated_at.tzinfo: updated_at = updated_at.replace(tzinfo=None)
+                         
+                         if updated_at > last_read:
+                             is_new = True
+                             badge_type = 'update'
+            
+            d['is_new'] = is_new
+            d['badge_type'] = badge_type
+            display_announcements.append(d)
 
         return render_template('announcements.html', 
                                announcements=display_announcements,
@@ -6059,6 +6184,7 @@ def admin_edit_announcement(announcement_id):
     announcement.title = title
     announcement.content = content
     announcement.is_active = is_active
+    # 明示的にUTCで更新日時をセット（onupdateに頼らず確実性を優先）
     announcement.updated_at = datetime.utcnow()
     
     db.session.commit()
@@ -14169,7 +14295,112 @@ def update_notification_settings():
     db.session.commit()
     return jsonify({'status': 'success'})
 
+@app.route('/api/announcements/status', methods=['GET'])
+def get_announcement_status():
+    """未読のお知らせがあるかチェック"""
+    if 'user_id' not in session:
+        return jsonify({'status': 'error', 'message': 'Login required'}), 401
 
+    try:
+        user = User.query.get(session['user_id'])
+        if not user:
+            return jsonify({'status': 'error', 'message': 'User not found'}), 404
+
+        # ユーザーに関連するお知らせ（自室またはall、かつ有効なもの）
+        # 最新のアクティビティ（作成 or 更新）を取得
+        from sqlalchemy import func
+        latest_announcement = Announcement.query.filter(
+            (Announcement.target_rooms == 'all') | 
+            (Announcement.target_rooms.contains(user.room_number)),
+            Announcement.is_active == True
+        ).order_by(func.coalesce(Announcement.updated_at, Announcement.date).desc()).first()
+
+        has_new = False
+        if latest_announcement:
+            # 比較用日時（updated_atがなければdateを使う）
+            latest_update = latest_announcement.updated_at or latest_announcement.date
+            
+            # 安全のため、未設定なら「新しい」とみなす（初回）
+            if not user.last_announcement_viewed_at:
+                has_new = True
+            elif latest_update:
+                # タイムゾーンをUTC（またはNaive）に統一して比較
+                last_seen = user.last_announcement_viewed_at
+                
+                # tzinfoの不一致を防ぐ（両方Naiveにする）
+                if last_seen.tzinfo: last_seen = last_seen.replace(tzinfo=None)
+                if latest_update.tzinfo: latest_update = latest_update.replace(tzinfo=None)
+                
+                # Check for "Future Timestamp" anomaly (Legacy JST data)
+                utc_now = datetime.utcnow()
+                if last_seen > utc_now + timedelta(hours=1):
+                    # print("DEBUG: Future timestamp detected (likely JST mismatch). Forcing HAS NEW = TRUE.")
+                    has_new = True
+                elif latest_update > last_seen:
+                    has_new = True
+
+        return jsonify({
+            'status': 'success',
+            'has_new': has_new
+        })
+
+    except Exception as e:
+        print(f"Error checking announcement status: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/announcements/mark_viewed', methods=['POST'])
+def mark_announcements_viewed():
+    """お知らせを既読にする（現在時刻を記録）"""
+    if 'user_id' not in session:
+        return jsonify({'status': 'error', 'message': 'Login required'}), 401
+
+    try:
+        user = User.query.get(session['user_id'])
+        if not user:
+             return jsonify({'status': 'error', 'message': 'User not found'}), 404
+        
+        # UTCで保存する（Announcement.updated_at と整合させるため）
+        user.last_announcement_viewed_at = datetime.utcnow()
+        db.session.commit()
+        
+        return jsonify({'status': 'success'})
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error marking announcements viewed: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/announcements/<int:announcement_id>/read', methods=['POST'])
+def mark_individual_announcement_read(announcement_id):
+    """個別のお知らせを既読にする"""
+    if 'user_id' not in session:
+        return jsonify({'status': 'error', 'message': 'Login required'}), 401
+
+    try:
+        user_id = session['user_id']
+        # 既存のレコードを確認、なければ作成、あれば更新
+        read_record = UserAnnouncementRead.query.filter_by(
+            user_id=user_id, 
+            announcement_id=announcement_id
+        ).first()
+
+        if not read_record:
+            read_record = UserAnnouncementRead(
+                user_id=user_id,
+                announcement_id=announcement_id
+            )
+            db.session.add(read_record)
+        
+        # 最終読了日時をUTCで更新
+        read_record.last_read_at = datetime.utcnow()
+        db.session.commit()
+        
+        return jsonify({'status': 'success'})
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error marking individual announcement {announcement_id} read: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 # =========================================================
 # RPGモード (Chronicle Quest) 関連ルート
@@ -16063,6 +16294,7 @@ if __name__ == '__main__':
         debug_mode = os.environ.get('RENDER') != 'true'
         
         logger.info(f"🌐 サーバーを起動します: http://0.0.0.0:{port}")
+        
         
 
         
