@@ -777,8 +777,9 @@
                                                 </button>
                                                 <form action="{{ url_for('admin_delete_announcement', id=ann.id) }}"
                                                     method="POST" style="display: inline;"
-                                                    onsubmit="handleAnnouncementDelete(event)">
-                                                    <button type="submit" class="btn btn-sm btn-danger">削除</button>
+                                                    class="delete-announcement-form">
+                                                    <button type="button" class="btn btn-sm btn-danger"
+                                                        onclick="confirmDeleteAnnouncement(this)">削除</button>
                                                 </form>
                                             </td>
                                         </tr>
@@ -5607,9 +5608,8 @@
             );
         }
 
-        function handleAnnouncementDelete(event) {
-            event.preventDefault();
-            const form = event.target;
+        function confirmDeleteAnnouncement(btn) {
+            const form = btn.closest('form');
             showConfirmModal(
                 'お知らせ削除',
                 '本当に削除しますか？',
