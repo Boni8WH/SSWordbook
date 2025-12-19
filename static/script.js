@@ -1,4 +1,4 @@
-// static/script.js - 完全修正版（全機能保持）
+// static/script.js
 
 // デバッグ用: window オブジェクトが存在するかどうかを確認
 if (typeof window === 'undefined') {
@@ -104,8 +104,6 @@ const downloadImageButton = document.getElementById('downloadImageButton');
 if (typeof window.chapterDataFromFlask === 'undefined') {
     console.error("Error: window.chapterDataFromFlask is undefined. Make sure it's passed from Flask.");
 }
-
-
 
 // =========================================================
 // スマホ対応関数
@@ -260,20 +258,9 @@ function optimizeScrolling() {
 }
 
 // =========================================================
-// 問題ID生成関数（修正版 - 衝突を防ぐ）
+// 問題ID生成関数
 // =========================================================
 
-// script.jsの問題ID生成関数を以下に置き換え（約197行目付近）
-
-// script.js の generateProblemId 関数を以下に置き換え
-
-// script.js の generateProblemId 関数を以下に置き換え
-// 既存のID形式に合わせて修正
-
-// script.js の generateProblemId 関数を以下に置き換え
-// script.js の generateProblemId 関数を以下に置き換え
-
-// ★修正: 問題ID生成ロジックをPython側(app.py)と完全に一致させる
 function generateProblemId(word) {
     try {
         // Python: str(word.get('chapter', '0')).zfill(3)
@@ -413,8 +400,6 @@ function saveRestrictionState() {
         hasBeenRestricted: hasBeenRestricted,
         restrictionReleased: restrictionReleased
     };
-
-
 
     fetch('/api/update_restriction_state', {
         method: 'POST',
@@ -726,7 +711,7 @@ function updateIncorrectOnlySelection() {
             rangeSelectionArea.style.display = 'none';
         }
         if (rangeSelectionTitleText) {
-            rangeSelectionTitleText.textContent = '出題数を選択（苦手問題モードでは無効）';
+            rangeSelectionTitleText.textContent = '苦手問題モード';
             rangeSelectionTitleText.style.color = '#95a5a6';
         }
     } else {
@@ -757,7 +742,7 @@ function updateIncorrectOnlySelection() {
 }
 
 // =========================================================
-// イベントリスナーの設定（修正版）
+// イベントリスナーの設定
 // =========================================================
 function setupEventListeners() {
     try {
@@ -1112,13 +1097,11 @@ let lastQuizSettings = {
     isIncorrectOnly: false,
     isUnsolvedOnly: false,
     isUnmasteredOnly: false,
-    availableQuestions: [] // 選択範囲の全問題
+    availableQuestions: []
 };
 
 function startQuiz() {
-    // ★重要：クイズ開始時に答えを見るボタンの状態を確実にリセット
     try {
-
 
         isAnswerButtonDisabled = false;
         if (answerButtonTimeout) {
@@ -1132,19 +1115,10 @@ function startQuiz() {
             showAnswerButton.style.pointerEvents = 'auto';
         }
 
-
-        // ★修正：有効な苦手問題数を使用
         const weakProblemCount = getValidWeakProblemCount();
         const rawWeakProblemCount = incorrectWords.length; // 表示用などに元の数も保持
         const selectedQuestionCount = getSelectedQuestionCount();
-
-        // ★修正：制限状態の判定をシンプルに
         const isCurrentlyRestricted = hasBeenRestricted && !restrictionReleased;
-
-
-
-        // ★修正：制限中は苦手問題モード以外を明確に拒否
-        // 未解答のみ・未マスターのみチェックボックスの状態も取得
         const isUnsolvedOnly = document.getElementById('unsolvedOnlyCheckbox')?.checked || false;
         const isUnmasteredOnly = document.getElementById('unmasteredOnlyCheckbox')?.checked || false;
 
@@ -1174,7 +1148,6 @@ function startQuiz() {
             }
         }
 
-        // ★修正: getFilteredQuestionsで一括取得
         let quizQuestions = getFilteredQuestions();
         const isIncorrectOnly = (selectedQuestionCount === 'incorrectOnly');
 
@@ -1256,16 +1229,10 @@ function startQuiz() {
 
         currentQuizData = shuffleArray(quizQuestions);
         currentQuestionIndex = 0;
-
-        // ★デバッグログ: 最初の問題をチェック
-
-
         correctCount = 0;
         incorrectCount = 0;
         totalQuestions = currentQuizData.length;
         quizStartTime = Date.now();
-
-
 
         // UIの切り替え
         if (selectionArea) selectionArea.classList.add('hidden');
@@ -1283,7 +1250,6 @@ function startQuiz() {
     }
 }
 
-
 function restartWeakProblemsQuiz() {
 
 
@@ -1299,9 +1265,6 @@ function restartWeakProblemsQuiz() {
         return incorrectWords.includes(wordIdentifier);
     });
 
-
-
-
     if (currentWeakProblems.length === 0) {
         // 苦手問題がなくなった場合
         showNoWeakProblemsMessage();
@@ -1313,8 +1276,6 @@ function restartWeakProblemsQuiz() {
         const wordIdentifier = generateProblemId(word);
         return incorrectWords.includes(wordIdentifier);
     });
-
-
 
     // ★改善メッセージを控えめに表示
     if (stillWeakFromLastQuiz.length < currentQuizData.length) {
@@ -1329,8 +1290,6 @@ function restartWeakProblemsQuiz() {
     incorrectCount = 0;
     totalQuestions = currentQuizData.length;
     quizStartTime = Date.now();
-
-
 
     // UIの切り替え
     if (quizResultArea) quizResultArea.classList.add('hidden');
@@ -1862,11 +1821,8 @@ function backToSelectionScreen() {
         const currentWeakCount = getValidWeakProblemCount();
         const isCurrentlyRestricted = hasBeenRestricted && !restrictionReleased;
 
-
-
         // ★重要：制限解除済み、または制限が元々ない場合はUIをリセット
         if (!isCurrentlyRestricted) {
-
 
             // DOM要素を強制的にリセット
             const questionCountRadios = document.querySelectorAll('input[name="questionCount"]:not(#incorrectOnlyRadio)');
@@ -1916,15 +1872,11 @@ window.debugCelebrationMessages = debugCelebrationMessages;
 
 function restartQuiz() {
 
-
     // 苦手問題モードの場合は専用処理
     if (lastQuizSettings.isIncorrectOnly) {
         restartWeakProblemsQuiz();
         return;
     }
-
-    // 以下は通常モードの処理（既存のコード）
-
 
     if (!lastQuizSettings.availableQuestions || lastQuizSettings.availableQuestions.length === 0) {
         console.warn('⚠️ 前回の設定が見つかりません。現在の問題セットで再開始します。');
@@ -1940,9 +1892,6 @@ function restartQuiz() {
         showNextQuestion();
         return;
     }
-
-
-
 
     // 前回と同じ範囲の全問題を取得
     let newQuizQuestions = [...lastQuizSettings.availableQuestions];
@@ -2007,8 +1956,6 @@ function restartQuiz() {
     totalQuestions = currentQuizData.length;
     quizStartTime = Date.now();
 
-
-
     // UIの切り替え
     if (quizResultArea) quizResultArea.classList.add('hidden');
     if (cardArea) cardArea.classList.remove('hidden');
@@ -2072,8 +2019,6 @@ function updateRestartButtonText() {
             explanationDiv.style.borderLeftColor = '#3498db';
             explanationDiv.style.backgroundColor = '#e8f4fd';
         }
-
-
     }
 }
 
@@ -2095,8 +2040,6 @@ function resetRestartButtonToDefault() {
         explanationDiv.style.borderLeftColor = '#3498db';
         explanationDiv.style.backgroundColor = '#e8f4fd';
     }
-
-
 }
 
 function resetSelections() {
@@ -2138,15 +2081,10 @@ function resetSelections() {
     } catch (e) {
         window.savedSelectionState = null;
     }
+
+    // 6. 問題数カウントをリセット (0問に更新)
+    updateSelectionTotalCount();
 }
-
-// =========================================================
-// 苦手問題リスト表示
-// =========================================================
-
-// showWeakWordsList and toggleWeakAnswer functions removed
-
-
 
 // =========================================================
 // API呼び出しヘルパー
@@ -2192,8 +2130,6 @@ function debugLastQuizSettings() {
 window.debugLastQuizSettings = debugLastQuizSettings;
 
 function debugSelectionDetails() {
-
-
     return {
         currentlyChecked: checkedBoxes.length,
         currentSelectionCount: currentSelectionCount,
@@ -2207,7 +2143,6 @@ window.debugSelectionDetails = debugSelectionDetails;
 
 // デバッグ用：現在の学習状況を表示する関数
 function debugCurrentProgress() {
-
 
     return sortedHistory;
 }
@@ -2892,6 +2827,7 @@ function executeSearch() {
         }
     }, 100); // UIブロックを防ぐための微小な遅延
 }
+
 // ==========================================
 // 通知機能 (Notification)
 // ==========================================
@@ -2924,8 +2860,6 @@ function initNotificationSettings() {
                     });
                 }
 
-                // 修正: 既に権限がある場合は、バックグラウンドでSWを登録・更新してサーバーにキーを送る
-                // これにより、再ログイン時やデバイス変更時も自動で購読が復活する
                 if (data.enabled && Notification.permission === 'granted') {
                     registerServiceWorker().catch(err => console.error('Auto-register SW failed:', err));
                 }
@@ -2963,8 +2897,6 @@ function initNotificationSettings() {
                     testBtn.innerHTML = '<i class="fas fa-paper-plane me-1"></i> 通知をテスト送信';
                 });
         });
-
-
     }
 
     // 保存ボタン
@@ -3053,8 +2985,6 @@ async function registerServiceWorker() {
             body: JSON.stringify(subscription)
         });
 
-
-
     } catch (error) {
         console.error('Service Worker Error:', error);
     }
@@ -3076,7 +3006,7 @@ function urlBase64ToUint8Array(base64String) {
 }
 
 /* =========================================
-   RPG Mode Logic (Chronicle Quest)
+   RPG Mode Logic
    ========================================= */
 
 let currentPostBattleDialogues = []; // 🆕 Store dialogues from result
@@ -3134,14 +3064,7 @@ function checkRpgStatus() {
                     if (starsEl) {
                         const tenStars = Math.floor(data.difficulty / 10);
                         const normalStars = data.difficulty % 10;
-                        // Use a special symbol for 10 units, e.g. 👑 (Crown), 🌟 (Glowing Star), or ✦ (Sparkle)
-                        // User said "10個を表す星" (A star representing 10). Let's use '★' but maybe with a different color/class if we could, but text content is easiest.
-                        // Let's use a distinct character. '✦' or '✴' or '✪'. Let's use '👑' as it feels boss-like, or stick to a big star '✪'.
-                        // Actually, '★' vs '☆'? No.
-                        // Let's use '🔟' emoji? No, aesthetic.
-                        // Let's use '✥' (Cross) or '❂'
-                        // Let's try '✪' (Circled Star) for 10.
-                        // Construct string
+
                         let starStr = '';
                         for (let i = 0; i < tenStars; i++) {
                             starStr += '✪';
@@ -3150,12 +3073,6 @@ function checkRpgStatus() {
                             starStr += '★';
                         }
                         starsEl.textContent = starStr;
-                        // To make ✪ distinct, we might want to style it in CSS, but here we just set text.
-                        // If we want to color them differently, we need innerHTML with spans.
-                        // Let's use innerHTML for flexibility.
-                        // 10-star: <span class="star-ten">★</span> (maybe simpler to just use same char but color?)
-                        // "10個を表す星1つ" implies a different visual unit.
-                        // Let's use '✪' as the character for now.
 
                         let html = '';
                         for (let i = 0; i < tenStars; i++) {
@@ -3206,7 +3123,6 @@ function openRpgIntro() {
     if (battle) battle.classList.add('hidden');
     if (result) result.classList.add('hidden');
 
-    // Set Image
     // Set Image with onload handler to hide shadow
     const img = document.getElementById('rpgBossImage');
     if (img) {
@@ -3769,7 +3685,6 @@ function updateIntroDialogueUI() {
 
     const imgInfo = data.image;
     const action = data.action;
-
     const perImg = document.getElementById('storyPerImage');
     const enemySil = document.getElementById('storyEnemySilhouette');
     const textDiv = document.getElementById('storyText');
@@ -3909,7 +3824,6 @@ function startTypewriter(text, element) {
     }
     type();
 }
-
 
 function finishRpgIntro() {
     const overlay = document.getElementById('rpgStoryOverlay');
