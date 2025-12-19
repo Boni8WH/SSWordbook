@@ -3870,7 +3870,11 @@
          * @param {string} [confirmClass='btn-primary'] - 実行ボタンのクラス
          */
         function showConfirmModal(title, message, onConfirm, confirmText = '実行', confirmClass = 'btn-primary') {
-            const modalEl = new bootstrap.Modal(document.getElementById('utilityModal'));
+            const modalDom = document.getElementById('utilityModal');
+            let modalEl = bootstrap.Modal.getInstance(modalDom);
+            if (!modalEl) {
+                modalEl = new bootstrap.Modal(modalDom);
+            }
             const titleEl = document.getElementById('utilityModalLabel');
             const bodyEl = document.getElementById('utilityModalBody');
             const confirmBtn = document.getElementById('utilityModalConfirmBtn');
@@ -3907,7 +3911,11 @@
          * @param {string} [type='info'] - タイプ ('info', 'success', 'error')
          */
         function showInfoModal(title, message, type = 'info') {
-            const modalEl = new bootstrap.Modal(document.getElementById('utilityModal'));
+            const modalDom = document.getElementById('utilityModal');
+            let modalEl = bootstrap.Modal.getInstance(modalDom);
+            if (!modalEl) {
+                modalEl = new bootstrap.Modal(modalDom);
+            }
             const titleEl = document.getElementById('utilityModalLabel');
             const bodyEl = document.getElementById('utilityModalBody');
             const confirmBtn = document.getElementById('utilityModalConfirmBtn');
