@@ -1429,8 +1429,18 @@ def serve_logo():
         return "", 500
 
 @app.context_processor
-def inject_logo_url():
-    return dict(get_logo_url=get_logo_url)
+def inject_global_vars():
+    # JavaScript用の共通情報を作成
+    app_info_for_js = get_app_info_dict(
+        user_id=session.get('user_id'),
+        username=session.get('username'),
+        room_number=session.get('room_number')
+    )
+    
+    return dict(
+        get_logo_url=get_logo_url,
+        app_info_for_js=app_info_for_js
+    )
 
 def get_app_info_dict(user_id=None, username=None, room_number=None):
     try:
@@ -3781,13 +3791,6 @@ def index():
             flash('ユーザーが見つかりません。再ログインしてください。', 'danger')
             return redirect(url_for('logout'))
 
-        # JavaScript用のapp_info（従来の形式）
-        app_info_for_js = get_app_info_dict(
-            user_id=session.get('user_id'),
-            username=session.get('username'), 
-            room_number=session.get('room_number')
-        )
-        
         word_data = load_word_data_for_room(current_user.room_number)
         
         room_setting = RoomSetting.query.filter_by(room_number=current_user.room_number).first()
@@ -3841,7 +3844,7 @@ def index():
         
         # ★重要な修正：JavaScriptで使う変数名を変更
         return render_template('index.html',
-                                app_info_for_js=app_info_for_js,
+
                                 chapter_data=sorted_all_chapter_unit_status)
     
     except Exception as e:
