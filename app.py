@@ -6237,6 +6237,9 @@ def admin_delete_announcement(id):
                 flash('他人が作成したお知らせは削除できません。', 'danger')
                 return redirect(url_for('admin_page'))
 
+        # 関連する既読レコードを先に削除（手動カスケード）
+        UserAnnouncementRead.query.filter_by(announcement_id=announcement.id).delete()
+        
         db.session.delete(announcement)
         db.session.commit()
         flash('お知らせを削除しました。', 'success')
