@@ -2169,11 +2169,9 @@ def migrate_database():
                     print("🔧 is_managerカラムを追加します...")
                     with db.engine.connect() as conn:
                         conn.execute(text('ALTER TABLE "user" ADD COLUMN is_manager BOOLEAN DEFAULT FALSE'))
-                        # 既存の担当者（ID:0）をマネージャーとしてマーク
-                        conn.execute(text("UPDATE \"user\" SET is_manager = TRUE WHERE student_id = '0'"))
                         conn.execute(text('ALTER TABLE "user" ALTER COLUMN is_manager SET NOT NULL'))
                         conn.commit()
-                    print("✅ is_managerカラムを追加し、既存の担当者(ID:0)を移行しました。")
+                    print("✅ is_managerカラムを追加しました。")
                 
                 if 'manager_auth_data' not in columns:
                     print("🔧 manager_auth_dataカラムを追加します...")
@@ -8782,10 +8780,8 @@ def admin_add_user():
         if existing_user:
             if is_manager:
                 flash(f'担当者 {username} は既に存在します。', 'warning')
-            elif student_id == '0':
-                 flash(f'部屋 {room_number} には既に担当者(ID:0)が登録されています。', 'warning')
             else:
-                 flash(f'部屋 {room_number} ・出席番号 {student_id} のユーザーは既に存在します。', 'warning')
+                flash(f'部屋 {room_number} ・出席番号 {student_id} のユーザーは既に存在します。', 'warning')
             return redirect(url_for('admin_page'))
 
         new_user = User(
