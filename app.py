@@ -3892,7 +3892,8 @@ def login_page():
                     return redirect(url_for('first_time_password_change'))
                 
                 # 担当者の場合は管理画面（認証）へ、生徒の場合はIndexへ
-                if user.is_manager:
+                # is_managerが明示的にTrueの場合のみ管理画面にリダイレクト
+                if hasattr(user, 'is_manager') and user.is_manager is True:
                      return redirect(url_for('manager_auth_page'))
                 else:
                     flash(f'ようこそ、{user.username}さん！', 'success')
@@ -5897,6 +5898,8 @@ def admin_add_announcement():
     try:
         title = request.form.get('title')
         content = request.form.get('content')
+        send_notification = request.form.get('send_notification') == 'on'
+        
         # target_roomsは複数選択なのでgetlistで取得
         target_rooms_list = request.form.getlist('target_rooms')
         
@@ -5961,41 +5964,42 @@ def admin_add_announcement():
         db.session.add(new_announcement)
         db.session.commit()
 
-        # Update: 対象ユーザーにプッシュ通知
-        try:
-            print(f"DEBUG: Announcement created. Target rooms: {target_rooms}")
-            # 全員または特定の部屋
-            website_url = url_for('index', _external=True)
-            
-            if target_rooms == "all":
-                users = User.query.filter(User.push_subscription.isnot(None)).all()
-                print(f"DEBUG: Target 'all'. Found {len(users)} users with subscription.")
-            else:
-                target_room_list = [r.strip() for r in target_rooms.split(',')]
-                users = User.query.filter(
-                    User.room_number.in_(target_room_list),
-                    User.push_subscription.isnot(None)
-                ).all()
-                print(f"DEBUG: Target rooms {target_room_list}. Found {len(users)} users with subscription.")
-
-            count = 0
-            for user in users:
-                if user.notification_enabled:
-                    # 本文を通知に使用（長すぎる場合は省略）
-                    body_text = content[:40] + "..." if len(content) > 40 else content
-                    send_push_notification(
-                        user,
-                        f"ペル「{title}」",
-                        body_text,
-                        url=website_url
-                    )
-                    count += 1
+        # プッシュ通知送信（チェックボックスがオンの場合のみ）
+        if send_notification:
+            try:
+                print(f"DEBUG: Announcement created. Target rooms: {target_rooms}")
+                # 全員または特定の部屋
+                website_url = url_for('index', _external=True)
+                
+                if target_rooms == "all":
+                    users = User.query.filter(User.push_subscription.isnot(None)).all()
+                    print(f"DEBUG: Target 'all'. Found {len(users)} users with subscription.")
                 else:
-                    print(f"DEBUG: User {user.username} has notifications disabled.")
-            print(f"DEBUG: Sent notification to {count} users.")
-            
-        except Exception as e:
-            print(f"Error sending announcement push: {e}")
+                    target_room_list = [r.strip() for r in target_rooms.split(',')]
+                    users = User.query.filter(
+                        User.room_number.in_(target_room_list),
+                        User.push_subscription.isnot(None)
+                    ).all()
+                    print(f"DEBUG: Target rooms {target_room_list}. Found {len(users)} users with subscription.")
+
+                count = 0
+                for user in users:
+                    if user.notification_enabled:
+                        # 本文を通知に使用（長すぎる場合は省略）
+                        body_text = content[:40] + "..." if len(content) > 40 else content
+                        send_push_notification(
+                            user,
+                            f"ペル「{title}」",
+                            body_text,
+                            url=website_url
+                        )
+                        count += 1
+                    else:
+                        print(f"DEBUG: User {user.username} has notifications disabled.")
+                print(f"DEBUG: Sent notification to {count} users.")
+                
+            except Exception as e:
+                print(f"Error sending announcement push: {e}")
 
         # flash('お知らせを投稿しました', 'success') # モーダルで表示するためFlashは削除または維持でも良いが、重複を避けるなら削除
         return redirect(url_for('admin_page', announcement_sent='true'))

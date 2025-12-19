@@ -717,6 +717,13 @@
                                             }
                                         }
                                     </script>
+                                    <div class="mb-3 form-check">
+                                        <input type="checkbox" class="form-check-input" id="newAnnNotification"
+                                            name="send_notification" checked>
+                                        <label class="form-check-label" for="newAnnNotification">
+                                            <i class="fas fa-bell"></i> 通知を送る
+                                        </label>
+                                    </div>
                                     <button type="submit" class="btn btn-warning">
                                         <i class="fas fa-paper-plane"></i> お知らせを配信
                                     </button>
@@ -8066,6 +8073,20 @@
                 // URLからパラメータを削除（カレント履歴を書き換え）
                 const newUrl = window.location.pathname;
                 window.history.replaceState({}, '', newUrl);
+            }
+
+            // 論述問題集タブが表示されたら章フィルターを初期化
+            const essayTabLink = document.getElementById('tab-link-essay-management');
+            if (essayTabLink) {
+                essayTabLink.addEventListener('shown.bs.tab', function (e) {
+                    // 既に初期化済みかチェック（2回目以降は不要）
+                    if (!essayTabLink.dataset.initialized) {
+                        if (typeof loadEssayStats === 'function') {
+                            loadEssayStats();
+                        }
+                        essayTabLink.dataset.initialized = 'true';
+                    }
+                });
             }
         });
     </script>
