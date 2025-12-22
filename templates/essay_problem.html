@@ -696,7 +696,7 @@
             <i class="fas fa-question-circle"></i>
             問題文
         </h2>
-        <p class="question-text">{{ problem.question }}</p>
+        <p class="question-text">{{ problem.question | safe }}</p>
 
         <!-- 画像表示部分を修正 -->
         {% if has_essay_image(problem.id) %}
@@ -738,7 +738,7 @@
             <i class="fas fa-lightbulb"></i>
             模範解答 ({{ problem.answer_length }}字)
         </h2>
-        <p class="answer-text">{{ problem.answer }}</p>
+        <p class="answer-text">{{ problem.answer | safe }}</p>
     </div>
 
     <!-- 進捗管理セクション -->

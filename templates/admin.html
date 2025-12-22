@@ -8097,5 +8097,115 @@
                 });
             }
         });
+
+        // --------------------------------------------------------
+        // Rich Text Editor Support (ContentEditable)
+        // --------------------------------------------------------
+
+        function convertToRichText(textareaId) {
+            const textarea = document.getElementById(textareaId);
+            if (!textarea || textarea.style.display === 'none') {
+                // If already converted (and hidden) or not found, try to find the editor
+                if (textarea && textarea.style.display === 'none') {
+                    const existingEditor = document.getElementById(textareaId + '_editor');
+                    if (existingEditor) return existingEditor;
+                }
+                return null;
+            }
+
+            // Create editor div
+            const editor = document.createElement('div');
+            editor.id = textareaId + '_editor';
+            editor.contentEditable = true;
+
+            // Inherit styles - copy strictly needed ones + bootstrap class
+            editor.className = textarea.className; // Inherit bootstrap classes like 'form-control'
+
+            // Set styles to likely match 'form-control' appearance and dimensions
+            editor.style.minHeight = (textarea.rows * 1.5) + 'em'; // Approx height
+            editor.style.height = 'auto';
+            editor.style.maxHeight = '400px';
+            editor.style.overflowY = 'auto';
+            editor.style.whiteSpace = 'pre-wrap'; // Preserve whitespace
+            editor.style.cursor = 'text';
+
+            // Copy initial content (Textarea contains HTML tags, div should render them)
+            editor.innerHTML = textarea.value;
+
+            // Insert editor before textarea
+            textarea.parentNode.insertBefore(editor, textarea);
+            textarea.style.display = 'none';
+
+            // Sync: Editor -> Textarea
+            editor.addEventListener('input', () => {
+                textarea.value = editor.innerHTML;
+                textarea.dispatchEvent(new Event('input', { bubbles: true }));
+            });
+
+            // Handle Paste: Strip styles, keep structure? Or just let it be?
+            // Simple approach: Let browser handle for now, but ensure we don't paste massive inline styles.
+            // For now, no sanitizer.
+
+            // Ensure pressing Enter creates <div> or <br> not <p> if desired?
+            // Browsers vary. Default is usually ok.
+
+            return editor;
+        }
+
+        // Initialize editors on load for static forms
+        document.addEventListener('DOMContentLoaded', () => {
+            const staticTargets = ['announcementContent', 'new_essay_question', 'new_essay_answer'];
+            staticTargets.forEach(id => convertToRichText(id));
+        });
+
+        // --------------------------------------------------------
+        // Hook into Modals for Dynamic Content
+        // --------------------------------------------------------
+
+        // Hook openEditAnnouncementModal
+        if (typeof window.openEditAnnouncementModal === 'function') {
+            const originalOpenEditAnn = window.openEditAnnouncementModal;
+            window.openEditAnnouncementModal = function (id, data) {
+                originalOpenEditAnn(id, data);
+                // Wait for modal to be populated (original function sets values synchronously)
+                // Convert if not yet converted
+                let editor = convertToRichText('editAnnContent');
+                // If already converted, update its content
+                if (!editor) editor = document.getElementById('editAnnContent_editor');
+                if (editor) {
+                    editor.innerHTML = data.content;
+                    // Update hidden textarea just in case
+                    document.getElementById('editAnnContent').value = data.content;
+                }
+            };
+        }
+
+        // Hook showEditDialog (Essay Edit)
+        // Ensure showEditDialog exists (it should be defined in previous scripts)
+        // Since showEditDialog is defined as function declaration earlier, we can wrap it.
+        // But if it is called via onclick="showEditDialog", window.showEditDialog works.
+        // Wait, showEditDialog is NOT global? It's in <script> tag. Yes global.
+
+        // We need to wait for the original function to complete strictly? 
+        // Original adds to DOM.
+        const originalShowEditDialog = window.showEditDialog;
+        if (originalShowEditDialog) {
+            window.showEditDialog = function (problem) {
+                originalShowEditDialog(problem);
+                // The modal is created and inserted into DOM.
+                // We can immediately target the textareas.
+                // Wait for transition? No, DOM is there.
+                setTimeout(() => {
+                    ['edit_question', 'edit_answer'].forEach(id => {
+                        let editor = convertToRichText(id);
+                        // If already converted (unlikely for new modal), sync.
+                        // Since modal is recreated, we always convert anew.
+                    });
+                }, 50); // Small delay to ensure DOM is ready
+            }
+        } else {
+            console.warn("showEditDialog function not found to hook.");
+        }
+
     </script>
     {% endblock %}
