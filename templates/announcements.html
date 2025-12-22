@@ -51,7 +51,7 @@
                     <div id="collapse{{ announcement.id }}" class="accordion-collapse collapse"
                         aria-labelledby="heading{{ announcement.id }}" data-bs-parent="#announcementsAccordion">
                         <div class="accordion-body bg-white text-secondary" style="white-space: pre-wrap;">{{
-                            announcement.content }}</div>
+                            announcement.content | safe }}</div>
                     </div>
                 </div>
                 {% endfor %}
