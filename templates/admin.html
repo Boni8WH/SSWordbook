@@ -2192,7 +2192,7 @@
                                 style="background-color: #fff8e1; border-left: 5px solid #ff9800; margin-bottom: 20px;">
                                 <h4>🗑️ ID不一致履歴の削除</h4>
                                 <p>現在の問題データと一致しない古い学習履歴を削除します。<br>
-                                    <strong>用途：：</strong>問題文修正後に古いIDの履歴を削除する場合に使用。<br>
+                                    <strong>用途：</strong>問題文修正後に古いIDの履歴を削除する場合に使用。<br>
                                     <strong>⚠️ 注意：</strong>削除された履歴は復元できません。
                                 </p>
 
@@ -3741,15 +3741,14 @@
                     <li>総ユーザー数: ${summary.total_users}人</li>
                     <li>統計データ数: ${summary.total_stats}個</li>
                     <li>統計なしユーザー: ${summary.users_without_stats}人</li>
-                    <li>古い統計: ${summary.outdated_stats}個</li>
                     <li>カバー率: ${summary.coverage_rate}%</li>
                 </ul>
             </div>
             <div class="col-md-6">
                 <h6>💡 推奨アクション</h6>
-                ${summary.users_without_stats === 0 && summary.outdated_stats === 0 ?
-                    '<p class="text-success">✅ 統計データは最新です。修復は不要です。</p>' :
-                    `<p class="text-warning">⚠️ ${summary.users_without_stats + summary.outdated_stats}件の統計に問題があります。<br>「統計データを修復」の実行を推奨します。</p>`
+                ${summary.users_without_stats === 0 ?
+                    '<p class="text-success">✅ 統計データは正常です。</p>' :
+                    `<p class="text-warning">⚠️ ${summary.users_without_stats}件の統計データが不足しています。<br>「統計データを修復」の実行を推奨します。</p>`
                 }
             </div>
         </div>

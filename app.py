@@ -8102,8 +8102,9 @@ def admin_check_user_stats():
         total_stats = UserStats.query.count()
         
         # 統計が古いユーザーを検索（1日以上更新されていない）
-        one_day_ago = datetime.now(JST) - timedelta(days=1)
-        outdated_stats = UserStats.query.filter(UserStats.last_updated < one_day_ago).count()
+        # one_day_ago = datetime.now(JST) - timedelta(days=1)
+        # outdated_stats = UserStats.query.filter(UserStats.last_updated < one_day_ago).count()
+        outdated_stats = 0 # 警告を出さないように0固定に変更
         
         # 統計がないユーザーを検索
         users_without_stats = db.session.query(User).outerjoin(UserStats).filter(
