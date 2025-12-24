@@ -5889,7 +5889,8 @@
                 return;
             }
 
-            const currentLength = textarea.value.length;
+            const textWithoutTags = textarea.value.replace(/<[^>]*>/g, '');
+            const currentLength = textWithoutTags.length;
             counter.textContent = `${currentLength}字`;
 
             // 文字数に応じてスタイル変更

@@ -12043,10 +12043,11 @@ def admin_essay_update_problem():
                         setattr(problem, field, 2025)
                 elif field == 'enabled':
                     setattr(problem, field, bool(data[field]))
-                elif field == 'answer':
                     answer = data[field] or '解答なし'
                     setattr(problem, field, answer)
-                    problem.answer_length = len(answer)
+                    # HTMLタグを除去して文字数をカウント
+                    clean_answer = re.sub(r'<[^>]+>', '', answer)
+                    problem.answer_length = len(clean_answer)
                 else:
                     setattr(problem, field, data[field])
         
@@ -12201,7 +12202,8 @@ def admin_essay_add_problem():
             year=year,
             question=question,
             answer=answer,
-            answer_length=len(answer),
+            # HTMLタグを除去して文字数をカウント
+            answer_length=len(re.sub(r'<[^>]+>', '', answer)),
             enabled=enabled
         )
         
