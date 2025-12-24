@@ -12043,6 +12043,7 @@ def admin_essay_update_problem():
                         setattr(problem, field, 2025)
                 elif field == 'enabled':
                     setattr(problem, field, bool(data[field]))
+                elif field == 'answer':
                     answer = data[field] or '解答なし'
                     setattr(problem, field, answer)
                     # HTMLタグを除去して文字数をカウント
