@@ -4321,10 +4321,11 @@
                                     ? '<span class="badge bg-success"><i class="fas fa-check"></i> 有効</span>'
                                     : '<span class="badge bg-secondary"><i class="fas fa-times"></i> 無効</span>';
 
-                                // 問題文を短縮（100文字まで）
-                                const shortQuestion = problem.question.length > 100
-                                    ? problem.question.substring(0, 100) + '...'
-                                    : problem.question;
+                                // 問題文を短縮（HTMLタグを除去して50文字まで）
+                                const strippedQuestion = problem.question.replace(/<[^>]+>/g, '');
+                                const shortQuestion = strippedQuestion.length > 50
+                                    ? strippedQuestion.substring(0, 50) + '...'
+                                    : strippedQuestion;
 
                                 html += `
                             <div class="essay-problem-item">
@@ -4526,6 +4527,34 @@
                 });
         }
 
+        // テキストエリアにタグを挿入する関数
+        function insertTag(textareaId, tagType) {
+            const textarea = document.getElementById(textareaId);
+            if (!textarea) return;
+
+            const start = textarea.selectionStart;
+            const end = textarea.selectionEnd;
+            const selectedText = textarea.value.substring(start, end);
+            let replacement = '';
+
+            if (tagType === 'bold') {
+                replacement = `<b>${selectedText}</b>`;
+            } else if (tagType === 'underline') {
+                replacement = `<u>${selectedText}</u>`;
+            }
+
+            // テキストを置換（選択状態を維持）
+            textarea.setRangeText(replacement, start, end, 'select');
+
+            // フォーカスを戻す
+            textarea.focus();
+
+            // 解答欄の場合は文字数カウントを更新
+            if (textareaId === 'edit_answer') {
+                updateAnswerCharCount('edit_answer', 'answerLength');
+            }
+        }
+
         function showEditDialog(problem) {
             // 既存のモーダルがあれば削除
             const existingModal = document.getElementById('editEssayModal');
@@ -4596,6 +4625,16 @@
                                 <label for="edit_question" class="form-label">
                                     <i class="fas fa-question-circle"></i> 問題文 <span class="text-danger">*</span>
                                 </label>
+                                <div class="mb-1">
+                                    <div class="btn-group btn-group-sm">
+                                        <button type="button" class="btn btn-outline-secondary" onclick="insertTag('edit_question', 'bold')" title="太字">
+                                            <i class="fas fa-bold"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-outline-secondary" onclick="insertTag('edit_question', 'underline')" title="下線">
+                                            <i class="fas fa-underline"></i>
+                                        </button>
+                                    </div>
+                                </div>
                                 <textarea class="form-control" id="edit_question" rows="4" required>${problem.question}</textarea>
                             </div>
                             
@@ -4603,6 +4642,16 @@
                                 <label for="edit_answer" class="form-label">
                                     <i class="fas fa-lightbulb"></i> 模範解答
                                 </label>
+                                <div class="mb-1">
+                                    <div class="btn-group btn-group-sm">
+                                        <button type="button" class="btn btn-outline-secondary" onclick="insertTag('edit_answer', 'bold')" title="太字">
+                                            <i class="fas fa-bold"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-outline-secondary" onclick="insertTag('edit_answer', 'underline')" title="下線">
+                                            <i class="fas fa-underline"></i>
+                                        </button>
+                                    </div>
+                                </div>
                                 <div class="textarea-wrapper">
                                     <textarea class="form-control" id="edit_answer" rows="6"
                                             oninput="updateAnswerCharCount('edit_answer', 'answerLength')">${problem.answer || ''}</textarea>
