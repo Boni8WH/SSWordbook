@@ -496,8 +496,16 @@
         /* 表示する */
     }
 </style>
+
+{% block footer %}
+<!-- フッターはログイン画面では非表示 -->
 {% endblock %}
 
+{% block info_icon %}
+<!-- インフォアイコンはログイン画面では非表示 -->
+{% endblock %}
+
+{% endblock %}
 {% block scripts %}
 <script>
     document.addEventListener('DOMContentLoaded', function () {
