@@ -52,6 +52,8 @@
         transition: all 0.2s ease;
         position: relative;
         overflow: hidden;
+        cursor: pointer;
+        /* Add pointer cursor */
     }
 
     .column-card:hover {
@@ -96,29 +98,29 @@
     }
 
     .card-title {
-        font-size: 1em;
+        font-size: 0.95em;
         font-weight: bold;
         color: #2c3e50;
-        margin-bottom: 3px;
+        margin-bottom: 0;
         line-height: 1.3;
         flex-grow: 1;
-        /* Title takes available space */
-    }
-
-    .card-subtitle {
-        font-size: 0.8em;
-        color: #7f8c8d;
-        margin-bottom: 8px;
-        min-height: 1.2em;
+        display: flex;
+        align-items: center;
+        white-space: nowrap;
+        /* Prevent wrapping */
+        overflow: hidden;
+        /* Hide overflow until resized */
     }
 
     .card-footer-action {
-        margin-top: auto;
+        margin-top: 8px;
         display: flex;
-        justify-content: space-between;
+        justify-content: flex-end;
+        /* Align button to right */
         align-items: center;
-        padding-top: 5px;
-        border-top: 1px dashed #eee;
+        padding-top: 0;
+        border-top: none;
+        /* Remove border for cleaner look */
     }
 
     /* Read Checkbox Style */
@@ -226,20 +228,17 @@
                                 {% set is_read = unique_id in read_columns %}
 
                                 <div class="col">
-                                    <div class="column-card {% if is_read %}read{% endif %}" id="card-{{ unique_id }}">
+                                    <div class="column-card {% if is_read %}read{% endif %}" id="card-{{ unique_id }}"
+                                        onclick='openColumnModal("{{ col.title|e }}", "{{ col.subtitle|e }}", {{ col.body|tojson|safe }}, "{{ unique_id }}", {{ "true" if is_read else "false" }})'>
                                         <div class="card-meta">
                                             <span class="column-number">No. {{ col.numbering }}</span>
                                         </div>
-                                        <div class="card-title">{{ col.title }}</div>
-                                        <div class="card-subtitle">{{ col.subtitle }}</div>
-
-                                        <div class="card-footer-action">
-                                            <span></span> <!-- Spacer for flex content -->
-                                            <button class="btn btn-outline-primary btn-sm rounded-pill"
-                                                onclick='openColumnModal("{{ col.title|e }}", "{{ col.subtitle|e }}", {{ col.body|tojson|safe }}, "{{ unique_id }}", {{ "true" if is_read else "false" }})'>
-                                                読む <i class="fas fa-arrow-right"></i>
-                                            </button>
+                                        <div class="card-title">{{ col.title }}
+                                            <i class="fas fa-chevron-right ms-auto text-muted"
+                                                style="font-size: 0.8em;"></i>
                                         </div>
+                                        <!-- Subtitle hidden for compact view -->
+                                        <!-- Footer removed, whole card is clickable -->
                                     </div>
                                 </div>
                                 {% endfor %}
@@ -324,6 +323,44 @@
                 localStorage.setItem('lastActiveColumnTab', targetId);
             });
         });
+    });
+
+    // Dynamic Font Scaling
+    function adjustTitleFontSizes() {
+        const titles = document.querySelectorAll('.card-title');
+        titles.forEach(title => {
+            // Reset font size to base value before measuring
+            title.style.fontSize = '0.95em';
+            title.style.whiteSpace = 'nowrap';
+
+            let parentWidth = title.parentElement.clientWidth;
+            // Account for the icon and padding if needed, though parent.clientWidth usually suffices
+            // We need to check if scrollWidth > clientWidth
+
+            let fontSize = 0.95;
+            const minFontSize = 0.6; // Minimum legible size
+
+            while (title.scrollWidth > title.clientWidth && fontSize > minFontSize) {
+                fontSize -= 0.05;
+                title.style.fontSize = fontSize + 'em';
+            }
+        });
+    }
+
+    // Call on load and resize
+    window.addEventListener('load', adjustTitleFontSizes);
+    window.addEventListener('resize', adjustTitleFontSizes);
+    // Also call when switching tabs as visibility changes might affect measurement
+    const tabElsForResize = document.querySelectorAll('button[data-bs-toggle="tab"]');
+    tabElsForResize.forEach(tabEl => {
+        tabEl.addEventListener('shown.bs.tab', function (event) {
+            adjustTitleFontSizes();
+        });
+    });
+    // Also call when accordion expands
+    const accordionEls = document.querySelectorAll('.accordion-collapse');
+    accordionEls.forEach(acc => {
+        acc.addEventListener('shown.bs.collapse', adjustTitleFontSizes);
     });
 
     let currentModalId = null;
