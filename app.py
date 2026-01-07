@@ -672,6 +672,32 @@ def _add_read_columns_to_user():
     except Exception as e:
         print(f"⚠️ Userマイグレーションエラー (read_columns): {e}")
 
+# 🆕 コラム用モデル
+class Column(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    school_type = db.Column(db.String(10), nullable=False) # 'middle' or 'high'
+    subject = db.Column(db.String(50), nullable=False)     # e.g., '歴史'
+    numbering = db.Column(db.Integer, nullable=False)      # e.g., 1
+    title = db.Column(db.String(200), nullable=False)
+    subtitle = db.Column(db.String(200), nullable=True)
+    body = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))
+
+def _create_column_table():
+    """Columnテーブルを作成するマイグレーション関数"""
+    try:
+        inspector = inspect(db.engine)
+        if 'column' not in inspector.get_table_names():
+            print("🔄 Columnテーブルを作成します...")
+            Column.__table__.create(db.engine)
+            print("✅ Columnテーブル作成完了")
+        else:
+            # 念のためカラム構成の変更があればここでAlterなどを行うが、今回は新規作成のみ
+            print("✅ Columnテーブルは既に存在します")
+    except Exception as e:
+        print(f"⚠️ Columnテーブル作成エラー: {e}")
+            
+
 def _add_manager_columns():
     """担当者機能用のカラムを追加するマイグレーション関数"""
     try:
@@ -13838,7 +13864,29 @@ def parse_columns_csv():
 @app.route('/columns')
 def columns_page():
     context = get_template_context()
-    columns_data = parse_columns_csv()
+    
+    # DBからコラムデータ取得して構築
+    columns_data = {
+        'middle': {},
+        'high': {}
+    }
+    
+    try:
+        all_columns = Column.query.order_by(Column.school_type, Column.subject, Column.numbering).all()
+        for col in all_columns:
+            target_dict = columns_data[col.school_type] # 'middle' or 'high'
+            if col.subject not in target_dict:
+                target_dict[col.subject] = []
+            
+            target_dict[col.subject].append({
+                'numbering': col.numbering,
+                'title': col.title,
+                'subtitle': col.subtitle,
+                'body': col.body
+            })
+    except Exception as e:
+        print(f"Error fetching columns: {e}")
+
     
     # ユーザー処理
     current_user_obj = None
@@ -13847,7 +13895,14 @@ def columns_page():
     if 'user_id' in session:
         current_user_obj = User.query.get(session['user_id'])
         if current_user_obj:
-            read_columns = current_user_obj.get_read_columns()
+            # Create a copy!
+            current_read_cols = current_user_obj.get_read_columns()
+            if isinstance(current_read_cols, list):
+                read_columns = list(current_read_cols) # Return copy
+            
+            # DB上のデータに合わせてIDの整合性を保つ
+            # unique_id = school_type + '-' + subject + '-' + str(numbering)
+            # 既にリストに入っているIDはそのまま使われる
 
     context['columns_data'] = columns_data
     context['read_columns'] = read_columns
@@ -13946,10 +14001,59 @@ def admin_upload_columns():
         
     if file and file.filename.endswith('.csv'):
         try:
-            file.save(COLUMNS_CSV_PATH)
-            flash('コラムデータを更新しました', 'success')
+            # DB保存ロジックへ変更
+            # CSVを読み込む
+            stream = io.TextIOWrapper(file.stream._file, encoding='utf-8')
+            reader = csv.reader(stream)
+            
+            # 既存データを全削除（完全入れ替え）
+            db.session.query(Column).delete()
+            
+            inserted_count = 0
+            
+            # 科目IDマッピング
+            SUBJECT_MAP = {
+                '1': '歴史', '2': '地理', '3': '公民', '4': '歴史総合',
+                '5': '日本史探究', '6': '世界史探究', '7': '地理総合',
+                '8': '地理探究', '9': '公共', '10': '倫理', '11': '政治経済'
+            }
+
+            for row in reader:
+                if len(row) < 6:
+                    continue
+                
+                school_type_id = row[0].strip() # 1: Middle, else: High
+                title = row[3].strip()
+                # タイトルが空、またはヘッダー行っぽい場合はスキップ
+                if not title or title == 'title': 
+                    continue
+                    
+                school_type = 'middle' if school_type_id == '1' else 'high'
+                subject_id = row[1].strip()
+                subject = SUBJECT_MAP.get(subject_id, f'不明({subject_id})')
+                numbering = int(row[2].strip()) if row[2].strip().isdigit() else 0
+                subtitle = row[4].strip()
+                body = row[5].strip()
+                
+                new_col = Column(
+                    school_type=school_type,
+                    subject=subject,
+                    numbering=numbering,
+                    title=title,
+                    subtitle=subtitle,
+                    body=body
+                )
+                db.session.add(new_col)
+                inserted_count += 1
+            
+            db.session.commit()
+            flash(f'コラムデータをデータベースに保存しました（{inserted_count}件）', 'success')
+            
         except Exception as e:
+            db.session.rollback()
             flash(f'更新エラー: {str(e)}', 'danger')
+            import traceback
+            traceback.print_exc()
     else:
         flash('CSVファイルのみアップロード可能です', 'danger')
         
@@ -16481,6 +16585,7 @@ def check_and_migrate_rpg_columns():
 check_and_migrate_rpg_columns()
 with app.app_context():
     _add_read_columns_to_user()
+    _create_column_table()
 
 @app.route('/api/check_rpg_intro_eligibility', methods=['GET'])
 def check_rpg_intro_eligibility():
