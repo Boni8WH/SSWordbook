@@ -13,6 +13,7 @@ import io
 from io import StringIO, BytesIO
 from datetime import datetime, timedelta
 from sqlalchemy import inspect, text, func, case, cast, Integer
+from sqlalchemy.orm.attributes import flag_modified
 from sqlalchemy.orm import joinedload
 from datetime import date, datetime, timedelta
 import random
@@ -13891,7 +13892,10 @@ def mark_column_read():
             if column_id in read_columns:
                 read_columns.remove(column_id)
                 
-        user.set_read_columns(read_columns)
+        # SQLAlchemy may not detect changes to MutableList/JSON automatically unless reassigned or flagged
+        user.read_columns = list(read_columns) # Reassign as a new list
+        flag_modified(user, 'read_columns') # Explicitly flag as modified
+        
         db.session.commit()
         
         return jsonify({'status': 'success', 'read_columns': read_columns})
