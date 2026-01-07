@@ -1231,10 +1231,14 @@ if database_url:
     app.config['SQLALCHEMY_DATABASE_URI'] = database_url
     app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
         'pool_timeout': 30,
-        'pool_recycle': -1,
+        'pool_recycle': 1800,  # Recycle connections every 30 minutes
         'pool_pre_ping': True,
         'connect_args': {
             'connect_timeout': 10,
+            'keepalives': 1,
+            'keepalives_idle': 30,
+            'keepalives_interval': 10,
+            'keepalives_count': 5,
         }
     }
     logger.info("✅ PostgreSQL接続設定完了")
