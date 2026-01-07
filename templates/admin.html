@@ -476,6 +476,11 @@
                 <i class="fas fa-file-csv me-2"></i> 問題CSV管理
             </a>
 
+            <a class="sidebar-link" id="tab-link-column-management" data-bs-toggle="pill"
+                href="#section-column-management" role="tab">
+                <i class="fas fa-columns me-2"></i> コラム管理
+            </a>
+
             <a class="sidebar-link" id="tab-link-room-settings" data-bs-toggle="pill" href="#section-room-settings"
                 role="tab">
                 <i class="fas fa-cogs me-2"></i> 部屋設定
@@ -1207,6 +1212,62 @@
                 </div>
 
                 <!-- 部屋ごとの設定管理セクション -->
+                <!-- Column Management Section -->
+                <div class="tab-pane fade" id="section-column-management" role="tabpanel">
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header bg-white">
+                            <h3><i class="fas fa-columns"></i> コラム管理</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="alert alert-info">
+                                <h5><i class="fas fa-info-circle"></i> CSVファイルの仕様</h5>
+                                <p>以下の形式のCSVファイルをアップロードしてください（ヘッダー行は不要ですが、あってもデータとして読み込まれます。1行目からデータとして適切か確認してください）。</p>
+                                <table class="table table-bordered table-sm bg-white">
+                                    <thead>
+                                        <tr>
+                                            <th>A列</th>
+                                            <th>B列</th>
+                                            <th>C列</th>
+                                            <th>D列</th>
+                                            <th>E列</th>
+                                            <th>F列</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>学校区分<br>(1:中学, 2:高校)</td>
+                                            <td>科目ID<br>(1-11)</td>
+                                            <td>ナンバリング</td>
+                                            <td>主題<br>(中央揃え)</td>
+                                            <td>副題<br>(中央揃え)</td>
+                                            <td>本文<br>(左揃え)</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                                <p class="mb-0 small">
+                                    <strong>科目ID一覧:</strong> 1:歴史, 2:地理, 3:公民, 4:歴史総合, 5:日本史探究, 6:世界史探究, 7:地理総合, 8:地理探究,
+                                    9:公共, 10:倫理, 11:政治経済
+                                </p>
+                            </div>
+
+                            <div class="admin-panel" style="background-color: #e8f6f3; border-left: 5px solid #1abc9c;">
+                                <h4><i class="fas fa-upload"></i> コラムCSVアップロード</h4>
+                                <form action="{{ url_for('admin_upload_columns') }}" method="POST"
+                                    enctype="multipart/form-data">
+                                    <div class="mb-3">
+                                        <label for="columns_csv" class="form-label">CSVファイルを選択</label>
+                                        <input type="file" class="form-control" id="columns_csv" name="columns_csv"
+                                            accept=".csv" required>
+                                    </div>
+                                    <button type="submit" class="btn btn-success">
+                                        <i class="fas fa-cloud-upload-alt"></i> アップロードして更新
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="tab-pane fade" id="section-room-settings" role="tabpanel">
                     <div class="card shadow-sm mb-4">
                         <div class="card-header bg-white">
