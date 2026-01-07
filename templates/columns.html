@@ -374,7 +374,12 @@
 
         {% if current_user.is_authenticated %}
         const switchEl = document.getElementById('modalReadSwitch');
-        switchEl.checked = isRead;
+
+        // Check live status from the card element class, as 'isRead' arg is stale after update
+        const cardEl = document.getElementById('card-' + uniqueId);
+        const currentIsRead = cardEl ? cardEl.classList.contains('read') : isRead;
+
+        switchEl.checked = currentIsRead;
         switchEl.onchange = function () {
             updateReadStatus(uniqueId, this.checked);
         };
