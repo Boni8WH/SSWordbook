@@ -62,6 +62,10 @@ else:
     S3_AVAILABLE = False  # 認証情報がない場合はS3_AVAILABLEをFalseに設定
     s3_client = None
 
+# 定数定義
+UPLOAD_FOLDER = 'uploads'
+COLUMNS_CSV_PATH = os.path.join(UPLOAD_FOLDER, 'columns.csv')
+
 def upload_image_to_s3(file, filename, folder='essay_images', content_type='image/jpeg'):
     """画像をS3にアップロード（boto3利用可能時のみ）"""
     if not S3_AVAILABLE:
@@ -147,11 +151,18 @@ class User(db.Model):
     # 🆕 お知らせ最終閲覧日時
     last_announcement_viewed_at = db.Column(db.DateTime, nullable=True)
 
+    # 🆕 コラム既読状態
+    read_columns = db.Column(JSONEncodedDict, default=[], nullable=False)
+
     # 🆕 担当者フラグ
     is_manager = db.Column(db.Boolean, default=False, nullable=False)
 
     # 担当者権限の永続化用 (JSON形式の文字列として保存: {"room_num": "hash", ...})
     manager_auth_data = db.Column(db.Text, nullable=True)
+
+    @property
+    def is_authenticated(self):
+        return True
 
     @property
     def title_equipped(self):
@@ -175,6 +186,8 @@ class User(db.Model):
     def set_problem_history(self, history): self.problem_history = history
     def get_incorrect_words(self): return self.incorrect_words or []
     def set_incorrect_words(self, words): self.incorrect_words = words
+    def get_read_columns(self): return self.read_columns or []
+    def set_read_columns(self, column_ids): self.read_columns = column_ids
     def change_username(self, new_username):
         if not self.original_username: self.original_username = self.username
         self.username = new_username
@@ -640,6 +653,24 @@ def _add_announcement_viewed_column_to_user():
             
     except Exception as e:
         print(f"⚠️ Userマイグレーションエラー (last_announcement_viewed_at): {e}")
+
+def _add_read_columns_to_user():
+    """Userテーブルにread_columnsカラムを追加するマイグレーション関数"""
+    try:
+        inspector = inspect(db.engine)
+        columns = [col['name'] for col in inspector.get_columns('user')]
+        
+        if 'read_columns' not in columns:
+            print("🔄 User: read_columnsカラムを追加します...")
+            with db.engine.connect() as conn:
+                with conn.begin(): # トランザクション
+                    conn.execute(text("ALTER TABLE \"user\" ADD COLUMN read_columns TEXT DEFAULT '[]' NOT NULL"))
+            print("✅ User: read_columnsカラム追加完了")
+        else:
+            print("✅ User: read_columnsカラムは既に存在します")
+            
+    except Exception as e:
+        print(f"⚠️ Userマイグレーションエラー (read_columns): {e}")
 
 def _add_manager_columns():
     """担当者機能用のカラムを追加するマイグレーション関数"""
@@ -13739,6 +13770,194 @@ def score_details():
     context = get_template_context()
     return render_template('score_details.html', **context)
 
+# ====================================================================
+# コラム機能
+# ====================================================================
+
+def parse_columns_csv():
+    """コラムCSVファイルを解析して構造化データを返す"""
+    if not os.path.exists(COLUMNS_CSV_PATH):
+        return {}
+    
+    columns_data = {
+        'middle': {},  # 中学
+        'high': {}     # 高校
+    }
+    
+    # 科目IDと表示名のマッピング
+    SUBJECT_MAP = {
+        '1': '歴史',
+        '2': '地理',
+        '3': '公民',
+        '4': '歴史総合',
+        '5': '日本史探究',
+        '6': '世界史探究',
+        '7': '地理総合',
+        '8': '地理探究',
+        '9': '公共',
+        '10': '倫理',
+        '11': '政治経済'
+    }
+
+    try:
+        with open(COLUMNS_CSV_PATH, newline='', encoding='utf-8') as csvfile:
+            reader = csv.reader(csvfile)
+            for row in reader:
+                if len(row) < 6:
+                    continue
+                
+                school_type = row[0].strip() # 1: 中学, 2: 高校
+                subject_id = row[1].strip()
+                numbering = row[2].strip()
+                title = row[3].strip()
+                subtitle = row[4].strip()
+                body = row[5].strip()
+                
+                column_entry = {
+                    'numbering': numbering,
+                    'title': title,
+                    'subtitle': subtitle,
+                    'body': body
+                }
+                
+                subject_name = SUBJECT_MAP.get(subject_id, f'不明な科目({subject_id})')
+                
+                target_dict = columns_data['middle'] if school_type == '1' else columns_data['high']
+                
+                if subject_name not in target_dict:
+                    target_dict[subject_name] = []
+                
+                target_dict[subject_name].append(column_entry)
+                
+    except Exception as e:
+        print(f"Error parsing columns CSV: {e}")
+        return {}
+        
+    return columns_data
+
+@app.route('/columns')
+def columns_page():
+    context = get_template_context()
+    columns_data = parse_columns_csv()
+    
+    # ユーザー処理
+    current_user_obj = None
+    read_columns = []
+    
+    if 'user_id' in session:
+        current_user_obj = User.query.get(session['user_id'])
+        if current_user_obj:
+            read_columns = current_user_obj.get_read_columns()
+
+    context['columns_data'] = columns_data
+    context['read_columns'] = read_columns
+    context['active_page'] = 'columns'
+    # テンプレートで current_user を使えるように渡す
+    context['current_user'] = current_user_obj
+    return render_template('columns.html', **context)
+
+@app.route('/api/mark_column_read', methods=['POST'])
+def mark_column_read():
+    if 'user_id' not in session:
+        return jsonify({'status': 'error', 'message': 'Not logged in'}), 401
+        
+    try:
+        user = User.query.get(session['user_id'])
+        if not user:
+             return jsonify({'status': 'error', 'message': 'User not found'}), 404
+
+        data = request.get_json()
+        column_id = data.get('column_id')
+        is_read = data.get('read', False)
+        
+        if not column_id:
+            return jsonify({'status': 'error', 'message': 'Missing column_id'}), 400
+            
+        read_columns = user.get_read_columns()
+        if isinstance(read_columns, str):
+            try:
+                read_columns = json.loads(read_columns)
+            except:
+                read_columns = []
+                
+        # リストであることを保証
+        if not isinstance(read_columns, list):
+            read_columns = []
+
+        if is_read:
+            if column_id not in read_columns:
+                read_columns.append(column_id)
+        else:
+            if column_id in read_columns:
+                read_columns.remove(column_id)
+                
+        user.set_read_columns(read_columns)
+        db.session.commit()
+        
+        return jsonify({'status': 'success', 'read_columns': read_columns})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+        if isinstance(read_columns, str):
+            try:
+                read_columns = json.loads(read_columns)
+            except:
+                read_columns = []
+                
+        # リストであることを保証
+        if not isinstance(read_columns, list):
+            read_columns = []
+
+        if is_read:
+            if column_id not in read_columns:
+                read_columns.append(column_id)
+        else:
+            if column_id in read_columns:
+                read_columns.remove(column_id)
+                
+        current_user.set_read_columns(read_columns)
+        db.session.commit()
+        
+        return jsonify({'status': 'success', 'read_columns': read_columns})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/admin/upload_columns', methods=['POST'])
+@admin_required
+def admin_upload_columns():
+    # admin_required で既にチェック済みのため、追加の認証チェックは不要
+
+    if 'columns_csv' not in request.files:
+        flash('ファイルが選択されていません', 'danger')
+        return redirect(url_for('admin_page'))
+        
+    file = request.files['columns_csv']
+    if file.filename == '':
+        flash('ファイルが選択されていません', 'danger')
+        return redirect(url_for('admin_page'))
+        
+    if file and file.filename.endswith('.csv'):
+        try:
+            file.save(COLUMNS_CSV_PATH)
+            flash('コラムデータを更新しました', 'success')
+        except Exception as e:
+            flash(f'更新エラー: {str(e)}', 'danger')
+    else:
+        flash('CSVファイルのみアップロード可能です', 'danger')
+        
+    return redirect(url_for('admin_page'))
+
+@app.route('/admin/manual_fix_columns')
+def manual_fix_columns():
+    try:
+        _add_read_columns_to_user()
+        return "データベース構造（read_columns）を修正しました。トップページに戻って確認してください。<a href='/'>トップへ</a>"
+    except Exception as e:
+        return f"修正エラー: {e}"
+
 # 起動時ログを改善
 def enhanced_startup_check():
     """起動時の詳細チェック（修正版）"""
@@ -16255,6 +16474,8 @@ def check_and_migrate_rpg_columns():
 
 # Run migration check on startup
 check_and_migrate_rpg_columns()
+with app.app_context():
+    _add_read_columns_to_user()
 
 @app.route('/api/check_rpg_intro_eligibility', methods=['GET'])
 def check_rpg_intro_eligibility():
