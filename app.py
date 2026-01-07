@@ -1230,11 +1230,11 @@ if database_url:
     
     app.config['SQLALCHEMY_DATABASE_URI'] = database_url
     app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-        'pool_timeout': 60,
+        'pool_timeout': 30,
         'pool_recycle': -1,
         'pool_pre_ping': True,
         'connect_args': {
-            'connect_timeout': 60,
+            'connect_timeout': 10,
         }
     }
     logger.info("✅ PostgreSQL接続設定完了")
@@ -16493,20 +16493,25 @@ def wait_for_db(max_retries=24, delay=5):
     print("❌ Could not connect to database after many retries.")
     return False
 
-# Ensure DB is ready before running migrations
-if wait_for_db():
-    try:
-        check_and_migrate_rpg_columns()
-    except Exception as e:
-        print(f"Migration error: {e}")
-        
-    with app.app_context():
+# Run migration check in background on startup
+def run_db_initialization():
+    """バックグラウンドでDB接続待機とマイグレーションを実行"""
+    if wait_for_db():
         try:
-            _add_read_columns_to_user()
+            check_and_migrate_rpg_columns()
         except Exception as e:
-            print(f"User migration error: {e}")
-else:
-    print("⚠️ Skipping migrations due to DB connection failure")
+            print(f"Migration error: {e}")
+            
+        with app.app_context():
+            try:
+                _add_read_columns_to_user()
+            except Exception as e:
+                print(f"User migration error: {e}")
+    else:
+        print("⚠️ Skipping migrations due to DB connection failure")
+
+# Execute initialization in background thread to avoid blocking Gunicorn worker boot
+threading.Thread(target=run_db_initialization).start()
 
 @app.route('/api/check_rpg_intro_eligibility', methods=['GET'])
 def check_rpg_intro_eligibility():
