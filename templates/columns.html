@@ -224,7 +224,7 @@
                                 '-' +
                                 col.numbering|string %}
                                 <!-- Generate unique ID -->
-                                {% set unique_id = school_type + '-' + subject + '-' + col.numbering %}
+                                {% set unique_id = school_type + '-' + subject + '-' + col.numbering|string %}
                                 {% set is_read = unique_id in read_columns %}
 
                                 <div class="col">
