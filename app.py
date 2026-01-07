@@ -1385,24 +1385,7 @@ db.init_app(app)
 # ==========================================
 # 起動時マイグレーション (Render/Gunicorn対応)
 # ==========================================
-with app.app_context():
-    try:
-        # データベース接続確認
-        db.engine.connect().close()
-        
-        # 必要なカラム追加を実行
-        # これらは __main__ ブロックだけでなく、ここで実行することで
-        # Gunicorn起動時にも確実に適用されるようにする
-        _add_manager_columns()
-        _add_updated_at_column_to_announcement()
-        
-        # 他の安全なマイグレーションも念のため実行
-        _add_logo_columns_to_app_info()
-        _add_rpg_image_columns_safe()
-        
-        logger.info("✅ Startup migrations completed successfully.")
-    except Exception as e:
-        logger.warning(f"⚠️ Startup migration warning: {e}")
+# Startup migrations moved to background thread
 
 UPLOAD_FOLDER = 'uploads'
 if not os.path.exists(UPLOAD_FOLDER):
@@ -14364,18 +14347,7 @@ def admin_comprehensive_storage_analysis():
         flash(f'包括的ストレージ分析エラー: {str(e)}', 'danger')
         return redirect(url_for('admin_page'))
 
-# データベース初期化とマイグレーション
-with app.app_context():
-    try:
-        # 既存テーブルの作成
-        db.create_all()
-        
-        # マイグレーションの実行
-        migrate_database()
-        
-        app.logger.info("✅ データベース初期化・マイグレーション完了")
-    except Exception as e:
-        app.logger.error(f"❌ データベース初期化エラー: {e}")
+# DB initialization moved to background thread
 
 @app.route('/api/find_related_essays', methods=['POST'])
 def find_related_essays():
@@ -14445,10 +14417,6 @@ def find_related_essays():
     )[:5] # 上位5件に絞る
     
     return jsonify({'essays': recommended_essays})
-
-# ===== メイン起動処理の修正 =====
-# データベース初期化
-create_tables_and_admin_user()
 
 # ====================================================================
 # 通知APIルート
@@ -16497,16 +16465,30 @@ def wait_for_db(max_retries=24, delay=5):
 def run_db_initialization():
     """バックグラウンドでDB接続待機とマイグレーションを実行"""
     if wait_for_db():
-        try:
-            check_and_migrate_rpg_columns()
-        except Exception as e:
-            print(f"Migration error: {e}")
-            
         with app.app_context():
             try:
+                # 1. テーブル作成と基本マイグレーション
+                db.create_all()
+                migrate_database()
+                
+                # 2. カラム追加マイグレーション
+                _add_manager_columns()
+                _add_updated_at_column_to_announcement()
+                _add_logo_columns_to_app_info()
+                _add_rpg_image_columns_safe()
+                
+                # 3. RPGカラムチェック
+                check_and_migrate_rpg_columns()
+
+                # 4. ユーザー初期化
                 _add_read_columns_to_user()
+                
+                # 5. 管理者作成など
+                create_tables_and_admin_user() 
+                
+                logger.info("🎉 Background DB initialization completed!")
             except Exception as e:
-                print(f"User migration error: {e}")
+                logger.error(f"❌ Background DB initialization failed: {e}")
     else:
         print("⚠️ Skipping migrations due to DB connection failure")
 
