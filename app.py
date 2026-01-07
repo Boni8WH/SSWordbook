@@ -16477,9 +16477,36 @@ def check_and_migrate_rpg_columns():
             print(f"Migration check failed: {e}")
 
 # Run migration check on startup
-check_and_migrate_rpg_columns()
-with app.app_context():
-    _add_read_columns_to_user()
+
+def wait_for_db(max_retries=24, delay=5):
+    """データベース接続待機（RenderなどのCold Start対策）"""
+    print("⏳ Waiting for database connection...")
+    for i in range(max_retries):
+        try:
+            with app.app_context():
+                db.engine.connect()
+            print("✅ Database connection established!")
+            return True
+        except Exception as e:
+            print(f"⚠️ Database connection failed (attempt {i+1}/{max_retries}): {e}")
+            time.sleep(delay)
+    print("❌ Could not connect to database after many retries.")
+    return False
+
+# Ensure DB is ready before running migrations
+if wait_for_db():
+    try:
+        check_and_migrate_rpg_columns()
+    except Exception as e:
+        print(f"Migration error: {e}")
+        
+    with app.app_context():
+        try:
+            _add_read_columns_to_user()
+        except Exception as e:
+            print(f"User migration error: {e}")
+else:
+    print("⚠️ Skipping migrations due to DB connection failure")
 
 @app.route('/api/check_rpg_intro_eligibility', methods=['GET'])
 def check_rpg_intro_eligibility():
