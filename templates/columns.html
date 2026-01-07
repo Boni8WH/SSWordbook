@@ -143,20 +143,161 @@
 
     /* Modal Text */
     .modal-column-content {
-        line-height: 1.8;
+        line-height: 2.2;
         color: #2c3e50;
         white-space: pre-wrap;
-        font-size: 1.05em;
-        padding: 10px;
+        font-size: 1.2em;
+        letter-spacing: 0.08em;
+        padding: 20px;
+        max-width: 800px;
+        margin: 0 auto;
+        font-feature-settings: "palt";
     }
 
     .modal-subtitle {
         text-align: center;
         color: #7f8c8d;
-        font-size: 1.1em;
-        margin-bottom: 20px;
+        font-size: 1.3em;
+        margin-bottom: 30px;
         border-bottom: 1px solid #eee;
-        padding-bottom: 10px;
+        padding-bottom: 15px;
+        font-feature-settings: "palt";
+    }
+
+    #columnReaderModal .modal-content {
+        background-color: #fdfdfd;
+        border: none;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    }
+
+    #modalColumnTitle {
+        font-size: 1.6em;
+        letter-spacing: 0.05em;
+    }
+
+    /* Reading Themes */
+    .modal-content.theme-sepia {
+        background-color: #f4ecd8 !important;
+        color: #5b4636 !important;
+    }
+
+    .theme-sepia .modal-column-content,
+    .theme-sepia .modal-title,
+    .theme-sepia .modal-subtitle {
+        color: #5b4636 !important;
+    }
+
+    .theme-sepia .btn-close {
+        filter: sepia(1);
+    }
+
+    .modal-content.theme-dark {
+        background-color: #2c3e50 !important;
+        color: #ecf0f1 !important;
+    }
+
+    .theme-dark .modal-column-content,
+    .theme-dark .modal-title,
+    .theme-dark .modal-subtitle {
+        color: #ecf0f1 !important;
+    }
+
+    .theme-dark .btn-close {
+        filter: invert(1);
+    }
+
+    .theme-dark .border-bottom {
+        border-color: #34495e !important;
+    }
+
+    /* Font Families */
+    .font-mincho .modal-column-content,
+    .font-mincho .modal-title,
+    .font-mincho .modal-subtitle {
+        font-family: "Yu Mincho", "YuMincho", "Hiragino Mincho ProN", serif;
+    }
+
+    /* Vertical Writing Mode */
+    .writing-vertical .modal-body {
+        overflow-x: auto;
+        overflow-y: hidden;
+        width: 100%;
+        /* Force scroll to start at right (visual alignment) */
+        direction: rtl;
+        text-align: left;
+        /* Reset text align inside rtl container */
+    }
+
+    .writing-vertical .modal-body-content-wrapper {
+        display: inline-flex;
+        flex-direction: column;
+        /* Stacks items vertically in logical sense, but horizontally in vertical-rl? No. */
+        /* vertical-rl rotates the axis.
+           In vertical-rl:
+           block-axis goes Right to Left.
+           inline-axis goes Top to Bottom.
+           Normal block flow: Element 1 (Right), Element 2 (Left of 1).
+        */
+        writing-mode: vertical-rl;
+        text-orientation: mixed;
+        height: 65vh;
+        padding: 20px;
+        gap: 3rem;
+        /* Space between Title and Body */
+        align-items: flex-start;
+        /* Aligns to Top */
+
+        /* CRITICAL FIX: Reset direction to ltr to ensure Top-to-Bottom flow in vertical mode */
+        /* The parent .modal-body has direction: rtl for scrollbar positioning, but we must reset text flow */
+        direction: ltr;
+    }
+
+    .writing-vertical .modal-column-content {
+        /* Remove writing-mode here as propergated from wrapper or set directly */
+        writing-mode: vertical-rl;
+        text-orientation: mixed;
+        height: 100%;
+        max-width: none;
+        margin: 0;
+        padding: 0;
+        line-height: 2.0;
+        /* Slightly tighter for vertical */
+        padding: 20px 40px;
+        /* More horizontal padding */
+        column-gap: 2rem;
+
+        /* Fix alignment issues: Disable proportional metrics for vertical text */
+        font-feature-settings: normal;
+        /* Align text to a grid */
+        text-align: justify;
+    }
+
+    .writing-vertical .modal-subtitle {
+        writing-mode: vertical-rl;
+        text-orientation: mixed;
+        border-bottom: none;
+        border-left: 1px solid #eee;
+        margin: 0;
+        padding: 0 0 0 15px;
+        /* Padding on Left (bottom of line in horizontal) */
+        height: 100%;
+        font-size: 1.1em;
+        /* Position styling */
+        white-space: nowrap;
+        line-break: strict;
+        font-feature-settings: normal;
+    }
+
+    /* Tate-chu-yoko: Horizontal text inside vertical line */
+    .tcy {
+        text-combine-upright: all;
+        /* font-feature-settings: "hwid" 1; -- Optional: use proportional glyphs */
+    }
+
+    /* Fix scrollbars for vertical mode */
+    .writing-vertical .modal-body::-webkit-scrollbar {
+        height: 12px;
+        width: 12px;
     }
 
     .nav-tabs .nav-link {
@@ -167,6 +308,14 @@
     .nav-tabs .nav-link.active {
         color: #3498db;
         border-bottom-color: #3498db;
+    }
+
+    /* Settings Panel Active Button Styling */
+    #readingSettingsPanel .btn.active {
+        border: 2px solid #3498db !important;
+        position: relative;
+        z-index: 10;
+        font-weight: bold;
     }
 </style>
 
@@ -266,20 +415,78 @@
                 <h5 class="modal-title fw-bold" id="modalColumnTitle"></h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
+            <!-- Settings Panel Removed -->
             <div class="modal-body pt-2">
                 <div id="modalColumnSubtitle" class="modal-subtitle"></div>
                 <div id="modalColumnBody" class="modal-column-content"></div>
             </div>
-            <div class="modal-footer justify-content-between">
-                {% if current_user.is_authenticated %}
-                <div class="form-check form-switch">
-                    <input class="form-check-input" type="checkbox" id="modalReadSwitch">
-                    <label class="form-check-label" for="modalReadSwitch">既読にする</label>
+            <div class="modal-footer justify-content-between align-items-center">
+                <div class="d-flex align-items-center gap-3">
+                    {% if current_user.is_authenticated %}
+                    <div class="form-check form-switch m-0">
+                        <input class="form-check-input" type="checkbox" id="modalReadSwitch">
+                        <label class="form-check-label" for="modalReadSwitch">既読にする</label>
+                    </div>
+                    {% endif %}
+                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="toggleSettingsPanel()">
+                        <i class="fas fa-font"></i> 表示設定
+                    </button>
                 </div>
-                {% else %}
-                <div><!-- Spacer --></div>
-                {% endif %}
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Reading Settings Floating Panel (Custom, not Bootstrap Modal) -->
+<div id="readingSettingsPanel" class="card shadow-lg"
+    style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 300px; z-index: 2000; background-color: rgba(255, 255, 255, 0.5); backdrop-filter: blur(2px);">
+    <div class="card-header d-flex justify-content-between align-items-center bg-transparent" style="cursor: move;">
+        <h6 class="mb-0 fw-bold">表示設定</h6>
+        <button type="button" class="btn-close" onclick="toggleSettingsPanel()" aria-label="Close"></button>
+    </div>
+    <div class="card-body">
+        <div class="d-flex flex-column gap-3">
+            <!-- Theme -->
+            <div>
+                <label class="form-label small text-muted mb-1">テーマ</label>
+                <div class="btn-group w-100" role="group">
+                    <button type="button" class="btn btn-outline-secondary btn-sm active" onclick="setTheme('light')"
+                        id="btn-theme-light">明</button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setTheme('sepia')"
+                        id="btn-theme-sepia" style="background-color: #f4ecd8; color: #5b4636;">セピア</button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setTheme('dark')"
+                        id="btn-theme-dark" style="background-color: #2c3e50; color: #fff;">暗</button>
+                </div>
+            </div>
+            <!-- Font -->
+            <div>
+                <label class="form-label small text-muted mb-1">フォント</label>
+                <div class="btn-group w-100" role="group">
+                    <button type="button" class="btn btn-outline-secondary btn-sm active" onclick="setFont('gothic')"
+                        id="btn-font-gothic">ゴシック</button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setFont('mincho')"
+                        id="btn-font-mincho" style="font-family: 'Yu Mincho', serif;">明朝</button>
+                </div>
+            </div>
+            <!-- Writing Mode -->
+            <div>
+                <label class="form-label small text-muted mb-1">文字の向き</label>
+                <div class="btn-group w-100" role="group">
+                    <button type="button" class="btn btn-outline-secondary btn-sm active"
+                        onclick="setWritingMode('horizontal')" id="btn-mode-horizontal">横書き</button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setWritingMode('vertical')"
+                        id="btn-mode-vertical">縦書き</button>
+                </div>
+            </div>
+            <!-- Font Size -->
+            <div>
+                <label class="form-label small text-muted mb-1">文字サイズ</label>
+                <div class="input-group input-group-sm">
+                    <button class="btn btn-outline-secondary" type="button" onclick="changeFontSize(-0.1)">-</button>
+                    <span class="input-group-text bg-white flex-grow-1 text-center" id="fontSizeDisplay">100%</span>
+                    <button class="btn btn-outline-secondary" type="button" onclick="changeFontSize(0.1)">+</button>
+                </div>
             </div>
         </div>
     </div>
@@ -363,12 +570,154 @@
         acc.addEventListener('shown.bs.collapse', adjustTitleFontSizes);
     });
 
+    // Reading Settings Logic
+    const defaultSettings = {
+        theme: 'light',
+        font: 'gothic',
+        writingMode: 'horizontal',
+        fontSize: 1.2
+    };
+
+    let currentSettings = { ...defaultSettings };
+
+    function toggleSettingsPanel() {
+        const panel = document.getElementById('readingSettingsPanel');
+        if (panel.style.display === 'none') {
+            panel.style.display = 'block';
+        } else {
+            panel.style.display = 'none';
+        }
+    }
+
+    function loadSettings() {
+        const saved = localStorage.getItem('columnReadingSettings');
+        if (saved) {
+            currentSettings = { ...defaultSettings, ...JSON.parse(saved) };
+        }
+        applySettings();
+        updateSettingsUI();
+    }
+
+    function saveSettings() {
+        localStorage.setItem('columnReadingSettings', JSON.stringify(currentSettings));
+    }
+
+    function setTheme(theme) {
+        currentSettings.theme = theme;
+        applySettings();
+        updateSettingsUI();
+        saveSettings();
+    }
+
+    function setFont(font) {
+        currentSettings.font = font;
+        applySettings();
+        updateSettingsUI();
+        saveSettings();
+    }
+
+    function setWritingMode(mode) {
+        currentSettings.writingMode = mode;
+        applySettings();
+        updateSettingsUI();
+        saveSettings();
+    }
+
+    function changeFontSize(delta) {
+        let newSize = parseFloat((currentSettings.fontSize + delta).toFixed(1));
+        if (newSize < 0.5) newSize = 0.5;
+        if (newSize > 3.0) newSize = 3.0;
+        currentSettings.fontSize = newSize;
+        applySettings();
+        updateSettingsUI();
+        saveSettings();
+    }
+
+    function applySettings() {
+        const modalContent = document.querySelector('#columnReaderModal .modal-content');
+        const modalBody = document.querySelector('#columnReaderModal .modal-body');
+
+        // --- Theme & Font ---
+        // Clear old classes
+        modalContent.classList.remove('theme-sepia', 'theme-dark', 'font-mincho', 'writing-vertical');
+
+        // Apply Theme
+        if (currentSettings.theme !== 'light') {
+            modalContent.classList.add('theme-' + currentSettings.theme);
+        }
+
+        // Apply Font
+        if (currentSettings.font === 'mincho') {
+            modalContent.classList.add('font-mincho');
+        }
+
+        // --- Writing Mode (Layout Changes) ---
+        // Element caching
+        const subtitleEl = document.getElementById('modalColumnSubtitle');
+        const contentEl = document.getElementById('modalColumnBody');
+        let wrapper = document.querySelector('.modal-body-content-wrapper');
+
+        if (currentSettings.writingMode === 'vertical') {
+            modalContent.classList.add('writing-vertical');
+
+            // Create wrapper if not exists
+            if (!wrapper) {
+                wrapper = document.createElement('div');
+                wrapper.className = 'modal-body-content-wrapper';
+                // Move elements into wrapper
+                // Check if they are already inside (unlikely if !wrapper)
+                if (subtitleEl.parentNode === modalBody) modalBody.removeChild(subtitleEl);
+                if (contentEl.parentNode === modalBody) modalBody.removeChild(contentEl);
+
+                wrapper.appendChild(subtitleEl);
+                wrapper.appendChild(contentEl);
+                modalBody.appendChild(wrapper);
+            }
+        } else {
+            // Horizontal Mode: Unwrap if wrapped
+            if (wrapper) {
+                // Move elements back to modalBody
+                modalBody.appendChild(subtitleEl);
+                modalBody.appendChild(contentEl);
+                // Remove wrapper
+                modalBody.removeChild(wrapper);
+            }
+        }
+
+        // Apply Font Size
+        contentEl.style.fontSize = currentSettings.fontSize + 'em';
+    }
+
+    function updateSettingsUI() {
+        // Update Theme Buttons
+        document.querySelectorAll('[onclick^="setTheme"]').forEach(btn => btn.classList.remove('active'));
+        document.getElementById('btn-theme-' + currentSettings.theme).classList.add('active');
+
+        // Update Font Buttons
+        document.querySelectorAll('[onclick^="setFont"]').forEach(btn => btn.classList.remove('active'));
+        document.getElementById('btn-font-' + currentSettings.font).classList.add('active');
+
+        // Update Mode Buttons
+        document.querySelectorAll('[onclick^="setWritingMode"]').forEach(btn => btn.classList.remove('active'));
+        document.getElementById('btn-mode-' + currentSettings.writingMode).classList.add('active');
+
+        // Update Font Size Display
+        document.getElementById('fontSizeDisplay').textContent = Math.round(currentSettings.fontSize / 1.2 * 100) + '%';
+    }
+
     let currentModalId = null;
+    let originalBodyText = '';
 
     function openColumnModal(title, subtitle, body, uniqueId, isRead) {
+        // Load settings before showing
+        loadSettings();
+
+        originalBodyText = body;
+
         document.getElementById('modalColumnTitle').textContent = title;
         document.getElementById('modalColumnSubtitle').textContent = subtitle || '';
-        document.getElementById('modalColumnBody').textContent = body; // Using textContent for safety, pre-wrap css handles newlines
+        // Body will be set by applySettings based on mode
+        // document.getElementById('modalColumnBody').textContent = body; 
 
         currentModalId = uniqueId;
 
@@ -385,8 +734,126 @@
         };
         {% endif %}
 
+        // Ensure settings are applied (which sets the body text)
+        applySettings();
+
         const modal = new bootstrap.Modal(document.getElementById('columnReaderModal'));
         modal.show();
+    }
+
+    // Helper to escape HTML characters
+    function escapeHtml(text) {
+        if (!text) return '';
+        return text
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    function formatForVertical(text) {
+        let safeText = escapeHtml(text);
+
+        // Helper to convert half-width numbers to full-width (Zenkaku)
+        const toZenkaku = (str) => {
+            return str.replace(/[0-9]/g, function (s) {
+                return String.fromCharCode(s.charCodeAt(0) + 0xFEE0);
+            });
+        };
+
+        // Strategy:
+        // 1. Identify tokens that MUST be TCY (Double punctuation, List markers).
+        // 2. Identify remaining number sequences.
+        //    - If 1-2 digits: Make TCY.
+        //    - If 3+ digits: Convert to Zenkaku (displays stacked upright).
+
+        // Regex Explanation:
+        // Group 1: Double Punctuation (!? or ！？)
+        // Group 2: List Markers (1-2 digits + dot, not followed by digit)
+        // Group 3: Generic Number sequences (\d+)
+        const regex = /([!?！？]{2})|(\b\d{1,2}\.(?!\d))|(\d+)/g;
+
+        return safeText.replace(regex, function (match, p1, p2, p3) {
+            // Case 1: Double Punctuation (Always TCY)
+            if (p1) return '<span class="tcy">' + p1 + '</span>';
+
+            // Case 2: List Marker (Always TCY)
+            if (p2) return '<span class="tcy">' + p2 + '</span>';
+
+            // Case 3: Numbers
+            if (p3) {
+                if (p3.length <= 2) {
+                    // 1-2 digits -> TCY (Side-by-side / Upright)
+                    return '<span class="tcy">' + p3 + '</span>';
+                } else {
+                    // 3+ digits -> Zenkaku (Stacked Vertical Upright)
+                    // e.g. 1940 -> １９４０
+                    return toZenkaku(p3);
+                }
+            }
+            return match;
+        });
+    }
+
+    function applySettings() {
+        const modalContent = document.querySelector('#columnReaderModal .modal-content');
+        const modalBody = document.querySelector('#columnReaderModal .modal-body');
+        const contentEl = document.getElementById('modalColumnBody');
+
+        // --- Theme & Font ---
+        // Clear old classes
+        modalContent.classList.remove('theme-sepia', 'theme-dark', 'font-mincho', 'writing-vertical');
+
+        // Apply Theme
+        if (currentSettings.theme !== 'light') {
+            modalContent.classList.add('theme-' + currentSettings.theme);
+        }
+
+        // Apply Font
+        if (currentSettings.font === 'mincho') {
+            modalContent.classList.add('font-mincho');
+        }
+
+        // --- Writing Mode (Layout Changes) ---
+        const subtitleEl = document.getElementById('modalColumnSubtitle');
+        let wrapper = document.querySelector('.modal-body-content-wrapper');
+
+        if (currentSettings.writingMode === 'vertical') {
+            modalContent.classList.add('writing-vertical');
+
+            // Set text content with TCY formatting
+            // Use innerHTML because we inserted spans
+            contentEl.innerHTML = formatForVertical(originalBodyText);
+
+            // Create wrapper if not exists
+            if (!wrapper) {
+                wrapper = document.createElement('div');
+                wrapper.className = 'modal-body-content-wrapper';
+                // Move elements into wrapper
+                if (subtitleEl.parentNode === modalBody) modalBody.removeChild(subtitleEl);
+                if (contentEl.parentNode === modalBody) modalBody.removeChild(contentEl);
+
+                wrapper.appendChild(subtitleEl);
+                wrapper.appendChild(contentEl);
+                modalBody.appendChild(wrapper);
+            }
+        } else {
+            // Horizontal Mode
+
+            // Restore raw text
+            contentEl.textContent = originalBodyText;
+
+            // Unwrap if wrapped
+            if (wrapper) {
+                modalBody.appendChild(subtitleEl);
+                modalBody.appendChild(contentEl);
+                modalBody.removeChild(wrapper);
+            }
+        }
+
+        // Apply Font Size
+        contentEl.style.fontSize = currentSettings.fontSize + 'em';
     }
 
     function toggleReadStatus(uniqueId, event) {
@@ -442,5 +909,55 @@
                 console.error('Error:', error);
             });
     }
+
+    // Draggable Logic for Custom Panel
+    document.addEventListener('DOMContentLoaded', function () {
+        const panel = document.getElementById('readingSettingsPanel');
+        const header = panel.querySelector('.card-header');
+
+        let isDragging = false;
+        let startX, startY, initialLeft, initialTop;
+
+        header.addEventListener('mousedown', dragStart);
+
+        function dragStart(e) {
+            // Prevent default if clicking buttons inside header
+            if (e.target.closest('button')) return;
+
+            const rect = panel.getBoundingClientRect();
+            // Store offset relative to VIEWPORT (fixed position)
+            initialLeft = rect.left;
+            initialTop = rect.top;
+            startX = e.clientX;
+            startY = e.clientY;
+
+            isDragging = true;
+
+            // Remove transform centering to allow manual positioning
+            panel.style.transform = 'none';
+            panel.style.left = initialLeft + 'px';
+            panel.style.top = initialTop + 'px';
+
+            document.addEventListener('mousemove', drag);
+            document.addEventListener('mouseup', dragEnd);
+        }
+
+        function drag(e) {
+            if (!isDragging) return;
+            e.preventDefault();
+
+            const currentX = e.clientX - startX;
+            const currentY = e.clientY - startY;
+
+            panel.style.left = (initialLeft + currentX) + 'px';
+            panel.style.top = (initialTop + currentY) + 'px';
+        }
+
+        function dragEnd(e) {
+            isDragging = false;
+            document.removeEventListener('mousemove', drag);
+            document.removeEventListener('mouseup', dragEnd);
+        }
+    });
 </script>
 {% endblock %}
