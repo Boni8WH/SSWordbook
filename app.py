@@ -13,7 +13,6 @@ import io
 from io import StringIO, BytesIO
 from datetime import datetime, timedelta
 from sqlalchemy import inspect, text, func, case, cast, Integer
-from sqlalchemy.orm.attributes import flag_modified
 from sqlalchemy.orm import joinedload
 from datetime import date, datetime, timedelta
 import random
@@ -1230,15 +1229,11 @@ if database_url:
     
     app.config['SQLALCHEMY_DATABASE_URI'] = database_url
     app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-        'pool_timeout': 30,
-        'pool_recycle': 1800,  # Recycle connections every 30 minutes
+        'pool_timeout': 20,
+        'pool_recycle': -1,
         'pool_pre_ping': True,
         'connect_args': {
             'connect_timeout': 10,
-            'keepalives': 1,
-            'keepalives_idle': 30,
-            'keepalives_interval': 10,
-            'keepalives_count': 5,
         }
     }
     logger.info("✅ PostgreSQL接続設定完了")
@@ -1389,7 +1384,24 @@ db.init_app(app)
 # ==========================================
 # 起動時マイグレーション (Render/Gunicorn対応)
 # ==========================================
-# Startup migrations moved to background thread
+with app.app_context():
+    try:
+        # データベース接続確認
+        db.engine.connect().close()
+        
+        # 必要なカラム追加を実行
+        # これらは __main__ ブロックだけでなく、ここで実行することで
+        # Gunicorn起動時にも確実に適用されるようにする
+        _add_manager_columns()
+        _add_updated_at_column_to_announcement()
+        
+        # 他の安全なマイグレーションも念のため実行
+        _add_logo_columns_to_app_info()
+        _add_rpg_image_columns_safe()
+        
+        logger.info("✅ Startup migrations completed successfully.")
+    except Exception as e:
+        logger.warning(f"⚠️ Startup migration warning: {e}")
 
 UPLOAD_FOLDER = 'uploads'
 if not os.path.exists(UPLOAD_FOLDER):
@@ -13879,10 +13891,7 @@ def mark_column_read():
             if column_id in read_columns:
                 read_columns.remove(column_id)
                 
-        # SQLAlchemy may not detect changes to MutableList/JSON automatically unless reassigned or flagged
-        user.read_columns = list(read_columns) # Reassign as a new list
-        flag_modified(user, 'read_columns') # Explicitly flag as modified
-        
+        user.set_read_columns(read_columns)
         db.session.commit()
         
         return jsonify({'status': 'success', 'read_columns': read_columns})
@@ -14351,7 +14360,18 @@ def admin_comprehensive_storage_analysis():
         flash(f'包括的ストレージ分析エラー: {str(e)}', 'danger')
         return redirect(url_for('admin_page'))
 
-# DB initialization moved to background thread
+# データベース初期化とマイグレーション
+with app.app_context():
+    try:
+        # 既存テーブルの作成
+        db.create_all()
+        
+        # マイグレーションの実行
+        migrate_database()
+        
+        app.logger.info("✅ データベース初期化・マイグレーション完了")
+    except Exception as e:
+        app.logger.error(f"❌ データベース初期化エラー: {e}")
 
 @app.route('/api/find_related_essays', methods=['POST'])
 def find_related_essays():
@@ -14421,6 +14441,10 @@ def find_related_essays():
     )[:5] # 上位5件に絞る
     
     return jsonify({'essays': recommended_essays})
+
+# ===== メイン起動処理の修正 =====
+# データベース初期化
+create_tables_and_admin_user()
 
 # ====================================================================
 # 通知APIルート
@@ -16449,55 +16473,9 @@ def check_and_migrate_rpg_columns():
             print(f"Migration check failed: {e}")
 
 # Run migration check on startup
-
-def wait_for_db(max_retries=24, delay=5):
-    """データベース接続待機（RenderなどのCold Start対策）"""
-    print("⏳ Waiting for database connection...")
-    for i in range(max_retries):
-        try:
-            with app.app_context():
-                db.engine.connect()
-            print("✅ Database connection established!")
-            return True
-        except Exception as e:
-            print(f"⚠️ Database connection failed (attempt {i+1}/{max_retries}): {e}")
-            time.sleep(delay)
-    print("❌ Could not connect to database after many retries.")
-    return False
-
-# Run migration check in background on startup
-def run_db_initialization():
-    """バックグラウンドでDB接続待機とマイグレーションを実行"""
-    if wait_for_db():
-        with app.app_context():
-            try:
-                # 1. テーブル作成と基本マイグレーション
-                db.create_all()
-                migrate_database()
-                
-                # 2. カラム追加マイグレーション
-                _add_manager_columns()
-                _add_updated_at_column_to_announcement()
-                _add_logo_columns_to_app_info()
-                _add_rpg_image_columns_safe()
-                
-                # 3. RPGカラムチェック
-                check_and_migrate_rpg_columns()
-
-                # 4. ユーザー初期化
-                _add_read_columns_to_user()
-                
-                # 5. 管理者作成など
-                create_tables_and_admin_user() 
-                
-                logger.info("🎉 Background DB initialization completed!")
-            except Exception as e:
-                logger.error(f"❌ Background DB initialization failed: {e}")
-    else:
-        print("⚠️ Skipping migrations due to DB connection failure")
-
-# Execute initialization in background thread to avoid blocking Gunicorn worker boot
-threading.Thread(target=run_db_initialization).start()
+check_and_migrate_rpg_columns()
+with app.app_context():
+    _add_read_columns_to_user()
 
 @app.route('/api/check_rpg_intro_eligibility', methods=['GET'])
 def check_rpg_intro_eligibility():
