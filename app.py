@@ -13873,7 +13873,12 @@ def mark_column_read():
         if not column_id:
             return jsonify({'status': 'error', 'message': 'Missing column_id'}), 400
             
-        read_columns = user.get_read_columns()
+        # Create a copy to ensure SQLAlchemy detects changes on re-assignment
+        current_read_cols = user.get_read_columns()
+        if isinstance(current_read_cols, list):
+            read_columns = list(current_read_cols)
+        else:
+            read_columns = []
         if isinstance(read_columns, str):
             try:
                 read_columns = json.loads(read_columns)
