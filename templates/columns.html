@@ -284,8 +284,15 @@
         font-size: 1.1em;
         /* Position styling */
         white-space: normal;
+        text-align: left;
+        /* Default Top (Left in vertical-rl) */
         line-break: strict;
         font-feature-settings: normal;
+    }
+
+    .writing-vertical .modal-subtitle.is-multiline {
+        text-align: right;
+        /* Bottom (Right in vertical-rl) */
     }
 
     /* Tate-chu-yoko: Horizontal text inside vertical line */
@@ -686,6 +693,46 @@
 
         // Apply Font Size
         contentEl.style.fontSize = currentSettings.fontSize + 'em';
+
+        // Re-check subtitle alignment after applying settings
+        checkSubtitleMultiline();
+    }
+
+    function checkSubtitleMultiline() {
+        if (currentSettings.writingMode !== 'vertical') return;
+
+        const subtitleEl = document.getElementById('modalColumnSubtitle');
+        if (!subtitleEl || !subtitleEl.textContent) return;
+
+        // Reset class to measure correctly
+        subtitleEl.classList.remove('is-multiline');
+
+        // In vertical-rl: 
+        // offsetWidth is the "height" of the text block (how many lines * line-height)
+        // clientHeight is the length of the longest line (viewport height effectively)
+
+        // However, we want to know if it wrapped.
+        // A single line's width is approximately 1em * lineHeight.
+        // Let's compare offsetWidth (total width of block) vs computed font-size.
+
+        const style = window.getComputedStyle(subtitleEl);
+        const fontSize = parseFloat(style.fontSize);
+        const padding = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
+
+        // Logical text width (in vertical mode, this is physical width occupied by lines)
+        const contentWidth = subtitleEl.offsetWidth - padding;
+
+        // One line width is approx fontSize * lineHeight.
+        // Assuming loose line-height of ~2.0 for safety.
+        // If contentWidth > fontSize * 2.5, it's definitely 2+ lines.
+        // Example: 1 line (font 18px * 2.0) = 36px.
+        // Threshold: 18 * 2.5 = 45px.
+        // 36 < 45 -> Single Line.
+        // 2 lines = 72px. 72 > 45 -> Multiline.
+
+        if (contentWidth > fontSize * 2.5) {
+            subtitleEl.classList.add('is-multiline');
+        }
     }
 
     function updateSettingsUI() {
@@ -739,6 +786,11 @@
 
         const modal = new bootstrap.Modal(document.getElementById('columnReaderModal'));
         modal.show();
+
+        // Check after modal is shown to ensure rendering dimensions are correct
+        modal._element.addEventListener('shown.bs.modal', function () {
+            checkSubtitleMultiline();
+        }, { once: true });
     }
 
     // Helper to escape HTML characters
