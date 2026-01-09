@@ -683,6 +683,19 @@ class Column(db.Model):
     body = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))
 
+class ColumnLike(db.Model):
+    __tablename__ = 'column_like'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False)
+    # Using composite text ID: school_type-subject-numbering to persist across CSV re-uploads
+    column_unique_id = db.Column(db.String(100), nullable=False)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))
+
+    __table_args__ = (
+        db.UniqueConstraint('user_id', 'column_unique_id', name='uq_user_column_like'),
+        db.Index('idx_column_like_unique_id', 'column_unique_id'),
+    )
+
 def _create_column_table():
     """Columnテーブルを作成するマイグレーション関数"""
     try:
@@ -696,6 +709,19 @@ def _create_column_table():
             print("✅ Columnテーブルは既に存在します")
     except Exception as e:
         print(f"⚠️ Columnテーブル作成エラー: {e}")
+
+def _create_column_like_table():
+    """ColumnLikeテーブルを作成するマイグレーション関数"""
+    try:
+        inspector = inspect(db.engine)
+        if 'column_like' not in inspector.get_table_names():
+            print("🔄 ColumnLikeテーブルを作成します...")
+            ColumnLike.__table__.create(db.engine)
+            print("✅ ColumnLikeテーブル作成完了")
+        else:
+            print("✅ ColumnLikeテーブルは既に存在します")
+    except Exception as e:
+        print(f"⚠️ ColumnLikeテーブル作成エラー: {e}")
             
 
 def _add_manager_columns():
@@ -13884,13 +13910,28 @@ def columns_page():
                 'subtitle': col.subtitle,
                 'body': col.body
             })
+            
     except Exception as e:
         print(f"Error fetching columns: {e}")
+
+    # Fetch Like Counts
+    try:
+        # Aggregate likes: {unique_id: count}
+        like_counts_res = db.session.query(
+            ColumnLike.column_unique_id, 
+            func.count(ColumnLike.id)
+        ).group_by(ColumnLike.column_unique_id).all()
+        
+        like_counts = {uid: count for uid, count in like_counts_res}
+    except Exception as e:
+        print(f"Error fetching likes: {e}")
+        like_counts = {}
 
     
     # ユーザー処理
     current_user_obj = None
     read_columns = []
+    user_likes = set()
     
     if 'user_id' in session:
         current_user_obj = User.query.get(session['user_id'])
@@ -13899,6 +13940,21 @@ def columns_page():
             current_read_cols = current_user_obj.get_read_columns()
             if isinstance(current_read_cols, list):
                 read_columns = list(current_read_cols) # Return copy
+            
+            # ユーザーのいいね取得
+            user_likes_res = ColumnLike.query.filter_by(user_id=session['user_id']).with_entities(ColumnLike.column_unique_id).all()
+            user_likes = {ul[0] for ul in user_likes_res}
+
+    # Inject like data into columns_data
+    # columns_data structure: {'middle': {'Subject': [col_dict, ...]}, ...}
+    for school in columns_data:
+        for subject in columns_data[school]:
+            for col_dict in columns_data[school][subject]:
+                # Reconstruct unique_id to match (school-subject-numbering)
+                # Note: col_dict['numbering'] is int, need str
+                unique_id = f"{school}-{subject}-{col_dict['numbering']}"
+                col_dict['like_count'] = like_counts.get(unique_id, 0)
+                col_dict['is_liked'] = unique_id in user_likes
             
             # DB上のデータに合わせてIDの整合性を保つ
             # unique_id = school_type + '-' + subject + '-' + str(numbering)
@@ -13959,27 +14015,45 @@ def mark_column_read():
     except Exception as e:
         db.session.rollback()
         return jsonify({'status': 'error', 'message': str(e)}), 500
-        if isinstance(read_columns, str):
-            try:
-                read_columns = json.loads(read_columns)
-            except:
-                read_columns = []
-                
-        # リストであることを保証
-        if not isinstance(read_columns, list):
-            read_columns = []
+@app.route('/api/toggle_column_like', methods=['POST'])
+def toggle_column_like():
+    if 'user_id' not in session:
+        return jsonify({'status': 'error', 'message': 'Not logged in'}), 401
+    
+    try:
+        data = request.get_json()
+        column_unique_id = data.get('column_unique_id')
+        
+        if not column_unique_id:
+            return jsonify({'status': 'error', 'message': 'Missing column_unique_id'}), 400
 
-        if is_read:
-            if column_id not in read_columns:
-                read_columns.append(column_id)
+        existing_like = ColumnLike.query.filter_by(
+            user_id=session['user_id'],
+            column_unique_id=column_unique_id
+        ).first()
+
+        liked = False
+        if existing_like:
+            db.session.delete(existing_like)
+            liked = False
         else:
-            if column_id in read_columns:
-                read_columns.remove(column_id)
-                
-        current_user.set_read_columns(read_columns)
+            new_like = ColumnLike(
+                user_id=session['user_id'],
+                column_unique_id=column_unique_id
+            )
+            db.session.add(new_like)
+            liked = True
+            
         db.session.commit()
         
-        return jsonify({'status': 'success', 'read_columns': read_columns})
+        # Get updated count
+        count = ColumnLike.query.filter_by(column_unique_id=column_unique_id).count()
+        
+        return jsonify({
+            'status': 'success', 
+            'liked': liked,
+            'count': count
+        })
         
     except Exception as e:
         db.session.rollback()
@@ -16586,6 +16660,7 @@ check_and_migrate_rpg_columns()
 with app.app_context():
     _add_read_columns_to_user()
     _create_column_table()
+    _create_column_like_table()
 
 @app.route('/api/check_rpg_intro_eligibility', methods=['GET'])
 def check_rpg_intro_eligibility():
