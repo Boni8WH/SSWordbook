@@ -4630,8 +4630,10 @@ def password_reset_request():
             ).first()
             
             if not user:
-                flash('入力された情報に一致するアカウントが見つかった場合、パスワード再発行のご案内をメールで送信しました。', 'success')
-                return redirect(url_for('login_page'))
+                flash('入力された情報に一致するアカウントが見つかりませんでした。', 'danger')
+                context = get_template_context()
+                context['mail_configured'] = mail_configured
+                return render_template('password_reset_request.html', **context)
             
             # 既存の未使用トークンがあれば無効化
             existing_tokens = PasswordResetToken.query.filter_by(user_id=user.id, used=False).all()
