@@ -76,7 +76,8 @@ async function initializeDailyQuiz() {
         if (data.completed) {
             // 既に回答済みの場合
             displayQuizResult(data.user_result, data.top_5_ranking, data.user_rank, data.total_participants,
-                data.monthly_top_5, data.monthly_user_rank, data.monthly_participants);
+                data.monthly_top_5, data.monthly_user_rank, data.monthly_participants,
+                data.previous_top_5, data.previous_user_rank, data.previous_participants);
         } else {
             // これから回答する場合
             runQuiz(data.questions);
@@ -203,7 +204,8 @@ async function submitQuizResult(score, time) {
         // レスポンスのデータを使って結果を表示
         if (data.status === 'success' && data.completed) {
             displayQuizResult(data.user_result, data.top_5_ranking, data.user_rank, data.total_participants,
-                data.monthly_top_5, data.monthly_user_rank, data.monthly_participants);
+                data.monthly_top_5, data.monthly_user_rank, data.monthly_participants,
+                data.previous_top_5, data.previous_user_rank, data.previous_participants);
         } else {
             // サーバーからのエラーメッセージを表示
             throw new Error(data.message || '結果の表示に失敗しました。');
@@ -215,9 +217,9 @@ async function submitQuizResult(score, time) {
 }
 
 /**
- * 結果とランキング（日次・月次）を表示する
+ * 結果とランキング（日次・月次・前回）を表示する
  */
-function displayQuizResult(userResult, top5Ranking, userRank, totalParticipants, monthlyTop5, monthlyUserRank, monthlyParticipants) {
+function displayQuizResult(userResult, top5Ranking, userRank, totalParticipants, monthlyTop5, monthlyUserRank, monthlyParticipants, previousTop5, previousUserRank, previousParticipants) {
     const quizContainer = document.getElementById('dailyQuizContainer');
 
     // --- 1. 日次ランキングHTMLの生成 ---
@@ -294,7 +296,45 @@ function displayQuizResult(userResult, top5Ranking, userRank, totalParticipants,
         `;
     }
 
-    // --- 3. 最終的なHTMLの組み立て ---
+    // --- 3. 前回のランキングHTMLの生成 (新規追加) ---
+    let previousRankingHTML = '<p class="text-muted text-center mt-2">前回のデータはありません。</p>';
+    if (previousTop5 && previousTop5.length > 0) {
+        const previousBodyHTML = previousTop5.map(r => `
+            <tr class="${(previousUserRank && r.rank === previousUserRank.rank) ? 'current-user-rank' : ''}">
+                <td>${r.rank}位</td>
+                <td><div class="text-truncate mx-auto" style="max-width: 100px;" title="${r.username}">${r.username}</div></td>
+                <td><div class="text-truncate mx-auto" style="max-width: 100px;" title="${r.title || ''}"><span class="${r.title ? 'premium-badge-title' : ''}">${r.title || '-'}</span></div></td>
+                <td>${r.score}/10</td>
+                <td>${r.time}</td>
+            </tr>
+        `).join('');
+
+        let previousFootHTML = '';
+        if (previousUserRank && previousUserRank.rank > 5) {
+            previousFootHTML = `
+                <tfoot>
+                    <tr class="rank-ellipsis"><td colspan="5">...</td></tr>
+                    <tr class="current-user-rank out-of-top5-rank">
+                        <td>${previousUserRank.rank}位</td>
+                        <td><div class="text-truncate mx-auto" style="max-width: 100px;" title="${previousUserRank.username}">${previousUserRank.username}</div></td>
+                        <td><div class="text-truncate mx-auto" style="max-width: 100px;" title="${previousUserRank.title || ''}"><span class="${previousUserRank.title ? 'premium-badge-title' : ''}">${previousUserRank.title || '-'}</span></div></td>
+                        <td>${previousUserRank.score}/10</td>
+                        <td>${previousUserRank.time}</td>
+                    </tr>
+                </tfoot>
+            `;
+        }
+        previousRankingHTML = `
+            <table class="table ranking-table mt-2 text-center">
+                <thead><tr><th>順位</th><th>名前</th><th>称号</th><th>スコア</th><th>タイム</th></tr></thead>
+                <tbody>${previousBodyHTML}</tbody>
+                ${previousFootHTML}
+            </table>
+            <p class="text-center text-muted participation-count">前回の参加人数: ${previousParticipants}人</p>
+        `;
+    }
+
+    // --- 4. 最終的なHTMLの組み立て ---
     quizContainer.innerHTML = `
         <div class="quiz-result-view">
             <h4>本日の結果</h4>
@@ -308,6 +348,11 @@ function displayQuizResult(userResult, top5Ranking, userRank, totalParticipants,
 
             <h5><i class="fas fa-medal"></i> 部屋別ランキング (本日 トップ5)</h5>
             ${dailyRankingHTML}
+
+            <hr class="result-divider">
+
+            <h5><i class="fas fa-history"></i> 部屋別ランキング (前回 トップ5)</h5>
+            ${previousRankingHTML}
 
             <hr class="result-divider">
 

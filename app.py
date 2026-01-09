@@ -15661,6 +15661,33 @@ def delete_essay_image(problem_id):
         app.logger.error(f"画像削除エラー: {str(e)}")
         return jsonify({'status': 'error', 'message': f'削除中にエラーが発生しました: {str(e)}'})
 
+
+def get_daily_ranking_data(quiz_id, current_user_id):
+    """
+    指定されたクイズIDの結果から、ランキング（トップ5とユーザー自身のランク）を取得するヘルパー関数
+    """
+    all_results = DailyQuizResult.query.filter_by(quiz_id=quiz_id)\
+        .options(joinedload(DailyQuizResult.user))\
+        .order_by(DailyQuizResult.score.desc(), DailyQuizResult.time_taken_ms.asc()).all()
+    
+    total_participants = len(all_results)
+    top_5_ranking = []
+    current_user_rank_info = None
+
+    for i, result in enumerate(all_results, 1):
+        if not result.user: continue
+        rank_entry = {
+            'rank': i, 
+            'username': result.user.username, 
+            'title': result.user.equipped_rpg_enemy.badge_name if result.user.equipped_rpg_enemy else None,
+            'score': result.score, 
+            'time': f"{(result.time_taken_ms / 1000):.2f}秒"
+        }
+        if i <= 5: top_5_ranking.append(rank_entry)
+        if result.user_id == current_user_id: current_user_rank_info = rank_entry
+        
+    return top_5_ranking, current_user_rank_info, total_participants
+
 @app.route('/api/daily_quiz/today')
 def get_daily_quiz():
     """今日の10問を取得、または結果を表示するためのAPI (月間ランキング対応版)"""
@@ -15695,29 +15722,25 @@ def get_daily_quiz():
         user.room_number, user.id, current_year, current_month
     )
 
+    # --- 前回のランキングデータを取得 (昨日とは限らない) ---
+    previous_top_5 = []
+    previous_user_rank = None
+    previous_participants = 0
+    
+    # 今日より前の日付で、最も新しいクイズを取得
+    previous_quiz_obj = DailyQuiz.query.filter(
+        DailyQuiz.date < today, 
+        DailyQuiz.room_number == user.room_number
+    ).order_by(DailyQuiz.date.desc()).first()
+
+    if previous_quiz_obj:
+        previous_top_5, previous_user_rank, previous_participants = get_daily_ranking_data(previous_quiz_obj.id, user.id)
+
     if daily_quiz:
         user_result = DailyQuizResult.query.filter_by(user_id=user.id, quiz_id=daily_quiz.id).first()
         if user_result:
             # --- (回答済みの場合) ---
-            all_results = DailyQuizResult.query.filter_by(quiz_id=daily_quiz.id)\
-                .options(joinedload(DailyQuizResult.user))\
-                .order_by(DailyQuizResult.score.desc(), DailyQuizResult.time_taken_ms.asc()).all()
-            
-            total_participants = len(all_results)
-            top_5_ranking = []
-            current_user_rank_info = None
-
-            for i, result in enumerate(all_results, 1):
-                if not result.user: continue
-                rank_entry = {
-                    'rank': i, 
-                    'username': result.user.username, 
-                    'title': result.user.equipped_rpg_enemy.badge_name if result.user.equipped_rpg_enemy else None,
-                    'score': result.score, 
-                    'time': f"{(result.time_taken_ms / 1000):.2f}秒"
-                }
-                if i <= 5: top_5_ranking.append(rank_entry)
-                if result.user_id == user.id: current_user_rank_info = rank_entry
+            top_5_ranking, current_user_rank_info, total_participants = get_daily_ranking_data(daily_quiz.id, user.id)
             
             user_result_data = {'score': user_result.score, 'time': f"{(user_result.time_taken_ms / 1000):.2f}秒"}
 
@@ -15728,9 +15751,12 @@ def get_daily_quiz():
                 'top_5_ranking': top_5_ranking,
                 'user_rank': current_user_rank_info,
                 'total_participants': total_participants,
-                'monthly_top_5': monthly_top_5, # 月間ランキング追加
-                'monthly_user_rank': monthly_user_rank, # 月間ランキング追加
-                'monthly_participants': monthly_participants # 月間ランキング追加
+                'monthly_top_5': monthly_top_5,
+                'monthly_user_rank': monthly_user_rank,
+                'monthly_participants': monthly_participants,
+                'previous_top_5': previous_top_5,       # 前回のランキング追加
+                'previous_user_rank': previous_user_rank, # 前回のランキング追加
+                'previous_participants': previous_participants # 前回のランキング追加
             })
 
     # --- (未回答の場合のクイズ生成ロジック) ---
@@ -15842,25 +15868,7 @@ def submit_daily_quiz():
         db.session.refresh(new_result)
         
         # (日次ランキング計算)
-        all_results = DailyQuizResult.query.filter_by(quiz_id=daily_quiz.id)\
-            .options(joinedload(DailyQuizResult.user))\
-            .order_by(DailyQuizResult.score.desc(), DailyQuizResult.time_taken_ms.asc()).all()
-        
-        total_participants = len(all_results)
-        top_5_ranking = []
-        current_user_rank_info = None
-
-        for i, result in enumerate(all_results, 1):
-            if not result.user: continue
-            rank_entry = {
-                'rank': i, 
-                'username': result.user.username, 
-                'title': result.user.equipped_rpg_enemy.badge_name if result.user.equipped_rpg_enemy else None,
-                'score': result.score, 
-                'time': f"{(result.time_taken_ms / 1000):.2f}秒"
-            }
-            if i <= 5: top_5_ranking.append(rank_entry)
-            if result.user_id == user.id: current_user_rank_info = rank_entry
+        top_5_ranking, current_user_rank_info, total_participants = get_daily_ranking_data(daily_quiz.id, user.id)
         
         # --- ▼▼▼ 月間ランキングデータを取得 ▼▼▼ ---
         current_year = today.year
@@ -15868,6 +15876,19 @@ def submit_daily_quiz():
         monthly_top_5, monthly_user_rank, monthly_participants = get_monthly_ranking(
             user.room_number, user.id, current_year, current_month
         )
+
+        # --- 前回のランキングデータを取得 ---
+        previous_top_5 = []
+        previous_user_rank = None
+        previous_participants = 0
+        
+        previous_quiz = DailyQuiz.query.filter(
+            DailyQuiz.date < today, 
+            DailyQuiz.room_number == user.room_number
+        ).order_by(DailyQuiz.date.desc()).first()
+
+        if previous_quiz:
+            previous_top_5, previous_user_rank, previous_participants = get_daily_ranking_data(previous_quiz.id, user.id)
 
         return jsonify({
             'status': 'success',
@@ -15877,9 +15898,12 @@ def submit_daily_quiz():
             'top_5_ranking': top_5_ranking,
             'user_rank': current_user_rank_info,
             'total_participants': total_participants,
-            'monthly_top_5': monthly_top_5, # 月間ランキング追加
-            'monthly_user_rank': monthly_user_rank, # 月間ランキング追加
-            'monthly_participants': monthly_participants # 月間ランキング追加
+            'monthly_top_5': monthly_top_5,
+            'monthly_user_rank': monthly_user_rank,
+            'monthly_participants': monthly_participants,
+            'previous_top_5': previous_top_5,         # 前回のランキング追加
+            'previous_user_rank': previous_user_rank,   # 前回のランキング追加
+            'previous_participants': previous_participants # 前回のランキング追加
         })
 
     except Exception as e:
