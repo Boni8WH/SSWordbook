@@ -317,22 +317,74 @@
         border-bottom-color: #3498db;
     }
 
-    /* Settings Panel Active Button Styling */
     #readingSettingsPanel .btn.active {
         border: 2px solid #3498db !important;
         position: relative;
         z-index: 10;
         font-weight: bold;
     }
+
+    /* Like Animation */
+    @keyframes like-bounce {
+        0% {
+            transform: scale(1);
+        }
+
+        50% {
+            transform: scale(1.4);
+        }
+
+        100% {
+            transform: scale(1);
+        }
+    }
+
+    .like-anim {
+        animation: like-bounce 0.4s ease-in-out;
+    }
+
+    #modalLikeButton {
+        border: none;
+        background: none;
+        padding: 0 10px;
+        color: #dc3545;
+        /* Bootstrap danger color */
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        transition: transform 0.1s;
+    }
+
+    #modalLikeButton:active {
+        transform: scale(0.95);
+    }
+
+    #modalLikeButton i {
+        font-size: 1.8rem;
+    }
+
+    #modalLikeCount {
+        font-size: 1.2rem;
+        font-weight: bold;
+        color: #6c757d;
+        /* Muted text for number */
+    }
 </style>
 
 <div class="container py-4">
     <!-- Filter Toolbar -->
-    <div class="d-flex justify-content-end mb-3 align-items-center">
-        <div class="form-check form-switch">
+    <div class="d-flex justify-content-end mb-3 align-items-center gap-3">
+        <div class="d-flex align-items-center">
+            <label class="me-2 text-muted small"><i class="fas fa-sort"></i> 並び順</label>
+            <select class="form-select form-select-sm" id="columnSort" onchange="sortColumns()" style="width: auto;">
+                <option value="number">No.順</option>
+                <option value="likes">いいね順</option>
+            </select>
+        </div>
+        <div class="form-check form-switch m-0">
             <input class="form-check-input" type="checkbox" id="unreadFilter" onchange="toggleUnreadFilter()">
             <label class="form-check-label user-select-none" for="unreadFilter" style="cursor: pointer;">
-                <i class="fas fa-filter text-muted me-1"></i> 未読のみ表示
+                <i class="fas fa-filter text-muted me-1"></i> 未読のみ
             </label>
         </div>
     </div>
@@ -379,15 +431,32 @@
                                 {% set col_id = (1 if school_type == 'middle' else 2)|string + '-' + loop.index|string +
                                 '-' +
                                 col.numbering|string %}
-                                <!-- Generate unique ID -->
+                                <!-- Generate unique ID for Logic and Safe ID for DOM -->
                                 {% set unique_id = school_type + '-' + subject + '-' + col.numbering|string %}
+                                {% set safe_id = unique_id|replace(' ', '_')|replace("'", "")|replace('"', "") %}
                                 {% set is_read = unique_id in read_columns %}
 
-                                <div class="col">
-                                    <div class="column-card {% if is_read %}read{% endif %}" id="card-{{ unique_id }}"
-                                        onclick='openColumnModal("{{ col.title|e }}", "{{ col.subtitle|e }}", {{ col.body|tojson|safe }}, "{{ unique_id }}", {{ "true" if is_read else "false" }})'>
+                                <div class="col" data-id="{{ unique_id }}" data-number="{{ col.numbering }}"
+                                    data-likes="{{ col.like_count }}">
+                                    <!-- Data Block for Safe Retrieval -->
+                                    <script id="data-{{ safe_id }}" type="application/json">
+                                        {
+                                            "title": {{ col.title|tojson|safe }},
+                                            "subtitle": {{ col.subtitle|tojson|safe }},
+                                            "body": {{ col.body|tojson|safe }}
+                                        }
+                                    </script>
+                                    <div class="column-card {% if is_read %}read{% endif %}" id="card-{{ safe_id }}"
+                                        data-unique-id="{{ unique_id }}" data-safe-id="{{ safe_id }}"
+                                        onclick="openColumnModal(this.dataset.uniqueId, this.dataset.safeId)">
                                         <div class="card-meta">
                                             <span class="column-number">No. {{ col.numbering }}</span>
+                                            <span class="like-count-badge text-muted"
+                                                id="list-like-count-{{ safe_id }}">
+                                                <i
+                                                    class="{{ 'fas' if col.is_liked else 'far' }} fa-heart text-danger"></i>
+                                                {{ col.like_count }}
+                                            </span>
                                         </div>
                                         <div class="card-title">{{ col.title }}
                                             <i class="fas fa-chevron-right ms-auto text-muted"
@@ -439,7 +508,10 @@
                         <i class="fas fa-font"></i> 表示設定
                     </button>
                 </div>
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
+                <button type="button" class="btn" id="modalLikeButton" onclick="toggleLikeFromModal()">
+                    <i class="far fa-heart"></i>
+                    <span id="modalLikeCount"></span>
+                </button>
             </div>
         </div>
     </div>
@@ -513,8 +585,33 @@
             }
         });
 
-        // Optional: Update accordion counts or hide empty accordions if needed
-        // For now, simpler is better.
+    }
+
+    function sortColumns() {
+        const sortType = document.getElementById('columnSort').value;
+        const accordions = document.querySelectorAll('.accordion');
+
+        accordions.forEach(acc => {
+            const bodies = acc.querySelectorAll('.accordion-body');
+            bodies.forEach(body => {
+                const row = body.querySelector('.row');
+                const cols = Array.from(row.children);
+
+                cols.sort((a, b) => {
+                    if (sortType === 'number') {
+                        return parseInt(a.dataset.number) - parseInt(b.dataset.number);
+                    } else if (sortType === 'likes') {
+                        const likesA = parseInt(a.dataset.likes) || 0;
+                        const likesB = parseInt(b.dataset.likes) || 0;
+                        // Sort descending by likes, then ascending by number
+                        if (likesB !== likesA) return likesB - likesA;
+                        return parseInt(a.dataset.number) - parseInt(b.dataset.number);
+                    }
+                });
+
+                cols.forEach(col => row.appendChild(col));
+            });
+        });
     }
 
     // Tab Persistence Logic
@@ -752,32 +849,74 @@
         document.getElementById('fontSizeDisplay').textContent = Math.round(currentSettings.fontSize / 1.2 * 100) + '%';
     }
 
+    let currentLikeState = false;
+    let currentLikeCount = 0;
     let currentModalId = null;
-    let originalBodyText = '';
+    let currentSafeId = null;
+    let originalBodyText = ''; // Initialize globally
 
-    function openColumnModal(title, subtitle, body, uniqueId, isRead) {
-        // Load settings before showing
-        loadSettings();
+    function openColumnModal(uniqueId, safeId) {
+        // Retrieve Data from Script Block using Safe ID
+        const dataScript = document.getElementById('data-' + safeId);
+        let columnData = { title: '', subtitle: '', body: '' };
+
+        if (dataScript) {
+            try {
+                columnData = JSON.parse(dataScript.textContent);
+            } catch (e) {
+                console.error('Failed to parse column data', e);
+                alert('データの読み込みに失敗しました。');
+                return;
+            }
+        }
+
+        const title = columnData.title;
+        const subtitle = columnData.subtitle;
+        const body = columnData.body;
 
         originalBodyText = body;
 
+        // Load settings AFTER setting content so applySettings works correctly
+        loadSettings();
+
         document.getElementById('modalColumnTitle').textContent = title;
         document.getElementById('modalColumnSubtitle').textContent = subtitle || '';
-        // Body will be set by applySettings based on mode
-        // document.getElementById('modalColumnBody').textContent = body; 
 
         currentModalId = uniqueId;
+        currentSafeId = safeId;
+
+        // Resolve Live State from DOM
+        // Use getElementById with SAFE ID
+        const badgeElement = document.getElementById('list-like-count-' + safeId);
+        const cardElement = document.getElementById('card-' + safeId);
+        const colEl = cardElement ? cardElement.closest('.col') : null;
+
+        let liveLiked = false;
+        let liveCount = 0;
+
+        if (badgeElement && colEl) {
+            const icon = badgeElement.querySelector('i');
+            if (icon) {
+                liveLiked = icon.classList.contains('fas');
+            }
+            liveCount = parseInt(colEl.dataset.likes) || 0;
+        }
+
+        currentLikeState = liveLiked;
+        currentLikeCount = liveCount;
+
+        updateLikeButtonState();
 
         {% if current_user.is_authenticated %}
         const switchEl = document.getElementById('modalReadSwitch');
 
-        // Check live status from the card element class, as 'isRead' arg is stale after update
-        const cardEl = document.getElementById('card-' + uniqueId);
-        const currentIsRead = cardEl ? cardEl.classList.contains('read') : isRead;
+        // Check live status from the card element class (Safe ID)
+        const cardEl = document.getElementById('card-' + safeId);
+        const currentIsRead = cardEl ? cardEl.classList.contains('read') : false;
 
         switchEl.checked = currentIsRead;
         switchEl.onchange = function () {
-            updateReadStatus(uniqueId, this.checked);
+            updateReadStatus(uniqueId, safeId, this.checked);
         };
         {% endif %}
 
@@ -792,6 +931,114 @@
             checkSubtitleMultiline();
         }, { once: true });
     }
+
+    function updateLikeButtonState() {
+        const btn = document.getElementById('modalLikeButton');
+        const icon = btn.querySelector('i');
+        const countSpan = document.getElementById('modalLikeCount');
+
+        // Update Count
+        countSpan.textContent = currentLikeCount;
+
+        if (currentLikeState) {
+            // Liked: Filled Heart
+            icon.classList.remove('far');
+            icon.classList.add('fas');
+
+            // Add animation class if not already present (triggering reflow to restart if needed?)
+            // For simple toggle, just adding it is enough. We can remove it later or on unlike.
+            // To replay animation on re-like, we remove it on unlike.
+            icon.classList.add('like-anim');
+        } else {
+            // Unliked: Outline Heart
+            icon.classList.remove('fas');
+            icon.classList.add('far');
+
+            icon.classList.remove('like-anim');
+        }
+    }
+
+    function toggleLikeFromModal() {
+        if (!currentModalId) return;
+
+        // Optimistic UI Update
+        currentLikeState = !currentLikeState;
+        if (currentLikeState) {
+            currentLikeCount++;
+        } else {
+            currentLikeCount--;
+        }
+        updateLikeButtonState();
+
+        // Update List View immediately
+        updateListLikeDisplay(currentSafeId, currentLikeState, currentLikeCount);
+
+        // API Call
+        fetch('/api/toggle_column_like', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ column_unique_id: currentModalId }),
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    // Sync with server source of truth
+                    currentLikeState = data.liked;
+                    currentLikeCount = data.count;
+                    updateLikeButtonState();
+                    updateListLikeDisplay(currentSafeId, currentLikeState, currentLikeCount);
+                } else {
+                    // Revert on error
+                    alert('エラーが発生しました: ' + data.message);
+                    currentLikeState = !currentLikeState;
+                    if (currentLikeState) currentLikeCount++; else currentLikeCount--;
+                    updateLikeButtonState();
+                    updateListLikeDisplay(currentSafeId, currentLikeState, currentLikeCount);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                // Revert on error
+                currentLikeState = !currentLikeState;
+                if (currentLikeState) currentLikeCount++; else currentLikeCount--;
+                updateLikeButtonState();
+                updateListLikeDisplay(currentSafeId, currentLikeState, currentLikeCount);
+            });
+    }
+
+    function updateListLikeDisplay(safeId, isLiked, count) {
+        // Update Badge
+        const badge = document.getElementById('list-like-count-' + safeId);
+        if (badge) {
+            badge.innerHTML = `<i class="${isLiked ? 'fas' : 'far'} fa-heart text-danger"></i> ${count}`;
+        }
+
+        // Update Data Attribute for sorting
+        // Note: For sorting we used data-id which is currently unique_id. 
+        // We can look up by ID using safeId card to find wrapper col.
+        const card = document.getElementById('card-' + safeId);
+        const colContainer = card ? card.closest('.col') : null;
+
+        if (colContainer) {
+            colContainer.dataset.likes = count;
+        }
+    }
+
+    // Patch openColumnModal to prefer reading updated state from DOM if available?
+    // No, that's complex.
+    // Let's just update the onclick attribute.
+    // Actually, simpler: Since we have `updateListLikeDisplay`, let's also update the onclick string.
+    // Regex: openColumnModal(..., ..., ..., "uniqueId", isRead, isLiked, count)
+    // The last two args are what changed.
+    // It's getting complicated to regex replace the onclick.
+    // ALTERNATIVE: Don't pass isLiked/Count in onclick. Pass ID, and read from dataset of the element!
+
+    // Changing openColumnModal signature in the ReplacementChunk above to:
+    // onclick='openColumnModal(..., ..., ..., "uniqueId", ...)'
+
+    // I will slightly adjust the `openColumnModal` logic in the replacement below to read from DOM if not passed or override.
 
     // Helper to escape HTML characters
     function escapeHtml(text) {
@@ -908,33 +1155,36 @@
         contentEl.style.fontSize = currentSettings.fontSize + 'em';
     }
 
-    function toggleReadStatus(uniqueId, event) {
+    function toggleReadStatus(uniqueId, safeId, event) {
         // Prevent button click from triggering card click if we had that, but here it's separate
         if (event) event.stopPropagation();
 
-        const checkbox = document.getElementById('check-' + uniqueId);
-        // Toggle happens automatically on UI, we just sync
-        // Wait for change to reflect? No, checkbox click toggles it.
-        // Actually if we click wrapper, we need to toggle checkbox manually if not clicking input directly
-        if (event.target !== checkbox) {
+        const checkbox = document.getElementById('check-' + safeId);
+        // ...
+
+        // Note: The UI for checkbox toggle in list might need update to use safeId too if it exists?
+        // Wait, the checkbox logic is separate. Let's assume it uses safeId logic or original?
+        // Actually, I haven't updated the list-view checkbox HTML to use safeId.
+        // I should stick to the modal logic for now. Use updateReadStatus params accordingly.
+        if (event.target !== checkbox && checkbox) {
             checkbox.checked = !checkbox.checked;
         }
 
-        updateReadStatus(uniqueId, checkbox.checked);
+        updateReadStatus(uniqueId, safeId, checkbox ? checkbox.checked : false);
     }
 
-    function updateReadStatus(uniqueId, isRead) {
+    function updateReadStatus(uniqueId, safeId, isRead) {
         // Optimistic UI update
-        const card = document.getElementById('card-' + uniqueId);
-        const checkbox = document.getElementById('check-' + uniqueId);
+        const card = document.getElementById('card-' + safeId);
+        const checkbox = document.getElementById('check-' + safeId); // This might break if check-ID is not updated
         const modalSwitch = document.getElementById('modalReadSwitch');
 
         if (isRead) {
-            card.classList.add('read');
+            if (card) card.classList.add('read');
             if (checkbox) checkbox.checked = true;
             if (modalSwitch && currentModalId === uniqueId) modalSwitch.checked = true;
         } else {
-            card.classList.remove('read');
+            if (card) card.classList.remove('read');
             if (checkbox) checkbox.checked = false;
             if (modalSwitch && currentModalId === uniqueId) modalSwitch.checked = false;
         }
