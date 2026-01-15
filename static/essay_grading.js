@@ -215,7 +215,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const overlay = document.createElement('div');
         overlay.style.position = 'fixed';
         overlay.style.top = '0';
-        overlay.style.left = '0';
+        overlay.style.left = '-10000px'; // Hide off-screen
         overlay.style.width = '100%';
         overlay.style.height = '100%';
         overlay.style.backgroundColor = '#ffffff';
@@ -235,6 +235,30 @@ document.addEventListener('DOMContentLoaded', function () {
         // Remove buttons
         const buttons = content.querySelectorAll('button');
         buttons.forEach(btn => btn.remove());
+
+        // 🆕 Add User Answer Section
+        const richTextEditor = document.getElementById('richTextEditor');
+        if (richTextEditor) {
+            const userAnswerDiv = document.createElement('div');
+            userAnswerDiv.style.marginTop = '20px';
+            userAnswerDiv.style.borderTop = '2px dashed #bdc3c7'; // Separator
+            userAnswerDiv.style.paddingTop = '15px';
+
+            const header = document.createElement('h3');
+            header.textContent = '【あなたの解答】';
+            // h3 style handled by page CSS injection below, but local style helps structure
+
+            const body = document.createElement('div');
+            body.innerHTML = richTextEditor.innerHTML;
+            body.style.padding = '10px';
+            body.style.backgroundColor = 'rgba(255, 255, 255, 0.5)';
+            body.style.border = '1px solid #bdc3c7';
+            body.style.borderRadius = '5px';
+
+            userAnswerDiv.appendChild(header);
+            userAnswerDiv.appendChild(body);
+            content.appendChild(userAnswerDiv);
+        }
 
         // Add Footer with Copyright
         let appName = 'SSWordbook';
