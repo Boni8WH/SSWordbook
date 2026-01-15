@@ -1,4 +1,3 @@
-# requirements.txt を修正
 Flask==3.0.3
 Flask-SQLAlchemy==3.0.5
 Flask-Mail==0.9.1
@@ -17,3 +16,4 @@ boto3==1.34.0
 Flask-APScheduler==1.13.1
 pywebpush==2.1.2
 google-generativeai
+python-dotenv
