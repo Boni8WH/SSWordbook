@@ -11365,13 +11365,13 @@ def essay_grade():
         if not problem:
              return jsonify({'status': 'error', 'message': 'Problem not found'}), 404
 
-        # Gemini 1.5 Flash を使用 (File API対応、高速、長文コンテキストに強い)
+        # Gemini 2.0 Flash を使用 (Latest Available Model)
         genai = get_genai_module()
         if not genai:
              raise Exception("Gemini module could not be loaded")
         
-        # モデル変更: gemini-pro-latest -> gemini-1.5-flash
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        # モデル変更: gemini-1.5-flash -> gemini-2.0-flash
+        model = genai.GenerativeModel('gemini-2.0-flash')
         
         # 教科書データの準備 (File API)
         textbook_file = get_uploaded_textbook_file()
