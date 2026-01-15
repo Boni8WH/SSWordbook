@@ -25,58 +25,50 @@ from dotenv import load_dotenv
 
 # .envファイルの内容を環境変数として読み込む
 load_dotenv()
-try:
-    import boto3
-    from botocore.exceptions import NoCredentialsError
-    S3_AVAILABLE = True
-except ImportError:
-    print("⚠️ boto3が利用できません。画像アップロードはローカル保存になります。")
-    S3_AVAILABLE = False
-    boto3 = None
-    NoCredentialsError = Exception
+
 JST = pytz.timezone('Asia/Tokyo')
 
 # AWS S3設定
-S3_BUCKET = 'your-bucket-name'
-S3_KEY = 'your-access-key'
-S3_SECRET = 'your-secret-key'
-S3_REGION = 'ap-northeast-1'  # 東京リージョン
-
 S3_BUCKET = os.environ.get('S3_BUCKET', 'your-default-bucket')
 S3_KEY = os.environ.get('AWS_ACCESS_KEY_ID')
 S3_SECRET = os.environ.get('AWS_SECRET_ACCESS_KEY')
 S3_REGION = os.environ.get('AWS_REGION', 'ap-northeast-1')
 
-# S3クライアント初期化（boto3利用可能時のみ）
-if S3_AVAILABLE and S3_KEY and S3_SECRET:
+def get_s3_client():
+    """Boto3を遅延インポートしてS3クライアントを取得"""
+    if not S3_KEY or not S3_SECRET:
+        return None
     try:
-        s3_client = boto3.client(
+        import boto3
+        return boto3.client(
             's3',
             aws_access_key_id=S3_KEY,
             aws_secret_access_key=S3_SECRET,
             region_name=S3_REGION
         )
-        print("✅ S3クライアント初期化完了")
+    except ImportError:
+        print("⚠️ boto3が利用できません（遅延ロード失敗）")
+        return None
     except Exception as e:
         print(f"⚠️ S3クライアント初期化失敗: {e}")
-        S3_AVAILABLE = False
-        s3_client = None
-else:
-    print("⚠️ S3設定不完全：ローカル保存を使用")
-    S3_AVAILABLE = False  # 認証情報がない場合はS3_AVAILABLEをFalseに設定
-    s3_client = None
+        return None
 
 # Gemini API設定
-import google.generativeai as genai
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
-if GEMINI_API_KEY:
+
+def get_genai_module():
+    """google.generativeaiを遅延インポートして設定済みモジュールを返す"""
+    if not GEMINI_API_KEY:
+        print("⚠️ GEMINI_API_KEYが設定されていません")
+        return None
+    
     try:
+        import google.generativeai as genai
         genai.configure(api_key=GEMINI_API_KEY)
-        print("✅ Gemini API設定完了")
+        return genai
     except Exception as e:
         print(f"⚠️ Gemini API設定失敗: {e}")
-else:
-    print("⚠️ GEMINI_API_KEYが設定されていません")
+        return None
 
 
 # 定数定義
@@ -85,11 +77,13 @@ COLUMNS_CSV_PATH = os.path.join(UPLOAD_FOLDER, 'columns.csv')
 
 def upload_image_to_s3(file, filename, folder='essay_images', content_type='image/jpeg'):
     """画像をS3にアップロード（boto3利用可能時のみ）"""
-    if not S3_AVAILABLE:
-        print("⚠️ S3アップロード不可：boto3がインストールされていません")
+    s3_client = get_s3_client()
+    if not s3_client:
+        print("⚠️ S3アップロード不可：boto3設定なし")
         return None
         
     try:
+        from botocore.exceptions import NoCredentialsError
         s3_client.upload_fileobj(
             file,
             S3_BUCKET,
@@ -97,10 +91,9 @@ def upload_image_to_s3(file, filename, folder='essay_images', content_type='imag
             ExtraArgs={'ContentType': content_type}
         )
         return f"https://{S3_BUCKET}.s3.{S3_REGION}.amazonaws.com/{folder}/{filename}"
-    except NoCredentialsError:
-        print("AWS認証情報が見つかりません")
-        return None
     except Exception as e:
+        # NoCredentialsErrorは動的インポートしないと捕まえられないが、Exceptionでまとめてキャッチでも実用上は問題ない
+        # 精密にやるなら try内で import する
         print(f"S3アップロードエラー: {e}")
         return None
 # ====================================================================
@@ -1272,7 +1265,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from sqlalchemy import inspect, text, func
 from functools import wraps
-from PIL import Image
+
 
 def admin_required(f):
     @wraps(f)
@@ -8749,7 +8742,8 @@ def _handle_image_logo(app_info, request):
 
         if app_info.logo_image_filename:
             # Delete old logo (S3 or local)
-            if S3_AVAILABLE:
+            s3_client = get_s3_client()
+            if s3_client:
                 try:
                     s3_client.delete_object(Bucket=S3_BUCKET, Key=f"logos/{app_info.logo_image_filename}")
                     logger.info(f"Deleted old logo from S3: logos/{app_info.logo_image_filename}")
@@ -8769,6 +8763,7 @@ def _handle_image_logo(app_info, request):
         unique_filename = f"{uuid.uuid4().hex}{ext}"
 
         # Process image
+        from PIL import Image
         img = Image.open(file)
         
         # Crop if data exists
@@ -11232,11 +11227,12 @@ def get_adjacent_problems_with_visibility(problem, room_number):
 # Gemini API連携機能 (論述問題添削 & OCR)
 # ====================================================================
 
-import PIL.Image
+
 
 @app.route('/api/essay/ocr', methods=['POST'])
 def essay_ocr():
     """アップロードされた画像から手書き文字を読み取り、HTML形式で返す"""
+    import PIL.Image
     if not GEMINI_API_KEY:
         return jsonify({'status': 'error', 'message': 'Gemini API key not configured'}), 500
 
@@ -11260,6 +11256,9 @@ def essay_ocr():
 
         # Gemini 2.0 Flash を使用 (高速・高性能OCR)
         # Note: 1.5-flashが404エラーになるため、以前認識されていた2.0-flashに戻す
+        genai = get_genai_module()
+        if not genai:
+             raise Exception("Gemini module could not be loaded")
         model = genai.GenerativeModel('gemini-2.0-flash')
         
         prompt = """
@@ -11287,8 +11286,10 @@ def essay_ocr():
         try:
             # エラー時に利用可能なモデル一覧をログに出力
             print("--- Available Models ---")
-            for m in genai.list_models():
-                print(f"- {m.name}")
+            genai_mod = get_genai_module()
+            if genai_mod:
+                for m in genai_mod.list_models():
+                    print(f"- {m.name}")
             print("------------------------")
         except:
             pass
@@ -11297,6 +11298,7 @@ def essay_ocr():
 @app.route('/api/essay/grade', methods=['POST'])
 def essay_grade():
     """論述問題の添削を行う"""
+    import PIL.Image
     if not GEMINI_API_KEY:
         return jsonify({'status': 'error', 'message': 'Gemini API key not configured'}), 500
 
@@ -11317,6 +11319,9 @@ def essay_grade():
 
         # Gemini Pro (Latest) を使用
         # Note: 1.5-proが404エラーになるため、以前認識されていたgemini-pro-latestに戻す
+        genai = get_genai_module()
+        if not genai:
+             raise Exception("Gemini module could not be loaded")
         model = genai.GenerativeModel('gemini-pro-latest')
         
         # 教科書データの読み込み
@@ -11418,8 +11423,10 @@ def essay_grade():
         try:
             # エラー時に利用可能なモデル一覧をログに出力
             print("--- Available Models ---")
-            for m in genai.list_models():
-                print(f"- {m.name}")
+            genai_mod = get_genai_module()
+            if genai_mod:
+                for m in genai_mod.list_models():
+                    print(f"- {m.name}")
             print("------------------------")
         except:
             pass
