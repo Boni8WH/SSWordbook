@@ -348,6 +348,7 @@ document.addEventListener('DOMContentLoaded', () => {
             improveTouchExperience();
             optimizeScrolling();
             updateIncorrectOnlySelection();
+            loadFontSize(); // フォントサイズ読み込み
         }, 1500);
 
         if (noWeakWordsMessage) {
@@ -567,6 +568,71 @@ function checkSpecialUnlockClientSide(chapterNum) {
     return true;
 }
 
+// ======================// ===================================
+// フォントサイズ調整機能 (Refined)
+// ===================================
+
+const decreaseFontBtn = document.getElementById('decreaseFontSize');
+const increaseFontBtn = document.getElementById('increaseFontSize');
+
+let currentFontSize = 1.3; // Default rem
+const MIN_FONT_SIZE = 0.8;
+const MAX_FONT_SIZE = 3.0;
+const FONT_STEP = 0.2;
+
+function applyFontSize(size) {
+    const questionEl = document.getElementById('question');
+    const answerEl = document.getElementById('answer');
+
+    if (questionEl) questionEl.style.fontSize = `${size}rem`;
+    if (answerEl) answerEl.style.fontSize = `${size}rem`;
+
+    // Persist
+    try {
+        localStorage.setItem('quiz_font_size_val', size);
+    } catch (e) { console.warn(e); }
+}
+
+function adjustFontSize(delta) {
+    let newSize = currentFontSize + delta;
+    // Round to 1 decimal place to avoid float errors
+    newSize = Math.round(newSize * 10) / 10;
+
+    if (newSize < MIN_FONT_SIZE) newSize = MIN_FONT_SIZE;
+    if (newSize > MAX_FONT_SIZE) newSize = MAX_FONT_SIZE;
+
+    currentFontSize = newSize;
+    applyFontSize(currentFontSize);
+}
+
+function loadFontSize() {
+    try {
+        const saved = localStorage.getItem('quiz_font_size_val');
+        if (saved) {
+            currentFontSize = parseFloat(saved);
+            // Validation
+            if (isNaN(currentFontSize) || currentFontSize < MIN_FONT_SIZE || currentFontSize > MAX_FONT_SIZE) {
+                currentFontSize = 1.3;
+            }
+        }
+    } catch (e) { }
+    applyFontSize(currentFontSize);
+}
+
+// Event Listeners
+if (decreaseFontBtn) {
+    decreaseFontBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        adjustFontSize(-FONT_STEP);
+    });
+}
+
+if (increaseFontBtn) {
+    increaseFontBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        adjustFontSize(FONT_STEP);
+    });
+}
 // =========================================================
 // 範囲選択の保存と復元機能
 // =========================================================
