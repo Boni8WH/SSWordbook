@@ -10830,6 +10830,7 @@ def essay_index():
                 
         except Exception as e:
             app.logger.error(f"公開設定取得エラー: {e}")
+            db.session.rollback()
             # デフォルト：全ての論述問題を取得して公開設定
             problems = EssayProblem.query.filter_by(enabled=True).all()
             for problem in problems:
@@ -11426,6 +11427,7 @@ def get_essay_visibility_settings(room_number):
         
     except Exception as e:
         print(f"Error getting essay visibility settings: {e}")
+        db.session.rollback()
         return {}
 
 def set_essay_visibility_setting(room_number, chapter, problem_type, is_visible):
