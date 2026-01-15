@@ -793,6 +793,22 @@ def _add_updated_at_column_to_announcement():
     except Exception as e:
         print(f"⚠️ Announcementマイグレーションエラー: {e}")
 
+def _add_draft_answer_to_essay_progress():
+    """EssayProgressテーブルにdraft_answerカラムを追加するマイグレーション関数"""
+    try:
+        inspector = inspect(db.engine)
+        if 'essay_progress' in inspector.get_table_names():
+            columns = [c['name'] for c in inspector.get_columns('essay_progress')]
+            
+            if 'draft_answer' not in columns:
+                print("🔄 EssayProgress: draft_answerカラムを追加します...")
+                with db.engine.connect() as conn:
+                    with conn.begin():
+                        conn.execute(text("ALTER TABLE essay_progress ADD COLUMN draft_answer TEXT"))
+                print("✅ EssayProgress: draft_answerカラム追加完了")
+    except Exception as e:
+        print(f"⚠️ EssayProgressマイグレーションエラー: {e}")
+
 
 
 # ====================================================================
@@ -1460,6 +1476,7 @@ with app.app_context():
         # Gunicorn起動時にも確実に適用されるようにする
         _add_manager_columns()
         _add_updated_at_column_to_announcement()
+        _add_draft_answer_to_essay_progress()
         
         # 他の安全なマイグレーションも念のため実行
         _add_logo_columns_to_app_info()
