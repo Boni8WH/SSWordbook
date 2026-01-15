@@ -21,6 +21,10 @@ import pytz
 import threading
 from flask_apscheduler import APScheduler
 from pywebpush import webpush, WebPushException
+from dotenv import load_dotenv
+
+# .envファイルの内容を環境変数として読み込む
+load_dotenv()
 try:
     import boto3
     from botocore.exceptions import NoCredentialsError
