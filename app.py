@@ -10920,6 +10920,7 @@ def essay_index():
                             understood_problems += 1
             except Exception:
                 # EssayProgressテーブルがない場合はスキップ
+                db.session.rollback()
                 pass
             
             # 進捗率を計算
