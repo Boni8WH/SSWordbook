@@ -13,7 +13,7 @@ import io
 from io import StringIO, BytesIO
 from datetime import datetime, timedelta
 from sqlalchemy import inspect, text, func, case, cast, Integer
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, deferred
 from datetime import date, datetime, timedelta
 import random
 import glob
@@ -358,7 +358,7 @@ class AppInfo(db.Model):
     school_name = db.Column(db.String(100), default="〇〇高校", nullable=True)
     
     # ロゴ画像データ（DB保存用）
-    logo_image_content = db.Column(db.LargeBinary, nullable=True)
+    logo_image_content = deferred(db.Column(db.LargeBinary, nullable=True))
     logo_image_mimetype = db.Column(db.String(50), nullable=True)
 
     # ロゴタイプ: 'text' or 'image'
@@ -428,17 +428,17 @@ class RpgEnemy(db.Model):
     
     # 画像関連 (ファイル名/URL + DB保存用バイナリ)
     icon_image = db.Column(db.String(255)) # ファイル名またはURL
-    icon_image_content = db.Column(db.LargeBinary) # 🆕 DB保存用
+    icon_image_content = deferred(db.Column(db.LargeBinary)) # 🆕 DB保存用
     icon_image_mimetype = db.Column(db.String(50)) # 🆕 MIMEタイプ
     
     badge_name = db.Column(db.String(100))
     badge_image = db.Column(db.String(255)) # ファイル名またはFAクラス
-    badge_image_content = db.Column(db.LargeBinary) # 🆕 DB保存用
+    badge_image_content = deferred(db.Column(db.LargeBinary)) # 🆕 DB保存用
     badge_image_mimetype = db.Column(db.String(50)) # 🆕 MIMEタイプ
 
     # 討伐後画像 (Status画面用)
     defeated_image = db.Column(db.String(255)) 
-    defeated_image_content = db.Column(db.LargeBinary)
+    defeated_image_content = deferred(db.Column(db.LargeBinary))
     defeated_image_mimetype = db.Column(db.String(50))
     
     difficulty = db.Column(db.Integer, default=1)
@@ -1334,7 +1334,7 @@ class EssayImage(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     problem_id = db.Column(db.Integer, db.ForeignKey('essay_problems.id'), nullable=False, unique=True)
-    image_data = db.Column(db.LargeBinary, nullable=False)  # 画像のバイナリデータ
+    image_data = deferred(db.Column(db.LargeBinary, nullable=False))  # 画像のバイナリデータ
     image_format = db.Column(db.String(10), nullable=False, default='PNG')  # PNG, JPEG など
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     
