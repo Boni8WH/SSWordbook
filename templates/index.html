@@ -140,8 +140,19 @@
         <button id="correctButton" class="correct-button hidden">正解</button>
         <button id="incorrectButton" class="incorrect-button hidden">不正解</button>
     </div>
-    <div class="back-to-selection-container">
-        <button id="backToSelectionFromCardButton" class="secondary-button">選択画面に戻る</button>
+    <div class="back-to-selection-container"
+        style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+        <button id="backToSelectionFromCardButton" class="secondary-button" style="margin: 0;">選択画面に戻る</button>
+
+        <div class="font-size-controls">
+            <span style="font-size: 0.8rem; color: #7f8c8d;">文字サイズ</span>
+            <div class="btn-group" role="group">
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="decreaseFontSize" title="文字を小さくする"><i
+                        class="fas fa-minus"></i></button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="increaseFontSize" title="文字を大きくする"><i
+                        class="fas fa-plus"></i></button>
+            </div>
+        </div>
     </div>
 </section>
 

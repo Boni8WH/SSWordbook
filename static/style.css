@@ -1740,11 +1740,11 @@ hr {
     }
 
     .answer-content {
-        position: absolute;
-        top: 120px;
-        left: 25px;
-        right: 25px;
-        margin-top: 0;
+        /* position: absolute; REMOVED to fix overlap */
+        /* top: 120px; */
+        /* left: 25px; */
+        /* right: 25px; */
+        margin-top: 20px;
     }
 
     .answer-content p {
@@ -6212,4 +6212,29 @@ a.nav-link.btn.change-username-button:hover,
         /* PC: Keep at 5% to avoid overlap */
         transform: none;
     }
+}
+
+/* Font Size Controls */
+.font-size-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+@media (max-width: 768px) {
+    .font-size-controls {
+        display: none !important;
+    }
+}
+
+/* Fix text overlap when font is large */
+.question-content {
+    margin-bottom: 30px;
+    /* Increased margin */
+}
+
+.answer-content {
+    margin-top: 20px;
+    clear: both;
+    /* Ensure it clears floating elements if any */
 }
