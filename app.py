@@ -11295,6 +11295,54 @@ def essay_ocr():
             pass
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
+# ====================================================================
+# Gemini File API Helper (Textbook Cache)
+# ====================================================================
+_uploaded_textbook_file = None
+_textbook_upload_lock = threading.Lock()
+
+def get_uploaded_textbook_file():
+    """
+    教科書ファイルをGeminiにアップロードし、その参照を返す（シングルトン・スレッドセーフ）
+    これにより、アプリ側のメモリ消費を抑え、コンテキスト送信量を減らす
+    """
+    global _uploaded_textbook_file
+    
+    # 既にアップロード済みならそれを返す
+    if _uploaded_textbook_file:
+        return _uploaded_textbook_file
+
+    with _textbook_upload_lock:
+        # ロック取得後にもう一度チェック (Double-checked locking)
+        if _uploaded_textbook_file:
+            return _uploaded_textbook_file
+            
+        try:
+            genai = get_genai_module()
+            if not genai:
+                return None
+                
+            textbook_path = os.path.join(app.root_path, 'data', 'textbook.txt')
+            if not os.path.exists(textbook_path):
+                print(f"Textbook file not found at: {textbook_path}")
+                return None
+                
+            print(f"📤 Uploading textbook to Gemini... ({textbook_path})")
+            
+            # MIME type is text/plain
+            file_obj = genai.upload_file(textbook_path, mime_type="text/plain")
+            
+            # アップロード完了待ち（通常は即時だが念のため）
+            # 大きなファイルの場合は処理待ちが必要だがテキストなら早い
+            
+            _uploaded_textbook_file = file_obj
+            print(f"✅ Textbook upload complete: {file_obj.name} (URI: {file_obj.uri})")
+            return _uploaded_textbook_file
+            
+        except Exception as e:
+            print(f"❌ Failed to upload textbook: {e}")
+            return None
+
 @app.route('/api/essay/grade', methods=['POST'])
 def essay_grade():
     """論述問題の添削を行う"""
@@ -11317,37 +11365,30 @@ def essay_grade():
         if not problem:
              return jsonify({'status': 'error', 'message': 'Problem not found'}), 404
 
-        # Gemini Pro (Latest) を使用
-        # Note: 1.5-proが404エラーになるため、以前認識されていたgemini-pro-latestに戻す
+        # Gemini 1.5 Flash を使用 (File API対応、高速、長文コンテキストに強い)
         genai = get_genai_module()
         if not genai:
              raise Exception("Gemini module could not be loaded")
-        model = genai.GenerativeModel('gemini-pro-latest')
         
-        # 教科書データの読み込み
-        textbook_content = ""
-        textbook_path = os.path.join(app.root_path, 'data', 'textbook.txt')
-        if os.path.exists(textbook_path):
-            try:
-                with open(textbook_path, 'r', encoding='utf-8') as f:
-                    textbook_content = f.read()
-            except Exception as e:
-                print(f"Textbook read error: {e}")
+        # モデル変更: gemini-pro-latest -> gemini-1.5-flash
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        
+        # 教科書データの準備 (File API)
+        textbook_file = get_uploaded_textbook_file()
+        if not textbook_file:
+             print("Warning: Textbook file could not be uploaded. Grading without textbook context.")
+             # フォールバック処理などは必要に応じて検討
 
         prompt = f"""
 # Role
-あなたは大学入試（世界史）の論述問題採点官です。教科書を正解の絶対基準とし、厳格な採点と、受験生の成長を促す愛のあるフィードバックを行ってください。
-
-# Reference Knowledge (Textbook)
-以下は教科書の記述です。この内容を「絶対的な正解基準」として使用してください。
-{textbook_content[:50000]} 
+あなたは大学入試（世界史）の論述問題採点官です。
+一緒に提供された「教科書データ（テキストファイル）」を正解の絶対基準とし、厳格な採点と、受験生の成長を促す愛のあるフィードバックを行ってください。
 
 # Input Data
 - 大学/年度: {problem.university} {problem.year}
 - 問題文: {problem.question}
 - 模範解答: {problem.answer}
 - 受験生の解答: {user_answer}
-
 
 # Task
 以下のステップで評価を実行し、**HTML形式**で出力してください。
@@ -11389,10 +11430,15 @@ def essay_grade():
             "HARM_CATEGORY_DANGEROUS_CONTENT": "BLOCK_NONE",
         }
 
-        # 画像データの取得
-        essay_image = EssayImage.query.filter_by(problem_id=problem_id).first()
+        # コンテンツパーツの構築 (プロンプト + 教科書ファイル + 画像(あれば))
         content_parts = [prompt]
         
+        # 教科書ファイルを追加
+        if textbook_file:
+            content_parts.append(textbook_file)
+
+        # 画像データの取得
+        essay_image = EssayImage.query.filter_by(problem_id=problem_id).first()
         if essay_image:
             try:
                 # バイナリデータからPIL Imageを作成
@@ -11402,6 +11448,7 @@ def essay_grade():
             except Exception as img_err:
                 print(f"Error loading problem image: {img_err}")
 
+        # 生成実行
         response = model.generate_content(content_parts, safety_settings=safety_settings)
         
         try:
