@@ -11249,8 +11249,17 @@ def essay_ocr():
 
     try:
         image = PIL.Image.open(file)
-        # Gemini 2.0 Flash を使用 (高速・高性能OCR)
-        model = genai.GenerativeModel('gemini-2.0-flash')
+        
+        # 画像のリサイズ（長辺最大1600px）- 高速化とタイムアウト防止
+        max_size = 1600
+        if max(image.size) > max_size:
+            ratio = max_size / max(image.size)
+            new_size = (int(image.size[0] * ratio), int(image.size[1] * ratio))
+            image = image.resize(new_size, PIL.Image.Resampling.LANCZOS)
+            logger.info(f"Image resized to {new_size}")
+
+        # Gemini 1.5 Flash を使用 (高速・安定)
+        model = genai.GenerativeModel('gemini-1.5-flash')
         
         prompt = """
         この画像の論述答案にある手書き文字を読み取ってください。
@@ -11297,8 +11306,8 @@ def essay_grade():
         if not problem:
              return jsonify({'status': 'error', 'message': 'Problem not found'}), 404
 
-        # Gemini Pro (Latest) を使用 (高精度推論・添削用)
-        model = genai.GenerativeModel('gemini-pro-latest')
+        # Gemini 1.5 Pro を使用 (長文脈対応・高精度)
+        model = genai.GenerativeModel('gemini-1.5-pro')
         
         # 教科書データの読み込み
         textbook_content = ""
