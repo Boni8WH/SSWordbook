@@ -62,6 +62,19 @@ else:
     S3_AVAILABLE = False  # 認証情報がない場合はS3_AVAILABLEをFalseに設定
     s3_client = None
 
+# Gemini API設定
+import google.generativeai as genai
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
+if GEMINI_API_KEY:
+    try:
+        genai.configure(api_key=GEMINI_API_KEY)
+        print("✅ Gemini API設定完了")
+    except Exception as e:
+        print(f"⚠️ Gemini API設定失敗: {e}")
+else:
+    print("⚠️ GEMINI_API_KEYが設定されていません")
+
+
 # 定数定義
 UPLOAD_FOLDER = 'uploads'
 COLUMNS_CSV_PATH = os.path.join(UPLOAD_FOLDER, 'columns.csv')
@@ -1209,6 +1222,7 @@ class EssayProgress(db.Model):
     understood = db.Column(db.Boolean, default=False, nullable=False)
     difficulty_rating = db.Column(db.Integer)
     memo = db.Column(db.Text)
+    draft_answer = db.Column(db.Text)  # ← 追加: 下書き保存用
     review_flag = db.Column(db.Boolean, default=False, nullable=False)
     viewed_at = db.Column(db.DateTime)
     understood_at = db.Column(db.DateTime)
@@ -1216,7 +1230,7 @@ class EssayProgress(db.Model):
     
     __table_args__ = (
         db.UniqueConstraint('user_id', 'problem_id', name='unique_user_problem'),
-        {'extend_existing': True}  # ← 追加
+        {'extend_existing': True}
     )
 
 class EssayCsvFile(db.Model):
@@ -11061,6 +11075,7 @@ def essay_problem(problem_id):
                 'understood': progress.understood,
                 'difficulty_rating': progress.difficulty_rating,
                 'memo': progress.memo,
+                'draft_answer': progress.draft_answer, # ← 追加
                 'review_flag': progress.review_flag
             }
         else:
@@ -11189,6 +11204,176 @@ def get_adjacent_problems_with_visibility(problem, room_number):
     except Exception as e:
         print(f"Error getting adjacent problems with visibility: {e}")
         return None, None
+
+# ====================================================================
+# Gemini API連携機能 (論述問題添削 & OCR)
+# ====================================================================
+
+import PIL.Image
+
+@app.route('/api/essay/ocr', methods=['POST'])
+def essay_ocr():
+    """アップロードされた画像から手書き文字を読み取り、HTML形式で返す"""
+    if not GEMINI_API_KEY:
+        return jsonify({'status': 'error', 'message': 'Gemini API key not configured'}), 500
+
+    if 'image' not in request.files:
+        return jsonify({'status': 'error', 'message': 'No image provided'}), 400
+    
+    file = request.files['image']
+    if file.filename == '':
+        return jsonify({'status': 'error', 'message': 'No image selected'}), 400
+
+    try:
+        image = PIL.Image.open(file)
+        # Gemini 2.0 Flash を使用 (高速・高性能OCR)
+        model = genai.GenerativeModel('gemini-2.0-flash')
+        
+        prompt = """
+        この画像の論述答案にある手書き文字を読み取ってください。
+        以下のルールに従ってテキストを出力してください：
+        1. 下線が引かれている部分は、そのテキストを <u>タグで囲んでください。
+        2. 改行は含めず、一つの文章として続けてください。（重要）
+        3. 読み取ったテキスト以外の説明や挨拶は一切不要です。
+        4. マークダウンのコードブロック（```html等）は使用しないでください。
+        5. 縦書きの場合は横書きに直してください。
+        """
+        
+        response = model.generate_content([prompt, image])
+        text = response.text
+        
+        # クリーニング（改行削除 & 不要なタグ削除）
+        text = text.replace('```html', '').replace('```', '').strip()
+        text = text.replace('\n', '') # 改行を完全に削除
+        text = text.replace('<br>', '') # 万が一生成されたタグも削除
+        
+        return jsonify({'status': 'success', 'text': text})
+        
+    except Exception as e:
+        print(f"OCR Error: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/essay/grade', methods=['POST'])
+def essay_grade():
+    """論述問題の添削を行う"""
+    if not GEMINI_API_KEY:
+        return jsonify({'status': 'error', 'message': 'Gemini API key not configured'}), 500
+
+    data = request.json
+    if not data:
+        return jsonify({'status': 'error', 'message': 'No data provided'}), 400
+        
+    problem_id = data.get('problem_id')
+    user_answer = data.get('user_answer')
+    
+    if not problem_id or not user_answer:
+        return jsonify({'status': 'error', 'message': 'Missing problem_id or user_answer'}), 400
+
+    try:
+        problem = EssayProblem.query.get(problem_id)
+        if not problem:
+             return jsonify({'status': 'error', 'message': 'Problem not found'}), 404
+
+        # Gemini Pro (Latest) を使用 (高精度推論・添削用)
+        model = genai.GenerativeModel('gemini-pro-latest')
+        
+        # 教科書データの読み込み
+        textbook_content = ""
+        textbook_path = os.path.join(app.root_path, 'data', 'textbook.txt')
+        if os.path.exists(textbook_path):
+            try:
+                with open(textbook_path, 'r', encoding='utf-8') as f:
+                    textbook_content = f.read()
+            except Exception as e:
+                print(f"Textbook read error: {e}")
+
+        prompt = f"""
+# Role
+あなたは大学入試（世界史）の論述問題採点官です。教科書を正解の絶対基準とし、厳格な採点と、受験生の成長を促す愛のあるフィードバックを行ってください。
+
+# Reference Knowledge (Textbook)
+以下は教科書の記述です。この内容を「絶対的な正解基準」として使用してください。
+{textbook_content[:50000]} 
+
+# Input Data
+- 大学/年度: {problem.university} {problem.year}
+- 問題文: {problem.question}
+- 模範解答: {problem.answer}
+- 受験生の解答: {user_answer}
+
+
+# Task
+以下のステップで評価を実行し、**HTML形式**で出力してください。
+`<html>`や`<body>`タグは不要です。各セクションは `<div class="grade-section">` 等で囲んでください。
+マークダウンの**太字**などは使用せず、`<b>`タグなどを使用してください。
+
+## Step 1: 【分析】出題意図と採点基準の策定
+1. この問題が問うている歴史的構造（因果関係：何が原因で、どうなり、その結果どうなったか）を整理してください。
+2. 採点基準を以下のように定義してください。
+   - 必須要素（キーワードや概念）のリスト
+   - 論理構成のポイント
+
+## Step 2: 【採点】(100点満点)
+以下の配点比率に基づき、1点刻みで厳密に採点してください。
+- 構成・論理（40点）: 因果関係の構築、論理の飛躍の有無。
+- 知識の正確性（40点）: 史実の誤認、用語の適切さ、指定語句の正しい使用。
+- 表現・形式（20点）: 文字数遵守。模範解答の9割未満は減点、8割未満は大幅に減点してください。日本語の正確さも評価対象です。
+
+## Step 3: 【フィードバック】
+受験生が次に何をすべきか明確に伝えてください。
+1. 評価できた点: 加点ポイントになった箇所。
+2. 減点対象・改善点: 具体的な誤りや不足している視点。教科書のどの単元を復習すべきか。
+3. リライト案（満点解答）: 受験生の解答の構成を活かしつつ、上記改善点を反映させた「合格者レベル」の答案。
+   **制約: リライト案の文字数は、問題文で指定がある場合はそれに従い、指定がない場合は模範解答の文字数（{problem.answer_length}文字）の90%〜100%程度に必ず収めること。**
+   **末尾に、リライト案の文字数を「【356文字】」のように（「約」をつけずに）明記すること。**
+
+# Constraints
+- 基準レベル: 高校教科書の範囲を絶対とし、大学レベルの特殊な学説は加点しません。
+- 厳格さ: 誤字脱字、事実誤認、指定語句の未提出は厳しく減点してください。
+- トーン: 採点官としての威厳を持ちつつ、受験生を鼓舞する教育的な言葉遣い。
+- 返答の内容: 【分析】の前に一言は不要。論拠となる書物には言及しなくて良い。
+- **出力形式**: HTMLのみ。Markdown（`**`など）は禁止。見出しは`<h3>`、リストは`<ul><li>`、強調は`<b>`や`<span class="highlight">`を使用すること。
+"""
+        # Safety settings to avoid blocking legitimate educational content
+        safety_settings = {
+            "HARM_CATEGORY_HARASSMENT": "BLOCK_NONE",
+            "HARM_CATEGORY_HATE_SPEECH": "BLOCK_NONE",
+            "HARM_CATEGORY_SEXUALLY_EXPLICIT": "BLOCK_NONE",
+            "HARM_CATEGORY_DANGEROUS_CONTENT": "BLOCK_NONE",
+        }
+
+        # 画像データの取得
+        essay_image = EssayImage.query.filter_by(problem_id=problem_id).first()
+        content_parts = [prompt]
+        
+        if essay_image:
+            try:
+                # バイナリデータからPIL Imageを作成
+                image = PIL.Image.open(io.BytesIO(essay_image.image_data))
+                content_parts.append(image)
+                print(f"Adding problem image to Gemini prompt: {essay_image.image_format}")
+            except Exception as img_err:
+                print(f"Error loading problem image: {img_err}")
+
+        response = model.generate_content(content_parts, safety_settings=safety_settings)
+        
+        try:
+            feedback = response.text
+        except ValueError:
+            # Fallback if response.text fails (e.g., safety block or empty)
+            print(f"Gemini generation error. Finish reason: {response.prompt_feedback}")
+            if response.candidates:
+                 print(f"Candidates: {response.candidates}")
+            return jsonify({'status': 'error', 'message': 'AIからの応答が取得できませんでした。時間をおいて再試行するか、入力内容を確認してください。'}), 500
+        
+        # クリーニング
+        feedback = feedback.replace('```html', '').replace('```', '').strip()
+        
+        return jsonify({'status': 'success', 'feedback': feedback})
+        
+    except Exception as e:
+        print(f"Grading Error: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 def is_essay_problem_visible_sql(room_number, chapter, problem_type):
     """SQLベースの公開設定チェック（モデル問題回避版）"""
@@ -12995,6 +13180,9 @@ def update_essay_progress():
         
         if 'memo' in updates:
             progress.memo = updates['memo']
+            
+        if 'draft_answer' in updates:
+            progress.draft_answer = updates['draft_answer']
         
         if 'review_flag' in updates:
             progress.review_flag = updates['review_flag']

@@ -608,6 +608,151 @@
             min-width: 100% !important;
         }
     }
+
+    /* 答案作成セクション */
+    .submission-section {
+        background: #ffffff;
+        border-radius: 12px;
+        padding: 25px;
+        margin-bottom: 25px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+        border: 1px solid #e9ecef;
+    }
+
+    .editor-toolbar {
+        background: #f8f9fa;
+        padding: 8px;
+        border: 1px solid #dee2e6;
+        border-bottom: none;
+        border-radius: 6px 6px 0 0;
+    }
+
+    .rich-text-editor {
+        min-height: 200px;
+        border: 1px solid #dee2e6;
+        padding: 15px;
+        border-radius: 0 0 6px 6px;
+        outline: none;
+        font-size: 1.05rem;
+        line-height: 1.8;
+    }
+
+    .rich-text-editor:focus {
+        border-color: #80bdff;
+        box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, .25);
+    }
+
+    .editor-footer {
+        text-align: right;
+        font-size: 0.9rem;
+        color: #6c757d;
+        margin-top: 5px;
+    }
+
+    .upload-area {
+        border: 2px dashed #dee2e6;
+        border-radius: 6px;
+        padding: 40px;
+        text-align: center;
+        background: #f8f9fa;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+    .upload-area:hover {
+        border-color: #6c757d;
+        background: #e9ecef;
+    }
+
+    .upload-placeholder {
+        color: #6c757d;
+    }
+
+    #imagePreview {
+        max-width: 100%;
+        max-height: 300px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .grading-result {
+        background: #fff;
+        border: 1px solid #e0e0e0;
+        border-radius: 12px;
+        padding: 30px;
+        animation: fadeIn 0.5s ease-in-out;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+        color: #333;
+        line-height: 1.8;
+    }
+
+    .grading-result h3 {
+        font-size: 1.1rem;
+        font-weight: 700;
+        margin-top: 25px;
+        margin-bottom: 15px;
+        color: #2c3e50;
+        border-left: 4px solid #4a90e2;
+        padding-left: 12px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .grading-result h3:first-child {
+        margin-top: 0;
+    }
+
+    .grading-result p {
+        margin-bottom: 1.2em;
+        color: #555;
+    }
+
+    .grading-result ul {
+        padding-left: 20px;
+        margin-bottom: 20px;
+        list-style-type: none;
+        /* カスタムアイコンのため */
+    }
+
+    .grading-result li {
+        margin-bottom: 10px;
+        position: relative;
+        padding-left: 15px;
+    }
+
+    .grading-result li::before {
+        content: "•";
+        color: #4a90e2;
+        font-weight: bold;
+        position: absolute;
+        left: 0;
+    }
+
+    .score-value {
+        font-size: 2.5rem;
+        font-weight: 800;
+        color: #e74c3c;
+        margin: 0 5px;
+        font-family: 'Outfit', sans-serif;
+        /* 数字を目立たせる */
+    }
+
+    .grade-score {
+        background: #fdf2f2;
+        padding: 20px;
+        border-radius: 8px;
+        margin-top: 30px;
+        text-align: center;
+        border: 1px dashed #e74c3c;
+    }
+
+    .grade-score h3 {
+        border-left: none;
+        justify-content: center;
+        margin-bottom: 10px;
+        color: #c0392b;
+    }
 </style>
 
 {% endblock %}
@@ -706,6 +851,87 @@
                 onerror="this.style.display='none';">
         </div>
         {% endif %}
+    </div>
+
+    <!-- 答案作成・添削セクション -->
+    <div class="submission-section">
+        <h2 class="section-title">
+            <i class="fas fa-pen-fancy"></i> 答案作成・AI添削
+        </h2>
+
+        <!-- タブ -->
+        <ul class="nav nav-tabs" id="submissionTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="direct-tab" data-bs-toggle="tab" data-bs-target="#direct-input"
+                    type="button" role="tab" aria-controls="direct-input" aria-selected="true"><i
+                        class="fas fa-keyboard"></i> 直接入力</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="upload-tab" data-bs-toggle="tab" data-bs-target="#upload-input"
+                    type="button" role="tab" aria-controls="upload-input" aria-selected="false"><i
+                        class="fas fa-camera"></i> プリント読込</button>
+            </li>
+        </ul>
+
+        <div class="tab-content border border-top-0 p-3 bg-white rounded-bottom" id="submissionTabContent">
+            <!-- 直接入力タブ -->
+            <div class="tab-pane fade show active" id="direct-input" role="tabpanel" aria-labelledby="direct-tab">
+                <div class="editor-toolbar">
+                    <button type="button" class="btn btn-sm btn-outline-secondary"
+                        onclick="document.execCommand('underline', false, null);"><i class="fas fa-underline"></i>
+                        下線</button>
+                    <span class="text-muted ms-2 small">※文字を選択してボタンを押すと下線が引けます</span>
+                </div>
+                <div id="richTextEditor" class="rich-text-editor" contenteditable="true"
+                    placeholder="ここに答案を入力してください...">{{ problem.progress.draft_answer | safe if problem.progress and
+                    problem.progress.draft_answer else '' }}</div>
+                <!-- 文字数カウント -->
+                <div class="editor-footer">
+                    <span id="charCount">0文字</span>
+                </div>
+            </div>
+
+            <!-- 画像アップロードタブ -->
+            <div class="tab-pane fade" id="upload-input" role="tabpanel" aria-labelledby="upload-tab">
+                <div class="upload-area" id="uploadArea">
+                    <input type="file" id="essayImageInput" accept="image/*" style="display: none;">
+                    <div class="upload-placeholder" onclick="document.getElementById('essayImageInput').click()">
+                        <div id="uploadInstructions">
+                            <i class="fas fa-cloud-upload-alt fa-3x mb-3"></i>
+                            <p>クリックして画像をアップロード<br>またはドラッグ＆ドロップ</p>
+                        </div>
+                        <div id="imagePreviewContainer" style="display: none;">
+                            <img id="imagePreview" src="" alt="Preview">
+                        </div>
+                    </div>
+                </div>
+                <div class="text-center mt-3" id="ocrActionArea" style="display: none;">
+                    <button type="button" class="btn btn-primary" id="processOcrBtn">
+                        <i class="fas fa-magic"></i> 画像から文字を読み取る (AI)
+                    </button>
+                    <p class="text-muted small mt-2">読み取ったテキストは「直接入力」タブに反映されます。</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="submission-actions mt-3 d-flex gap-2 justify-content-end">
+            <button type="button" class="btn btn-outline-primary" id="saveDraftBtn">
+                <i class="fas fa-save"></i> 下書き保存
+            </button>
+            <button type="button" class="btn btn-success" id="gradeEssayBtn">
+                <i class="fas fa-robot"></i> AI添削を依頼する
+            </button>
+        </div>
+
+        <!-- 添削結果エリア -->
+        <div id="gradingResult" class="grading-result mt-4" style="display: none;">
+            <div class="text-center p-4">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="mt-2 text-muted">AIが添削中です...<br>（30秒〜1分ほどかかる場合があります）</p>
+            </div>
+        </div>
     </div>
 
     <div class="action-buttons-container">
@@ -818,8 +1044,11 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script src="{{ url_for('static', filename='essay_grading.js') }}"></script>
 <!-- データ属性でJavaScriptに値を渡す -->
-<div id="problem-data" data-problem-id="{{ problem.id }}"
+<div id="problem-data" data-problem-id="{{ problem.id }}" data-university="{{ problem.university }}"
+    data-year="{{ problem.year }}" data-answer-length="{{ problem.answer_length }}"
     data-current-rating="{% if problem.progress and problem.progress.difficulty_rating %}{{ problem.progress.difficulty_rating }}{% else %}0{% endif %}"
     data-viewed-answer="{% if problem.progress and problem.progress.viewed_answer %}true{% else %}false{% endif %}"
     style="display: none;"></div>
