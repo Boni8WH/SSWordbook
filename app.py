@@ -11259,7 +11259,7 @@ def essay_ocr():
             logger.info(f"Image resized to {new_size}")
 
         # Gemini 1.5 Flash を使用 (高速・安定)
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        model = genai.GenerativeModel('gemini-1.5-flash-latest')
         
         prompt = """
         この画像の論述答案にある手書き文字を読み取ってください。
@@ -11283,6 +11283,14 @@ def essay_ocr():
         
     except Exception as e:
         print(f"OCR Error: {e}")
+        try:
+            # エラー時に利用可能なモデル一覧をログに出力
+            print("--- Available Models ---")
+            for m in genai.list_models():
+                print(f"- {m.name}")
+            print("------------------------")
+        except:
+            pass
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/api/essay/grade', methods=['POST'])
@@ -11307,7 +11315,7 @@ def essay_grade():
              return jsonify({'status': 'error', 'message': 'Problem not found'}), 404
 
         # Gemini 1.5 Pro を使用 (長文脈対応・高精度)
-        model = genai.GenerativeModel('gemini-1.5-pro')
+        model = genai.GenerativeModel('gemini-1.5-pro-latest')
         
         # 教科書データの読み込み
         textbook_content = ""
@@ -11405,6 +11413,14 @@ def essay_grade():
         
     except Exception as e:
         print(f"Grading Error: {e}")
+        try:
+            # エラー時に利用可能なモデル一覧をログに出力
+            print("--- Available Models ---")
+            for m in genai.list_models():
+                print(f"- {m.name}")
+            print("------------------------")
+        except:
+            pass
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 def is_essay_problem_visible_sql(room_number, chapter, problem_type):
