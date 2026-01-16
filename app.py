@@ -11570,7 +11570,7 @@ def essay_grade():
         min_rewrite = int(target_len * 0.9) # Reverted to 90% as per user request
         max_rewrite = int(target_len * 1.0)
         
-        length_instruction = f"上限（{max_rewrite}文字）に限りなく近づけよ（{min_rewrite}文字以上は必須）。"
+        length_instruction = f"必ず{min_rewrite}文字以上、{max_rewrite}文字以内で記述せよ。{max_rewrite}文字を超過することは許されない。"
 
 
         # ---------------------------------------------------------
@@ -11696,7 +11696,17 @@ def essay_grade():
                 print(f"Error loading problem image: {img_err}")
 
         # 生成実行
-        response = model.generate_content(content_parts, safety_settings=safety_settings)
+        # Generation Config for stricter adherence
+        generation_config = {
+            "temperature": 0.4,
+            "max_output_tokens": 2000, 
+        }
+
+        response = model.generate_content(
+            content_parts, 
+            safety_settings=safety_settings,
+            generation_config=generation_config
+        )
         
         try:
             feedback = response.text
