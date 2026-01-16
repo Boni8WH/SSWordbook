@@ -34,7 +34,9 @@ JST = pytz.timezone('Asia/Tokyo')
 S3_BUCKET = os.environ.get('S3_BUCKET', 'your-default-bucket')
 S3_KEY = os.environ.get('AWS_ACCESS_KEY_ID')
 S3_SECRET = os.environ.get('AWS_SECRET_ACCESS_KEY')
-S3_REGION = os.environ.get('AWS_REGION', 'ap-northeast-1')
+S3_REGION = os.environ.get('S3_REGION', 'ap-northeast-1')
+
+S3_AVAILABLE = all([S3_KEY, S3_SECRET, S3_BUCKET])
 
 def get_s3_client():
     """Boto3を遅延インポートしてS3クライアントを取得"""
