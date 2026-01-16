@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+
+{% block title %}ホーム - {{ app_name }}{% endblock %}
+
+{% block head_extra %}
+<style>
+    .landing-hero {
+        text-align: center;
+        padding: 80px 20px;
+        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        border-radius: 15px;
+        margin-bottom: 40px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    }
+
+    .landing-hero h1 {
+        font-size: 3.5rem;
+        font-weight: 900;
+        margin-bottom: 20px;
+        color: #2c3e50;
+        text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.8);
+    }
+
+    .landing-hero p {
+        font-size: 1.25rem;
+        color: #555;
+        max-width: 600px;
+        margin: 0 auto 30px;
+        line-height: 1.6;
+    }
+
+    .feature-card {
+        border: none;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        height: 100%;
+        background: #fff;
+        border-radius: 12px;
+        overflow: hidden;
+    }
+
+    .feature-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 15px 30px rgba(0, 0, 0, 0.15);
+    }
+
+    .feature-icon {
+        font-size: 2.5rem;
+        margin-bottom: 20px;
+        color: #4a90e2;
+    }
+
+    .cta-button {
+        padding: 15px 40px;
+        font-size: 1.2rem;
+        border-radius: 50px;
+        font-weight: bold;
+        transition: all 0.3s;
+        box-shadow: 0 4px 15px rgba(74, 144, 226, 0.4);
+    }
+
+    .cta-button:hover {
+        transform: scale(1.05);
+        box-shadow: 0 6px 20px rgba(74, 144, 226, 0.6);
+    }
+
+    .section-title {
+        text-align: center;
+        margin-bottom: 40px;
+        font-weight: 800;
+        color: #34495e;
+        position: relative;
+        padding-bottom: 15px;
+    }
+
+    .section-title::after {
+        content: '';
+        display: block;
+        width: 60px;
+        height: 4px;
+        background: #4a90e2;
+        margin: 10px auto 0;
+        border-radius: 2px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="landing-hero">
+    <h1>{{ app_name }}</h1>
+    <p>
+        社会科学習の新しいスタンダード
+    </p>
+    <div class="d-flex justify-content-center gap-3">
+        <a href="{{ url_for('login_page') }}" class="btn btn-primary cta-button">
+            <i class="fas fa-sign-in-alt me-2"></i>ログインして学習を始める
+        </a>
+        <a href="{{ url_for('columns_page') }}" class="btn btn-outline-dark cta-button"
+            style="background: rgba(255,255,255,0.8);">
+            <i class="fas fa-book-open me-2"></i>コラムを読む
+        </a>
+    </div>
+</div>
+
+<div class="container py-5">
+    <h2 class="section-title">主な機能</h2>
+    <div class="row g-4">
+        <div class="col-md-6">
+            <div class="card feature-card p-4 text-center">
+                <div class="feature-icon"><i class="fas fa-pen-fancy"></i></div>
+                <h3 class="h4 font-weight-bold">論述問題演習</h3>
+                <p class="text-muted">
+                    大学入試レベルの論述問題を多数収録。
+                    AIの添削で自分のペースで記述力を磨くことができます。
+                </p>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card feature-card p-4 text-center">
+                <div class="feature-icon"><i class="fas fa-history"></i></div>
+                <h3 class="h4 font-weight-bold">豊富なコラム</h3>
+                <p class="text-muted">
+                    教科書だけでは分からない歴史の背景や面白さを、
+                    詳しく解説したコラムで深く学べます。
+                </p>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card feature-card p-4 text-center">
+                <div class="feature-icon"><i class="fas fa-check-circle"></i></div>
+                <h3 class="h4 font-weight-bold">一問一答チェック</h3>
+                <p class="text-muted">
+                    重要用語をクイズ形式でサクサク確認。
+                    スキマ時間の学習に最適です。
+                </p>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card feature-card p-4 text-center">
+                <div class="feature-icon"><i class="fas fa-chart-line"></i></div>
+                <h3 class="h4 font-weight-bold">学習進捗管理</h3>
+                <p class="text-muted">
+                    学習の進み具合をグラフで可視化。
+                    モチベーションを維持しながら効率的に学習できます。
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container py-5 bg-light rounded-3 mt-5">
+    <div class="row align-items-center">
+        <div class="col-md-6 text-center text-md-start px-5">
+            <h2 class="fw-bold mb-3">今すぐ始めよう</h2>
+            <p class="lead text-muted mb-4">
+                {{ app_name }}で、教養をワンランクアップさせましょう。
+            </p>
+        </div>
+        <div class="col-md-6 text-center">
+            <a href="{{ url_for('columns_page') }}" class="btn btn-warning btn-lg px-5 py-3 fw-bold shadow-sm">
+                <i class="fas fa-arrow-right me-2"></i>公開中のコラムを見る
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block footer %}{% endblock %}
+{% block info_icon %}{% endblock %}
