@@ -11687,11 +11687,15 @@ def essay_grade():
 """
 
         # Safety settings to avoid blocking legitimate educational content
+        # Safety settings to avoid blocking legitimate educational content
+        # Updated to use new library format if needed, but keeping dict for compatibility.
+        # Ensure BLOCK_NONE is correctly interpreted.
+        from google.generativeai.types import HarmCategory, HarmBlockThreshold
         safety_settings = {
-            "HARM_CATEGORY_HARASSMENT": "BLOCK_NONE",
-            "HARM_CATEGORY_HATE_SPEECH": "BLOCK_NONE",
-            "HARM_CATEGORY_SEXUALLY_EXPLICIT": "BLOCK_NONE",
-            "HARM_CATEGORY_DANGEROUS_CONTENT": "BLOCK_NONE",
+            HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
+            HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
+            HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
+            HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
         }
 
         # コンテンツパーツの構築 (プロンプト + 教科書ファイル + 画像(あれば))
