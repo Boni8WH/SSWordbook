@@ -400,14 +400,15 @@ document.addEventListener('DOMContentLoaded', function () {
                     linear-gradient(90deg, #e5e5e5 1px, transparent 1px) !important;
                 background-size: 10mm 10mm !important; /* 1cm grid */
                 font-family: 'Zen Maru Gothic', 'Hiragino Maru Gothic ProN', 'Rounded Mplus 1c', sans-serif !important;
-                line-height: 1.8 !important;
+                line-height: 2.2 !important; /* Increased line-height to prevent underline overlap */
             }
             #pdf-content-wrapper u {
                 text-decoration: underline !important;
                 text-decoration-color: #2c3e50 !important;
-                text-underline-offset: 3px !important; /* Adjust distance */
+                text-underline-offset: 4px !important; /* Increased offset */
                 text-decoration-skip-ink: none !important;
                 border-bottom: none !important;
+                padding-bottom: 2px; /* Add padding for safety */
             }
             #pdf-content-wrapper * {
                 color: #2c3e50 !important;
@@ -439,13 +440,14 @@ document.addEventListener('DOMContentLoaded', function () {
             #pdf-content-wrapper blockquote {
                 page-break-inside: avoid !important;
                 break-inside: avoid !important;
-                margin-bottom: 0.5em;
-                display: block; /* Ensure block level for better break handling */
+                margin-bottom: 0.8em;
+                display: block; 
+                position: relative; /* Sometimes helps with rendering context */
             }
             
             #pdf-content-wrapper ul, 
             #pdf-content-wrapper ol {
-                page-break-inside: auto; /* Allow lists to break between items */
+                page-break-inside: auto; 
             }
             
             #pdf-content-wrapper .grade-section {
@@ -469,18 +471,12 @@ document.addEventListener('DOMContentLoaded', function () {
         document.body.appendChild(overlay);
 
         // Update options to be more aggressive with p tags
-        // 'css' mode respects page-break-inside: avoid
-        // 'legacy' mode is a fallback that tries to calculate breaks
-        // We add 'p' to avoid in legacy mode as well
         const updatedOpt = {
             ...opt,
             pagebreak: {
                 mode: ['css', 'legacy'],
-                avoid: ['h1', 'h2', 'h3', '.grading-block', 'tr', 'blockquote']
-                // Removed 'p', 'li' from legacy avoid list to let CSS handle it properly or to avoid too many page breaks if paragraphs are huge.
-                // However, user problem is text cutoff. Let's trust CSS 'avoid' first. 
-                // If CSS avoid works, legacy isn't needed for p. 
-                // Let's rely on CSS page-break-inside: avoid !important for p.
+                // Add 'p' and 'li' back to avoid list for safer page breaks
+                avoid: ['h1', 'h2', 'h3', '.grading-block', 'tr', 'blockquote', 'p', 'li']
             }
         };
 
