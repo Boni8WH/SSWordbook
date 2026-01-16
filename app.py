@@ -11628,7 +11628,7 @@ def essay_grade():
 1. 評価点: 加点箇所。
 2. 減点対象・改善点: 誤り、不足視点、復習すべき単元。
 3. リライト案（満点解答）: 受験生の構成を活かした「合格者レベル」の答案。
-   **制約: {length_instruction} (基準: {target_len}文字)**
+   **制約: {length_instruction} (基準: 正味{target_len}文字)**
    - **重要**: リライト案は `<div class="model-rewrite">` と `</div>` で囲め。
    - **文字数はシステムが計算するため、記述不要。**
 
@@ -11673,7 +11673,7 @@ def essay_grade():
 2. 改善点: 誤りや不足点のみ。
 3. リライト案（満点解答）:
    - 受験生の構成を活かした「合格者レベル」の答案。
-   - **制約: {length_instruction} (基準: {target_len}文字)**
+   - **制約: {length_instruction} (基準: 正味{target_len}文字)**
    - **重要**: リライト案は `<div class="model-rewrite">` と `</div>` で囲め。
    - **文字数はシステムが計算するため、記述不要。**
 
