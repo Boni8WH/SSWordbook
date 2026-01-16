@@ -11553,7 +11553,6 @@ def essay_grade():
         user_answer_optimized = re.sub(r'\n+', '\n', user_answer_optimized).strip()
 
 
-        # =========================================================
         # Rewrite Length Check
         # =========================================================
         # Use problem.answer_length if valid, otherwise measure model answer length
@@ -11567,10 +11566,15 @@ def essay_grade():
         if target_len == 0:
              target_len = 200 # Fallback 
 
-        min_rewrite = int(target_len * 0.9) # Reverted to 90% as per user request
+        min_rewrite = int(target_len * 0.9) 
         max_rewrite = int(target_len * 1.0)
         
-        length_instruction = f"必ず{min_rewrite}文字以上、{max_rewrite}文字以内で記述せよ。{max_rewrite}文字を超過することは許されない。"
+        # Flash model tends to be verbose, so we give a very strict instruction.
+        length_instruction = (
+            f"【最重要・厳守】{max_rewrite}文字以内で記述せよ（目安: {min_rewrite}〜{max_rewrite}文字）。"
+            f"提供された「模範解答」がこの文字数より長くても、絶対に真似せず、"
+            f"指定文字数内に収まるよう要約してリライトせよ。"
+        )
 
 
         # ---------------------------------------------------------
