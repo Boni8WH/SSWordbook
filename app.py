@@ -11733,7 +11733,6 @@ def essay_grade():
 
         # 生成実行
         # Generation Config for stricter adherence
-        # 2000 tokens was too short for detailed HTMl output. Increased to 8192.
         generation_config = {
             "temperature": 0.4,
             "max_output_tokens": 8192, 
@@ -11744,6 +11743,19 @@ def essay_grade():
             safety_settings=safety_settings,
             generation_config=generation_config
         )
+        
+        # Debug Logging for Truncation/Safety
+        try:
+            if response.candidates:
+                candidate = response.candidates[0]
+                print(f"DEBUG: Gen Finish Reason: {candidate.finish_reason}")
+                print(f"DEBUG: Gen Safety Ratings: {candidate.safety_ratings}")
+                if candidate.finish_reason != 1: # 1 = STOP (Normal)
+                     print(f"WARNING: Generation stopped abnormally! Reason: {candidate.finish_reason}")
+            else:
+                 print("WARNING: No candidates returned in response.")
+        except Exception as log_err:
+            print(f"Error logging candidate check: {log_err}")
         
         # === Post-Processing: AI Auto-Repair for Length Constraint ===
         final_output = response.text
