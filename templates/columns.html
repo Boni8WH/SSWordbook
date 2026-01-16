@@ -959,6 +959,11 @@
     }
 
     function toggleLikeFromModal() {
+        if (!window.appInfoFromFlask || !window.appInfoFromFlask.isLoggedIn) {
+            alert('いいね機能を利用するためにはログインしてください');
+            return;
+        }
+
         if (!currentModalId) return;
 
         // Optimistic UI Update
@@ -1263,3 +1268,6 @@
     });
 </script>
 {% endblock %}
+
+{% block footer %}{% endblock %}
+{% block info_icon %}{% endblock %}

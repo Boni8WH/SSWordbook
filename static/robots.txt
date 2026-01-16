@@ -1,0 +1,6 @@
+User-agent: *
+Disallow: /admin/
+Disallow: /essay/problem/
+Allow: /
+Allow: /columns
+Sitemap: https://sswordbook.onrender.com/sitemap.xml

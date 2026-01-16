@@ -1659,6 +1659,14 @@ def to_jst_filter(dt):
 def ads_txt():
     return send_from_directory(app.static_folder, 'ads.txt')
 
+@app.route('/robots.txt')
+def robots_txt():
+    return send_from_directory(app.static_folder, 'robots.txt')
+
+@app.route('/sitemap.xml')
+def sitemap_xml():
+    return send_from_directory(app.static_folder, 'sitemap.xml')
+
 # ====================================================================
 # ヘルパー関数
 # ====================================================================
@@ -3916,8 +3924,10 @@ def favicon():
 def index():
     try:
         if 'user_id' not in session:
-            flash('学習を始めるにはログインしてください。', 'info')
-            return redirect(url_for('login_page'))
+            # ゲストはランディングページへ
+            return render_template('landing.html', 
+                                   app_name=AppInfo.get_current_info().app_name, 
+                                   app_info=AppInfo.get_current_info())
         
         current_user = User.query.get(session['user_id'])
         if not current_user:
