@@ -11566,11 +11566,23 @@ def essay_grade():
 
         # Rewrite Length Check
         # =========================================================
-        # Use problem.answer_length if valid, otherwise measure model answer length
+        # Priority 1: Extract from Question text (e.g., "100字以内で")
+        # Priority 2: Use problem.answer_length if valid
+        # Priority 3: Measure model answer length
         target_len = 0
-        if isinstance(problem.answer_length, int) and problem.answer_length > 0:
+        
+        # 1. Regex Match from Question
+        limit_match = re.search(r'(\d+)字', problem.question)
+        if limit_match:
+             target_len = int(limit_match.group(1))
+             print(f"INFO: Detected character limit from Question text: {target_len}")
+        
+        # 2. DB Value Fallback
+        if target_len == 0 and isinstance(problem.answer_length, int) and problem.answer_length > 0:
              target_len = problem.answer_length
-        elif problem.answer:
+
+        # 3. Model Answer Length Fallback
+        if target_len == 0 and problem.answer:
              # Strip HTML tags (like <u>) from model answer for accurate length calculation
              clean_answer = re.sub(r'<[^>]+>', '', problem.answer)
              target_len = len(clean_answer.replace('\n', '').strip())
