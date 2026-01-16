@@ -11613,7 +11613,7 @@ def essay_grade():
             f"【最重要・厳守】**HTMLタグを除いた正味の文字数**で{max_rewrite}文字以内で記述せよ（目安: {min_rewrite}〜{max_rewrite}文字）。"
             f"提供された「模範解答」がこの文字数より長くても、絶対に真似せず、"
             f"指定文字数内に収まるよう要約してリライトせよ。"
-            f"長すぎるよりは短い方が良い。"
+            f"このリライト案をあなたが採点した際、「表現・形式」の項目で文字数不足による減点対象とならない長さを必ず満たすこと。"
         )
 
 
@@ -11770,6 +11770,11 @@ def essay_grade():
             print(f"Error logging candidate check: {log_err}")
         
         # === Post-Processing: AI Auto-Repair for Length Constraint ===
+        # Check if response has valid parts before accessing text
+        if not response.candidates or not response.candidates[0].content.parts:
+             print(f"ERROR: Gemini response contained no valid parts. Finish Reason: {response.candidates[0].finish_reason if response.candidates else 'Unknown'}")
+             return jsonify({'status': 'error', 'message': 'AIからの応答が空でした。再試行してください。'}), 500
+
         final_output = response.text
         
         try:
