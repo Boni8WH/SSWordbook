@@ -10,6 +10,8 @@ import secrets
 import string
 import uuid
 import io
+import pickle 
+import numpy as np # Vector calculation
 from io import StringIO, BytesIO
 from datetime import datetime, timedelta
 from sqlalchemy import inspect, text, func, case, cast, Integer
@@ -11292,12 +11294,17 @@ def essay_ocr():
         
         prompt = """
         この画像の論述答案にある手書き文字を読み取ってください。
-        以下のルールに従ってテキストを出力してください：
-        1. 下線が引かれている部分は、そのテキストを <u>タグで囲んでください。
-        2. 改行は含めず、一つの文章として続けてください。（重要）
-        3. 読み取ったテキスト以外の説明や挨拶は一切不要です。
-        4. マークダウンのコードブロック（```html等）は使用しないでください。
-        5. 縦書きの場合は横書きに直してください。
+        
+        # 最重要ルール: 下線の検出
+        - 手書きの下線（アンダーライン）が**明確に**引かれている箇所のみ、その部分のテキストを `<u>` タグで囲んでください。
+        - 画像全体を見て相対的に判断してください。単なる筆跡のブレや、行の基準線（ベースライン）と区別し、意図的な強調線と判断できる場合のみ下線として扱ってください。
+        - 迷う場合は下線なしとして扱ってください。
+
+        # その他のルール
+        1. 改行は含めず、一つの文章として続けてください。（重要）
+        2. 読み取ったテキスト以外の説明や挨拶は一切不要です。
+        3. マークダウンのコードブロック（```html等）は使用しないでください。
+        4. 縦書きの場合は横書きに直してください。
         """
         
         response = model.generate_content([prompt, image])
@@ -11334,7 +11341,9 @@ class TextbookManager:
     def __init__(self):
         self.sections = {} # { "Title": "Content" }
         self.toc = []      # [ "Title1", "Title2", ... ]
+        self.vectors = []  # List of {title, content, vector}
         self._load_textbook()
+        self._load_vectors() # New: Load vectors
 
     @classmethod
     def get_instance(cls):
@@ -11343,6 +11352,73 @@ class TextbookManager:
                 if not cls._instance:
                     cls._instance = cls()
         return cls._instance
+
+    def _load_vectors(self):
+        """Load vector DB if exists"""
+        vector_path = os.path.join(app.root_path, 'data', 'textbook_vectors.pkl')
+        if os.path.exists(vector_path):
+            try:
+                with open(vector_path, 'rb') as f:
+                    self.vectors = pickle.load(f)
+                print(f"✅ Vector DB loaded: {len(self.vectors)} items.")
+            except Exception as e:
+                print(f"❌ Failed to load vector DB: {e}")
+        else:
+             print("⚠️ Vector DB not found. Run scripts/build_vector_db.py")
+
+    def search_relevant_sections(self, query, top_k=3):
+        """Vector Search for retrieval"""
+        if not self.vectors:
+            print("⚠️ No vectors loaded, falling back to empty.")
+            return [], []
+
+        # 1. Embed query (using same model as build script)
+        genai = get_genai_module()
+        if not genai:
+             return [], []
+
+        try:
+            # model must match the one used in build logic
+            result = genai.embed_content(
+                model="models/embedding-001",
+                content=query,
+                task_type="retrieval_query",
+                title=None 
+            )
+            query_vector = np.array(result['embedding'])
+        except Exception as e:
+            print(f"⚠️ Query embedding failed: {e}")
+            return [], []
+
+        # 2. Cosine Similarity Calculation
+        # (Since vectors are normalized, dot product is sufficient, but let's be safe)
+        scores = []
+        for item in self.vectors:
+            vec = np.array(item['vector'])
+            # Cosine similarity: (A . B) / (||A||*||B||)
+            # Assuming embeddings are not guaranteed normalized:
+            norm_q = np.linalg.norm(query_vector)
+            norm_v = np.linalg.norm(vec)
+            if norm_q == 0 or norm_v == 0:
+                score = 0
+            else:
+                score = np.dot(query_vector, vec) / (norm_q * norm_v)
+            
+            scores.append((score, item))
+
+        # 3. Sort & Select
+        scores.sort(key=lambda x: x[0], reverse=True)
+        
+        top_items = scores[:top_k]
+        
+        selected_titles = [x[1]['title'] for x in top_items]
+        
+        # Log results for verification
+        print(f"🔍 Vector Search Results for: {query[:20]}...")
+        for s, item in top_items:
+            print(f"   - [{s:.4f}] {item['title']}")
+            
+        return selected_titles
 
     def _load_textbook(self):
         textbook_path = os.path.join(app.root_path, 'data', 'textbook.txt')
@@ -11420,6 +11496,7 @@ def essay_grade():
     if not data:
         return jsonify({'status': 'error', 'message': 'No data provided'}), 400
         
+    feedback_style = data.get('feedback_style', 'concise')
     problem_id = data.get('problem_id')
     user_answer = data.get('user_answer')
     
@@ -11437,53 +11514,20 @@ def essay_grade():
         # ============================================================
         
         # 1. Initialize Textbook Manager
+        genai = get_genai_module()  # Needed for later model init
         tm = TextbookManager.get_instance()
         
-        # 2. Librarian Step (Flash) - 高速・安価に該当箇所を検索
-        genai = get_genai_module()
-        if not genai:
-             raise Exception("Gemini module could not be loaded")
+        # 2. Vector Search Retrieval (Cost: 0 Tokens for Selection!)
+        print("🔍 Searching textbook (Vector Search mode)...")
+        # Search using the question text
+        # Using 3 sections as requested (reduced from 5)
+        selected_titles = tm.search_relevant_sections(problem.question, top_k=3)
+        
+        if not selected_titles:
+             # Fallback logic if vector search fails (e.g., empty DB)
+             print("⚠️ Vector search returned nothing. Skipping context.")
 
-        librarian_model = genai.GenerativeModel('gemini-flash-latest')
-        
-        toc_text = tm.get_toc_text()
-        
-        # 検索精度のためのプロンプト
-        librarian_prompt = f"""
-        あなたは「世界史教科書の司書」です。
-        以下の「論述問題」に対して、正解の根拠となる情報が含まれている教科書の「セクション（目次）」を
-        **3つ〜5つ** 選び出してください。
-        
-        # 論述問題
-        大学/年度: {problem.university} {problem.year}
-        問題文: {problem.question}
-        
-        # 教科書の目次リスト
-        {toc_text}
-        
-        # 重要
-        - 問題の時代・地域・テーマに関連するセクションを的確に選んでください。
-        - 選択肢は必ず上記の目次リストにある文字列と完全に一致させてください。
-        
-        # 出力形式
-        選んだタイトルを、以下のようなJSONのリスト形式のみで出力してください。
-        ["●農耕と牧畜のはじまり", "1　文明の誕生"]
-        """
-        
-        print("🔍 Searching textbook for relevant sections...")
-        librarian_resp = librarian_model.generate_content(librarian_prompt)
-        
-        selected_titles = []
-        try:
-             # Clean JSON formatting
-             json_str = librarian_resp.text.replace('```json', '').replace('```', '').strip()
-             selected_titles = json.loads(json_str)
-             print(f"📚 Librarian selected: {selected_titles}")
-        except Exception as e:
-             print(f"⚠️ Librarian JSON parse failed: {e}. Raw: {librarian_resp.text}")
-             # Fallback: cannot retrieve context effectively without titles
-        
-        # 3. Retrieve Context
+        # 3. Retrieve Content (Same method as before)
         relevant_context, used_titles = tm.get_relevant_content(selected_titles)
         
         if not relevant_context:
@@ -11495,49 +11539,136 @@ def essay_grade():
         model = genai.GenerativeModel('gemini-flash-latest')
 
 
-        prompt = f"""
+        # Clean user answer for accurate counting
+        user_answer_clean = re.sub(r'<[^>]+>', '', user_answer).replace('\n', '')
+        user_char_count = len(user_answer_clean)
+
+        # Optimize user_answer for AI Prompt (Token Reduction)
+        # 1. Block tags to newline
+        user_answer_optimized = re.sub(r'<(div|p|br|li)[^>]*>', '\n', user_answer)
+        # 2. Remove all tags except <u> (Underline)
+        # <u> is preserved as it contains semantic meaning (emphasis/keywords)
+        user_answer_optimized = re.sub(r'<(?!/?u\b)[^>]+>', '', user_answer_optimized)
+        # 3. Normalize newlines
+        user_answer_optimized = re.sub(r'\n+', '\n', user_answer_optimized).strip()
+
+
+        # =========================================================
+        # Rewrite Length Check
+        # =========================================================
+        # Use problem.answer_length if valid, otherwise measure model answer length
+        target_len = 0
+        if isinstance(problem.answer_length, int) and problem.answer_length > 0:
+             target_len = problem.answer_length
+        elif problem.answer:
+             target_len = len(problem.answer.replace('\n', '').strip())
+        
+        # Default fallback
+        if target_len == 0:
+             target_len = 200 # Fallback 
+
+        min_rewrite = int(target_len * 0.9) # Reverted to 90% as per user request
+        max_rewrite = int(target_len * 1.0)
+        
+        length_instruction = f"上限（{max_rewrite}文字）に限りなく近づけよ（{min_rewrite}文字以上は必須）。"
+
+
+        # ---------------------------------------------------------
+        # Prompt Selection based on Style
+        # ---------------------------------------------------------
+        if feedback_style == 'detailed':
+            # === 丁寧（詳細）モード ===
+            prompt = f"""
 # Role
-あなたは大学入試（世界史）の論述問題採点官です。
-一緒に提供された「教科書データ（抜粋）」を正解の根拠とし、厳格な採点と、受験生の成長を促す愛のあるフィードバックを行ってください。
+大学入試（世界史）の論述問題採点官。
+「教科書データ（抜粋）」を正解の根拠とし、厳格な採点と、受験生の成長を促す愛のあるフィードバックを行え。
 
 # Input Data
 - 大学/年度: {problem.university} {problem.year}
 - 問題文: {problem.question}
 - 模範解答: {problem.answer}
-- 受験生の解答: {user_answer}
+- 受験生の解答: {user_answer_optimized}
+- 現在の文字数: {user_char_count}文字
 
 # Task
-以下のステップで評価を実行し、**HTML形式**で出力してください。
-`<html>`や`<body>`タグは不要です。各セクションは `<div class="grade-section">` 等で囲んでください。
-マークダウンの**太字**などは使用せず、`<b>`タグなどを使用してください。
+以下のステップで評価し、**HTML形式**で出力せよ。
+`<html>` `<body>`タグ不要。各セクションは `<div class="grade-section">` 等で囲むこと。
+`<b>`タグ使用。**Markdown記法（`**`等）は絶対禁止**。
+**重要: 受験生の元の解答（Input Data）を出力に含めるな。**
 
-## Step 1: 【分析】出題意図と採点基準の策定
-1. この問題が問うている歴史的構造（因果関係：何が原因で、どうなり、その結果どうなったか）を整理してください。
-2. 採点基準を以下のように定義してください。
-   - 必須要素（キーワードや概念）のリスト
-   - 論理構成のポイント
+## Step 1: 【分析】出題意図と採点基準
+1. 歴史的構造（因果関係）を整理せよ。
+2. 採点基準を定義せよ（必須要素・論理構成）。
 
 ## Step 2: 【採点】(100点満点)
-以下の配点比率に基づき、1点刻みで厳密に採点してください。
-- 構成・論理（40点）: 因果関係の構築、論理の飛躍の有無。
-- 知識の正確性（40点）: 史実の誤認、用語の適切さ、指定語句の正しい使用。
-- 表現・形式（20点）: 文字数遵守。模範解答の9割未満は減点、8割未満は大幅に減点してください。日本語の正確さも評価対象です。
+以下の配点比率で厳密に採点せよ。
+- 構成・論理（40点）: 因果関係、論理の飛躍。
+- 知識の正確性（40点）: 史実、用語の正しい使用。
+- 表現・形式（20点）: 文字数など。模範解答の9割未満は減点（8割未満は表現・形式は0点）。
 
 ## Step 3: 【フィードバック】
-受験生が次に何をすべきか明確に伝えてください。
-1. 評価できた点: 加点ポイントになった箇所。
-2. 減点対象・改善点: 具体的な誤りや不足している視点。教科書のどの単元を復習すべきか。
-3. リライト案（満点解答）: 受験生の解答の構成を活かしつつ、上記改善点を反映させた「合格者レベル」の答案。
-   **制約: リライト案の文字数は、問題文で指定がある場合はそれに従い、指定がない場合は模範解答の文字数（{problem.answer_length}文字）の90%〜100%程度に必ず収めること。**
-   **末尾に、リライト案の文字数を「【356文字】」のように（「約」をつけずに）明記すること。**
+受験生が次にすべきことを伝えよ。
+1. 評価点: 加点箇所。
+2. 減点対象・改善点: 誤り、不足視点、復習すべき単元。
+3. リライト案（満点解答）: 受験生の構成を活かした「合格者レベル」の答案。
+   **制約: {length_instruction} (基準: {target_len}文字)**
+   - **重要**: リライト案は `<div class="model-rewrite">` と `</div>` で囲め。
+   - **文字数はシステムが計算するため、記述不要。**
 
 # Constraints
-- 基準レベル: 高校教科書の範囲を絶対とし、大学レベルの特殊な学説は加点しません。
-- 厳格さ: 誤字脱字、事実誤認、指定語句の未提出は厳しく減点してください。
-- トーン: 採点官としての威厳を持ちつつ、受験生を鼓舞する教育的な言葉遣い。
-- 返答の内容: 【分析】の前に一言は不要。論拠となる書物には言及しなくて良い。
-- **出力形式**: HTMLのみ。Markdown（`**`など）は禁止。見出しは`<h3>`、リストは`<ul><li>`、強調は`<b>`や`<span class="highlight">`を使用すること。
+- 基準: 高校教科書範囲。大学レベルの特殊な学説は加点しない。
+- 厳格さ: 誤字脱字、事実誤認、指定語句の未記入は厳しく減点。
+- トーン: 威厳を持ちつつ教育的。
+- 返答内容: 【分析】前の挨拶不要。論拠書物への言及不要。**元解答の出力禁止。**
+- **出力形式**: HTMLのみ。見出し`<h3>`、リスト`<ul><li>`、段落`<p>`必須。
 """
+        else:
+            # === 簡潔モード（デフォルト） ===
+            prompt = f"""
+# Role
+大学入試（世界史）の論述問題採点官。
+「教科書データ（抜粋）」を根拠とし、厳格な採点と的確なフィードバックを行え。
+
+# Input Data
+- 大学/年度: {problem.university} {problem.year}
+- 問題文: {problem.question}
+- 模範解答: {problem.answer}
+- 受験生の解答: {user_answer_optimized}
+- 現在の文字数: {user_char_count}文字
+
+# Task
+以下のステップで評価し、**HTML形式**で出力せよ。
+**簡潔に**まとめよ。受験生に長文を読む時間はない。
+`<html>` `<body>`不要。セクションは `<div class="grade-section">` 等で囲むこと。
+**重要: 受験生の元の解答（Input Data）を出力に含めるな。**
+
+## Step 1: 【分析】(簡潔に)
+採点基準（キーワード、論理構成）を箇条書きで定義せよ。（配点を書くな）
+
+## Step 2: 【採点】(100点満点)
+以下の配点比率で採点せよ。
+- 構成・論理（40点）
+- 知識の正確性（40点）
+- 表現・形式（20点）: 文字数は模範解答の9割未満で減点（8割未満は表現・形式は0点）。
+
+## Step 3: 【フィードバック】
+1. 評価点: 簡潔に。
+2. 改善点: 誤りや不足点のみ。
+3. リライト案（満点解答）:
+   - 受験生の構成を活かした「合格者レベル」の答案。
+   - **制約: {length_instruction} (基準: {target_len}文字)**
+   - **重要**: リライト案は `<div class="model-rewrite">` と `</div>` で囲め。
+   - **文字数はシステムが計算するため、記述不要。**
+
+# Constraints
+- 基準: 高校教科書範囲。
+- 厳格さ: 誤字脱字、事実誤認、指定語句の未使用は厳しく減点。
+- トーン: 威厳を持ちつつ教育的。
+- 返答内容: 【分析】前の挨拶不要。論拠書物への言及不要。**元解答の出力禁止。**
+- **出力形式**: HTMLのみ。見出し`<h3>`、段落`<p>`必須。
+- Step 1【分析】で配点（〇〇点）を書くな。
+"""
+
         # Safety settings to avoid blocking legitimate educational content
         safety_settings = {
             "HARM_CATEGORY_HARASSMENT": "BLOCK_NONE",
@@ -11569,15 +11700,40 @@ def essay_grade():
         
         try:
             feedback = response.text
+            # クリーニング
+            feedback = feedback.replace('```html', '').replace('```', '').strip()
+            
+            # Markdownの**太字**が混入していた場合の救済措置: <b>タグに変換
+            feedback = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', feedback)
+
+            # --- プログラムによる文字数カウント注入 ---
+            # model-rewriteブロックを探して処理
+            # 正規表現で置換することで、特定箇所に確実に注入する
+                
+            def inject_count(match):
+                content = match.group(1)
+                
+                # AIが勝手に書いた文字数表記を削除 (例: (95文字), 【100文字】, [98文字]など)
+                # カウントの邪魔になるだけでなく、表示も重複するため
+                content = re.sub(r'[（\(【\[［]\s*\d+文字\s*[）\)】\]］]', '', content)
+
+                # タグを除去して純粋なテキストの長さを測る
+                clean = re.sub(r'<[^>]+>', '', content).replace('\n', '').replace('\r', '').strip()
+                count = len(clean)
+                return f'<div class="model-rewrite">{content}<p class="text-end text-muted small mb-0" style="margin-top:5px;">【{count}文字】</p></div>'
+
+            # グローバルクリーニング: AIが勝手に書いた文字数表記を全体から削除
+            # model-rewriteの内外に関わらず、(XX文字)のような表記を全て消す
+            feedback = re.sub(r'[（\(【\[［]\s*\d+文字\s*[）\)】\]］]', '', feedback)
+
+            feedback = re.sub(r'<div class="model-rewrite">(.*?)</div>', inject_count, feedback, flags=re.DOTALL)
+
         except ValueError:
             # Fallback if response.text fails (e.g., safety block or empty)
             print(f"Gemini generation error. Finish reason: {response.prompt_feedback}")
             if response.candidates:
                  print(f"Candidates: {response.candidates}")
             return jsonify({'status': 'error', 'message': 'AIからの応答が取得できませんでした。時間をおいて再試行するか、入力内容を確認してください。'}), 500
-        
-        # クリーニング
-        feedback = feedback.replace('```html', '').replace('```', '').strip()
         
         return jsonify({'status': 'success', 'feedback': feedback})
         
@@ -17145,9 +17301,6 @@ if __name__ == '__main__':
         debug_mode = os.environ.get('RENDER') != 'true'
         
         logger.info(f"🌐 サーバーを起動します: http://0.0.0.0:{port}")
-        
-        
-
         
         app.run(host='0.0.0.0', port=port, debug=debug_mode)
         

@@ -218,7 +218,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     <div class="spinner-border text-primary" role="status">
                         <span class="visually-hidden">Loading...</span>
                     </div>
-                    <p class="mt-2 text-muted">AIが添削中です...<br>（1分ほどかかります）</p>
+                    <p class="mt-2 text-muted">AIが添削中です...<br>（調子が良ければ15秒ほどで完成）</p>
                 ${adHtml}
                 </div>
             `;
@@ -235,6 +235,9 @@ document.addEventListener('DOMContentLoaded', function () {
             // Scroll to result
             gradingResult.scrollIntoView({ behavior: 'smooth' });
 
+            // Get Feedback Style
+            const feedbackStyle = document.querySelector('input[name="feedbackStyle"]:checked').value;
+
             // 1. Grading Promise (The heavy lifting)
             const gradingPromise = fetch('/api/essay/grade', {
                 method: 'POST',
@@ -243,7 +246,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 },
                 body: JSON.stringify({
                     problem_id: problemId,
-                    user_answer: userAnswer
+                    user_answer: userAnswer,
+                    feedback_style: feedbackStyle
                 })
             }).then(response => response.json());
 
@@ -314,8 +318,25 @@ document.addEventListener('DOMContentLoaded', function () {
 
         // Content wrapper with specific print styles
         const content = document.createElement('div');
-        content.innerHTML = element.innerHTML;
         content.id = 'pdf-content-wrapper';
+
+        // 🆕 Add Title
+        const titleContainer = document.createElement('div');
+        titleContainer.style.textAlign = 'center';
+        titleContainer.style.marginBottom = '20px'; // Give some space
+
+        const pdfTitle = document.createElement('h1');
+        pdfTitle.textContent = `論述添削：${university}/${year}`;
+        // Ensure the title block doesn't look like a highlighted grading section if not desired,
+        // but the user just asked for a title. The centralized alignment is handled by container.
+
+        titleContainer.appendChild(pdfTitle);
+        content.appendChild(titleContainer);
+
+        // Original content
+        const bodyContent = document.createElement('div');
+        bodyContent.innerHTML = element.innerHTML;
+        content.appendChild(bodyContent);
         content.style.padding = '20px'; // Internal padding
         content.style.width = '210mm'; // Force A4 width to match PDF
         content.style.maxWidth = '100%';
@@ -329,6 +350,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const richTextEditor = document.getElementById('richTextEditor');
         if (richTextEditor) {
             const userAnswerDiv = document.createElement('div');
+            userAnswerDiv.className = 'user-answer-container';
             userAnswerDiv.style.marginTop = '20px';
             userAnswerDiv.style.borderTop = '2px dashed #bdc3c7'; // Separator
             userAnswerDiv.style.paddingTop = '15px';
@@ -380,6 +402,13 @@ document.addEventListener('DOMContentLoaded', function () {
                 font-family: 'Zen Maru Gothic', 'Hiragino Maru Gothic ProN', 'Rounded Mplus 1c', sans-serif !important;
                 line-height: 1.8 !important;
             }
+            #pdf-content-wrapper u {
+                text-decoration: underline !important;
+                text-decoration-color: #2c3e50 !important;
+                text-underline-offset: 3px !important; /* Adjust distance */
+                text-decoration-skip-ink: none !important;
+                border-bottom: none !important;
+            }
             #pdf-content-wrapper * {
                 color: #2c3e50 !important;
                 background-color: transparent !important;
@@ -399,17 +428,39 @@ document.addEventListener('DOMContentLoaded', function () {
                 border-left: 5px solid #ff9800 !important;
                 padding-left: 3mm !important;
                 margin-top: 5mm;
-                page-break-after: avoid;
+                page-break-after: avoid !important;
+                break-after: avoid !important;
             }
+            
+            /* Page Break Control */
+            #pdf-content-wrapper p, 
+            #pdf-content-wrapper li, 
+            #pdf-content-wrapper .grading-block, 
+            #pdf-content-wrapper blockquote {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+                margin-bottom: 0.5em;
+                display: block; /* Ensure block level for better break handling */
+            }
+            
+            #pdf-content-wrapper ul, 
+            #pdf-content-wrapper ol {
+                page-break-inside: auto; /* Allow lists to break between items */
+            }
+            
+            #pdf-content-wrapper .grade-section {
+                page-break-inside: auto;
+                margin-bottom: 15px;
+            }
+            
+            .user-answer-container {
+                page-break-inside: auto;
+            }
+            
             /* Emphasis Marker */
             #pdf-content-wrapper strong, #pdf-content-wrapper b {
                 background: linear-gradient(transparent 60%, rgba(255, 235, 59, 0.5) 60%) !important;
                 font-weight: 700 !important;
-            }
-            #pdf-content-wrapper p, #pdf-content-wrapper li {
-                page-break-inside: avoid;
-                break-inside: avoid;
-                margin-bottom: 0.5em;
             }
         `;
 
@@ -417,7 +468,23 @@ document.addEventListener('DOMContentLoaded', function () {
         overlay.appendChild(content);
         document.body.appendChild(overlay);
 
-        html2pdf().set(opt).from(content).save().then(() => {
+        // Update options to be more aggressive with p tags
+        // 'css' mode respects page-break-inside: avoid
+        // 'legacy' mode is a fallback that tries to calculate breaks
+        // We add 'p' to avoid in legacy mode as well
+        const updatedOpt = {
+            ...opt,
+            pagebreak: {
+                mode: ['css', 'legacy'],
+                avoid: ['h1', 'h2', 'h3', '.grading-block', 'tr', 'blockquote']
+                // Removed 'p', 'li' from legacy avoid list to let CSS handle it properly or to avoid too many page breaks if paragraphs are huge.
+                // However, user problem is text cutoff. Let's trust CSS 'avoid' first. 
+                // If CSS avoid works, legacy isn't needed for p. 
+                // Let's rely on CSS page-break-inside: avoid !important for p.
+            }
+        };
+
+        html2pdf().set(updatedOpt).from(content).save().then(() => {
             document.body.removeChild(overlay);
         }).catch(err => {
             console.error(err);
