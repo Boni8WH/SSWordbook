@@ -11584,7 +11584,7 @@ def essay_grade():
         
         # Flash model tends to be verbose, so we give a very strict instruction.
         length_instruction = (
-            f"【最重要・厳守】{max_rewrite}文字以内で記述せよ（目安: {min_rewrite}〜{max_rewrite}文字）。"
+            f"【最重要・厳守】**HTMLタグを除いた正味の文字数**で{max_rewrite}文字以内で記述せよ（目安: {min_rewrite}〜{max_rewrite}文字）。"
             f"提供された「模範解答」がこの文字数より長くても、絶対に真似せず、"
             f"指定文字数内に収まるよう要約してリライトせよ。"
         )
