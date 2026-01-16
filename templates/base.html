@@ -29,6 +29,14 @@
         window.appInfoFromFlask = {{ app_info_for_js | tojson | safe if app_info_for_js else 'null' }};
         window.chapterDataFromFlask = {{ chapter_data | tojson | safe if chapter_data else 'null' }};
     </script>
+
+    <!-- AdSense Verification Meta -->
+    <meta name="google-adsense-account" content="ca-pub-4793789398503896">
+
+    <!-- Google AdSense -->
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4793789398503896"
+        crossorigin="anonymous"></script>
+
     <style>
         .navbar-brand {
             font-family: 'Merriweather', serif !important;

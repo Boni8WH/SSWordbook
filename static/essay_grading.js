@@ -68,6 +68,36 @@ document.addEventListener('DOMContentLoaded', function () {
             processOcrBtn.disabled = true;
             processOcrBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 読み込み中...';
 
+            // Ad Container ID
+            const adContainerId = 'ocr-ad-container';
+
+            // Check Ad Setting
+            const appInfo = window.appInfoFromFlask || {};
+            const settings = appInfo.app_settings || {};
+            const isBannerAdEnabled = settings.ad_banner_enabled === true;
+
+            let adContainer = document.getElementById(adContainerId);
+
+            if (isBannerAdEnabled) {
+                // Create and append Ad Placeholder ONLY if enabled
+                if (!adContainer) {
+                    adContainer = document.createElement('div');
+                    adContainer.id = adContainerId;
+                    adContainer.className = 'mt-3 p-2 bg-light border rounded text-center';
+                    adContainer.innerHTML = `
+                        <p class="small text-muted mb-1">▼ 読み込み中に広告が表示されます</p>
+                        <div style="width: 300px; height: 100px; background-color: #ddd; margin: 0 auto; display: flex; align-items: center; justify-content: center; color: #666;">
+                            <span class="fs-4"><i class="fas fa-image"></i> Image Ad (300x100)</span>
+                        </div>
+                    `;
+                    ocrActionArea.appendChild(adContainer);
+                }
+                adContainer.style.display = 'block';
+            } else {
+                // Ensure it's hidden if setting is off
+                if (adContainer) adContainer.style.display = 'none';
+            }
+
             const formData = new FormData();
             formData.append('image', file);
 
@@ -103,6 +133,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 .finally(() => {
                     processOcrBtn.disabled = false;
                     processOcrBtn.innerHTML = '<i class="fas fa-magic"></i> 画像から文字を読み取る (AI)';
+                    // Hide/Remove Ad
+                    if (adContainer) adContainer.style.display = 'none';
                 });
         });
     }
@@ -148,19 +180,42 @@ document.addEventListener('DOMContentLoaded', function () {
             gradeEssayBtn.disabled = true;
             gradeEssayBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 添削中...';
             gradingResult.style.display = 'block';
+            // Check Ad Setting
+            const appInfo = window.appInfoFromFlask || {};
+            const settings = appInfo.app_settings || {};
+            const isAdEnabled = settings.ad_video_enabled === true;
+
+            let adHtml = '';
+            if (isAdEnabled) {
+                adHtml = `
+                    <!-- Ad Placeholder -->
+                    <div class="mt-4 p-3 bg-light border rounded" style="max-width: 320px; margin: 0 auto;">
+                        <p class="small text-muted mb-2">▼ 動画広告をご視聴ください（サービスの維持にご協力お願いします）</p>
+                        <div id="ad-video-placeholder" style="width: 100%; height: 180px; background-color: #000; display: flex; align-items: center; justify-content: center; color: white;">
+                            <i class="fas fa-play-circle fa-2x"></i>
+                            <span class="ms-2">広告スペース</span>
+                        </div>
+                        <p id="ad-timer-text" class="text-primary fw-bold mt-2">あと 15 秒で結果を表示します</p>
+                        <p class="small text-muted mt-1">※ 広告再生終了後に結果が表示されます</p>
+                    </div>
+                `;
+            }
+
             gradingResult.innerHTML = `
                 <div class="text-center p-4">
                     <div class="spinner-border text-primary" role="status">
                         <span class="visually-hidden">Loading...</span>
                     </div>
                     <p class="mt-2 text-muted">AIが添削中です...<br>（1分ほどかかります）</p>
+                    ${adHtml}
                 </div>
             `;
 
             // Scroll to result
             gradingResult.scrollIntoView({ behavior: 'smooth' });
 
-            fetch('/api/essay/grade', {
+            // 1. Grading Promise (The heavy lifting)
+            const gradingPromise = fetch('/api/essay/grade', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -169,15 +224,60 @@ document.addEventListener('DOMContentLoaded', function () {
                     problem_id: problemId,
                     user_answer: userAnswer
                 })
-            })
-                .then(response => response.json())
-                .then(data => {
+            }).then(response => response.json());
+
+            // 2. Ad Wait Promise (The monetization guard)
+            const adWaitPromise = new Promise((resolve) => {
+                // Check Global Ad Setting
+                const appInfo = window.appInfoFromFlask || {};
+                const settings = appInfo.app_settings || {};
+                const isAdEnabled = settings.ad_video_enabled === true;
+
+                if (!isAdEnabled) {
+                    // 広告無効なら即終了
+                    resolve();
+                    return;
+                }
+
+                // 広告有効時のロジック (15秒待機)
+                const adDurationSec = 15;
+                let timeLeft = adDurationSec;
+
+                // Show Ad Placeholder
+                // 広告有効時のみプレースホルダーを表示するためのCSS操作が必要になるが、
+                // 今回はinnerHTML構築時にHTMLを出し分けていないため、ここでの制御は「待ち時間」のみとする。
+                // (本来はHTML生成部分も分岐すべきだが、CSSで隠すか、HTML生成時に分岐するのがベター) 
+
+                const timerDisplay = document.getElementById('ad-timer-text');
+                const updateTimer = () => {
+                    if (timerDisplay) {
+                        timerDisplay.textContent = `あと ${timeLeft} 秒で結果を表示します`;
+                        // 広告が無効なら非表示にするスタイル操作を入れても良いが、今回はResolveだけ行う
+                    }
+                    if (timeLeft > 0) {
+                        timeLeft--;
+                        setTimeout(updateTimer, 1000);
+                    } else {
+                        resolve();
+                    }
+                };
+                updateTimer();
+            });
+
+            // 3. Wait for BOTH to finish
+            Promise.all([gradingPromise, adWaitPromise])
+                .then(([data, _]) => {
+                    // Both grading is done and ad is finished
                     if (data.status === 'success') {
                         gradingResult.innerHTML = data.feedback;
                         addDownloadButton();
                     } else {
                         gradingResult.innerHTML = `<div class="alert alert-danger">エラーが発生しました: ${data.message}</div>`;
                     }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    gradingResult.innerHTML = `<div class="alert alert-danger">通信エラーが発生しました。もう一度お試しください。</div>`;
                 })
                 .finally(() => {
                     gradeEssayBtn.disabled = false;
