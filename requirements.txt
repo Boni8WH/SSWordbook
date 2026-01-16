@@ -17,3 +17,4 @@ Flask-APScheduler==1.13.1
 pywebpush==2.1.2
 google-generativeai
 python-dotenv
+numpy
