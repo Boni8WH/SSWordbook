@@ -11560,7 +11560,9 @@ def essay_grade():
         if isinstance(problem.answer_length, int) and problem.answer_length > 0:
              target_len = problem.answer_length
         elif problem.answer:
-             target_len = len(problem.answer.replace('\n', '').strip())
+             # Strip HTML tags (like <u>) from model answer for accurate length calculation
+             clean_answer = re.sub(r'<[^>]+>', '', problem.answer)
+             target_len = len(clean_answer.replace('\n', '').strip())
         
         # Default fallback
         if target_len == 0:
