@@ -11579,14 +11579,17 @@ def essay_grade():
         if target_len == 0:
              target_len = 200 # Fallback 
 
-        min_rewrite = int(target_len * 0.9) 
-        max_rewrite = int(target_len * 1.0)
+        # Safety Buffer: Aim for 95% of target to allow minor overflow
+        prompt_limit = int(target_len * 0.95)
+        min_rewrite = int(target_len * 0.8) 
+        max_rewrite = prompt_limit
         
         # Flash model tends to be verbose, so we give a very strict instruction.
         length_instruction = (
             f"【最重要・厳守】**HTMLタグを除いた正味の文字数**で{max_rewrite}文字以内で記述せよ（目安: {min_rewrite}〜{max_rewrite}文字）。"
             f"提供された「模範解答」がこの文字数より長くても、絶対に真似せず、"
             f"指定文字数内に収まるよう要約してリライトせよ。"
+            f"長すぎるよりは短い方が良い。"
         )
 
 
@@ -11730,10 +11733,62 @@ def essay_grade():
             generation_config=generation_config
         )
         
+        # === Post-Processing: AI Auto-Repair for Length Constraint ===
+        final_output = response.text
+        
         try:
-            feedback = response.text
-            # クリーニング
-            feedback = feedback.replace('```html', '').replace('```', '').strip()
+             # Basic Cleaning first
+             final_output = final_output.replace('```html', '').replace('```', '').strip()
+
+             # 1. Parse Output to find <div class="model-rewrite">...</div>
+             rewrite_match = re.search(r'<div class="model-rewrite">(.*?)</div>', final_output, re.DOTALL)
+            
+             if rewrite_match:
+                original_rewrite_html = rewrite_match.group(1)
+                # Strip tags for length check
+                original_rewrite_text = re.sub(r'<[^>]+>', '', original_rewrite_html).strip()
+                # Normalize whitespace
+                original_rewrite_text_norm = re.sub(r'\s+', '', original_rewrite_text) 
+                
+                current_rewrite_len = len(original_rewrite_text_norm)
+                
+                print(f"DEBUG: Rewrite Length Check: Current={current_rewrite_len}, Target={target_len}")
+                
+                if current_rewrite_len > target_len:
+                    print(f"WARNING: Rewrite exceeded limit ({current_rewrite_len} > {target_len}). Triggering AI Repair...")
+                    
+                    # Trigger Repair
+                    repair_prompt = f"""
+                    You are a strict editor. The following text is too long.
+                    Summarize it to be within {target_len} Japanese characters strictly.
+                    Do not lose the key historical points.
+                    Output ONLY the shortened text. Do not output HTML.
+                    
+                    Text to shorten:
+                    {original_rewrite_text}
+                    """
+                    
+                    try:
+                        repair_response = model.generate_content(
+                            repair_prompt,
+                            generation_config={"temperature": 0.1, "max_output_tokens": 500}
+                        )
+                        repaired_text = repair_response.text.strip()
+                        
+                        # Replace in final output
+                        # We wrap the new text in the div again
+                        new_rewrite_block = f'<div class="model-rewrite">{repaired_text}</div>'
+                        final_output = final_output.replace(rewrite_match.group(0), new_rewrite_block)
+                        print(f"INFO: AI Repair applied. Replaced rewrite block.")
+                    except Exception as repair_err:
+                        print(f"ERROR: AI Repair failed: {repair_err}")
+
+        except Exception as e:
+            print(f"Error in post-processing: {e}")
+
+        
+        try:
+            feedback = final_output
             
             # Markdownの**太字**が混入していた場合の救済措置: <b>タグに変換
             feedback = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', feedback)
