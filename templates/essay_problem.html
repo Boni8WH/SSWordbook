@@ -969,7 +969,7 @@
         <div class="answer-info action-btn">
             <span class="answer-char-count">
                 <i class="fas fa-text-width"></i>
-                模範解答：{{ problem.answer_length }}字
+                模範解答：{{ problem.clean_answer_length }}字
             </span>
         </div>
     </div>
@@ -978,7 +978,7 @@
     <div class="answer-section" id="answerSection">
         <h2 class="section-title">
             <i class="fas fa-lightbulb"></i>
-            模範解答 ({{ problem.answer_length }}字)
+            模範解答 ({{ problem.clean_answer_length }}字)
         </h2>
         <p class="answer-text">{{ problem.answer | safe }}</p>
     </div>

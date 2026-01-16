@@ -1213,6 +1213,17 @@ class EssayProblem(db.Model):
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))
     image_url = db.Column(db.Text, nullable=True) 
     
+    @property
+    def clean_answer_length(self):
+        """HTMLタグと改行を除いた正味の文字数を返す"""
+        if not self.answer:
+            return 0
+        # タグ除去
+        text = re.sub(r'<[^>]+>', '', self.answer)
+        # 改行と空白除去
+        text = text.replace('\n', '').strip()
+        return len(text)
+
     def to_dict(self):
         return {
             'id': self.id,
