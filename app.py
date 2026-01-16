@@ -386,7 +386,8 @@ class AppInfo(db.Model):
             'updateContent': self.update_content,
             'footerText': self.footer_text,
             'contactEmail': self.contact_email,
-            'schoolName': getattr(self, 'school_name', '〇〇高校')
+            'schoolName': getattr(self, 'school_name', '〇〇高校'),
+            'app_settings': self.app_settings or {}
         }
 
     def __repr__(self):
@@ -1587,7 +1588,8 @@ def get_app_info_dict(user_id=None, username=None, room_number=None):
                     'schoolName': getattr(app_info, 'school_name', '〇〇高校'),
                     'isLoggedIn': user_id is not None,
                     'username': username,
-                    'roomNumber': room_number
+                    'roomNumber': room_number,
+                    'app_settings': app_info.app_settings or {}
                 }
         except:
             pass
@@ -1636,6 +1638,13 @@ def to_jst_filter(dt):
     except Exception as e:
         print(f"🔍 エラー: {e}")
         return str(dt)
+
+# ====================================================================
+# 静的ファイル (ads.txt)
+# ====================================================================
+@app.route('/ads.txt')
+def ads_txt():
+    return send_from_directory(app.static_folder, 'ads.txt')
 
 # ====================================================================
 # ヘルパー関数
@@ -8819,6 +8828,24 @@ def admin_app_info():
         app_info = AppInfo.get_current_info()
 
         if request.method == 'POST':
+            # アプリ設定の保存 (JSON)
+            from sqlalchemy.orm.attributes import flag_modified
+            
+            # SQLAlchemy may not detect in-place mutations of JSON types, so we create a copy.
+            current_settings = (app_info.app_settings or {}).copy()
+            
+            # 広告設定の取得 (チェックボックスなので存在すればTrue)
+            is_video_enabled = 'ad_video_enabled' in request.form
+            is_banner_enabled = 'ad_banner_enabled' in request.form
+            
+            current_settings['ad_video_enabled'] = is_video_enabled
+            current_settings['ad_banner_enabled'] = is_banner_enabled
+
+            app_info.app_settings = current_settings
+            
+            # Explicitly flag as modified to ensure SQLAlchemy persists the JSON change
+            flag_modified(app_info, "app_settings")
+
             _update_app_info_general(app_info, request.form)
 
             logo_type = request.form.get('logo_type')
@@ -8862,11 +8889,13 @@ def admin_app_info_reset():
         app_info.update_content = "アプリケーションが開始されました。"
         app_info.footer_text = ""
         app_info.contact_email = ""
-        app_info.updated_by = session.get('username', 'admin')
+        
+        # タイムスタンプ更新
+        app_info.updated_by = session.get('username') or 'admin'
         app_info.updated_at = datetime.now(JST)
         
         db.session.commit()
-        flash('アプリ情報をデフォルト値にリセットしました。', 'success')
+        flash('アプリ情報をデフォルトにリセットしました。', 'warning')
         
         return redirect(url_for('admin_app_info'))
     except Exception as e:
@@ -11296,52 +11325,89 @@ def essay_ocr():
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 # ====================================================================
-# Gemini File API Helper (Textbook Cache)
+# Textbook Manager (Dynamic Context Selection)
 # ====================================================================
-_uploaded_textbook_file = None
-_textbook_upload_lock = threading.Lock()
-
-def get_uploaded_textbook_file():
-    """
-    教科書ファイルをGeminiにアップロードし、その参照を返す（シングルトン・スレッドセーフ）
-    これにより、アプリ側のメモリ消費を抑え、コンテキスト送信量を減らす
-    """
-    global _uploaded_textbook_file
+class TextbookManager:
+    _instance = None
+    _lock = threading.Lock()
     
-    # 既にアップロード済みならそれを返す
-    if _uploaded_textbook_file:
-        return _uploaded_textbook_file
+    def __init__(self):
+        self.sections = {} # { "Title": "Content" }
+        self.toc = []      # [ "Title1", "Title2", ... ]
+        self._load_textbook()
 
-    with _textbook_upload_lock:
-        # ロック取得後にもう一度チェック (Double-checked locking)
-        if _uploaded_textbook_file:
-            return _uploaded_textbook_file
-            
+    @classmethod
+    def get_instance(cls):
+        if not cls._instance:
+            with cls._lock:
+                if not cls._instance:
+                    cls._instance = cls()
+        return cls._instance
+
+    def _load_textbook(self):
+        textbook_path = os.path.join(app.root_path, 'data', 'textbook.txt')
+        if not os.path.exists(textbook_path):
+            print(f"Textbook file not found at: {textbook_path}")
+            return
+
         try:
-            genai = get_genai_module()
-            if not genai:
-                return None
+            with open(textbook_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+
+            # Split by headers
+            # Pattern: 
+            # 1. 第X部 or 第X章 (Part/Chapter)
+            # 2. Number + Full-width Space (e.g., １　文明の誕生)
+            # 3. ● (Subsection)
+            # 4. 【 (Source materials etc)
+            lines = content.splitlines()
+            current_header = "Introduction"
+            current_content = []
+            
+            header_pattern = re.compile(r'^(第[０-９0-9]+[部章].*|[０-９0-9]+　.*|●.*|【.*】.*)') 
+            
+            for line in lines:
+                if header_pattern.match(line):
+                    # Save previous section
+                    if current_content:
+                        self.sections[current_header] = "\n".join(current_content)
+                        self.toc.append(current_header)
+                    
+                    # Start new section
+                    current_header = line.strip()
+                    current_content = [line]
+                else:
+                    current_content.append(line)
+            
+            # Save last section
+            if current_content:
+                self.sections[current_header] = "\n".join(current_content)
+                self.toc.append(current_header)
                 
-            textbook_path = os.path.join(app.root_path, 'data', 'textbook.txt')
-            if not os.path.exists(textbook_path):
-                print(f"Textbook file not found at: {textbook_path}")
-                return None
-                
-            print(f"📤 Uploading textbook to Gemini... ({textbook_path})")
-            
-            # MIME type is text/plain
-            file_obj = genai.upload_file(textbook_path, mime_type="text/plain")
-            
-            # アップロード完了待ち（通常は即時だが念のため）
-            # 大きなファイルの場合は処理待ちが必要だがテキストなら早い
-            
-            _uploaded_textbook_file = file_obj
-            print(f"✅ Textbook upload complete: {file_obj.name} (URI: {file_obj.uri})")
-            return _uploaded_textbook_file
+            print(f"✅ Textbook loaded: {len(self.toc)} sections parsed.")
             
         except Exception as e:
-            print(f"❌ Failed to upload textbook: {e}")
-            return None
+            print(f"❌ Failed to parse textbook: {e}")
+
+    def get_toc_text(self):
+        return "\n".join(self.toc)
+
+    def get_relevant_content(self, selected_titles):
+        content = ""
+        used_titles = []
+        for title in selected_titles:
+            # Flexible matching: exact or partial
+            if title in self.sections:
+                content += f"\n\n--- {title} ---\n" + self.sections[title]
+                used_titles.append(title)
+            else:
+                # Fuzzy match attempt
+                for real_title in self.sections.keys():
+                    if title in real_title or real_title in title:
+                         content += f"\n\n--- {real_title} ---\n" + self.sections[real_title]
+                         used_titles.append(real_title)
+                         break
+        return content, used_titles
 
 @app.route('/api/essay/grade', methods=['POST'])
 def essay_grade():
@@ -11365,24 +11431,74 @@ def essay_grade():
         if not problem:
              return jsonify({'status': 'error', 'message': 'Problem not found'}), 404
 
-        # Gemini 2.5 Pro を使用 (Higher Intelligence for better grading)
+
+        # ============================================================
+        # Dynamic Context Selection (Cost Reduction Logic)
+        # ============================================================
+        
+        # 1. Initialize Textbook Manager
+        tm = TextbookManager.get_instance()
+        
+        # 2. Librarian Step (Flash) - 高速・安価に該当箇所を検索
         genai = get_genai_module()
         if not genai:
              raise Exception("Gemini module could not be loaded")
+
+        librarian_model = genai.GenerativeModel('gemini-flash-latest')
         
-        # モデル変更: gemini-2.0-flash -> gemini-2.5-pro
-        model = genai.GenerativeModel('gemini-2.5-pro')
+        toc_text = tm.get_toc_text()
         
-        # 教科書データの準備 (File API)
-        textbook_file = get_uploaded_textbook_file()
-        if not textbook_file:
-             print("Warning: Textbook file could not be uploaded. Grading without textbook context.")
-             # フォールバック処理などは必要に応じて検討
+        # 検索精度のためのプロンプト
+        librarian_prompt = f"""
+        あなたは「世界史教科書の司書」です。
+        以下の「論述問題」に対して、正解の根拠となる情報が含まれている教科書の「セクション（目次）」を
+        **3つ〜5つ** 選び出してください。
+        
+        # 論述問題
+        大学/年度: {problem.university} {problem.year}
+        問題文: {problem.question}
+        
+        # 教科書の目次リスト
+        {toc_text}
+        
+        # 重要
+        - 問題の時代・地域・テーマに関連するセクションを的確に選んでください。
+        - 選択肢は必ず上記の目次リストにある文字列と完全に一致させてください。
+        
+        # 出力形式
+        選んだタイトルを、以下のようなJSONのリスト形式のみで出力してください。
+        ["●農耕と牧畜のはじまり", "1　文明の誕生"]
+        """
+        
+        print("🔍 Searching textbook for relevant sections...")
+        librarian_resp = librarian_model.generate_content(librarian_prompt)
+        
+        selected_titles = []
+        try:
+             # Clean JSON formatting
+             json_str = librarian_resp.text.replace('```json', '').replace('```', '').strip()
+             selected_titles = json.loads(json_str)
+             print(f"📚 Librarian selected: {selected_titles}")
+        except Exception as e:
+             print(f"⚠️ Librarian JSON parse failed: {e}. Raw: {librarian_resp.text}")
+             # Fallback: cannot retrieve context effectively without titles
+        
+        # 3. Retrieve Context
+        relevant_context, used_titles = tm.get_relevant_content(selected_titles)
+        
+        if not relevant_context:
+            print("⚠️ No relevant context found. Grading might be less accurate.")
+            relevant_context = "（教科書から関連するセクションが見つかりませんでした。一般的な世界史の知識に基づいて採点してください。）"
+
+        # 4. Grading Step (Pro) - 高精度モデルで採点（したかった・・・）
+        # Use gemini-flash-latest for cost performance
+        model = genai.GenerativeModel('gemini-flash-latest')
+
 
         prompt = f"""
 # Role
 あなたは大学入試（世界史）の論述問題採点官です。
-一緒に提供された「教科書データ（テキストファイル）」を正解の絶対基準とし、厳格な採点と、受験生の成長を促す愛のあるフィードバックを行ってください。
+一緒に提供された「教科書データ（抜粋）」を正解の根拠とし、厳格な採点と、受験生の成長を促す愛のあるフィードバックを行ってください。
 
 # Input Data
 - 大学/年度: {problem.university} {problem.year}
@@ -11433,9 +11549,9 @@ def essay_grade():
         # コンテンツパーツの構築 (プロンプト + 教科書ファイル + 画像(あれば))
         content_parts = [prompt]
         
-        # 教科書ファイルを追加
-        if textbook_file:
-            content_parts.append(textbook_file)
+        # 教科書データ（抜粋）を追加
+        if relevant_context:
+            content_parts.append(f"【教科書データ（抜粋）】\n{relevant_context}")
 
         # 画像データの取得
         essay_image = EssayImage.query.filter_by(problem_id=problem_id).first()
