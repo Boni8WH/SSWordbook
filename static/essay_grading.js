@@ -86,11 +86,22 @@ document.addEventListener('DOMContentLoaded', function () {
                     adContainer.className = 'mt-3 p-2 bg-light border rounded text-center';
                     adContainer.innerHTML = `
                         <p class="small text-muted mb-1">▼ 読み込み中に広告が表示されます</p>
-                        <div style="width: 300px; height: 100px; background-color: #ddd; margin: 0 auto; display: flex; align-items: center; justify-content: center; color: #666;">
-                            <span class="fs-4"><i class="fas fa-image"></i> Image Ad (300x100)</span>
-                        </div>
+                        <!-- OCR_Loading AdSense -->
+                        <ins class="adsbygoogle"
+                             style="display:block"
+                             data-ad-client="ca-pub-4793789398503896"
+                             data-ad-slot="1531506184"
+                             data-ad-format="auto"
+                             data-full-width-responsive="true"></ins>
                     `;
                     ocrActionArea.appendChild(adContainer);
+
+                    // Trigger AdSense
+                    try {
+                        (window.adsbygoogle = window.adsbygoogle || []).push({});
+                    } catch (e) {
+                        console.error("AdSense Error:", e);
+                    }
                 }
                 adContainer.style.display = 'block';
             } else {
@@ -188,15 +199,16 @@ document.addEventListener('DOMContentLoaded', function () {
             let adHtml = '';
             if (isAdEnabled) {
                 adHtml = `
-                    <!-- Ad Placeholder -->
-                    <div class="mt-4 p-3 bg-light border rounded" style="max-width: 320px; margin: 0 auto;">
-                        <p class="small text-muted mb-2">▼ 動画広告をご視聴ください（サービスの維持にご協力お願いします）</p>
-                        <div id="ad-video-placeholder" style="width: 100%; height: 180px; background-color: #000; display: flex; align-items: center; justify-content: center; color: white;">
-                            <i class="fas fa-play-circle fa-2x"></i>
-                            <span class="ms-2">広告スペース</span>
-                        </div>
-                        <p id="ad-timer-text" class="text-primary fw-bold mt-2">あと 15 秒で結果を表示します</p>
-                        <p class="small text-muted mt-1">※ 広告再生終了後に結果が表示されます</p>
+                    <div class="mt-4 mb-3 text-center">
+                        <p class="small text-muted mb-2">▼ 広告が表示されます（15秒後に結果へ移動します）</p>
+                        
+                        <!-- Grading_Wait AdSense -->
+                        <ins class="adsbygoogle"
+                             style="display:block"
+                             data-ad-client="ca-pub-4793789398503896"
+                             data-ad-slot="7123578365"
+                             data-ad-format="auto"
+                             data-full-width-responsive="true"></ins>
                     </div>
                 `;
             }
@@ -207,9 +219,18 @@ document.addEventListener('DOMContentLoaded', function () {
                         <span class="visually-hidden">Loading...</span>
                     </div>
                     <p class="mt-2 text-muted">AIが添削中です...<br>（1分ほどかかります）</p>
-                    ${adHtml}
+                ${adHtml}
                 </div>
             `;
+
+            // Trigger AdSense if enabled
+            if (isAdEnabled) {
+                try {
+                    (window.adsbygoogle = window.adsbygoogle || []).push({});
+                } catch (e) {
+                    console.error("AdSense Error:", e);
+                }
+            }
 
             // Scroll to result
             gradingResult.scrollIntoView({ behavior: 'smooth' });
@@ -228,40 +249,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
             // 2. Ad Wait Promise (The monetization guard)
             const adWaitPromise = new Promise((resolve) => {
-                // Check Global Ad Setting
-                const appInfo = window.appInfoFromFlask || {};
-                const settings = appInfo.app_settings || {};
-                const isAdEnabled = settings.ad_video_enabled === true;
-
-                if (!isAdEnabled) {
-                    // 広告無効なら即終了
-                    resolve();
-                    return;
-                }
-
-                // 広告有効時のロジック (15秒待機)
-                const adDurationSec = 15;
-                let timeLeft = adDurationSec;
-
-                // Show Ad Placeholder
-                // 広告有効時のみプレースホルダーを表示するためのCSS操作が必要になるが、
-                // 今回はinnerHTML構築時にHTMLを出し分けていないため、ここでの制御は「待ち時間」のみとする。
-                // (本来はHTML生成部分も分岐すべきだが、CSSで隠すか、HTML生成時に分岐するのがベター) 
-
-                const timerDisplay = document.getElementById('ad-timer-text');
-                const updateTimer = () => {
-                    if (timerDisplay) {
-                        timerDisplay.textContent = `あと ${timeLeft} 秒で結果を表示します`;
-                        // 広告が無効なら非表示にするスタイル操作を入れても良いが、今回はResolveだけ行う
-                    }
-                    if (timeLeft > 0) {
-                        timeLeft--;
-                        setTimeout(updateTimer, 1000);
-                    } else {
-                        resolve();
-                    }
-                };
-                updateTimer();
+                // 広告の有無に関わらず、即座に完了とする（ユーザー要望によりタイマー削除）
+                resolve();
             });
 
             // 3. Wait for BOTH to finish
