@@ -11714,9 +11714,10 @@ def essay_grade():
 
         # 生成実行
         # Generation Config for stricter adherence
+        # 2000 tokens was too short for detailed HTMl output. Increased to 8192.
         generation_config = {
             "temperature": 0.4,
-            "max_output_tokens": 2000, 
+            "max_output_tokens": 8192, 
         }
 
         response = model.generate_content(
