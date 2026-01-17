@@ -101,6 +101,81 @@ def upload_image_to_s3(file, filename, folder='essay_images', content_type='imag
         print(f"S3アップロードエラー: {e}")
         return None
 # ====================================================================
+# 大学群の定義 (AI検索用)
+# ====================================================================
+UNIVERSITY_GROUPS = {
+    # 難関大学（東大、京大、一橋、旧帝国大学）
+    "ex_national": [
+        "東京大学", "京都大学", "一橋大学", "東京科学大学",
+        "北海道大学", "東北大学", "名古屋大学", "大阪大学", "九州大学"
+    ],
+    # 国公立大学（難関大学以外の主な国公立）
+    "national": [
+        # --- 国立大学 ---
+        # 北海道・東北
+        "北海道教育大学", "室蘭工業大学", "小樽商科大学", "帯広畜産大学", "旭川医科大学", "北見工業大学",
+        "弘前大学", "岩手大学", "宮城教育大学", "秋田大学", "山形大学", "福島大学",
+        
+        # 関東・甲信越
+        "茨城大学", "筑波大学", "筑波技術大学", "宇都宮大学", "群馬大学", "埼玉大学", "千葉大学", "横浜国立大学",
+        "新潟大学", "長岡技術科学大学", "上越教育大学", "山梨大学", "信州大学",
+        
+        # 東京
+        "東京外国語大学", "東京学芸大学", "東京農工大学", "東京芸術大学",
+        "東京海洋大学", "お茶の水女子大学", "電気通信大学",
+        
+        # 北陸・東海
+        "富山大学", "金沢大学", "福井大学", "岐阜大学", "静岡大学", "浜松医科大学",
+        "名古屋工業大学", "愛知教育大学", "豊橋技術科学大学", "三重大学",
+        
+        # 近畿
+        "滋賀大学", "滋賀医科大学", "京都教育大学", "京都府立医科大学","京都工芸繊維大学", "大阪教育大学",
+        "兵庫教育大学", "神戸大学", "奈良教育大学", "奈良女子大学", "和歌山大学",
+        
+        # 中国・四国
+        "鳥取大学", "島根大学", "岡山大学", "広島大学", "山口大学",
+        "徳島大学", "鳴門教育大学", "香川大学", "愛媛大学", "高知大学",
+        
+        # 九州・沖縄
+        "福岡教育大学", "九州工業大学", "佐賀大学", "長崎大学", "熊本大学",
+        "大分大学", "宮崎大学", "鹿児島大学", "鹿屋体育大学", "琉球大学",
+
+        # --- 公立大学 ---
+        # 主要・大規模
+        "東京都立大学", "大阪公立大学", "横浜市立大学", "名古屋市立大学",
+        "京都府立大学", "兵庫県立大学", "神戸市外国語大学", "北九州市立大学",
+        
+        # 北海道・東北
+        "札幌医科大学", "札幌市立大学", "釧路公立大学", "公立はこだて未来大学", "名寄市立大学",
+        "青森公立大学", "青森県立保健大学", "岩手県立大学", "宮城大学", "秋田県立大学", "国際教養大学",
+        "山形県立保健医療大学", "会津大学", "福島県立医科大学",
+        
+        # 関東・甲信越
+        "群馬県立女子大学", "群馬県立県民健康科学大学", "高崎経済大学", "前橋工科大学",
+        "埼玉県立大学", "千葉県立保健医療大学", "神奈川県立保健福祉大学", "川崎市立看護大学",
+        
+        # 北陸・東海
+        "新潟県立大学", "富山県立大学", "石川県立大学", "金沢美術工芸大学", "公立小松大学",
+        "福井県立大学", "都留文科大学", "山梨県立大学", "長野県立大学", "長野大学",
+        "岐阜薬科大学", "静岡県立大学", "静岡文化芸術大学", "愛知県立大学", "愛知県立芸術大学",
+        "三重県立看護大学",
+        
+        # 近畿
+        "滋賀県立大学", "京都市立芸術大学", "福知山公立大学",
+        "神戸市看護大学", "公立鳥取環境大学", "奈良県立大学", "奈良県立医科大学", "和歌山県立医科大学",
+        
+        # 中国・四国
+        "島根県立大学", "岡山県立大学", "県立広島大学", "広島市立大学", "尾道市立大学", "福山市立大学",
+        "下関市立大学", "山口県立大学", "香川県立保健医療大学", "愛媛県立医療技術大学", "高知工科大学", "高知県立大学",
+        
+        # 九州・沖縄
+        "九州歯科大学", "福岡女子大学", "福岡県立大学",
+        "長崎県立大学", "熊本県立大学", "大分県立看護科学大学", "宮崎県立看護大学", "宮崎公立大学", "沖縄県立芸術大学", "名桜大学"
+    ],
+    "early_keio": ["早稲田大学", "慶應義塾大学", "上智大学"],
+    "gmarch": ["学習院大学", "明治大学", "青山学院大学", "立教大学", "中央大学", "法政大学"],
+    "kan-kan-do-ritsu": ["関西大学", "関西学院大学", "同志社大学", "立命館大学"]
+}# ====================================================================
 # データベースモデル定義
 # ====================================================================
 
@@ -3855,6 +3930,189 @@ def api_search_essays():
         
     except Exception as e:
         app.logger.error(f"Essay search error: {str(e)}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/search_essays_ai', methods=['POST'])
+def api_search_essays_ai():
+    """AIを使用した論述問題の検索"""
+    try:
+        data = request.get_json()
+        keywords = data.get('keywords', '').strip()
+        selected_groups = data.get('university_groups', []) # List of group keys
+        selected_types = data.get('types', []) # List of types ['A', 'B', ...]
+        year_start = data.get('year_start')
+        year_end = data.get('year_end')
+        
+        if not keywords:
+             return jsonify({'status': 'success', 'results': []})
+
+        # キーワードの分割（全角・半角スペース対応）
+        keyword_list = re.split(r'[\s　]+', keywords)
+        keyword_list = [k for k in keyword_list if k] # 空文字除去
+
+        # 1. DBフィルタリング
+        query = EssayProblem.query.filter(EssayProblem.enabled == True)
+        
+        # 年度フィルタ
+        if year_start:
+            try:
+                query = query.filter(EssayProblem.year >= int(year_start))
+            except ValueError: pass
+        if year_end:
+            try:
+                query = query.filter(EssayProblem.year <= int(year_end))
+            except ValueError: pass
+            
+        # タイプフィルタ
+        if selected_types:
+            query = query.filter(EssayProblem.type.in_(selected_types))
+
+        # 大学群フィルタ
+        if selected_groups:
+            # 全定義済み大学リストを作成（フラット化）
+            all_defined_unis = []
+            for unis in UNIVERSITY_GROUPS.values():
+                all_defined_unis.extend(unis)
+
+            university_filter_conditions = []
+            
+            # 1. 選択された既存グループの大学を追加
+            for group_key in selected_groups:
+                if group_key in UNIVERSITY_GROUPS:
+                    for uni_name in UNIVERSITY_GROUPS[group_key]:
+                        university_filter_conditions.append(EssayProblem.university.like(f"%{uni_name}%"))
+            
+            # 2. 'other' が選択されている場合の処理
+            if 'other' in selected_groups:
+                # 定義済み大学のどれにもマッチしない
+                if all_defined_unis:
+                    # NOT (uni LIKE A OR uni LIKE B ...)
+                    not_defined_condition = ~db.or_(*[EssayProblem.university.like(f"%{u}%") for u in all_defined_unis])
+                    university_filter_conditions.append(not_defined_condition)
+                else:
+                    # 定義がなければ全てが「その他」
+                    university_filter_conditions.append(text("1=1"))
+            
+            if university_filter_conditions:
+                query = query.filter(db.or_(*university_filter_conditions))
+        
+        # キーワードでの絞り込み（OR検索）
+        # 少なくとも1つのキーワードが含まれるものを取得
+        if keyword_list:
+            keyword_conditions = []
+            for k in keyword_list:
+                term = f"%{k}%"
+                keyword_conditions.append(EssayProblem.question.like(term))
+                keyword_conditions.append(EssayProblem.answer.like(term))
+                keyword_conditions.append(EssayProblem.university.like(term))
+            query = query.filter(db.or_(*keyword_conditions))
+
+        # 候補を取得（広めに取得してPython側でスコアリング）
+        raw_candidates = query.limit(300).all()
+        
+        if not raw_candidates:
+             return jsonify({'status': 'success', 'results': [], 'message': '条件に一致する問題が見つかりませんでした。'})
+
+        # Python側でスコアリング（キーワード一致数）
+        scored_candidates = []
+        for c in raw_candidates:
+            # 全テキストを結合して検索
+            full_text = f"{c.university} {c.question} {c.answer}"
+            match_count = 0
+            for k in keyword_list:
+                if k in full_text:
+                    match_count += 1
+            scored_candidates.append({'candidate': c, 'score': match_count})
+        
+        # スコア順にソート（降順）
+        scored_candidates.sort(key=lambda x: x['score'], reverse=True)
+        
+        # フィルタリング
+        # フロントエンドで3〜5個のキーワード入力を強制しているため、
+        # 2個以上のキーワードがヒットした問題のみを候補とする（精度重視）
+        final_candidates = [item['candidate'] for item in scored_candidates if item['score'] >= 2]
+            
+        # AIに渡す上限（トークン節約 & 精度向上）
+        candidates = final_candidates[:15]
+        
+        if not candidates:
+             return jsonify({'status': 'success', 'results': [], 'message': 'キーワードに関連性の高い問題が見つかりませんでした。'})
+
+        # 2. AI選定 (Gemini API)
+        genai = get_genai_module()
+        if not genai:
+             return jsonify({'status': 'error', 'message': 'AI機能が利用できません'}), 503
+
+        # 候補リストの作成（JSON化）
+        candidate_list_for_ai = []
+        for c in candidates:
+            # トークン節約のため、問題文のみを記述する（解答は含めない）
+            # ユーザー同意済み: 問題文を150文字に制限
+            q_text = c.question[:150]
+            
+            # システム側でキーワードマッチング済みのため、AIには「問題の質」だけを判断させる
+            candidate_list_for_ai.append({
+                "id": c.id,
+                "text": f"大学: {c.university}, 年度: {c.year}\n問題: {q_text}..."
+            })
+            
+        model = genai.GenerativeModel('gemini-2.0-flash')
+        
+        prompt = f"""
+あなたの入試問題の専門コンシェルジュです。
+ユーザーの【検索キーワード】に基づいて、以下の【候補問題リスト】から最も学習効果の高い問題を最大3つ選び、推奨順に並べてください。
+
+# ユーザー検索キーワード
+{keywords}
+
+# 候補問題リスト
+{json.dumps(candidate_list_for_ai, ensure_ascii=False)}
+
+# 出力形式（厳守）
+JSON形式のリスト（配列）のみを出力してください。配列の中身は選択した問題のID（整数）のみです。
+例: [102, 55, 8]
+余計な解説やマークダウン記法(```jsonなど)は一切不要です。
+"""
+        
+        response = model.generate_content(prompt)
+        ai_output = response.text.strip()
+        
+        # JSON解析
+        try:
+            # マークダウンのコードブロック除去
+            if "```" in ai_output:
+                ai_output = ai_output.split("```")[1].replace("json", "").strip()
+            
+            recommended_ids = json.loads(ai_output)
+            if not isinstance(recommended_ids, list):
+                recommended_ids = []
+        except Exception as e:
+            print(f"AI JSON Parse Error: {e}, Output: {ai_output}")
+            recommended_ids = []
+            
+        # 3. 結果の整形
+        results = []
+        # AIが選んだ順序を維持して取得
+        for rec_id in recommended_ids:
+            # python側で該当IDのオブジェクトを探す（DB再クエリよりメモリ内検索が早い）
+            # filtered candidatesから探す
+            found = next((c for c in candidates if c.id == rec_id), None)
+            if found:
+                snippet = found.question[:100] + '...' if len(found.question) > 100 else found.question
+                results.append({
+                    'id': found.id,
+                    'chapter': found.chapter,
+                    'university': found.university,
+                    'year': found.year,
+                    'type': found.type,
+                    'question_snippet': snippet,
+                    'is_recommended': True
+                })
+        
+        return jsonify({'status': 'success', 'results': results})
+
+    except Exception as e:
+        app.logger.error(f"AI Essay search error: {str(e)}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/api/essay/get_keywords/<int:problem_id>')
