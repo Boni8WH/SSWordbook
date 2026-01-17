@@ -11,6 +11,10 @@ document.addEventListener('DOMContentLoaded', function () {
     const processOcrBtn = document.getElementById('processOcrBtn');
     const ocrActionArea = document.getElementById('ocrActionArea');
     const gradingResult = document.getElementById('gradingResult');
+    const uploadArea = document.getElementById('uploadArea');
+
+    // File object for OCR (handles both input selection and drag & drop)
+    let ocrFile = null;
 
     // Get Problem Data
     const problemData = document.getElementById('problem-data');
@@ -39,27 +43,74 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // Image Upload Preview
+    // Helper to process file
+    const processFile = (file) => {
+        if (!file || !file.type.startsWith('image/')) return;
+
+        ocrFile = file;
+        const reader = new FileReader();
+        reader.onload = function (e) {
+            imagePreview.src = e.target.result;
+            imagePreviewContainer.style.display = 'block';
+            uploadInstructions.style.display = 'none';
+            ocrActionArea.style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+    };
+
+    // Image Upload Preview (Input Change)
     if (essayImageInput) {
         essayImageInput.addEventListener('change', function (e) {
-            const file = e.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = function (e) {
-                    imagePreview.src = e.target.result;
-                    imagePreviewContainer.style.display = 'block';
-                    uploadInstructions.style.display = 'none';
-                    ocrActionArea.style.display = 'block';
-                };
-                reader.readAsDataURL(file);
+            if (e.target.files && e.target.files[0]) {
+                processFile(e.target.files[0]);
             }
         });
+    }
+
+    // Drag and Drop Logic
+    if (uploadArea) {
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            uploadArea.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            uploadArea.addEventListener(eventName, highlight, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            uploadArea.addEventListener(eventName, unhighlight, false);
+        });
+
+        function highlight(e) {
+            uploadArea.style.backgroundColor = '#e9ecef';
+            uploadArea.style.borderColor = '#6c757d';
+        }
+
+        function unhighlight(e) {
+            uploadArea.style.backgroundColor = '#f8f9fa';
+            uploadArea.style.borderColor = '#dee2e6';
+        }
+
+        uploadArea.addEventListener('drop', handleDrop, false);
+
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            if (files && files[0]) {
+                processFile(files[0]);
+            }
+        }
     }
 
     // Process OCR
     if (processOcrBtn) {
         processOcrBtn.addEventListener('click', function () {
-            const file = essayImageInput.files[0];
+            const file = ocrFile;
             if (!file) {
                 alert('画像を選択してください');
                 return;
