@@ -669,6 +669,19 @@
                 searchModal.show();
                 // 初期化：結果クリア
                 if (searchResults) searchResults.innerHTML = '';
+
+                // 年度のデフォルト値を設定
+                const now = new Date();
+                const currentYear = now.getFullYear();
+                const yearStartInput = document.getElementById('yearStart');
+                const yearEndInput = document.getElementById('yearEnd');
+
+                if (yearStartInput && !yearStartInput.value) {
+                    yearStartInput.value = currentYear - 10;
+                }
+                if (yearEndInput && !yearEndInput.value) {
+                    yearEndInput.value = currentYear - 1;
+                }
             });
         }
 
