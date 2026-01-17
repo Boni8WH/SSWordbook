@@ -895,7 +895,7 @@
             <div class="tab-pane fade" id="upload-input" role="tabpanel" aria-labelledby="upload-tab">
                 <div class="upload-area" id="uploadArea">
                     <input type="file" id="essayImageInput" accept="image/*" style="display: none;">
-                    <div class="upload-placeholder" onclick="document.getElementById('essayImageInput').click()">
+                    <label class="upload-placeholder" for="essayImageInput" style="display: block; cursor: pointer;">
                         <div id="uploadInstructions">
                             <i class="fas fa-cloud-upload-alt fa-3x mb-3"></i>
                             <p>クリックして画像をアップロード<br>またはドラッグ＆ドロップ</p>
@@ -903,7 +903,7 @@
                         <div id="imagePreviewContainer" style="display: none;">
                             <img id="imagePreview" src="" alt="Preview">
                         </div>
-                    </div>
+                    </label>
                 </div>
                 <div class="text-center mt-3" id="ocrActionArea" style="display: none;">
                     <button type="button" class="btn btn-primary" id="processOcrBtn">
