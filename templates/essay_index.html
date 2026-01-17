@@ -444,7 +444,7 @@
                             <button class="nav-link active" id="normal-search-tab" data-bs-toggle="tab"
                                 data-bs-target="#normal-search" type="button" role="tab" aria-controls="normal-search"
                                 aria-selected="true">
-                                <i class="fas fa-keyboard"></i> かんたん検索
+                                <i class="fas fa-keyboard"></i> キーワード検索
                             </button>
                         </li>
                         <li class="nav-item" role="presentation">
@@ -469,10 +469,10 @@
                         <!-- AI検索タブ -->
                         <div class="tab-pane fade" id="ai-search" role="tabpanel" aria-labelledby="ai-search-tab">
                             <div class="mb-3">
-                                <label for="aiSearchKeywords" class="form-label">検索キーワード（3〜5個）</label>
+                                <label for="aiSearchKeywords" class="form-label">検索キーワード（3〜5個推奨）</label>
                                 <input type="text" id="aiSearchKeywords" class="form-control"
                                     placeholder="例: フランス革命 市民 ブルジョワジー">
-                                <div class="form-text">スペース区切りで複数のキーワード（用語推奨）を入力してください。</div>
+                                <div class="form-text">スペース区切りで複数のキーワードを入力してください。</div>
                             </div>
 
                             <div class="accordion mb-3" id="searchOptionsAccordion">
@@ -481,7 +481,7 @@
                                         <button class="accordion-button collapsed" type="button"
                                             data-bs-toggle="collapse" data-bs-target="#collapseOptions"
                                             aria-expanded="false" aria-controls="collapseOptions">
-                                            詳細条件（現状登録問題が多くはないので、条件を絞るのは非推奨）
+                                            詳細条件（大学・年度）
                                         </button>
                                     </h2>
                                     <div id="collapseOptions" class="accordion-collapse collapse"
@@ -494,12 +494,12 @@
                                                         <input class="form-check-input" type="checkbox"
                                                             value="ex_national" id="chkExNational">
                                                         <label class="form-check-label"
-                                                            for="chkExNational">旧帝+一橋</label>
+                                                            for="chkExNational">難関国公立</label>
                                                     </div>
                                                     <div class="form-check">
                                                         <input class="form-check-input" type="checkbox" value="national"
                                                             id="chkNational">
-                                                        <label class="form-check-label" for="chkNational">他国公立</label>
+                                                        <label class="form-check-label" for="chkNational">国公立</label>
                                                     </div>
                                                     <div class="form-check">
                                                         <input class="form-check-input" type="checkbox"
@@ -517,43 +517,8 @@
                                                         <label class="form-check-label"
                                                             for="chkKankandoritsu">関関同立</label>
                                                     </div>
-                                                    <div class="form-check">
-                                                        <input class="form-check-input" type="checkbox" value="other"
-                                                            id="chkOther">
-                                                        <label class="form-check-label" for="chkOther">その他私立</label>
-                                                    </div>
                                                 </div>
                                             </div>
-
-                                            <div class="mb-3">
-                                                <label class="form-label fw-bold">問題タイプ</label>
-                                                <div class="d-flex flex-wrap gap-2">
-                                                    <div class="form-check">
-                                                        <input class="form-check-input" type="checkbox" value="A"
-                                                            id="chkTypeA" checked>
-                                                        <label class="form-check-label" for="chkTypeA">A
-                                                            (200字以上)</label>
-                                                    </div>
-                                                    <div class="form-check">
-                                                        <input class="form-check-input" type="checkbox" value="B"
-                                                            id="chkTypeB" checked>
-                                                        <label class="form-check-label" for="chkTypeB">B
-                                                            (100-150字)</label>
-                                                    </div>
-                                                    <div class="form-check">
-                                                        <input class="form-check-input" type="checkbox" value="C"
-                                                            id="chkTypeC" checked>
-                                                        <label class="form-check-label" for="chkTypeC">C
-                                                            (50-75字)</label>
-                                                    </div>
-                                                    <div class="form-check">
-                                                        <input class="form-check-input" type="checkbox" value="D"
-                                                            id="chkTypeD" checked>
-                                                        <label class="form-check-label" for="chkTypeD">D (30字程度)</label>
-                                                    </div>
-                                                </div>
-                                            </div>
-
                                             <div class="mb-3">
                                                 <label class="form-label fw-bold">年度範囲</label>
                                                 <div class="input-group">
@@ -569,28 +534,11 @@
                                 </div>
                             </div>
 
-                            <div class="mb-3 text-muted" style="font-size: 0.85rem;">
-                                <i class="fas fa-info-circle"></i>
-                                問題がヒットしても、ユーザーの望んだ問題でない場合（事実上ヒット０件）もあります。
-                            </div>
-
                             <div class="d-grid mb-3">
                                 <button class="btn btn-success" type="button" id="essaySearchAIButton">
                                     <i class="fas fa-sparkles"></i> AI検索
                                 </button>
                             </div>
-
-                            {% if app_info_for_js.app_settings.ad_banner_enabled %}
-                            <div class="mb-3 text-center">
-                                <!-- AI検索下部バナー広告 -->
-                                <ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-4793789398503896"
-                                    data-ad-slot="7040953356" data-ad-format="auto"
-                                    data-full-width-responsive="true"></ins>
-                                <script>
-                                    (adsbygoogle = window.adsbygoogle || []).push({});
-                                </script>
-                            </div>
-                            {% endif %}
                         </div>
                     </div>
 
@@ -721,19 +669,6 @@
                 searchModal.show();
                 // 初期化：結果クリア
                 if (searchResults) searchResults.innerHTML = '';
-
-                // 年度のデフォルト値を設定
-                const now = new Date();
-                const currentYear = now.getFullYear();
-                const yearStartInput = document.getElementById('yearStart');
-                const yearEndInput = document.getElementById('yearEnd');
-
-                if (yearStartInput && !yearStartInput.value) {
-                    yearStartInput.value = currentYear - 10;
-                }
-                if (yearEndInput && !yearEndInput.value) {
-                    yearEndInput.value = currentYear - 1;
-                }
             });
         }
 
@@ -783,38 +718,17 @@
         }
 
         function executeEssaySearchAI() {
-            const keywordsRaw = aiSearchKeywords.value.trim();
-            if (!keywordsRaw) {
+            const keywords = aiSearchKeywords.value.trim();
+            if (!keywords) {
                 searchResults.innerHTML = '<div class="list-group-item text-muted">キーワードを入力してください</div>';
                 return;
             }
 
-            // キーワード数をカウント（全角・半角スペース区切り）
-            const keywordList = keywordsRaw.split(/[\s　]+/).filter(k => k.length > 0);
-            if (keywordList.length < 3 || keywordList.length > 5) {
-                searchResults.innerHTML = `<div class="list-group-item list-group-item-warning text-dark">
-                    <i class="fas fa-exclamation-triangle"></i> 検索精度を高めるため、キーワードは<strong>3〜5個</strong>入力してください。<br>
-                    <small>現在のキーワード数: ${keywordList.length}個</small>
-                </div>`;
-                return;
-            }
-
-            const keywords = keywordsRaw;
-
             // オプション取得
             const selectedGroups = [];
-            document.querySelectorAll('#collapseOptions input[type="checkbox"][id^="chk"]:not([id^="chkType"])').forEach(cb => {
-                if (cb.checked) {
-                    selectedGroups.push(cb.value);
-                }
+            document.querySelectorAll('#collapseOptions input[type="checkbox"]:checked').forEach(cb => {
+                selectedGroups.push(cb.value);
             });
-
-            // 問題タイプ取得
-            const selectedTypes = [];
-            document.querySelectorAll('#collapseOptions input[type="checkbox"][id^="chkType"]:checked').forEach(cb => {
-                selectedTypes.push(cb.value);
-            });
-
             const yearStart = document.getElementById('yearStart').value;
             const yearEnd = document.getElementById('yearEnd').value;
 
@@ -826,7 +740,6 @@
                 body: JSON.stringify({
                     keywords: keywords,
                     university_groups: selectedGroups,
-                    types: selectedTypes,
                     year_start: yearStart,
                     year_end: yearEnd
                 }),
@@ -851,7 +764,7 @@
 
                         let badge = '';
                         if (essay.is_recommended) {
-                            badge = `<span class="badge bg-warning text-dark ms-2"><i class="fas fa-crown"></i> オススメ${index + 1}位</span>`;
+                            badge = `<span class="badge bg-warning text-dark ms-2"><i class="fas fa-crown"></i> おすすめ${index + 1}位</span>`;
                         }
 
                         item.innerHTML = `
