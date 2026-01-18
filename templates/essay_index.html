@@ -481,7 +481,7 @@
                                         <button class="accordion-button collapsed" type="button"
                                             data-bs-toggle="collapse" data-bs-target="#collapseOptions"
                                             aria-expanded="false" aria-controls="collapseOptions">
-                                            詳細条件（大学・年度）
+                                            詳細条件（現状登録問題が多くはないので、条件を絞るのは非推奨）
                                         </button>
                                     </h2>
                                     <div id="collapseOptions" class="accordion-collapse collapse"
@@ -517,6 +517,36 @@
                                                         <label class="form-check-label"
                                                             for="chkKankandoritsu">関関同立</label>
                                                     </div>
+                                                    <div class="form-check">
+                                                        <input class="form-check-input" type="checkbox" value="other"
+                                                            id="chkOther">
+                                                        <label class="form-check-label" for="chkOther">その他私立</label>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label fw-bold">問題タイプ</label>
+                                                <div class="d-flex flex-wrap gap-2">
+                                                    <div class="form-check">
+                                                        <input class="form-check-input" type="checkbox" value="A"
+                                                            id="chkTypeA">
+                                                        <label class="form-check-label" for="chkTypeA">A</label>
+                                                    </div>
+                                                    <div class="form-check">
+                                                        <input class="form-check-input" type="checkbox" value="B"
+                                                            id="chkTypeB">
+                                                        <label class="form-check-label" for="chkTypeB">B</label>
+                                                    </div>
+                                                    <div class="form-check">
+                                                        <input class="form-check-input" type="checkbox" value="C"
+                                                            id="chkTypeC">
+                                                        <label class="form-check-label" for="chkTypeC">C</label>
+                                                    </div>
+                                                    <div class="form-check">
+                                                        <input class="form-check-input" type="checkbox" value="D"
+                                                            id="chkTypeD">
+                                                        <label class="form-check-label" for="chkTypeD">D</label>
+                                                    </div>
                                                 </div>
                                             </div>
                                             <div class="mb-3">
@@ -534,96 +564,109 @@
                                 </div>
                             </div>
 
-                            <div class="d-grid mb-3">
-                                <button class="btn btn-success" type="button" id="essaySearchAIButton">
-                                    <i class="fas fa-sparkles"></i> AI検索
-                                </button>
+                            <button class="btn btn-success" type="button" id="essaySearchAIButton">
+                                <i class="fas fa-sparkles"></i> AI検索
+                            </button>
+                        </div>
+
+                        <!-- バナー広告エリア -->
+                        <div class="text-center mb-3" id="bannerAdContainer">
+                            <!-- バナー広告エリア -->
+                            <div class="text-center mb-3" id="bannerAdContainer">
+                                <!-- search -->
+                                <ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-4793789398503896"
+                                    data-ad-slot="7040953356" data-ad-format="auto"
+                                    data-full-width-responsive="true"></ins>
+                                <script>
+                                    (adsbygoogle = window.adsbygoogle || []).push({});
+                                </script>
                             </div>
                         </div>
                     </div>
+                </div>
 
-                    <div id="essaySearchResults" class="list-group" style="max-height: 400px; overflow-y: auto;">
-                        <!-- 検索結果がここに表示されます -->
-                    </div>
+                <div id="essaySearchResults" class="list-group" style="max-height: 400px; overflow-y: auto;">
+                    <!-- 検索結果がここに表示されます -->
                 </div>
             </div>
         </div>
     </div>
+</div>
 
-    <div class="chapter-grid">
-        {% for chapter_stat in chapter_stats %}
-        <div class="chapter-card" data-chapter-url="{{ url_for('essay_chapter', chapter=chapter_stat.chapter) }}">
-            <div class="chapter-card-header">
-                <h3 class="chapter-title">
-                    {% if chapter_stat.chapter == 'com' %}
-                    <i class="fas fa-star"></i> {{ chapter_stat.chapter_name }}
-                    {% else %}
-                    <i class="fas fa-book"></i> {{ chapter_stat.chapter_name }}
-                    {% endif %}
-                </h3>
-                <div class="problem-count">
-                    <span class="total-count">{{ chapter_stat.total_problems }}問</span>
+<div class="chapter-grid">
+    {% for chapter_stat in chapter_stats %}
+    <div class="chapter-card" data-chapter-url="{{ url_for('essay_chapter', chapter=chapter_stat.chapter) }}">
+        <div class="chapter-card-header">
+            <h3 class="chapter-title">
+                {% if chapter_stat.chapter == 'com' %}
+                <i class="fas fa-star"></i> {{ chapter_stat.chapter_name }}
+                {% else %}
+                <i class="fas fa-book"></i> {{ chapter_stat.chapter_name }}
+                {% endif %}
+            </h3>
+            <div class="problem-count">
+                <span class="total-count">{{ chapter_stat.total_problems }}問</span>
+            </div>
+        </div>
+
+        <div class="progress-section">
+            <div class="progress-stats">
+                <div class="stat-item">
+                    <span class="stat-label">閲覧済み</span>
+                    <span class="stat-value">{{ chapter_stat.viewed_problems }}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">理解済み</span>
+                    <span class="stat-value understood">{{ chapter_stat.understood_problems }}</span>
                 </div>
             </div>
-
-            <div class="progress-section">
-                <div class="progress-stats">
-                    <div class="stat-item">
-                        <span class="stat-label">閲覧済み</span>
-                        <span class="stat-value">{{ chapter_stat.viewed_problems }}</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-label">理解済み</span>
-                        <span class="stat-value understood">{{ chapter_stat.understood_problems }}</span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="chapter-card-footer">
-                <span class="enter-hint">
-                    <i class="fas fa-arrow-right"></i> クリックして問題一覧へ
-                </span>
-            </div>
         </div>
-        {% endfor %}
 
-        {% if not chapter_stats %}
-        <div class="no-problems-message">
-            <div class="message-content">
-                <i class="fas fa-info-circle"></i>
-                <h3>論述問題がまだ登録されていません</h3>
-                <p>管理者によって問題が登録されるまでお待ちください。</p>
-            </div>
-        </div>
-        {% endif %}
-    </div>
-
-    <!-- 学習のヒント -->
-    <div class="study-tips">
-        <h3><i class="fas fa-lightbulb"></i> 学習のコツ</h3>
-        <div class="tips-grid">
-            <div class="tip-card">
-                <i class="fas fa-eye"></i>
-                <h4>まずは問題を読む</h4>
-                <p>解答を見る前に、自分なりに答えを考えてみましょう。</p>
-            </div>
-            <div class="tip-card">
-                <i class="fas fa-check-circle"></i>
-                <h4>理解度をマーク</h4>
-                <p>「理解した」ボタンで進捗を記録し、学習状況を把握しましょう。</p>
-            </div>
-            <div class="tip-card">
-                <i class="fas fa-sticky-note"></i>
-                <h4>メモを活用</h4>
-                <p>重要なポイントや覚えにくい内容はメモ機能を使って記録しましょう。</p>
-            </div>
-            <div class="tip-card">
-                <i class="fas fa-flag"></i>
-                <h4>復習フラグ</h4>
-                <p>後で見返したい問題には復習フラグを付けておきましょう。</p>
-            </div>
+        <div class="chapter-card-footer">
+            <span class="enter-hint">
+                <i class="fas fa-arrow-right"></i> クリックして問題一覧へ
+            </span>
         </div>
     </div>
+    {% endfor %}
+
+    {% if not chapter_stats %}
+    <div class="no-problems-message">
+        <div class="message-content">
+            <i class="fas fa-info-circle"></i>
+            <h3>論述問題がまだ登録されていません</h3>
+            <p>管理者によって問題が登録されるまでお待ちください。</p>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- 学習のヒント -->
+<div class="study-tips">
+    <h3><i class="fas fa-lightbulb"></i> 学習のコツ</h3>
+    <div class="tips-grid">
+        <div class="tip-card">
+            <i class="fas fa-eye"></i>
+            <h4>まずは問題を読む</h4>
+            <p>解答を見る前に、自分なりに答えを考えてみましょう。</p>
+        </div>
+        <div class="tip-card">
+            <i class="fas fa-check-circle"></i>
+            <h4>理解度をマーク</h4>
+            <p>「理解した」ボタンで進捗を記録し、学習状況を把握しましょう。</p>
+        </div>
+        <div class="tip-card">
+            <i class="fas fa-sticky-note"></i>
+            <h4>メモを活用</h4>
+            <p>重要なポイントや覚えにくい内容はメモ機能を使って記録しましょう。</p>
+        </div>
+        <div class="tip-card">
+            <i class="fas fa-flag"></i>
+            <h4>復習フラグ</h4>
+            <p>後で見返したい問題には復習フラグを付けておきましょう。</p>
+        </div>
+    </div>
+</div>
 </div>
 
 <script>
@@ -740,7 +783,15 @@
             // オプション取得
             const selectedGroups = [];
             document.querySelectorAll('#collapseOptions input[type="checkbox"]:checked').forEach(cb => {
-                selectedGroups.push(cb.value);
+                if (cb.value.length === 1 && ['A', 'B', 'C', 'D'].includes(cb.value)) {
+                    // タイプは別リストへ（もし必要なら）
+                } else {
+                    selectedGroups.push(cb.value);
+                }
+            });
+            const selectedTypes = [];
+            document.querySelectorAll('#collapseOptions input[type="checkbox"][id^="chkType"]:checked').forEach(cb => {
+                selectedTypes.push(cb.value);
             });
             const yearStart = document.getElementById('yearStart').value;
             const yearEnd = document.getElementById('yearEnd').value;
@@ -752,7 +803,9 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     keywords: keywords,
+                    keywords: keywords,
                     university_groups: selectedGroups,
+                    types: selectedTypes,
                     year_start: yearStart,
                     year_end: yearEnd
                 }),

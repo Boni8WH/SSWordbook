@@ -482,43 +482,152 @@ hr {
     padding-bottom: 0;
 }
 
-.radio-group {
+/* 出題数選択ボタン */
+.question-count-buttons {
     display: flex;
-    flex-direction: column;
-    gap: 10px;
-    /* スマホでは小さく */
+    gap: 0;
     margin-bottom: 15px;
-    /* スマホでは小さく */
+    background-color: #f0f0f0;
+    border-radius: 8px;
+    overflow: hidden;
 }
 
-.radio-group label {
+.count-btn {
+    flex: 1;
+    text-align: center;
+    padding: 10px 5px;
+    cursor: pointer;
+    font-size: 0.9em;
+    font-weight: 500;
+    color: #666;
+    background-color: #f0f0f0;
+    transition: all 0.2s ease;
+    border-right: 1px solid #e0e0e0;
+}
+
+.count-btn:last-child {
+    border-right: none;
+}
+
+.count-btn:hover {
+    background-color: #e0e0e0;
+}
+
+.count-btn.active {
+    background-color: #3498db;
+    color: white;
+}
+
+/* 苦手問題ボタン */
+.weak-problem-toggle {
     display: flex;
     align-items: center;
+}
+
+.weak-problem-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background-color: #f5f5f5;
+    border: 1px solid #ddd;
+    border-radius: 20px;
     cursor: pointer;
-    font-size: 0.95em;
-    /* スマホでは小さく */
-    color: #555;
-    padding: 8px;
-    /* スマホ用のタッチエリア拡大 */
-    background-color: #fff;
-    border: 1px solid #e0e0e0;
-    border-radius: 6px;
-    transition: background-color 0.2s ease;
+    font-size: 0.9em;
+    color: #666;
+    transition: all 0.2s ease;
 }
 
-.radio-group label:hover {
-    background-color: #f0f0f0;
+.weak-problem-btn input[type="checkbox"] {
+    display: none;
 }
 
-.radio-group input[type="radio"] {
-    margin-right: 8px;
-    transform: scale(1.1);
-    /* スマホでは少し小さく */
+.weak-problem-btn:hover {
+    background-color: #e8e8e8;
 }
 
-.radio-group input[type="radio"]:disabled+label {
-    opacity: 0.6;
+.weak-problem-btn:has(input:checked) {
+    background-color: #e74c3c;
+    border-color: #e74c3c;
+    color: white;
+}
+
+.weak-problem-btn.disabled {
+    opacity: 0.5;
     cursor: not-allowed;
+}
+
+/* 統一フィルターオプションバー */
+.filter-options-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+.filter-option-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    background-color: #f5f5f5;
+    border: 1px solid #ddd;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 0.85em;
+    color: #666;
+    transition: all 0.2s ease;
+}
+
+.filter-option-btn input[type="checkbox"] {
+    display: none;
+}
+
+.filter-option-btn:hover {
+    background-color: #e8e8e8;
+}
+
+.filter-option-btn:has(input:checked) {
+    background-color: #3498db;
+    border-color: #3498db;
+    color: white;
+}
+
+.filter-option-btn:has(#incorrectOnlyCheckbox2:checked) {
+    background-color: #e74c3c;
+    border-color: #e74c3c;
+}
+
+.filter-option-btn.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* スライダーラベル位置調整 */
+.slider-labels {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 8px;
+    font-size: 0.85em;
+    color: #666;
+    padding: 0;
+}
+
+.slider-labels span {
+    flex: none;
+    text-align: center;
+    cursor: pointer;
+    padding: 5px 0;
+    transition: color 0.2s ease;
+}
+
+/* 端のラベルを適切に配置 */
+.slider-labels span:first-child {
+    text-align: left;
+}
+
+.slider-labels span:last-child {
+    text-align: right;
 }
 
 .auth-message-incorrect-only {

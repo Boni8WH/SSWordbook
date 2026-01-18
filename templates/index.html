@@ -20,43 +20,49 @@
 
         <div class="question-count-and-auth">
             <div class="question-count-selection">
-                <h3><span id="rangeSelectionTitleText">出題数を選択</span> <span id="selectionTotalCount"
-                        style="font-size: 0.8em; color: #666; font-weight: normal; margin-left: 10px;"></span></h3>
-                <div class="radio-group">
-                    <label>
-                        <input type="radio" name="questionCount" value="10">
-                        <span>10問</span>
-                    </label>
-                    <label>
-                        <input type="radio" name="questionCount" value="20">
-                        <span>20問</span>
-                    </label>
-                    <label>
-                        <input type="radio" name="questionCount" value="50">
-                        <span>50問</span>
-                    </label>
-                    <label>
-                        <input type="radio" name="questionCount" value="all">
-                        <span>全問</span>
-                    </label>
-                    <label>
-                        <input type="radio" name="questionCount" value="incorrectOnly" id="incorrectOnlyRadio" {% if not
-                            session.get('user_id') %}disabled{% endif %}>
-                        <span>苦手問題</span>
-                    </label>
+                <div
+                    style="display: flex; justify-content: space-between; align-items: center; width: 100%; border-bottom: 1px solid #eee; margin-bottom: 12px; padding-bottom: 8px;">
+                    <h3 style="margin: 0; border: none; padding: 0;"><span id="rangeSelectionTitleText">出題数を選択</span>
+                        <span id="selectionTotalCount"
+                            style="font-size: 0.8em; color: #666; font-weight: normal; margin-left: 10px;"></span>
+                    </h3>
+                    <button id="resetSelectionButton" class="btn btn-sm btn-link text-secondary text-decoration-none"
+                        style="font-size: 0.85rem;">
+                        <i class="fas fa-undo-alt"></i> リセット
+                    </button>
                 </div>
-                <!-- 未解答のみチェックボックス -->
-                <div class="checkbox-group" style="margin-top: 10px; display: flex; gap: 15px;">
-                    <label>
+                <!-- 出題数選択ボタン -->
+                <div class="question-count-buttons">
+                    <span class="count-btn active" data-value="0">10問</span>
+                    <span class="count-btn" data-value="1">20問</span>
+                    <span class="count-btn" data-value="2">50問</span>
+                    <span class="count-btn" data-value="3">全問</span>
+                </div>
+                <!-- オプションボタン（統一デザイン） -->
+                <div class="filter-options-bar">
+                    <label class="filter-option-btn {% if not session.get('user_id') %}disabled{% endif %}">
+                        <input type="checkbox" id="incorrectOnlyCheckbox2" {% if not session.get('user_id') %}disabled{%
+                            endif %}>
+                        <span><i class="fas fa-crosshairs"></i> 苦手問題</span>
+                    </label>
+                    <label class="filter-option-btn {% if not session.get('user_id') %}disabled{% endif %}">
                         <input type="checkbox" id="unsolvedOnlyCheckbox" {% if not session.get('user_id') %}disabled{%
                             endif %}>
-                        <span>未解答のみ</span>
+                        <span><i class="fas fa-question-circle"></i> 未解答のみ</span>
                     </label>
-                    <label>
+                    <label class="filter-option-btn {% if not session.get('user_id') %}disabled{% endif %}">
                         <input type="checkbox" id="unmasteredOnlyCheckbox" {% if not session.get('user_id') %}disabled{%
                             endif %}>
-                        <span>未マスターのみ</span>
+                        <span><i class="fas fa-star-half-alt"></i> 未マスター</span>
                     </label>
+                </div>
+                <!-- 隠しラジオ（既存JS互換用） -->
+                <div style="display: none;">
+                    <input type="radio" name="questionCount" value="10" id="qc10" checked>
+                    <input type="radio" name="questionCount" value="20" id="qc20">
+                    <input type="radio" name="questionCount" value="50" id="qc50">
+                    <input type="radio" name="questionCount" value="all" id="qcAll">
+                    <input type="radio" name="questionCount" value="incorrectOnly" id="incorrectOnlyRadio">
                 </div>
             </div>
         </div>
@@ -100,9 +106,6 @@
         <div class="bottom-controls">
             <button id="startButton" class="btn btn-start">
                 <i class="fas fa-play"></i> 学習開始
-            </button>
-            <button id="resetSelectionButton" class="btn btn-reset">
-                <i class="fas fa-undo"></i> 選択リセット
             </button>
             <button id="dailyQuizButton" class="btn btn-daily">
                 <i class="fas fa-stopwatch"></i> 今日の10問
@@ -434,4 +437,96 @@
         transition: opacity 0.3s ease, transform 0.3s ease;
     }
 </style>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const countBtns = document.querySelectorAll('.count-btn');
+        const radioMap = ['qc10', 'qc20', 'qc50', 'qcAll'];
+        const weakCheckbox = document.getElementById('incorrectOnlyCheckbox2');
+        const incorrectOnlyRadio = document.getElementById('incorrectOnlyRadio');
+        const rangeSelectionArea = document.querySelector('.range-selection-area');
+        const rangeSelectionTitleText = document.getElementById('rangeSelectionTitleText');
+
+        function selectCount(value) {
+            // Update hidden radio and dispatch change event
+            const radioId = radioMap[value];
+            const radio = document.getElementById(radioId);
+            if (radio) {
+                radio.checked = true;
+                radio.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+
+            // Update button highlight
+            countBtns.forEach((btn, index) => {
+                btn.classList.toggle('active', index == value);
+            });
+
+            // Uncheck weak problem if count is selected
+            if (weakCheckbox && weakCheckbox.checked) {
+                weakCheckbox.checked = false;
+            }
+
+            // Show range selection area
+            if (rangeSelectionArea) {
+                rangeSelectionArea.style.display = 'block';
+            }
+            if (rangeSelectionTitleText) {
+                rangeSelectionTitleText.textContent = '出題数を選択';
+                rangeSelectionTitleText.style.color = '#34495e';
+            }
+        }
+
+        // Click on count buttons
+        countBtns.forEach((btn) => {
+            btn.addEventListener('click', function () {
+                const val = this.getAttribute('data-value');
+                selectCount(val);
+            });
+        });
+
+        // Weak problem toggle
+        const unsolvedCheckbox = document.getElementById('unsolvedOnlyCheckbox');
+        const unmasteredCheckbox = document.getElementById('unmasteredOnlyCheckbox');
+
+        function updateFilterCheckboxState(disabled) {
+            if (unsolvedCheckbox) {
+                unsolvedCheckbox.disabled = disabled;
+                unsolvedCheckbox.closest('.filter-option-btn').classList.toggle('disabled', disabled);
+                if (disabled) unsolvedCheckbox.checked = false;
+            }
+            if (unmasteredCheckbox) {
+                unmasteredCheckbox.disabled = disabled;
+                unmasteredCheckbox.closest('.filter-option-btn').classList.toggle('disabled', disabled);
+                if (disabled) unmasteredCheckbox.checked = false;
+            }
+        }
+
+        if (weakCheckbox) {
+            weakCheckbox.addEventListener('change', function () {
+                if (this.checked) {
+                    incorrectOnlyRadio.checked = true;
+                    incorrectOnlyRadio.dispatchEvent(new Event('change', { bubbles: true }));
+                    countBtns.forEach(btn => btn.classList.remove('active'));
+
+                    // Hide range selection area when weak problem is selected
+                    if (rangeSelectionArea) {
+                        rangeSelectionArea.style.display = 'none';
+                    }
+                    if (rangeSelectionTitleText) {
+                        rangeSelectionTitleText.textContent = '苦手問題モード';
+                        rangeSelectionTitleText.style.color = '#e74c3c';
+                    }
+
+                    // Disable other filters
+                    updateFilterCheckboxState(true);
+                } else {
+                    // Default back to 10問
+                    selectCount(0);
+
+                    // Re-enable other filters
+                    updateFilterCheckboxState(false);
+                }
+            });
+        }
+    });
+</script>
 {% endblock %}
