@@ -14807,6 +14807,118 @@ def parse_columns_csv():
         
     return columns_data
 
+# ====================================================================
+# プライバシーポリシー・利用規約
+# ====================================================================
+
+@app.route('/privacy-policy')
+def privacy_policy():
+    """プライバシーポリシーページ"""
+    context = get_template_context()
+    return render_template('privacy_policy.html', **context)
+
+@app.route('/terms-of-service')
+def terms_of_service():
+    """利用規約ページ"""
+    context = get_template_context()
+    return render_template('terms_of_service.html', **context)
+
+# ====================================================================
+# サンプルクイズAPI（ログイン不要）
+# ====================================================================
+
+@app.route('/api/sample-quiz')
+def get_sample_quiz():
+    """ログイン不要でサンプル問題を取得（10問ランダム・4択形式）"""
+    import random
+    
+    try:
+        # デフォルトのwords.csvから読み込み
+        word_data = []
+        all_answers = []  # 選択肢生成用に全回答を収集
+        
+        try:
+            with open('words.csv', 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    if not row.get('question') or not row.get('answer'):
+                        continue
+                    if not row.get('question').strip() or not row.get('answer').strip():
+                        continue
+                    # 有効な問題のみ
+                    if row.get('enabled', '1') != '1':
+                        continue
+                    # z問題（難関私大対策）を除外
+                    number_str = str(row.get('number', '')).lower()
+                    if 'z' in number_str:
+                        continue
+                    
+                    answer = row.get('answer', '').strip()
+                    word_data.append({
+                        'question': row.get('question', '').strip(),
+                        'answer': answer,
+                        'category': row.get('category', ''),
+                        'incorrect': row.get('incorrect', ''),  # 手動設定の誤答
+                    })
+                    all_answers.append(answer)
+        except FileNotFoundError:
+            return jsonify({'error': 'Sample data not available'}), 404
+        
+        if not word_data:
+            return jsonify({'error': 'No sample questions available'}), 404
+        
+        # ランダムに10問選択
+        sample_count = min(10, len(word_data))
+        sample_problems = random.sample(word_data, sample_count)
+        
+        # 4択形式に変換
+        sample_questions = []
+        for problem in sample_problems:
+            correct_answer = problem['answer']
+            
+            # 誤答（ダミー選択肢）を生成
+            distractors = []
+            
+            # 1. CSVにincorrectカラムがあればそれを優先
+            manual_incorrect_str = problem.get('incorrect', '')
+            if manual_incorrect_str and manual_incorrect_str.strip():
+                manual_candidates = [x.strip() for x in manual_incorrect_str.split(',') if x.strip()]
+                if len(manual_candidates) >= 3:
+                    distractors = random.sample(manual_candidates, 3)
+                else:
+                    distractors = manual_candidates
+            
+            # 2. 足りない場合はランダムな他の回答から補充
+            if len(distractors) < 3:
+                distractor_pool = [ans for ans in all_answers if ans != correct_answer and ans not in distractors]
+                needed = 3 - len(distractors)
+                if len(distractor_pool) >= needed:
+                    distractors.extend(random.sample(distractor_pool, needed))
+                else:
+                    distractors.extend(distractor_pool)
+            
+            # 正解と誤答を合わせてシャッフル
+            choices = distractors[:3] + [correct_answer]  # 最大4択
+            random.shuffle(choices)
+            
+            sample_questions.append({
+                'question': problem['question'],
+                'answer': correct_answer,
+                'choices': choices,
+                'category': problem['category']
+            })
+        
+        return jsonify({
+            'questions': sample_questions,
+            'total': len(sample_questions)
+        })
+        
+    except Exception as e:
+        print(f"Sample quiz error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': 'Failed to load sample questions'}), 500
+
 @app.route('/columns')
 def columns_page():
     context = get_template_context()

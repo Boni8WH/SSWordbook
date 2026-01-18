@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+
+{% block title %}プライバシーポリシー - {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h1 class="h3 mb-0"><i class="fas fa-shield-alt me-2"></i>プライバシーポリシー</h1>
+                </div>
+                <div class="card-body p-4">
+                    <p class="text-muted mb-4">最終更新日: 2026年1月18日</p>
+
+                    <section class="mb-5">
+                        <h2 class="h4 border-bottom pb-2 mb-3">1. はじめに</h2>
+                        <p>
+                            {{ app_name }}（以下「当サービス」といいます）は、ユーザーの皆様のプライバシーを尊重し、
+                            個人情報の保護に努めています。本プライバシーポリシーは、当サービスにおける個人情報の
+                            取り扱いについて説明するものです。
+                        </p>
+                    </section>
+
+                    <section class="mb-5">
+                        <h2 class="h4 border-bottom pb-2 mb-3">2. 収集する情報</h2>
+                        <p>当サービスでは、以下の情報を収集することがあります：</p>
+                        <ul>
+                            <li><strong>アカウント情報：</strong>ユーザー名（変更履歴含む）</li>
+                            <li><strong>学習履歴：</strong>問題への回答履歴、正誤情報、学習進捗データ</li>
+                            <li><strong>利用ログ：</strong>アクセス日時、利用した機能、ブラウザ情報</li>
+                        </ul>
+                    </section>
+
+                    <section class="mb-5">
+                        <h2 class="h4 border-bottom pb-2 mb-3">3. Cookieの使用について</h2>
+                        <p>
+                            当サービスでは、ユーザー体験の向上、セッション管理、およびサービスの分析のために
+                            Cookie（クッキー）を使用しています。
+                        </p>
+                        <h5 class="mt-4">3.1 当サービスが使用するCookie</h5>
+                        <ul>
+                            <li><strong>セッションCookie：</strong>ログイン状態を維持するために使用</li>
+                            <li><strong>設定Cookie：</strong>ユーザーの表示設定等を保存するために使用</li>
+                        </ul>
+
+                        <h5 class="mt-4">3.2 第三者によるCookie</h5>
+                        <p>
+                            当サービスでは、Google AdSense等の広告サービスを利用しており、これらのサービスが
+                            独自のCookieを使用する場合があります。
+                        </p>
+                    </section>
+
+                    <section class="mb-5">
+                        <h2 class="h4 border-bottom pb-2 mb-3">4. 広告について</h2>
+                        <p>
+                            当サービスでは、Google AdSenseを利用した広告配信を行っています。
+                        </p>
+                        <div class="alert alert-info">
+                            <h5><i class="fas fa-info-circle me-2"></i>パーソナライズド広告について</h5>
+                            <p class="mb-2">
+                                Google AdSenseは、ユーザーの興味に基づいたパーソナライズド広告（行動ターゲティング広告）を
+                                表示するために、Cookieを使用することがあります。
+                            </p>
+                            <p class="mb-0">
+                                パーソナライズド広告の無効化については、
+                                <a href="https://www.google.com/settings/ads" target="_blank" rel="noopener noreferrer">
+                                    Googleの広告設定
+                                </a>
+                                をご確認ください。
+                            </p>
+                        </div>
+                        <p>
+                            Googleによるデータの使用方法については、
+                            <a href="https://policies.google.com/technologies/partner-sites" target="_blank"
+                                rel="noopener noreferrer">
+                                Googleのプライバシーポリシー
+                            </a>
+                            をご参照ください。
+                        </p>
+                    </section>
+
+                    <section class="mb-5">
+                        <h2 class="h4 border-bottom pb-2 mb-3">5. 情報の利用目的</h2>
+                        <p>収集した情報は、以下の目的で利用します：</p>
+                        <ul>
+                            <li>サービスの提供・運営・維持</li>
+                            <li>ユーザーの学習進捗の管理・表示</li>
+                            <li>サービスの改善・新機能の開発</li>
+                            <li>ユーザーサポートへの対応</li>
+                            <li>広告の配信</li>
+                        </ul>
+                    </section>
+
+                    <section class="mb-5">
+                        <h2 class="h4 border-bottom pb-2 mb-3">6. 情報の共有</h2>
+                        <p>
+                            当サービスは、以下の場合を除き、ユーザーの個人情報を第三者と共有することはありません：
+                        </p>
+                        <ul>
+                            <li>ユーザーの同意がある場合</li>
+                            <li>法令に基づく要請がある場合</li>
+                            <li>サービス運営に必要な業務委託先（サーバー運営等）との共有</li>
+                        </ul>
+                    </section>
+
+                    <section class="mb-5">
+                        <h2 class="h4 border-bottom pb-2 mb-3">7. データの保護</h2>
+                        <p>
+                            当サービスは、ユーザーの個人情報を不正アクセス、紛失、破壊、改ざん、漏洩から保護するため、
+                            適切なセキュリティ対策を講じています。
+                        </p>
+                    </section>
+
+                    <section class="mb-5">
+                        <h2 class="h4 border-bottom pb-2 mb-3">8. ユーザーの権利</h2>
+                        <p>ユーザーは、以下の権利を有します：</p>
+                        <ul>
+                            <li>ご自身の個人情報へのアクセス</li>
+                            <li>個人情報の訂正・更新</li>
+                            <li>アカウントの削除依頼</li>
+                        </ul>
+                        <p>これらの権利を行使する場合は、管理者にお問い合わせください。</p>
+                    </section>
+
+                    <section class="mb-5">
+                        <h2 class="h4 border-bottom pb-2 mb-3">9. 未成年者のプライバシー</h2>
+                        <p>
+                            当サービスは教育目的で提供されており、未成年者も利用することを想定しています。
+                            未成年者のプライバシー保護には特に配慮し、必要以上の個人情報は収集しません。
+                        </p>
+                    </section>
+
+                    <section class="mb-5">
+                        <h2 class="h4 border-bottom pb-2 mb-3">10. プライバシーポリシーの変更</h2>
+                        <p>
+                            本プライバシーポリシーは、法令の改正やサービスの変更等に伴い、
+                            事前の通知なく変更することがあります。変更後のプライバシーポリシーは、
+                            当サービス上に掲載した時点で効力を生じるものとします。
+                        </p>
+                    </section>
+
+                    <section class="mb-4">
+                        <h2 class="h4 border-bottom pb-2 mb-3">11. お問い合わせ</h2>
+                        <p>
+                            本プライバシーポリシーに関するお問い合わせは、サービス内のお問い合わせ機能
+                            {% if app_contact_email %}
+                            または <a href="mailto:{{ app_contact_email }}">{{ app_contact_email }}</a>
+                            {% endif %}
+                            までご連絡ください。
+                        </p>
+                    </section>
+
+                    <div class="text-center mt-5">
+                        <a href="{{ url_for('index') }}" class="btn btn-outline-primary">
+                            <i class="fas fa-home me-2"></i>トップページに戻る
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

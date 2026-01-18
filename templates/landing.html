@@ -32,20 +32,19 @@
     .feature-card {
         border: none;
         transition: transform 0.3s ease, box-shadow 0.3s ease;
-        height: 100%;
         background: #fff;
-        border-radius: 12px;
+        border-radius: 10px;
         overflow: hidden;
     }
 
     .feature-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 15px 30px rgba(0, 0, 0, 0.15);
+        transform: translateY(-3px);
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
     }
 
     .feature-icon {
-        font-size: 2.5rem;
-        margin-bottom: 20px;
+        font-size: 1.4rem;
+        margin-bottom: 5px;
         color: #4a90e2;
     }
 
@@ -65,11 +64,11 @@
 
     .section-title {
         text-align: center;
-        margin-bottom: 40px;
+        margin-bottom: 15px;
         font-weight: 800;
         color: #34495e;
         position: relative;
-        padding-bottom: 15px;
+        padding-bottom: 10px;
     }
 
     .section-title::after {
@@ -101,68 +100,307 @@
     </div>
 </div>
 
-<div class="container py-5">
-    <h2 class="section-title">主な機能</h2>
-    <div class="row g-4">
-        <div class="col-md-6">
-            <div class="card feature-card p-4 text-center">
-                <div class="feature-icon"><i class="fas fa-pen-fancy"></i></div>
-                <h3 class="h4 font-weight-bold">論述問題演習</h3>
-                <p class="text-muted">
-                    大学入試レベルの論述問題を多数収録。
-                    AIの添削で自分のペースで記述力を磨くことができます。
-                </p>
+<div class="container py-2">
+    <h2 class="section-title" style="margin-bottom: 10px; font-size: 1.3rem;">主な機能</h2>
+    <div class="row g-2">
+        <div class="col-6 col-md-3">
+            <div class="card border-0 shadow-sm py-2 px-2 text-center"
+                style="border-radius: 8px; min-height: auto !important;">
+                <div style="font-size: 1.5rem; color: #4a90e2;"><i class="fas fa-pen-fancy"></i></div>
+                <div class="fw-bold" style="font-size: 0.85rem;">論述問題演習</div>
+                <div class="text-muted" style="font-size: 0.75rem;">AIの添削で記述力UP</div>
             </div>
         </div>
-        <div class="col-md-6">
-            <div class="card feature-card p-4 text-center">
-                <div class="feature-icon"><i class="fas fa-history"></i></div>
-                <h3 class="h4 font-weight-bold">豊富なコラム</h3>
-                <p class="text-muted">
-                    教科書だけでは分からない歴史の背景や面白さを、
-                    詳しく解説したコラムで深く学べます。
-                </p>
+        <div class="col-6 col-md-3">
+            <div class="card border-0 shadow-sm py-2 px-2 text-center"
+                style="border-radius: 8px; min-height: auto !important;">
+                <div style="font-size: 1.5rem; color: #4a90e2;"><i class="fas fa-history"></i></div>
+                <div class="fw-bold" style="font-size: 0.85rem;">豊富なコラム</div>
+                <div class="text-muted" style="font-size: 0.75rem;">歴史の背景を深く学習</div>
             </div>
         </div>
-        <div class="col-md-6">
-            <div class="card feature-card p-4 text-center">
-                <div class="feature-icon"><i class="fas fa-check-circle"></i></div>
-                <h3 class="h4 font-weight-bold">一問一答チェック</h3>
-                <p class="text-muted">
-                    重要用語をクイズ形式でサクサク確認。
-                    スキマ時間の学習に最適です。
-                </p>
+        <div class="col-6 col-md-3">
+            <div class="card border-0 shadow-sm py-2 px-2 text-center"
+                style="border-radius: 8px; min-height: auto !important;">
+                <div style="font-size: 1.5rem; color: #4a90e2;"><i class="fas fa-check-circle"></i></div>
+                <div class="fw-bold" style="font-size: 0.85rem;">一問一答</div>
+                <div class="text-muted" style="font-size: 0.75rem;">スキマ時間に最適</div>
             </div>
         </div>
-        <div class="col-md-6">
-            <div class="card feature-card p-4 text-center">
-                <div class="feature-icon"><i class="fas fa-chart-line"></i></div>
-                <h3 class="h4 font-weight-bold">学習進捗管理</h3>
-                <p class="text-muted">
-                    学習の進み具合をグラフで可視化。
-                    モチベーションを維持しながら効率的に学習できます。
-                </p>
+        <div class="col-6 col-md-3">
+            <div class="card border-0 shadow-sm py-2 px-2 text-center"
+                style="border-radius: 8px; min-height: auto !important;">
+                <div style="font-size: 1.5rem; color: #4a90e2;"><i class="fas fa-chart-line"></i></div>
+                <div class="fw-bold" style="font-size: 0.85rem;">進捗管理</div>
+                <div class="text-muted" style="font-size: 0.75rem;">学習をグラフで可視化</div>
             </div>
         </div>
     </div>
-</div>
 
-<div class="container py-5 bg-light rounded-3 mt-5">
-    <div class="row align-items-center">
-        <div class="col-md-6 text-center text-md-start px-5">
-            <h2 class="fw-bold mb-3">今すぐ始めよう</h2>
-            <p class="lead text-muted mb-4">
-                {{ app_name }}で、教養をワンランクアップさせましょう。
-            </p>
-        </div>
-        <div class="col-md-6 text-center">
-            <a href="{{ url_for('columns_page') }}" class="btn btn-warning btn-lg px-5 py-3 fw-bold shadow-sm">
-                <i class="fas fa-arrow-right me-2"></i>公開中のコラムを見る
-            </a>
+    <!-- サンプルクイズセクション -->
+    <div class="container py-5 mt-4">
+        <h2 class="section-title">サンプルクイズ</h2>
+        <p class="text-center text-muted mb-4">ログイン不要で10問のクイズに挑戦</p>
+
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <!-- クイズ開始前 -->
+                <div id="quiz-start" class="card shadow-sm p-5 text-center">
+                    <div class="mb-4">
+                        <i class="fas fa-question-circle text-primary" style="font-size: 4rem;"></i>
+                    </div>
+                    <h3 class="h4 mb-3">一問一答</h3>
+                    <p class="text-muted mb-4">ランダムで10問出題されます。</p>
+                    <button id="startQuizBtn" class="btn btn-primary btn-lg px-5" onclick="startSampleQuiz()">
+                        <i class="fas fa-play me-2"></i>開始
+                    </button>
+                </div>
+
+                <!-- クイズ中 -->
+                <div id="quiz-area" class="card shadow-sm" style="display: none;">
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                        <span><i class="fas fa-question-circle me-2"></i>サンプルクイズ</span>
+                        <span id="quiz-progress" class="badge bg-light text-dark">1 / 10</span>
+                    </div>
+                    <div class="card-body p-4">
+                        <div id="quiz-question" class="mb-4">
+                            <p class="h5 mb-2" id="question-text"></p>
+                            <p class="text-muted small mb-0" id="question-category"></p>
+                        </div>
+
+                        <div id="quiz-choices" class="d-grid gap-2">
+                            <!-- 選択肢ボタンがJSで動的に挿入される -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- クイズ結果 -->
+                <div id="quiz-result" class="card shadow-sm p-5 text-center" style="display: none;">
+                    <div class="mb-4">
+                        <i class="fas fa-trophy text-warning" style="font-size: 4rem;"></i>
+                    </div>
+                    <h3 class="h4 mb-3">クイズ完了！</h3>
+                    <p class="display-4 fw-bold text-primary mb-3" id="result-score">0 / 10</p>
+                    <p class="text-muted mb-4" id="result-message"></p>
+                    <div class="d-flex justify-content-center gap-3 flex-wrap">
+                        <button class="btn btn-outline-primary" onclick="startSampleQuiz()">
+                            <i class="fas fa-redo me-2"></i>もう一度
+                        </button>
+                        <a href="{{ url_for('login_page') }}" class="btn btn-primary">
+                            <i class="fas fa-sign-in-alt me-2"></i>ログインして学習
+                        </a>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
-</div>
-{% endblock %}
 
-{% block footer %}{% endblock %}
-{% block info_icon %}{% endblock %}
+    <div class="container py-5 bg-light rounded-3 mt-5">
+        <div class="row align-items-center">
+            <div class="col-md-6 text-center text-md-start px-5">
+                <h2 class="fw-bold mb-3">今すぐ始めよう</h2>
+                <p class="lead text-muted mb-4">
+                    {{ app_name }}で、教養をワンランクアップさせましょう。
+                </p>
+            </div>
+            <div class="col-md-6 text-center">
+                <a href="{{ url_for('columns_page') }}" class="btn btn-warning btn-lg px-5 py-3 fw-bold shadow-sm">
+                    <i class="fas fa-arrow-right me-2"></i>公開中のコラムを見る
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        /* 4択ボタンのスタイル */
+        .choice-btn {
+            text-align: left;
+            padding: 12px 20px;
+            font-size: 1rem;
+            border: 2px solid #dee2e6;
+            background: #fff;
+            transition: all 0.2s;
+        }
+
+        .choice-btn:hover:not(:disabled) {
+            border-color: #4a90e2;
+            background: #f8f9fa;
+        }
+
+        .choice-btn.correct {
+            border-color: #28a745 !important;
+            background: #d4edda !important;
+            color: #155724 !important;
+        }
+
+        .choice-btn.incorrect {
+            border-color: #dc3545 !important;
+            background: #f8d7da !important;
+            color: #721c24 !important;
+        }
+
+        .choice-btn:disabled {
+            opacity: 0.8;
+        }
+
+        .feedback-icon {
+            float: right;
+            font-size: 1.2em;
+        }
+    </style>
+
+    <script>
+        // サンプルクイズ用スクリプト（4択形式）
+        let sampleQuizData = {
+            questions: [],
+            currentIndex: 0,
+            correctCount: 0
+        };
+
+        async function startSampleQuiz() {
+            try {
+                document.getElementById('startQuizBtn').innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>読み込み中...';
+                document.getElementById('startQuizBtn').disabled = true;
+
+                const response = await fetch('/api/sample-quiz');
+                const data = await response.json();
+
+                if (data.error) {
+                    alert('問題の読み込みに失敗しました: ' + data.error);
+                    document.getElementById('startQuizBtn').innerHTML = '<i class="fas fa-play me-2"></i>開始';
+                    document.getElementById('startQuizBtn').disabled = false;
+                    return;
+                }
+
+                sampleQuizData.questions = data.questions;
+                sampleQuizData.currentIndex = 0;
+                sampleQuizData.correctCount = 0;
+
+                document.getElementById('quiz-start').style.display = 'none';
+                document.getElementById('quiz-result').style.display = 'none';
+                document.getElementById('quiz-area').style.display = 'block';
+
+                showQuestion();
+
+            } catch (error) {
+                console.error('Quiz load error:', error);
+                alert('問題の読み込みに失敗しました');
+                document.getElementById('startQuizBtn').innerHTML = '<i class="fas fa-play me-2"></i>開始';
+                document.getElementById('startQuizBtn').disabled = false;
+            }
+        }
+
+        function showQuestion() {
+            const q = sampleQuizData.questions[sampleQuizData.currentIndex];
+            document.getElementById('question-text').textContent = q.question;
+            document.getElementById('question-category').textContent = q.category ? `📚 ${q.category}` : '';
+            document.getElementById('quiz-progress').textContent = `${sampleQuizData.currentIndex + 1} / ${sampleQuizData.questions.length}`;
+
+            // 選択肢を生成（data-index属性でクリック時に参照）
+            const choicesContainer = document.getElementById('quiz-choices');
+            choicesContainer.innerHTML = q.choices.map((choice, index) =>
+                `<button class="btn choice-btn" data-index="${index}">${choice}</button>`
+            ).join('');
+
+            // クリックイベントをバインド
+            choicesContainer.querySelectorAll('.choice-btn').forEach((btn, index) => {
+                btn.addEventListener('click', function () {
+                    handleSampleAnswer(this, q.choices[index]);
+                });
+            });
+        }
+
+        function handleSampleAnswer(button, selectedChoice) {
+            const q = sampleQuizData.questions[sampleQuizData.currentIndex];
+            const correctAnswer = q.answer;
+            const isCorrect = selectedChoice === correctAnswer;
+
+            // 全てのボタンを無効化
+            document.querySelectorAll('.choice-btn').forEach(btn => btn.disabled = true);
+
+            if (isCorrect) {
+                sampleQuizData.correctCount++;
+                button.classList.add('correct');
+                button.innerHTML += ' <i class="fas fa-check-circle feedback-icon"></i>';
+            } else {
+                button.classList.add('incorrect');
+                button.innerHTML += ' <i class="fas fa-times-circle feedback-icon"></i>';
+                // 正解の選択肢をハイライト
+                document.querySelectorAll('.choice-btn').forEach(btn => {
+                    if (btn.textContent.trim() === correctAnswer || btn.textContent.includes(correctAnswer)) {
+                        btn.classList.add('correct');
+                    }
+                });
+            }
+
+            // 1.5秒後に次の問題へ
+            setTimeout(() => {
+                sampleQuizData.currentIndex++;
+                if (sampleQuizData.currentIndex >= sampleQuizData.questions.length) {
+                    showResult();
+                } else {
+                    showQuestion();
+                }
+            }, 1200);
+        }
+
+        function showResult() {
+            document.getElementById('quiz-area').style.display = 'none';
+            document.getElementById('quiz-result').style.display = 'block';
+
+            const total = sampleQuizData.questions.length;
+            const correct = sampleQuizData.correctCount;
+            const percentage = Math.round((correct / total) * 100);
+
+            document.getElementById('result-score').textContent = `${correct} / ${total}`;
+
+            let message = '';
+            if (percentage === 100) {
+                message = '🎉 パーフェクト！素晴らしい！';
+            } else if (percentage >= 80) {
+                message = '👏 すごい！よくできました！';
+            } else if (percentage >= 60) {
+                message = '👍 いい調子！もう少し頑張ろう！';
+            } else if (percentage >= 40) {
+                message = '📚 もっと復習してみましょう！';
+            } else {
+                message = '💪 一緒に頑張りましょう！';
+            }
+            document.getElementById('result-message').textContent = message;
+
+            // ボタンをリセット
+            document.getElementById('startQuizBtn').innerHTML = '<i class="fas fa-play me-2"></i>開始';
+            document.getElementById('startQuizBtn').disabled = false;
+        }
+    </script>
+    {% endblock %}
+
+    {% block footer %}
+    <footer class="footer mt-5 py-4 bg-light border-top">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="footer-text">
+                        © 2025 {{ app_name }}. All rights reserved.
+                    </div>
+                    <div class="footer-links mt-2">
+                        <a href="{{ url_for('privacy_policy') }}" class="text-muted small text-decoration-none me-3">
+                            <i class="fas fa-shield-alt me-1"></i>プライバシーポリシー
+                        </a>
+                        <a href="{{ url_for('terms_of_service') }}" class="text-muted small text-decoration-none">
+                            <i class="fas fa-file-contract me-1"></i>利用規約
+                        </a>
+                    </div>
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <div class="app-version mt-1">
+                        <small class="text-muted">
+                            {{ app_name }}
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </footer>
+    {% endblock %}
+    {% block info_icon %}{% endblock %}
