@@ -27,11 +27,12 @@ document.addEventListener('DOMContentLoaded', function () {
     // Rich Text Editor - Character Count
     if (richTextEditor) {
         richTextEditor.addEventListener('input', function () {
-            const text = richTextEditor.innerText.replace(/\n/g, '');
+            // Remove ALL whitespace (newlines, spaces, nbsp) for consistent counting
+            const text = richTextEditor.innerText.replace(/\s+/g, '');
             charCount.textContent = text.length + '文字';
         });
         // Initial count
-        const initialText = richTextEditor.innerText.replace(/\n/g, '');
+        const initialText = richTextEditor.innerText.replace(/\s+/g, '');
         charCount.textContent = initialText.length + '文字';
     }
 

@@ -14,6 +14,8 @@ import pickle
 import numpy as np # Vector calculation
 from io import StringIO, BytesIO
 from datetime import datetime, timedelta
+from html.parser import HTMLParser
+import html
 from sqlalchemy import inspect, text, func, case, cast, Integer
 from sqlalchemy.orm import joinedload, deferred
 from datetime import date, datetime, timedelta
@@ -100,6 +102,32 @@ def upload_image_to_s3(file, filename, folder='essay_images', content_type='imag
         # 精密にやるなら try内で import する
         print(f"S3アップロードエラー: {e}")
         return None
+        print(f"S3アップロードエラー: {e}")
+        return None
+
+# ====================================================================
+# Helper: MLStripper (Robust HTML Tag Stripper)
+# ====================================================================
+class MLStripper(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.reset()
+        self.strict = False
+        self.convert_charrefs = True
+        self.text = StringIO()
+    def handle_data(self, d):
+        self.text.write(d)
+    def get_data(self):
+        return self.text.getvalue()
+
+def strip_tags(html_text):
+    """HTMLタグを安全に除去し、実テキストのみを返す"""
+    if not html_text:
+        return ""
+    s = MLStripper()
+    s.feed(html_text)
+    return s.get_data()
+
 # ====================================================================
 # 大学群の定義 (AI検索用)
 # ====================================================================
@@ -11787,8 +11815,14 @@ def essay_grade():
         model = genai.GenerativeModel('gemini-flash-latest')
 
 
-        # Clean user answer for accurate counting
-        user_answer_clean = re.sub(r'<[^>]+>', '', user_answer).replace('\n', '')
+        # Clean user answer for accurate counting (Robust & Spaces Excluded)
+        # user_answer_clean = re.sub(r'<[^>]+>', '', user_answer).replace('\n', '') # OLD (Buggy for <)
+        
+        # 1. Robust Strip (Handles "A < B" correctly)
+        raw_text = strip_tags(user_answer)
+        # 2. Exclude ALL whitespace (Spaces, Tabs, Newlines) as per request
+        user_answer_clean = re.sub(r'\s+', '', raw_text)
+        
         user_char_count = len(user_answer_clean)
 
         # Optimize user_answer for AI Prompt (Token Reduction)
@@ -11806,13 +11840,44 @@ def essay_grade():
         # Priority 1: Extract from Question text (e.g., "100字以内で")
         # Priority 2: Use problem.answer_length if valid
         # Priority 3: Measure model answer length
-        target_len = 0
+        target_len = 0 # Max length
+        min_limit_len = 0 # Min length (explicit)
         
-        # 1. Regex Match from Question
-        limit_match = re.search(r'(\d+)字', problem.question)
-        if limit_match:
-             target_len = int(limit_match.group(1))
-             print(f"INFO: Detected character limit from Question text: {target_len}")
+        # 1. Regex Match from Question (Robust Logic)
+        limit_match_max = re.search(r'(\d+)字(?:以内|以下)', problem.question)
+        if limit_match_max:
+             target_len = int(limit_match_max.group(1))
+             print(f"INFO: Detected character limit (max) from Question: {target_len}")
+        
+        # Check for Explicit Minimum "XX字以上"
+        limit_match_min = re.search(r'(\d+)字以上', problem.question)
+        if limit_match_min:
+             min_limit_len = int(limit_match_min.group(1))
+             print(f"INFO: Detected character limit (min) from Question: {min_limit_len}")
+
+        # Fallback: Range "XX〜YY字" (Sets both min and max)
+        if target_len == 0:
+             limit_match_range = re.search(r'(\d+)[〜~-](\d+)字', problem.question)
+             if limit_match_range:
+                 min_limit_len = int(limit_match_range.group(1))
+                 target_len = int(limit_match_range.group(2))
+                 print(f"INFO: Detected character limit (range {min_limit_len}-{target_len}) from Question")
+
+        # Fallback: Heuristic "XX字" (ignoring "以上")
+        if target_len == 0:
+             # Find all candidates, ignore those followed by '以上' (already handled or valid max)
+             candidates = []
+             matches = re.finditer(r'(\d+)字(以上|程度)?', problem.question)
+             for m in matches:
+                 val = int(m.group(1))
+                 suffix = m.group(2)
+                 if suffix == '以上':
+                     continue # Skip, already checked in min logic or irrelevant for max fallback
+                 candidates.append(val)
+             
+             if candidates:
+                 target_len = max(candidates)
+                 print(f"INFO: Detected character limit (heuristic) from Question: {target_len}")
         
         # 2. DB Value Fallback
         if target_len == 0 and isinstance(problem.answer_length, int) and problem.answer_length > 0:
@@ -11821,17 +11886,30 @@ def essay_grade():
         # 3. Model Answer Length Fallback
         if target_len == 0 and problem.answer:
              # Strip HTML tags (like <u>) from model answer for accurate length calculation
-             clean_answer = re.sub(r'<[^>]+>', '', problem.answer)
-             target_len = len(clean_answer.replace('\n', '').strip())
+             match_clean_answer = strip_tags(problem.answer)
+             target_len = len(re.sub(r'\s+', '', match_clean_answer))
         
         # Default fallback
         if target_len == 0:
              target_len = 200 # Fallback 
 
-        # Safety Buffer: Aim for 95% of target to allow minor overflow
-        prompt_limit = int(target_len * 0.95)
-        min_rewrite = int(target_len * 0.8) 
-        max_rewrite = prompt_limit
+        # Define Grading Criteria Text dynamic to detected limits
+        if min_limit_len > 0:
+            # Explicit Range Mode
+            grading_criteria_text = f"{min_limit_len}字未満または{target_len}字超過は減点（大幅な不足は0点）。"
+            
+            # Rewrite Target: Aim for Safe Middle Ground (e.g., Avg of Min/Max or just safely below Max)
+            # Safe Strategy: Aim for (Min + Max) / 2 to Max * 0.95
+            min_rewrite = min_limit_len
+            max_rewrite = int(target_len * 0.95)
+        else:
+            # Default Strict Mode (No explicit min found)
+            grading_criteria_text = "文字数など。模範解答の9割未満は減点（8割未満は表現・形式は0点）。"
+            
+            # Safety Buffer: Aim for 95% of target
+            prompt_limit = int(target_len * 0.95)
+            min_rewrite = int(target_len * 0.8) 
+            max_rewrite = prompt_limit
         
         # Flash model tends to be verbose, so we give a very strict instruction.
         length_instruction = (
@@ -11873,7 +11951,7 @@ def essay_grade():
 以下の配点比率で厳密に採点せよ。
 - 構成・論理（40点）: 因果関係、論理の飛躍。
 - 知識の正確性（40点）: 史実、用語の正しい使用。
-- 表現・形式（20点）: 文字数など。模範解答の9割未満は減点（8割未満は表現・形式は0点）。
+- 表現・形式（20点）: {grading_criteria_text}
 
 ## Step 3: 【フィードバック】
 受験生が次にすべきことを伝えよ。
@@ -11918,7 +11996,7 @@ def essay_grade():
 以下の配点比率で採点せよ。
 - 構成・論理（40点）
 - 知識の正確性（40点）
-- 表現・形式（20点）: 文字数は模範解答の9割未満で減点（8割未満は表現・形式は0点）。
+- 表現・形式（20点）: {grading_criteria_text}
 
 ## Step 3: 【フィードバック】
 1. 評価点: 簡潔に。
@@ -12012,8 +12090,10 @@ def essay_grade():
              if rewrite_match:
                 original_rewrite_html = rewrite_match.group(1)
                 # Strip tags for length check
-                original_rewrite_text = re.sub(r'<[^>]+>', '', original_rewrite_html).strip()
-                # Normalize whitespace
+                # original_rewrite_text = re.sub(r'<[^>]+>', '', original_rewrite_html).strip() # OLD
+                original_rewrite_text = strip_tags(original_rewrite_html)
+                
+                # Normalize whitespace (Remove all spaces)
                 original_rewrite_text_norm = re.sub(r'\s+', '', original_rewrite_text) 
                 
                 current_rewrite_len = len(original_rewrite_text_norm)
@@ -12071,8 +12151,12 @@ def essay_grade():
                 content = re.sub(r'[（\(【\[［]\s*\d+文字\s*[）\)】\]］]', '', content)
 
                 # タグを除去して純粋なテキストの長さを測る
-                clean = re.sub(r'<[^>]+>', '', content).replace('\n', '').replace('\r', '').strip()
-                count = len(clean)
+                # clean = re.sub(r'<[^>]+>', '', content).replace('\n', '').replace('\r', '').strip() # OLD
+                
+                content_raw = strip_tags(content)
+                content_clean = re.sub(r'\s+', '', content_raw)
+                
+                count = len(content_clean)
                 return f'<div class="model-rewrite">{content}<p class="text-end text-muted small mb-0" style="margin-top:5px;">【{count}文字】</p></div>'
 
             # グローバルクリーニング: AIが勝手に書いた文字数表記を全体から削除
