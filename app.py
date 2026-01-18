@@ -3938,7 +3938,8 @@ def api_search_essays_ai():
     try:
         data = request.get_json()
         keywords = data.get('keywords', '').strip()
-        selected_groups = data.get('university_groups', []) # List of group keys
+        selected_groups = data.get('university_groups', [])
+        selected_types = data.get('types', [])
         year_start = data.get('year_start')
         year_end = data.get('year_end')
         
@@ -3957,6 +3958,10 @@ def api_search_essays_ai():
             try:
                 query = query.filter(EssayProblem.year <= int(year_end))
             except ValueError: pass
+            
+        # タイプフィルタ
+        if selected_types:
+            query = query.filter(EssayProblem.type.in_(selected_types))
             
         # 大学群フィルタ
         if selected_groups:
