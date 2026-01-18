@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+
+{% block title %}利用規約 - {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <div class="card shadow-sm">
+                <div class="card-header bg-secondary text-white">
+                    <h1 class="h3 mb-0"><i class="fas fa-file-contract me-2"></i>利用規約</h1>
+                </div>
+                <div class="card-body p-4">
+                    <p class="text-muted mb-4">最終更新日: 2026年1月18日</p>
+
+                    <section class="mb-5">
+                        <h2 class="h4 border-bottom pb-2 mb-3">第1条（適用）</h2>
+                        <ol>
+                            <li>本規約は、{{ app_name }}（以下「当サービス」といいます）の利用条件を定めるものです。</li>
+                            <li>ユーザーは、本規約に同意した上で当サービスを利用するものとします。</li>
+                            <li>当サービスを利用した時点で、ユーザーは本規約に同意したものとみなします。</li>
+                        </ol>
+                    </section>
+
+                    <section class="mb-5">
+                        <h2 class="h4 border-bottom pb-2 mb-3">第2条（サービスの内容）</h2>
+                        <p>当サービスは、以下の機能を提供する学習支援サービスです：</p>
+                        <ul>
+                            <li>一問一答形式の問題演習機能</li>
+                            <li>論述問題演習およびAI添削機能</li>
+                            <li>学習進捗の記録・管理機能</li>
+                            <li>教育コラムの閲覧機能</li>
+                        </ul>
+                    </section>
+
+                    <section class="mb-5">
+                        <h2 class="h4 border-bottom pb-2 mb-3">第3条（利用登録）</h2>
+                        <ol>
+                            <li>当サービスの利用には、所定の方法によるアカウント登録が必要です。</li>
+                            <li>登録にあたり、正確な情報を提供してください。</li>
+                            <li>アカウントは個人に対して発行されるものであり、第三者への譲渡・貸与はできません。</li>
+                        </ol>
+                    </section>
+
+                    <section class="mb-5">
+                        <h2 class="h4 border-bottom pb-2 mb-3">第4条（禁止事項）</h2>
+                        <p>ユーザーは、以下の行為を行ってはなりません：</p>
+                        <ol>
+                            <li>法令または公序良俗に違反する行為</li>
+                            <li>不正アクセス、またはこれを試みる行為</li>
+                            <li>当サービスの運営を妨害する行為</li>
+                            <li>他のユーザーのアカウントを不正に使用する行為</li>
+                            <li>当サービスの問題データを無断で複製・再配布する行為</li>
+                            <li>AI添削機能を本来の学習目的以外で使用する行為</li>
+                            <li>その他、当サービスが不適切と判断する行為</li>
+                        </ol>
+                    </section>
+
+                    <section class="mb-5">
+                        <h2 class="h4 border-bottom pb-2 mb-3">第5条（AI機能について）</h2>
+                        <ol>
+                            <li>当サービスのAI添削機能は、学習支援を目的として提供されるものであり、
+                                その結果の正確性を完全に保証するものではありません。</li>
+                            <li>AI添削の結果は参考情報としてご利用ください。</li>
+                            <li>AI機能の利用により生じた損害について、当サービスは責任を負いません。</li>
+                        </ol>
+                    </section>
+
+                    <section class="mb-5">
+                        <h2 class="h4 border-bottom pb-2 mb-3">第6条（知的財産権）</h2>
+                        <ol>
+                            <li>当サービスに掲載されているコンテンツ（問題、解説、コラム等）の著作権は、
+                                当サービスまたは正当な権利者に帰属します。</li>
+                            <li>ユーザーは、私的利用の範囲を超えてコンテンツを複製・転載・配布することはできません。</li>
+                        </ol>
+                    </section>
+
+                    <section class="mb-5">
+                        <h2 class="h4 border-bottom pb-2 mb-3">第7条（広告の表示）</h2>
+                        <ol>
+                            <li>当サービスは、運営費用を賄うため、Google AdSense等による広告を表示することがあります。</li>
+                            <li>広告の内容は広告主によるものであり、当サービスはその内容について責任を負いません。</li>
+                        </ol>
+                    </section>
+
+                    <section class="mb-5">
+                        <h2 class="h4 border-bottom pb-2 mb-3">第8条（サービスの変更・中断・終了）</h2>
+                        <ol>
+                            <li>当サービスは、ユーザーへの事前通知なく、サービスの内容を変更することがあります。</li>
+                            <li>システムメンテナンス等により、サービスを一時的に中断することがあります。</li>
+                            <li>やむを得ない事由により、サービスを終了することがあります。</li>
+                        </ol>
+                    </section>
+
+                    <section class="mb-5">
+                        <h2 class="h4 border-bottom pb-2 mb-3">第9条（アカウントの停止・削除）</h2>
+                        <ol>
+                            <li>ユーザーが本規約に違反した場合、当サービスはアカウントを停止または削除できます。</li>
+                            <li>アカウント削除の際、学習履歴等のデータも削除されます。</li>
+                        </ol>
+                    </section>
+
+                    <section class="mb-5">
+                        <h2 class="h4 border-bottom pb-2 mb-3">第10条（免責事項）</h2>
+                        <ol>
+                            <li>当サービスは「現状有姿」で提供され、その完全性・正確性・特定目的への適合性について
+                                保証するものではありません。</li>
+                            <li>当サービスの利用により生じた損害（学習成果を含む）について、
+                                当サービスは一切の責任を負いません。</li>
+                            <li>当サービスに掲載される問題・解説は、入試における正答を保証するものではありません。</li>
+                        </ol>
+                    </section>
+
+                    <section class="mb-5">
+                        <h2 class="h4 border-bottom pb-2 mb-3">第11条（プライバシー）</h2>
+                        <p>
+                            ユーザーの個人情報の取り扱いについては、
+                            <a href="{{ url_for('privacy_policy') }}">プライバシーポリシー</a>
+                            をご確認ください。
+                        </p>
+                    </section>
+
+                    <section class="mb-5">
+                        <h2 class="h4 border-bottom pb-2 mb-3">第12条（規約の変更）</h2>
+                        <ol>
+                            <li>当サービスは、必要に応じて本規約を変更することがあります。</li>
+                            <li>変更後の規約は、当サービス上に掲載した時点で効力を生じます。</li>
+                            <li>変更後も当サービスを利用した場合、ユーザーは変更後の規約に同意したものとみなします。</li>
+                        </ol>
+                    </section>
+
+                    <section class="mb-4">
+                        <h2 class="h4 border-bottom pb-2 mb-3">第13条（準拠法・管轄）</h2>
+                        <ol>
+                            <li>本規約は日本法に準拠します。</li>
+                            <li>当サービスに関する紛争については、日本の裁判所を専属的合意管轄とします。</li>
+                        </ol>
+                    </section>
+
+                    <div class="text-center mt-5">
+                        <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-home me-2"></i>トップページに戻る
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

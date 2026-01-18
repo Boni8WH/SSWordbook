@@ -3,4 +3,4 @@ Disallow: /admin/
 Disallow: /essay/problem/
 Allow: /
 Allow: /columns
-Sitemap: https://sswordbook.onrender.com/sitemap.xml
+Sitemap: https://bayt-al-hikmah.com/sitemap.xml
