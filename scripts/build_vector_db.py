@@ -1,10 +1,9 @@
-
 import os
 import sys
 import re
 import pickle
 import threading
-import google.generativeai as genai
+from google import genai
 from dotenv import load_dotenv
 import numpy as np
 
@@ -19,7 +18,8 @@ if not GEMINI_API_KEY:
     print("Error: GEMINI_API_KEY not found in environment variables.")
     sys.exit(1)
 
-genai.configure(api_key=GEMINI_API_KEY)
+# 新API: Client初期化
+client = genai.Client(api_key=GEMINI_API_KEY)
 
 TEXTBOOK_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data', 'textbook.txt')
 OUTPUT_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data', 'textbook_vectors.pkl')
@@ -67,16 +67,14 @@ class TextbookManagerLogic:
             print(f"❌ Failed to parse textbook: {e}")
 
 def get_embedding(text):
-    """Gemini APIを使ってテキストをベクトル化"""
+    """Gemini APIを使ってテキストをベクトル化（新API）"""
     try:
-        # embedding-001 モデルを使用
-        result = genai.embed_content(
-            model="models/embedding-001",
-            content=text,
-            task_type="retrieval_document",
-            title="Textbook Section"
+        # text-embedding-004 モデルを使用（新API）
+        result = client.models.embed_content(
+            model="text-embedding-004",
+            contents=text
         )
-        return result['embedding']
+        return result.embeddings[0].values
     except Exception as e:
         print(f"⚠️ Embedding failed: {e}")
         return None
