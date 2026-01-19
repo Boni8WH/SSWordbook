@@ -11906,9 +11906,9 @@ def essay_grade():
             # Default Strict Mode (No explicit min found)
             grading_criteria_text = "文字数など。模範解答の9割未満は減点（8割未満は表現・形式は0点）。"
             
-            # Safety Buffer: Aim for 95% of target
-            prompt_limit = int(target_len * 0.95)
-            min_rewrite = int(target_len * 0.8) 
+            # Safety Buffer: Aim for 100% of target (allow full match)
+            prompt_limit = int(target_len)
+            min_rewrite = int(target_len * 0.9) 
             max_rewrite = prompt_limit
         
         # Flash model tends to be verbose, so we give a very strict instruction.
