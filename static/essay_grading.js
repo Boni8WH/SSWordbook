@@ -203,18 +203,48 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function addDownloadButton() {
-        // Remove existing button if any
-        const existingBtn = document.getElementById('downloadPdfBtn');
-        if (existingBtn) existingBtn.remove();
+        // Remove existing container if any
+        const existingContainer = document.getElementById('downloadBtnContainer');
+        if (existingContainer) existingContainer.remove();
 
+        const container = document.createElement('div');
+        container.id = 'downloadBtnContainer';
+        container.className = 'mt-4 d-flex gap-3 justify-content-center align-items-center';
+
+        // 1. Standard PDF Button
         const btn = document.createElement('button');
         btn.id = 'downloadPdfBtn';
-        btn.className = 'btn btn-outline-danger mt-4';
+        btn.className = 'btn btn-outline-danger';
         btn.innerHTML = '<i class="fas fa-file-pdf"></i> PDFとして保存';
-        btn.onclick = window.downloadPdf;
+
+        // 2. Checkbox for skipping question
+        const checkDiv = document.createElement('div');
+        checkDiv.className = 'form-check mb-0'; // mb-0 to align with button
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.className = 'form-check-input';
+        checkbox.id = 'skipQuestionCheck';
+        checkbox.style.cursor = 'pointer';
+
+        const label = document.createElement('label');
+        label.className = 'form-check-label';
+        label.htmlFor = 'skipQuestionCheck';
+        label.textContent = '問題文割愛';
+        label.style.cursor = 'pointer';
+        label.style.userSelect = 'none';
+
+        checkDiv.appendChild(checkbox);
+        checkDiv.appendChild(label);
+
+        // Click handler: If checked (skip) -> include=false
+        btn.onclick = () => window.downloadPdf(!checkbox.checked);
+
+        container.appendChild(btn);
+        container.appendChild(checkDiv);
 
         const gradingResult = document.getElementById('gradingResult');
-        gradingResult.appendChild(btn);
+        gradingResult.appendChild(container);
     }
 
     // Grade Essay
@@ -252,7 +282,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (isAdEnabled) {
                 adHtml = `
                     <div class="mt-4 mb-3 text-center">
-                        <p class="small text-muted mb-2">▼ 広告が表示されます（15秒後に結果へ移動します）</p>
+                        <p class="small text-muted mb-2">▼ 広告が表示されます</p>
                         
                         <!-- Grading_Wait AdSense -->
                         <ins class="adsbygoogle"
@@ -316,6 +346,18 @@ document.addEventListener('DOMContentLoaded', function () {
                     if (data.status === 'success') {
                         gradingResult.innerHTML = data.feedback;
                         addDownloadButton();
+
+                        // 🆕 Style the Logic Flow (Thinking Process)
+                        // Note: Logic Flow is NOT rewrite, so no char counting needed.
+                        const logicFlowDiv = gradingResult.querySelector('.logic-flow');
+                        if (logicFlowDiv) {
+                            logicFlowDiv.style.backgroundColor = '#f0f8ff'; // Light Alice Blue
+                            logicFlowDiv.style.borderLeft = '5px solid #3498db';
+                            logicFlowDiv.style.padding = '15px';
+                            logicFlowDiv.style.borderRadius = '5px';
+                            logicFlowDiv.style.marginTop = '15px';
+                        }
+
                     } else {
                         gradingResult.innerHTML = `<div class="alert alert-danger">エラーが発生しました: ${data.message}</div>`;
                     }
@@ -332,7 +374,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     // PDF Download Function
-    window.downloadPdf = function () {
+    window.downloadPdf = function (includeQuestion = true) {
         const element = document.getElementById('gradingResult');
         const problemData = document.getElementById('problem-data');
         const university = problemData.getAttribute('data-university') || '大学不明';
@@ -353,20 +395,20 @@ document.addEventListener('DOMContentLoaded', function () {
             image: { type: 'jpeg', quality: 1.0 },
             html2canvas: { scale: 3, useCORS: true, letterRendering: true, scrollY: 0 },
             jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-            pagebreak: { mode: ['css', 'legacy'], avoid: ['p', 'li', 'h1', 'h2', 'h3', '.grading-block'] }
+            pagebreak: { mode: ['css', 'legacy'], avoid: ['p', 'li', 'h1', 'h2', 'h3', '.grading-block', '.pdf-footer'] }
         };
 
         // Create overlay
+        // Create overlay
         const overlay = document.createElement('div');
-        overlay.style.position = 'fixed';
         overlay.style.top = '0';
-        overlay.style.left = '-10000px'; // Hide off-screen
-        overlay.style.width = '100%';
-        overlay.style.height = '100%';
-        overlay.style.backgroundColor = '#ffffff';
-        overlay.style.zIndex = '99999'; // Top of everything
-        overlay.style.overflow = 'auto'; // Allow scrolling for html2canvas capture
-        overlay.style.padding = '0'; // Reset padding to avoid double margins with pdf margin
+        overlay.style.left = '0'; // Use 0 to prevent canvas clipping limits
+        overlay.style.position = 'fixed'; // Ensure it stays on screen relative to viewport for capture
+        overlay.style.width = '210mm'; // Standardize width here too
+        overlay.style.zIndex = '-9999'; // Behind everything
+        overlay.style.visibility = 'visible'; // Must be visible for html2canvas
+        overlay.style.overflow = 'visible';
+        overlay.style.padding = '0';
 
         // Content wrapper with specific print styles
         const content = document.createElement('div');
@@ -375,52 +417,131 @@ document.addEventListener('DOMContentLoaded', function () {
         // 🆕 Add Title
         const titleContainer = document.createElement('div');
         titleContainer.style.textAlign = 'center';
-        titleContainer.style.marginBottom = '20px'; // Give some space
+        titleContainer.style.marginBottom = '10px'; // Reduced space
 
         const pdfTitle = document.createElement('h1');
         pdfTitle.textContent = `論述添削：${university}/${year}`;
+        pdfTitle.style.marginBottom = '0'; // Remove default margin
+
         // Ensure the title block doesn't look like a highlighted grading section if not desired,
         // but the user just asked for a title. The centralized alignment is handled by container.
 
         titleContainer.appendChild(pdfTitle);
+
+        const pdfDate = document.createElement('p');
+        pdfDate.textContent = `${now.getFullYear()}/${now.getMonth() + 1}/${now.getDate()}`;
+        pdfDate.style.fontSize = '0.9em';
+        pdfDate.style.color = '#666';
+        pdfDate.style.marginTop = '0px'; // Tighter
+        titleContainer.appendChild(pdfDate);
+
+        // 1. Append Title
         content.appendChild(titleContainer);
 
-        // Original content
-        const bodyContent = document.createElement('div');
-        bodyContent.innerHTML = element.innerHTML;
-        content.appendChild(bodyContent);
-        content.style.padding = '20px'; // Internal padding
-        content.style.width = '210mm'; // Force A4 width to match PDF
-        content.style.maxWidth = '100%';
-        content.style.margin = '0 auto';
+        // 2. Append Problem Statement (if found and requested)
+        const questionSectionElement = document.querySelector('.question-section');
+        if (includeQuestion && questionSectionElement) {
+            const questionDiv = document.createElement('div');
+            questionDiv.className = 'pdf-section-container';
+            questionDiv.style.marginBottom = '10px'; // Reduced from 20px
+            questionDiv.style.borderBottom = '1px solid #eee';
+            questionDiv.style.paddingBottom = '10px'; // Reduced from 15px
 
-        // Remove buttons
-        const buttons = content.querySelectorAll('button');
-        buttons.forEach(btn => btn.remove());
+            const qHeader = document.createElement('h3');
+            qHeader.textContent = '【問題】';
+            qHeader.style.color = '#2c3e50';
+            qHeader.style.borderLeft = '4px solid #667eea';
+            qHeader.style.paddingLeft = '10px';
+            qHeader.style.marginBottom = '5px'; // Reduced from 10px
 
-        // 🆕 Add User Answer Section
+            // Clone the entire section to catch multiple paragraphs
+            const qBody = questionSectionElement.cloneNode(true);
+
+            // Remove the existing header from the clone to avoid duplication
+            const existingHeader = qBody.querySelector('.section-title');
+            if (existingHeader) {
+                existingHeader.remove();
+            }
+
+            // Remove the image from the clone (User request)
+            const existingImage = qBody.querySelector('.question-image');
+            if (existingImage) {
+                existingImage.remove();
+            }
+
+            qBody.style.margin = '0';
+            qBody.style.padding = '0';
+            qBody.style.border = 'none';
+            qBody.style.fontSize = '10pt';
+            qBody.style.lineHeight = '1.6';
+            qBody.style.letterSpacing = 'normal';
+
+            // Reset margins for paragraphs inside
+            const paragraphs = qBody.querySelectorAll('p, .question-text');
+            paragraphs.forEach(p => {
+                p.style.margin = '0 0 5px 0'; // Tight margins
+                p.style.whiteSpace = 'pre-wrap'; // Apply pre-wrap specifically to text containers
+            });
+
+            // Clean up empty text nodes from cloning (source code indentation)
+            Array.from(qBody.childNodes).forEach(node => {
+                if (node.nodeType === Node.TEXT_NODE && !node.textContent.trim()) {
+                    node.remove();
+                }
+            });
+
+            questionDiv.appendChild(qHeader);
+            questionDiv.appendChild(qBody);
+            content.appendChild(questionDiv);
+        }
+
+        // 3. Append User Answer (if found)
         const richTextEditor = document.getElementById('richTextEditor');
         if (richTextEditor) {
             const userAnswerDiv = document.createElement('div');
             userAnswerDiv.className = 'user-answer-container';
-            userAnswerDiv.style.marginTop = '20px';
-            userAnswerDiv.style.borderTop = '2px dashed #bdc3c7'; // Separator
-            userAnswerDiv.style.paddingTop = '15px';
+            userAnswerDiv.style.marginBottom = '20px';
+            userAnswerDiv.style.borderBottom = '2px dashed #bdc3c7';
+            userAnswerDiv.style.paddingBottom = '15px';
 
             const header = document.createElement('h3');
             header.textContent = '【あなたの解答】';
-            // h3 style handled by page CSS injection below, but local style helps structure
+            header.style.color = '#2c3e50';
+            header.style.borderLeft = '4px solid #ff9800'; // Orange for answer
+            header.style.paddingLeft = '10px';
+            header.style.marginBottom = '10px';
 
             const body = document.createElement('div');
             body.innerHTML = richTextEditor.innerHTML;
             body.style.padding = '10px';
-            body.style.backgroundColor = 'rgba(255, 255, 255, 0.5)';
-            body.style.border = '1px solid #bdc3c7';
+            body.style.backgroundColor = 'rgba(255, 248, 225, 0.5)'; // Light orange bg
+            body.style.border = '1px solid #ffe0b2';
             body.style.borderRadius = '5px';
 
             userAnswerDiv.appendChild(header);
             userAnswerDiv.appendChild(body);
             content.appendChild(userAnswerDiv);
+        }
+
+        // 4. Append Grading Result (Original content)
+        const bodyContent = document.createElement('div');
+        bodyContent.innerHTML = element.innerHTML;
+        content.appendChild(bodyContent);
+
+        // 5. Apply styles to content wrapper
+        content.style.padding = '20px';
+        content.style.width = '210mm';
+        content.style.maxWidth = '100%';
+        content.style.margin = '0 auto';
+
+        // 6. Remove buttons and controls
+        const buttons = content.querySelectorAll('button');
+        buttons.forEach(btn => btn.remove());
+
+        // Remove the download button container (includes checkbox)
+        const downloadContainer = content.querySelector('#downloadBtnContainer');
+        if (downloadContainer) {
+            downloadContainer.remove();
         }
 
         // Add Footer with Copyright
@@ -430,6 +551,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         const footer = document.createElement('div');
+        footer.className = 'pdf-footer';
         footer.innerHTML = `<small>©︎ ${appName}</small>`;
         footer.style.textAlign = 'right';
         footer.style.marginTop = '20px';
@@ -437,7 +559,19 @@ document.addEventListener('DOMContentLoaded', function () {
         footer.style.fontSize = '10pt';
         footer.style.borderTop = '1px solid #e5e5e5';
         footer.style.paddingTop = '10px';
+        footer.style.paddingBottom = '10px'; // Prevent cut-off
         content.appendChild(footer);
+
+        // Global text normalization for the entire PDF content
+        // This fixes NFD issues (detached dakuten) across problem, answer, and grading
+        const normalizeAllText = (node) => {
+            if (node.nodeType === Node.TEXT_NODE) {
+                node.nodeValue = node.nodeValue.normalize('NFC');
+            } else {
+                node.childNodes.forEach(normalizeAllText);
+            }
+        };
+        normalizeAllText(content);
 
         // Apply strong styles and Notebook Design rules
         const style = document.createElement('style');
@@ -467,6 +601,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 background-color: transparent !important;
                 text-shadow: none !important;
                 box-shadow: none !important;
+                
             }
             /* Marker Effect for Headers */
             #pdf-content-wrapper h1, #pdf-content-wrapper h2 {
@@ -487,16 +622,16 @@ document.addEventListener('DOMContentLoaded', function () {
             
             /* Page Break Control */
             #pdf-content-wrapper p, 
-            #pdf-content-wrapper li, 
-            #pdf-content-wrapper .grading-block, 
+            #pdf-content-wrapper li,
+            #pdf-content-wrapper .grading-block,
             #pdf-content-wrapper blockquote {
-                page-break-inside: avoid !important;
+                page-break-inside: avoid !important; /* Keep content intact to prevent text chopping */
                 break-inside: avoid !important;
                 margin-bottom: 0.8em;
                 display: block; 
-                position: relative; /* Sometimes helps with rendering context */
+                position: relative;
             }
-            
+
             #pdf-content-wrapper ul, 
             #pdf-content-wrapper ol {
                 page-break-inside: auto; 
@@ -513,8 +648,15 @@ document.addEventListener('DOMContentLoaded', function () {
             
             /* Emphasis Marker */
             #pdf-content-wrapper strong, #pdf-content-wrapper b {
-                background: linear-gradient(transparent 60%, rgba(255, 235, 59, 0.5) 60%) !important;
+                /* Use simple background color instead of gradient to avoid html2canvas wrapping glitches */
+                background-color: rgba(255, 235, 59, 0.4) !important;
+                background-image: none !important;
                 font-weight: 700 !important;
+                display: inline;
+                -webkit-box-decoration-break: clone;
+                box-decoration-break: clone;
+                padding: 0 2px;
+                border-radius: 2px;
             }
         `;
 
@@ -522,13 +664,19 @@ document.addEventListener('DOMContentLoaded', function () {
         overlay.appendChild(content);
         document.body.appendChild(overlay);
 
-        // Update options to be more aggressive with p tags
+        // Update options
         const updatedOpt = {
             ...opt,
+            html2canvas: {
+                scale: 3,
+                useCORS: true,
+                letterRendering: false, // Disabled to prevent text artifacts
+                scrollY: 0
+            },
             pagebreak: {
                 mode: ['css', 'legacy'],
-                // Add 'p' and 'li' back to avoid list for safer page breaks
-                avoid: ['h1', 'h2', 'h3', '.grading-block', 'tr', 'blockquote', 'p', 'li']
+                // Avoid breaking atoms AND containers to strictly prevent cutting
+                avoid: ['h1', 'h2', 'h3', 'tr', 'p', 'li', '.grading-block', 'blockquote']
             }
         };
 

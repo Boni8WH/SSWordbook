@@ -321,6 +321,19 @@
         text-overflow: ellipsis;
         /* フレックスで成長させる */
         flex-grow: 1;
+        /* 改行を保持する */
+        white-space: pre-wrap;
+    }
+
+    /* 子要素のスタイルを強制リセット */
+    .problem-preview * {
+        margin: 0;
+        padding: 0;
+        color: inherit;
+        font-size: inherit;
+        line-height: inherit;
+        display: inline;
+        /* インライン表示を強制して改行崩れを防ぐ */
     }
 
     /* 問題がない場合 */
@@ -646,8 +659,8 @@
                         </div>
 
                         <div class="problem-content">
-                            <p class="problem-preview">{{ (problem.question[:150] + '...' if problem.question|length >
-                                150 else problem.question) | safe }}</p>
+                            <div class="problem-preview">{{ (problem.question[:150] + '...' if problem.question|length >
+                                150 else problem.question) | striptags }}</div>
                         </div>
                     </div>
                 </a>
