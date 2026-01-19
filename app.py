@@ -62,16 +62,16 @@ def get_s3_client():
 # Gemini API設定
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
 
-def get_genai_module():
-    """google.generativeaiを遅延インポートして設定済みモジュールを返す"""
+def get_genai_client():
+    """google.genaiを遅延インポートして設定済みClientを返す"""
     if not GEMINI_API_KEY:
         print("⚠️ GEMINI_API_KEYが設定されていません")
         return None
     
     try:
-        import google.generativeai as genai
-        genai.configure(api_key=GEMINI_API_KEY)
-        return genai
+        from google import genai
+        client = genai.Client(api_key=GEMINI_API_KEY)
+        return client
     except Exception as e:
         print(f"⚠️ Gemini API設定失敗: {e}")
         return None
@@ -1377,7 +1377,7 @@ class EssayCsvFile(db.Model):
     problem_count = db.Column(db.Integer, default=0, nullable=False)
     upload_date = db.Column(db.DateTime, default=lambda: datetime.now(JST))
 
-from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, Response, abort, make_response, send_file
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, Response, abort, make_response, send_file, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from flask_mail import Mail, Message
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -4036,8 +4036,8 @@ def api_search_essays_ai():
         candidates = [item['candidate'] for item in scored_candidates[:15]]
         
         # 2. AI選定 (Gemini API)
-        genai = get_genai_module()
-        if not genai:
+        client = get_genai_client()
+        if not client:
              return jsonify({'status': 'error', 'message': 'AI機能が利用できません'}), 503
 
         # 候補リストの作成（JSON化）
@@ -4054,8 +4054,6 @@ def api_search_essays_ai():
                 "text": f"大学: {c.university}, 年度: {c.year}\n問題: {q_text}...\n解答要素: {a_text}..."
             })
             
-        model = genai.GenerativeModel('gemini-2.0-flash')
-        
         prompt = f"""
 あなたは入試問題の専門コンシェルジュです。
 ユーザーの【検索キーワード】に基づいて、以下の【候補問題リスト】から最も学習効果の高い問題を最大3つ選び、推奨順に並べてください。
@@ -4072,7 +4070,10 @@ JSON形式のリスト（配列）のみを出力してください。配列の�
 余計な解説やマークダウン記法(```jsonなど)は一切不要です。
 """
         
-        response = model.generate_content(prompt)
+        response = client.models.generate_content(
+            model='gemini-2.0-flash',
+            contents=prompt
+        )
         ai_output = response.text.strip()
         
         # JSON解析
@@ -11566,11 +11567,14 @@ def essay_ocr():
             logger.info(f"Image resized to {new_size}")
 
         # Gemini 2.0 Flash を使用 (高速・高性能OCR)
-        # Note: 1.5-flashが404エラーになるため、以前認識されていた2.0-flashに戻す
-        genai = get_genai_module()
-        if not genai:
-             raise Exception("Gemini module could not be loaded")
-        model = genai.GenerativeModel('gemini-2.0-flash')
+        client = get_genai_client()
+        if not client:
+             raise Exception("Gemini client could not be loaded")
+        
+        # PIL Image を bytes に変換 (新APIで必要)
+        img_byte_arr = io.BytesIO()
+        image.save(img_byte_arr, format='PNG')
+        img_byte_arr = img_byte_arr.getvalue()
         
         prompt = """
         この画像の論述答案にある手書き文字を読み取ってください。
@@ -11587,7 +11591,13 @@ def essay_ocr():
         4. 縦書きの場合は横書きに直してください。
         """
         
-        response = model.generate_content([prompt, image])
+        response = client.models.generate_content(
+            model='gemini-2.0-flash',
+            contents=[
+                prompt,
+                {'inline_data': {'mime_type': 'image/png', 'data': img_byte_arr}}
+            ]
+        )
         text = response.text
         
         # クリーニング（改行削除 & 不要なタグ削除）
@@ -11602,9 +11612,9 @@ def essay_ocr():
         try:
             # エラー時に利用可能なモデル一覧をログに出力
             print("--- Available Models ---")
-            genai_mod = get_genai_module()
-            if genai_mod:
-                for m in genai_mod.list_models():
+            client_mod = get_genai_client()
+            if client_mod:
+                for m in client_mod.models.list():
                     print(f"- {m.name}")
             print("------------------------")
         except:
@@ -11653,19 +11663,17 @@ class TextbookManager:
             return [], []
 
         # 1. Embed query (using same model as build script)
-        genai = get_genai_module()
-        if not genai:
+        client = get_genai_client()
+        if not client:
              return [], []
 
         try:
             # model must match the one used in build logic
-            result = genai.embed_content(
-                model="models/embedding-001",
-                content=query,
-                task_type="retrieval_query",
-                title=None 
+            result = client.models.embed_content(
+                model="text-embedding-004",
+                contents=query
             )
-            query_vector = np.array(result['embedding'])
+            query_vector = np.array(result.embeddings[0].values)
         except Exception as e:
             print(f"⚠️ Query embedding failed: {e}")
             return [], []
@@ -11794,7 +11802,7 @@ def essay_grade():
         # ============================================================
         
         # 1. Initialize Textbook Manager
-        genai = get_genai_module()  # Needed for later model init
+        genai = get_genai_client()  # Needed for later model init
         tm = TextbookManager.get_instance()
         
         # 2. Vector Search Retrieval (Cost: 0 Tokens for Selection!)
@@ -11815,8 +11823,10 @@ def essay_grade():
             relevant_context = "（教科書から関連するセクションが見つかりませんでした。一般的な世界史の知識に基づいて採点してください。）"
 
         # 4. Grading Step (Pro) - 高精度モデルで採点（したかった・・・）
-        # Use gemini-flash-latest for cost performance
-        model = genai.GenerativeModel('gemini-flash-latest')
+        # Use gemini-flash-exp for cost performance
+        client = get_genai_client()
+        if not client:
+            return jsonify({'status': 'error', 'message': 'AI機能が利用できません'}), 503
 
 
         # Clean user answer for accurate counting (Robust & Spaces Excluded)
@@ -11934,9 +11944,37 @@ def essay_grade():
 **重要: 受験生の元の解答（Input Data）を出力に含めるな。**
 **必ずStep 1とStep 2の両方を出力すること。Step 1だけで終了してはならない。**
 
+**【出力形式の厳守】**
+必ず以下のHTML構造で出力せよ:
+
+```html
+<div class="grade-section">
+<h3>Step 1: 【採点】(100点満点)</h3>
+<p>得点: XX点</p>
+<p>内容の完成度（80点）: [減点理由]</p>
+<p>表現・形式（20点）: [減点理由]</p>
+</div>
+
+<div class="grade-section">
+<h3>Step 2: 【フィードバック】</h3>
+<h4>1. 評価点</h4>
+<p>[評価点の内容]</p>
+<h4>2. 減点対象・改善点</h4>
+<p>[改善点の内容]</p>
+<h4>3. 合格者の思考プロセス（論理構成の組み立て方）</h4>
+<div class="logic-flow">
+[思考プロセスの内容]
+</div>
+</div>
+```
+
 ## Step 1: 【採点】(100点満点)
 **原則として減点法で採点せよ。** 満点からスタートし、誤りや不足があるごとに減点すること。
 **記述は簡潔に留めよ。** 詳細な解説はStep 2で行うため、ここでは減点箇所と点数（例：「〜の欠落 (-10点)」）を端的に記すこと。
+
+**(重要) 採点時の注意:**
+1. **要素の不足を厳しく指摘せよ:** 書かれている内容が歴史的に正しくても、問題の要求する他の要素が抜けていれば「満点」にはせず、不足点を指摘すること。「減点対象となる誤りが見当たらない」といったコメントは、全ての要素が完璧に網羅されている場合にのみ出力せよ。
+2. **構成順序の確認:** 問題文で問われている順番通りに解答が構成されているか確認せよ。問われている順序と大きく異なる構成の場合は、論理構成の不備として指摘すること。
 
 以下の配点比率で厳密に採点せよ。
 - 内容の完成度（歴史的理解・論理構成）（80点）: 減点理由を簡潔に列挙。
@@ -11945,7 +11983,7 @@ def essay_grade():
 ## Step 2: 【フィードバック】
 受験生が次にすべきことを伝えよ。
 1. 評価点: 加点箇所。
-2. 減点対象・改善点: 誤り、不足視点、復習すべき単元。
+2. 減点対象・改善点: 誤り、不足している視点・要素、復習すべき単元。
 3. 合格者の思考プロセス（論理構成の組み立て方）:
    - 問題文の着眼点、想起すべき歴史的事象、因果関係の構築手順を箇条書きで示せ。
    - どのように思考すれば満点答案に辿り着けるかをガイドせよ。
@@ -11979,8 +12017,34 @@ def essay_grade():
 `<html>` `<body>`不要。セクションは `<div class="grade-section">` 等で囲むこと。
 **重要: 受験生の元の解答（Input Data）を出力に含めるな。**
 
+**【出力形式の厳守】**
+必ず以下のHTML構造で出力せよ:
+
+```html
+<div class="grade-section">
+<h3>Step 1: 【採点】(100点満点)</h3>
+<p>得点: XX点</p>
+<p>内容の完成度（80点）: [減点理由]</p>
+<p>表現・形式（20点）: [減点理由]</p>
+</div>
+
+<div class="grade-section">
+<h3>Step 2: 【フィードバック】</h3>
+<h4>1. 評価点</h4>
+<p>[評価点の内容]</p>
+<h4>2. 改善点</h4>
+<p>[改善点の内容]</p>
+<h4>3. 合格への思考フロー</h4>
+<div class="logic-flow">
+[思考プロセスの内容]
+</div>
+</div>
+```
+
 ## Step 1: 【採点】(100点満点)
 **減点法で採点せよ。**
+**注意:** 書かれていることが正しくても、要素不足があれば指摘し減点せよ。満点コメントは慎重に行え。また、解答順序が問題の問いと一致しているか確認せよ。
+
 以下の配点比率で採点せよ。
 - 内容の完成度（80点）: 要素不足、誤りを減点。
 - 表現・形式（20点）: {grading_criteria_text}
@@ -12003,16 +12067,25 @@ def essay_grade():
 """
 
         # Safety settings to avoid blocking legitimate educational content
-        # Safety settings to avoid blocking legitimate educational content
-        # Updated to use new library format if needed, but keeping dict for compatibility.
-        # Ensure BLOCK_NONE is correctly interpreted.
-        from google.generativeai.types import HarmCategory, HarmBlockThreshold
-        safety_settings = {
-            HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
-            HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
-            HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
-            HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
-        }
+        from google.genai import types
+        safety_settings = [
+            types.SafetySetting(
+                category='HARM_CATEGORY_HARASSMENT',
+                threshold='BLOCK_NONE'
+            ),
+            types.SafetySetting(
+                category='HARM_CATEGORY_HATE_SPEECH',
+                threshold='BLOCK_NONE'
+            ),
+            types.SafetySetting(
+                category='HARM_CATEGORY_SEXUALLY_EXPLICIT',
+                threshold='BLOCK_NONE'
+            ),
+            types.SafetySetting(
+                category='HARM_CATEGORY_DANGEROUS_CONTENT',
+                threshold='BLOCK_NONE'
+            ),
+        ]
 
         # コンテンツパーツの構築 (プロンプト + 教科書ファイル + 画像(あれば))
         content_parts = [prompt]
@@ -12025,24 +12098,28 @@ def essay_grade():
         essay_image = EssayImage.query.filter_by(problem_id=problem_id).first()
         if essay_image:
             try:
-                # バイナリデータからPIL Imageを作成
+                # バイナリデータからPIL Imageを作成して bytes に変換
                 image = PIL.Image.open(io.BytesIO(essay_image.image_data))
-                content_parts.append(image)
+                img_byte_arr = io.BytesIO()
+                image.save(img_byte_arr, format='PNG')
+                img_byte_arr = img_byte_arr.getvalue()
+                content_parts.append({'inline_data': {'mime_type': 'image/png', 'data': img_byte_arr}})
                 print(f"Adding problem image to Gemini prompt: {essay_image.image_format}")
             except Exception as img_err:
                 print(f"Error loading problem image: {img_err}")
 
         # 生成実行
         # Generation Config for stricter adherence
-        generation_config = {
-            "temperature": 0.4,
-            "max_output_tokens": 8192, 
-        }
+        generation_config = types.GenerateContentConfig(
+            temperature=0.4,
+            max_output_tokens=8192,
+            safety_settings=safety_settings
+        )
 
-        response = model.generate_content(
-            content_parts, 
-            safety_settings=safety_settings,
-            generation_config=generation_config
+        response = client.models.generate_content(
+            model='gemini-2.0-flash',
+            contents=content_parts,
+            config=generation_config
         )
         
         # Debug Logging for Truncation/Safety
@@ -12165,9 +12242,9 @@ def essay_grade():
         try:
             # エラー時に利用可能なモデル一覧をログに出力
             print("--- Available Models ---")
-            genai_mod = get_genai_module()
-            if genai_mod:
-                for m in genai_mod.list_models():
+            client_mod = get_genai_client()
+            if client_mod:
+                for m in client_mod.models.list():
                     print(f"- {m.name}")
             print("------------------------")
         except:
