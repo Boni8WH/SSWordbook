@@ -408,6 +408,20 @@
         padding-bottom: 0;
         /* 下部の余白を削除 */
     }
+
+    /* 検索結果のスニペット用スタイル */
+    .essay-search-snippet {
+        white-space: pre-wrap;
+    }
+
+    .essay-search-snippet * {
+        margin: 0;
+        padding: 0;
+        color: inherit !important;
+        font-size: inherit !important;
+        line-height: inherit !important;
+        display: inline;
+    }
 </style>
 {% endblock %}
 
@@ -838,7 +852,7 @@
                                 <h6 class="mb-1">${essay.university} ${essay.year}年 (${essay.type})${badge}</h6>
                                 <small class="text-muted">${essay.chapter === 'com' ? '総合問題' : '第' + essay.chapter + '章'}</small>
                             </div>
-                            <p class="mb-1 small text-secondary">${essay.question_snippet}</p>
+                            <div class="mb-1 small text-secondary essay-search-snippet">${essay.question_snippet}</div>
                         `;
                         searchResults.appendChild(item);
                     });

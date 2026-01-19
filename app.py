@@ -3943,7 +3943,8 @@ def api_search_essays():
         results = []
         for essay in essays:
             # 問題文を短く切り詰める
-            snippet = essay.question[:100] + '...' if len(essay.question) > 100 else essay.question
+            clean_question = re.sub(r'<[^>]+>', '', essay.question)
+            snippet = clean_question[:100] + '...' if len(clean_question) > 100 else clean_question
             
             results.append({
                 'id': essay.id,
@@ -4044,8 +4045,10 @@ def api_search_essays_ai():
         for c in candidates:
             # トークン節約のため、問題文と解答を短縮して渡す
             # ユーザー同意済み: 問題文150文字 + 解答150文字
-            q_text = c.question[:150]
-            a_text = c.answer[:150]
+            clean_q = re.sub(r'<[^>]+>', '', c.question)
+            clean_a = re.sub(r'<[^>]+>', '', c.answer)
+            q_text = clean_q[:150]
+            a_text = clean_a[:150]
             candidate_list_for_ai.append({
                 "id": c.id,
                 "text": f"大学: {c.university}, 年度: {c.year}\n問題: {q_text}...\n解答要素: {a_text}..."
@@ -4093,7 +4096,8 @@ JSON形式のリスト（配列）のみを出力してください。配列の�
             # filtered candidatesから探す
             found = next((c for c in candidates if c.id == rec_id), None)
             if found:
-                snippet = found.question[:100] + '...' if len(found.question) > 100 else found.question
+                clean_found_q = re.sub(r'<[^>]+>', '', found.question)
+                snippet = clean_found_q[:100] + '...' if len(clean_found_q) > 100 else clean_found_q
                 results.append({
                     'id': found.id,
                     'chapter': found.chapter,
@@ -11898,27 +11902,13 @@ def essay_grade():
             # Explicit Range Mode
             grading_criteria_text = f"{min_limit_len}字未満または{target_len}字超過は減点（大幅な不足は0点）。"
             
-            # Rewrite Target: Aim for Safe Middle Ground (e.g., Avg of Min/Max or just safely below Max)
-            # Safe Strategy: Aim for (Min + Max) / 2 to Max * 0.95
-            min_rewrite = min_limit_len
-            max_rewrite = int(target_len * 0.95)
         else:
             # Default Strict Mode (No explicit min found)
-            grading_criteria_text = "文字数など。模範解答の9割未満は減点（8割未満は表現・形式は0点）。"
-            
-            # Safety Buffer: Aim for 100% of target (allow full match)
-            prompt_limit = int(target_len)
-            min_rewrite = int(target_len * 0.9) 
-            max_rewrite = prompt_limit
-        
-        # Flash model tends to be verbose, so we give a very strict instruction.
-        length_instruction = (
-            f"【最重要・厳守】**HTMLタグを除いた正味の文字数**で{max_rewrite}文字以内で記述せよ（目安: {min_rewrite}〜{max_rewrite}文字）。"
-            f"提供された「模範解答」がこの文字数より長くても、絶対に真似せず、"
-            f"指定文字数内に収まるよう要約してリライトせよ。"
-            f"このリライト案をあなたが採点した際、「表現・形式」の項目で文字数不足による減点対象とならない長さを必ず満たすこと。"
-        )
+            grading_criteria_text = f"文字数規定（{target_len}字程度）。{int(target_len*0.9)}字以上で減点なし。{int(target_len*0.9)}字未満は「表現・形式」10点減点。{int(target_len*0.8)}字未満は「表現・形式」を0点とせよ。"
 
+        # ---------------------------------------------------------
+        # Prompt Selection based on Style
+        # ---------------------------------------------------------
 
         # ---------------------------------------------------------
         # Prompt Selection based on Style
@@ -11942,31 +11932,30 @@ def essay_grade():
 `<html>` `<body>`タグ不要。各セクションは `<div class="grade-section">` 等で囲むこと。
 `<b>`タグ使用。**Markdown記法（`**`等）は絶対禁止**。
 **重要: 受験生の元の解答（Input Data）を出力に含めるな。**
+**必ずStep 1とStep 2の両方を出力すること。Step 1だけで終了してはならない。**
 
-## Step 1: 【分析】出題意図と採点基準
-1. 歴史的構造（因果関係）を整理せよ。
-2. 採点基準を定義せよ（必須要素・論理構成）。
+## Step 1: 【採点】(100点満点)
+**原則として減点法で採点せよ。** 満点からスタートし、誤りや不足があるごとに減点すること。
+**記述は簡潔に留めよ。** 詳細な解説はStep 2で行うため、ここでは減点箇所と点数（例：「〜の欠落 (-10点)」）を端的に記すこと。
 
-## Step 2: 【採点】(100点満点)
 以下の配点比率で厳密に採点せよ。
-- 構成・論理（40点）: 因果関係、論理の飛躍。
-- 知識の正確性（40点）: 史実、用語の正しい使用。
+- 内容の完成度（歴史的理解・論理構成）（80点）: 減点理由を簡潔に列挙。
 - 表現・形式（20点）: {grading_criteria_text}
 
-## Step 3: 【フィードバック】
+## Step 2: 【フィードバック】
 受験生が次にすべきことを伝えよ。
 1. 評価点: 加点箇所。
 2. 減点対象・改善点: 誤り、不足視点、復習すべき単元。
-3. リライト案（満点解答）: 受験生の構成を活かした「合格者レベル」の答案。
-   **制約: {length_instruction} (基準: 正味{target_len}文字)**
-   - **重要**: リライト案は `<div class="model-rewrite">` と `</div>` で囲め。
-   - **文字数はシステムが計算するため、記述不要。**
+3. 合格者の思考プロセス（論理構成の組み立て方）:
+   - 問題文の着眼点、想起すべき歴史的事象、因果関係の構築手順を箇条書きで示せ。
+   - どのように思考すれば満点答案に辿り着けるかをガイドせよ。
+   - **重要**: このセクションは `<div class=\"logic-flow\">` と `</div>` で囲め。
 
 # Constraints
 - 基準: 高校教科書範囲。大学レベルの特殊な学説は加点しない。
 - 厳格さ: 誤字脱字、事実誤認、指定語句の未記入は厳しく減点。
 - トーン: 威厳を持ちつつ教育的。
-- 返答内容: 【分析】前の挨拶不要。論拠書物への言及不要。**元解答の出力禁止。**
+- 返答内容: 【採点】前の挨拶不要。論拠書物への言及不要。**元解答の出力禁止。**
 - **出力形式**: HTMLのみ。見出し`<h3>`、リスト`<ul><li>`、段落`<p>`必須。
 """
         else:
@@ -11989,31 +11978,26 @@ def essay_grade():
 `<html>` `<body>`不要。セクションは `<div class="grade-section">` 等で囲むこと。
 **重要: 受験生の元の解答（Input Data）を出力に含めるな。**
 
-## Step 1: 【分析】(簡潔に)
-採点基準（キーワード、論理構成）を箇条書きで定義せよ。（配点を書くな）
-
-## Step 2: 【採点】(100点満点)
+## Step 1: 【採点】(100点満点)
+**減点法で採点せよ。**
 以下の配点比率で採点せよ。
-- 構成・論理（40点）
-- 知識の正確性（40点）
+- 内容の完成度（80点）: 要素不足、誤りを減点。
 - 表現・形式（20点）: {grading_criteria_text}
 
-## Step 3: 【フィードバック】
+## Step 2: 【フィードバック】
 1. 評価点: 簡潔に。
 2. 改善点: 誤りや不足点のみ。
-3. リライト案（満点解答）:
-   - 受験生の構成を活かした「合格者レベル」の答案。
-   - **制約: {length_instruction} (基準: 正味{target_len}文字)**
-   - **重要**: リライト案は `<div class="model-rewrite">` と `</div>` で囲め。
-   - **文字数はシステムが計算するため、記述不要。**
+3. 合格への思考フロー:
+   - 結論に至る論理ステップを `→` で繋いで示せ。
+   - 例: 着眼点 → 想起事項 → 結びつけ
+   - **重要**: このセクションは `<div class="logic-flow">` と `</div>` で囲め。
 
 # Constraints
 - 基準: 高校教科書範囲。
 - 厳格さ: 誤字脱字、事実誤認、指定語句の未使用は厳しく減点。
 - トーン: 威厳を持ちつつ教育的。
-- 返答内容: 【分析】前の挨拶不要。論拠書物への言及不要。**元解答の出力禁止。**
+- 返答内容: 【採点】前の挨拶不要。論拠書物への言及不要。**元解答の出力禁止。**
 - **出力形式**: HTMLのみ。見出し`<h3>`、段落`<p>`必須。
-- Step 1【分析】で配点（〇〇点）を書くな。
 """
 
         # Safety settings to avoid blocking legitimate educational content
