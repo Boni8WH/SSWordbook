@@ -4147,8 +4147,19 @@ JSON形式のリスト（配列）のみを出力してください。配列の�
         return jsonify({'status': 'success', 'results': results})
 
     except Exception as e:
-        app.logger.error(f"AI Essay search error: {str(e)}")
-        return jsonify({'status': 'error', 'message': str(e)}), 500
+        error_msg = str(e)
+        app.logger.error(f"AI Essay search error: {error_msg}")
+        
+        # レート制限エラーハンドリング
+        if '429' in error_msg or 'RESOURCE_EXHAUSTED' in error_msg:
+             return jsonify({
+                'status': 'error', 
+                'error_type': 'rate_limit',
+                'message': 'AI機能が混雑しています（利用制限）。数分待ってから再度お試しください。',
+                'retry_after': 300
+            }), 429
+            
+        return jsonify({'status': 'error', 'message': error_msg}), 500
 
 @app.route('/api/essay/get_keywords/<int:problem_id>')
 def get_essay_keywords(problem_id):
@@ -11643,7 +11654,18 @@ def essay_ocr():
         return jsonify({'status': 'success', 'text': text})
         
     except Exception as e:
-        print(f"OCR Error: {e}")
+        error_msg = str(e)
+        print(f"OCR Error: {error_msg}")
+        
+        # レート制限エラーハンドリング
+        if '429' in error_msg or 'RESOURCE_EXHAUSTED' in error_msg:
+             return jsonify({
+                'status': 'error', 
+                'error_type': 'rate_limit',
+                'message': 'AI機能が混雑しています（利用制限）。数分待ってから再度お試しください。',
+                'retry_after': 300
+            }), 429
+
         try:
             # エラー時に利用可能なモデル一覧をログに出力
             print("--- Available Models ---")
