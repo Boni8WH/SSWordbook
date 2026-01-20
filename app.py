@@ -4117,7 +4117,7 @@ JSON形式のリスト（配列）のみを出力してください。配列の�
         except Exception as e:
             if '429' in str(e) or 'RESOURCE_EXHAUSTED' in str(e):
                 print(f"⚠️ AI Search Rate Limit ({current_model}). Switching to fallback...")
-                current_model = 'gemini-2.0-flash-lite'
+                current_model = 'gemini-flash-latest'
                 response = client.models.generate_content(
                     model=current_model,
                     contents=prompt
@@ -11668,7 +11668,7 @@ def essay_ocr():
         except Exception as e:
             if '429' in str(e) or 'RESOURCE_EXHAUSTED' in str(e):
                 print(f"⚠️ OCR Rate Limit ({current_model}). Switching to fallback...")
-                current_model = 'gemini-2.0-flash-lite'
+                current_model = 'gemini-flash-latest'
                 response = client.models.generate_content(
                     model=current_model,
                     contents=content_payload
@@ -12266,7 +12266,7 @@ def essay_grade():
             if '429' in error_str or 'RESOURCE_EXHAUSTED' in error_str:
                 print(f"⚠️ Primary Model ({current_model}) Rate Limited. Switching to Fallback...")
                 try:
-                    current_model = 'gemini-2.0-flash-lite'
+                    current_model = 'gemini-flash-latest'
                     print(f"🔄 User-AI Retry with Fallback Model: {current_model}")
                     response = client.models.generate_content(
                         model=current_model,
