@@ -900,6 +900,21 @@ def _add_manager_columns():
     except Exception as e:
         print(f"⚠️ Managerカラムマイグレーションエラー: {e}")
 
+def _add_temp_answer_data_column():
+    """AI採点混雑時の一時保存用カラムを追加するマイグレーション関数"""
+    try:
+        inspector = inspect(db.engine)
+        if 'user' in inspector.get_table_names():
+            columns = [c['name'] for c in inspector.get_columns('user')]
+            if 'temp_answer_data' not in columns:
+                print("🔄 User: temp_answer_dataカラムを追加します...")
+                with db.engine.connect() as conn:
+                    conn.execute(text('ALTER TABLE "user" ADD COLUMN temp_answer_data TEXT'))
+                    conn.commit()
+                print("✅ User: temp_answer_dataカラム追加完了")
+    except Exception as e:
+        print(f"⚠️ マイグレーションエラー (Temp Answer): {e}")
+
 def _add_updated_at_column_to_announcement():
     """Announcementテーブルにupdated_atカラムを追加するマイグレーション関数"""
     try:
@@ -1458,6 +1473,8 @@ else:
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'quiz_data.db')
     is_postgres = False
 
+
+
 class EssayImage(db.Model):
     __tablename__ = 'essay_images'
     
@@ -1610,6 +1627,7 @@ with app.app_context():
         _add_manager_columns()
         _add_updated_at_column_to_announcement()
         _add_draft_answer_to_essay_progress()
+        _add_temp_answer_data_column()
         
         # 他の安全なマイグレーションも念のため実行
         _add_logo_columns_to_app_info()
