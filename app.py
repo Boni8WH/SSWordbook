@@ -87,6 +87,10 @@ def get_genai_client():
         print(f"⚠️ Gemini API設定失敗: {e}")
         return None
 
+# AI採点の同時実行制限（メモリクラッシュ防止）
+# 同時に3件までのAI採点を許可。それを超える場合は一時的に拒否。
+ai_grading_semaphore = threading.Semaphore(3)
+
 # 定数定義
 UPLOAD_FOLDER = 'uploads'
 COLUMNS_CSV_PATH = os.path.join(UPLOAD_FOLDER, 'columns.csv')
@@ -286,6 +290,9 @@ class User(db.Model):
 
     # 担当者権限の永続化用 (JSON形式の文字列として保存: {"room_num": "hash", ...})
     manager_auth_data = db.Column(db.Text, nullable=True)
+
+    # AI採点の一時答案保存（混雑時用）
+    temp_answer_data = db.Column(db.Text, nullable=True)
 
     @property
     def is_authenticated(self):
@@ -11800,6 +11807,38 @@ def essay_grade():
     
     if not problem_id or not user_answer:
         return jsonify({'status': 'error', 'message': 'Missing problem_id or user_answer'}), 400
+    
+    # ====================================================================
+    # AI採点の同時実行制限（メモリクラッシュ防止）
+    # ====================================================================
+    # 現在処理中のAI採点が3件以上の場合は一時的に拒否
+    if not ai_grading_semaphore.acquire(blocking=False):
+        print(f"⚠️ AI採点制限: 同時実行数が上限に達しました（ユーザー: {session.get('username', 'unknown')}）")
+        
+        # 答案を一時的にセッションに保存（ユーザーがリロードしても失わないように）
+        try:
+            if 'user_id' in session and session['user_id']:
+                user = User.query.get(session['user_id'])
+                if user:
+                    # ユーザーの一時答案を保存（上書きOK）
+                    user.temp_answer_data = json.dumps({
+                        'problem_id': problem_id,
+                        'user_answer': user_answer,
+                        'feedback_style': feedback_style,
+                        'saved_at': datetime.now(JST).isoformat()
+                    })
+                    db.session.commit()
+                    print(f"✅ 答案を一時保存しました（ユーザーID: {user.id}）")
+        except Exception as save_error:
+            print(f"⚠️ 答案の一時保存に失敗: {save_error}")
+            db.session.rollback()
+        
+        return jsonify({
+            'status': 'busy',
+            'message': '現在、AI採点機能が混雑しています。答案は自動保存されました。30秒ほど待ってから「AI採点」ボタンを再度押してください。',
+            'retry_after': 30,
+            'answer_saved': True
+        }), 503  # Service Unavailable
 
     try:
         problem = EssayProblem.query.get(problem_id)
@@ -12259,9 +12298,22 @@ def essay_grade():
             return jsonify({'status': 'error', 'message': 'AIからの応答が取得できませんでした。時間をおいて再試行するか、入力内容を確認してください。'}), 500
         
         return jsonify({'status': 'success', 'feedback': feedback})
-        
+    
     except Exception as e:
-        print(f"Grading Error: {e}")
+        error_message = str(e)
+        print(f"Grading Error: {error_message}")
+        
+        # Gemini APIのレート制限エラー（429）を特別処理
+        if '429' in error_message or 'RESOURCE_EXHAUSTED' in error_message:
+            print(f"⚠️ Gemini APIレート制限に達しました")
+            return jsonify({
+                'status': 'error',
+                'error_type': 'rate_limit',
+                'message': 'Gemini APIの使用量制限に達しました。数分待ってから再度お試しください。頻繁に発生する場合は、管理者にご連絡ください。',
+                'retry_after': 300  # 5分後に再試行を推奨
+            }), 429
+        
+        # その他のAPIエラー
         try:
             # エラー時に利用可能なモデル一覧をログに出力
             print("--- Available Models ---")
@@ -12272,7 +12324,13 @@ def essay_grade():
             print("------------------------")
         except:
             pass
-        return jsonify({'status': 'error', 'message': str(e)}), 500
+        
+        return jsonify({'status': 'error', 'message': f'エラーが発生しました: {error_message}'}), 500
+    
+    finally:
+        # 必ずSemaphoreを解放（次のリクエストが処理できるように）
+        ai_grading_semaphore.release()
+        print("✅ AI採点スロット解放")
 
 def is_essay_problem_visible_sql(room_number, chapter, problem_type):
     """SQLベースの公開設定チェック（モデル問題回避版）"""
