@@ -11,7 +11,7 @@ import string
 import uuid
 import io
 import pickle 
-import numpy as np # Vector calculation
+
 from io import StringIO, BytesIO
 from datetime import datetime, timedelta
 from html.parser import HTMLParser
