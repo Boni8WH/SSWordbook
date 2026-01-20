@@ -21,6 +21,12 @@ workers = 1
 # Allow 4 simultaneous requests per worker. Good for I/O bound tasks like AI/DB waits.
 threads = 4
 
+# Worker recycle (メモリリーク防止)
+# 各ワーカーを1000リクエスト処理後に自動再起動してメモリをクリア
+max_requests = 1000
+# ランダムジッター（800-1200リクエストの間でランダムに再起動）
+max_requests_jitter = 200
+
 # Bind address
 bind = "0.0.0.0:" + os.environ.get("PORT", "10000")
 
@@ -28,3 +34,4 @@ bind = "0.0.0.0:" + os.environ.get("PORT", "10000")
 accesslog = '-'
 errorlog = '-'
 loglevel = 'info'
+

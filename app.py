@@ -62,20 +62,30 @@ def get_s3_client():
 # Gemini API設定
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
 
+# Gemini APIクライアントのシングルトンインスタンス（メモリリーク防止）
+_genai_client_instance = None
+
 def get_genai_client():
-    """google.genaiを遅延インポートして設定済みClientを返す"""
+    """google.genaiを遅延インポートして設定済みClientを返す（シングルトン）"""
+    global _genai_client_instance
+    
     if not GEMINI_API_KEY:
         print("⚠️ GEMINI_API_KEYが設定されていません")
         return None
     
+    # 既にクライアントが作成されている場合は再利用
+    if _genai_client_instance is not None:
+        return _genai_client_instance
+    
+    # 初回のみクライアントを作成
     try:
         from google import genai
-        client = genai.Client(api_key=GEMINI_API_KEY)
-        return client
+        _genai_client_instance = genai.Client(api_key=GEMINI_API_KEY)
+        print("✅ Gemini APIクライアントを初期化しました（シングルトン）")
+        return _genai_client_instance
     except Exception as e:
         print(f"⚠️ Gemini API設定失敗: {e}")
         return None
-
 
 # 定数定義
 UPLOAD_FOLDER = 'uploads'
@@ -12106,11 +12116,17 @@ def essay_grade():
         if essay_image:
             try:
                 # バイナリデータからPIL Imageを作成して bytes に変換
-                image = PIL.Image.open(io.BytesIO(essay_image.image_data))
+                img_input = io.BytesIO(essay_image.image_data)
+                image = PIL.Image.open(img_input)
                 img_byte_arr = io.BytesIO()
                 image.save(img_byte_arr, format='PNG')
-                img_byte_arr = img_byte_arr.getvalue()
-                content_parts.append({'inline_data': {'mime_type': 'image/png', 'data': img_byte_arr}})
+                img_data = img_byte_arr.getvalue()
+                
+                # メモリ解放（重要）
+                img_byte_arr.close()
+                img_input.close()
+                
+                content_parts.append({'inline_data': {'mime_type': 'image/png', 'data': img_data}})
                 print(f"Adding problem image to Gemini prompt: {essay_image.image_format}")
             except Exception as img_err:
                 print(f"Error loading problem image: {img_err}")
