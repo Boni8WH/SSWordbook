@@ -4105,10 +4105,25 @@ JSON形式のリスト（配列）のみを出力してください。配列の�
 余計な解説やマークダウン記法(```jsonなど)は一切不要です。
 """
         
-        response = client.models.generate_content(
-            model='gemini-2.0-flash',
-            contents=prompt
-        )
+        # === AI検索: モデルフォールバックロジック ===
+        current_model = 'gemini-2.0-flash'
+        response = None
+        
+        try:
+             response = client.models.generate_content(
+                model=current_model,
+                contents=prompt
+            )
+        except Exception as e:
+            if '429' in str(e) or 'RESOURCE_EXHAUSTED' in str(e):
+                print(f"⚠️ AI Search Rate Limit ({current_model}). Switching to fallback...")
+                current_model = 'gemini-1.5-flash'
+                response = client.models.generate_content(
+                    model=current_model,
+                    contents=prompt
+                )
+            else:
+                raise e
         ai_output = response.text.strip()
         
         # JSON解析
@@ -11637,13 +11652,29 @@ def essay_ocr():
         4. 縦書きの場合は横書きに直してください。
         """
         
-        response = client.models.generate_content(
-            model='gemini-2.0-flash',
-            contents=[
-                prompt,
-                {'inline_data': {'mime_type': 'image/png', 'data': img_byte_arr}}
-            ]
-        )
+        # === OCR: モデルフォールバックロジック ===
+        current_model = 'gemini-2.0-flash'
+        response = None
+        content_payload = [
+            prompt,
+            {'inline_data': {'mime_type': 'image/png', 'data': img_byte_arr}}
+        ]
+        
+        try:
+            response = client.models.generate_content(
+                model=current_model,
+                contents=content_payload
+            )
+        except Exception as e:
+            if '429' in str(e) or 'RESOURCE_EXHAUSTED' in str(e):
+                print(f"⚠️ OCR Rate Limit ({current_model}). Switching to fallback...")
+                current_model = 'gemini-1.5-flash'
+                response = client.models.generate_content(
+                    model=current_model,
+                    contents=content_payload
+                )
+            else:
+                raise e
         text = response.text
         
         # クリーニング（改行削除 & 不要なタグ削除）
@@ -12212,17 +12243,42 @@ def essay_grade():
 
         # 生成実行
         # Generation Config for stricter adherence
+        # Generation Config
         generation_config = types.GenerateContentConfig(
             temperature=0.4,
             max_output_tokens=8192,
             safety_settings=safety_settings
         )
 
-        response = client.models.generate_content(
-            model='gemini-2.0-flash',
-            contents=content_parts,
-            config=generation_config
-        )
+        # === 頑健な生成ロジック (Model Fallback) ===
+        response = None
+        current_model = 'gemini-2.0-flash'
+        
+        try:
+            print(f"🤖 User-AI Trying with Primary Model: {current_model}")
+            response = client.models.generate_content(
+                model=current_model,
+                contents=content_parts,
+                config=generation_config
+            )
+        except Exception as e_primary:
+            error_str = str(e_primary)
+            if '429' in error_str or 'RESOURCE_EXHAUSTED' in error_str:
+                print(f"⚠️ Primary Model ({current_model}) Rate Limited. Switching to Fallback...")
+                try:
+                    current_model = 'gemini-1.5-flash'
+                    print(f"🔄 User-AI Retry with Fallback Model: {current_model}")
+                    response = client.models.generate_content(
+                        model=current_model,
+                        contents=content_parts,
+                        config=generation_config
+                    )
+                    print(f"✅ Fallback Model ({current_model}) Succeeded!")
+                except Exception as e_secondary:
+                    print(f"❌ Fallback Model failed: {e_secondary}")
+                    raise e_secondary # フォールバックも失敗したら元のエラーフローへ
+            else:
+                raise e_primary # 429以外のエラーはそのままスロー
         
         # Debug Logging for Truncation/Safety
         try:
