@@ -16650,10 +16650,17 @@ def get_notification_settings():
         return jsonify({'status': 'error', 'message': 'Login required'}), 401
     
     user = User.query.get(session['user_id'])
+    if not user:
+        return jsonify({'status': 'error', 'message': 'User not found'}), 404
+        
     return jsonify({
         'status': 'success',
+        # WebPush settings
         'enabled': user.notification_enabled,
-        'time': user.notification_time
+        'time': user.notification_time,
+        # Email settings
+        'email_enabled': user.email_notification_enabled,
+        'email': user.notification_email or ''
     })
 
 @app.route('/api/test_notification', methods=['POST'])
@@ -16664,7 +16671,23 @@ def test_notification():
     user = User.query.get(session['user_id'])
     if not user:
         return jsonify({'status': 'error', 'message': 'User not found'}), 404
+    
+    data = request.get_json() or {}
+    notification_type = data.get('type', 'push')  # 'push' or 'email'
+    
+    # Email notification test
+    if notification_type == 'email':
+        email = data.get('email') or user.notification_email
+        if not email:
+            return jsonify({'status': 'error', 'message': 'メールアドレスが設定されていません'}), 400
         
+        success = send_test_notification_email(email)
+        if success:
+            return jsonify({'status': 'success', 'message': 'テストメールを送信しました'})
+        else:
+            return jsonify({'status': 'error', 'message': '送信に失敗しました'}), 500
+    
+    # Push notification test (original logic)
     if not user.push_subscription:
         return jsonify({'status': 'error', 'message': 'Push subscription not found. Please enable notifications first.'}), 400
         
@@ -16695,13 +16718,26 @@ def update_notification_settings():
     data = request.get_json()
     user = User.query.get(session['user_id'])
     
-    if 'enabled' in data:
-        user.notification_enabled = data['enabled']
-    if 'time' in data:
-        user.notification_time = data['time']
+    try:
+        # WebPush settings
+        if 'enabled' in data:
+            user.notification_enabled = bool(data['enabled'])
+        if 'time' in data:
+            user.notification_time = str(data['time'])
+            
+        # Email settings
+        if 'email_enabled' in data:
+            user.email_notification_enabled = bool(data['email_enabled'])
+        if 'email' in data:
+            user.notification_email = str(data['email']).strip()
+            
+        db.session.commit()
+        return jsonify({'status': 'success', 'message': '設定を保存しました'})
         
-    db.session.commit()
-    return jsonify({'status': 'success'})
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error updating notification settings: {e}")
+        return jsonify({'status': 'error', 'message': '保存中にエラーが発生しました'}), 500
 
 @app.route('/api/announcements/status', methods=['GET'])
 def get_announcement_status():
@@ -18879,80 +18915,6 @@ def check_and_create_correction_tables():
 
 check_and_create_correction_tables()
 
-
-# =========================================================
-# 通知設定API
-# =========================================================
-@app.route('/api/notification_settings', methods=['GET'])
-def get_notification_settings():
-    if not session.get('user_id'):
-        return jsonify({'status': 'error', 'message': 'ログインが必要です'}), 401
-    
-    user = User.query.get(session['user_id'])
-    if not user:
-        return jsonify({'status': 'error', 'message': 'ユーザーが見つかりません'}), 404
-        
-    return jsonify({
-        'status': 'success',
-        # WebPush settings (Existing logic assumed based on script.js)
-        'enabled': user.notification_enabled,
-        'time': user.notification_time,
-        # Email settings (New)
-        'email_enabled': user.email_notification_enabled,
-        'email': user.notification_email or ''
-    })
-
-@app.route('/api/update_notification_settings', methods=['POST'])
-def update_notification_settings():
-    if not session.get('user_id'):
-        return jsonify({'status': 'error', 'message': 'ログインが必要です'}), 401
-    
-    data = request.get_json()
-    user = User.query.get(session['user_id'])
-    
-    try:
-        # Existing WebPush settings
-        if 'enabled' in data:
-            user.notification_enabled = bool(data['enabled'])
-        if 'time' in data:
-            user.notification_time = str(data['time'])
-            
-        # New Email settings
-        if 'email_enabled' in data:
-            user.email_notification_enabled = bool(data['email_enabled'])
-        if 'email' in data:
-            user.notification_email = str(data['email']).strip()
-            
-        db.session.commit()
-        return jsonify({'status': 'success', 'message': '設定を保存しました'})
-        
-    except Exception as e:
-        db.session.rollback()
-        print(f"Error updating API settings: {e}")
-        return jsonify({'status': 'error', 'message': '保存中にエラーが発生しました'}), 500
-
-@app.route('/api/test_notification', methods=['POST'])
-def test_notification():
-    if not session.get('user_id'):
-        return jsonify({'status': 'error', 'message': 'ログインが必要です'}), 401
-        
-    data = request.get_json() or {}
-    email = data.get('email')
-    
-    # メールアドレスが指定されていない場合はユーザー設定を使用
-    if not email:
-        user = User.query.get(session['user_id'])
-        email = user.notification_email
-        
-    if not email:
-        return jsonify({'status': 'error', 'message': 'メールアドレスが設定されていません'}), 400
-        
-    success = send_test_notification_email(email)
-    
-    if success:
-        return jsonify({'status': 'success', 'message': 'テストメールを送信しました'})
-    else:
-        return jsonify({'status': 'error', 'message': '送信に失敗しました'}), 500
 
 if __name__ == '__main__':
     try:
