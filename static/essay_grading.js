@@ -68,6 +68,17 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    // Click handler for Safari PWA mode (Add to Dock) - label clicks don't work reliably
+    if (uploadArea && essayImageInput) {
+        uploadArea.addEventListener('click', function (e) {
+            // Prevent triggering twice if clicking directly on the label
+            // Only trigger if the click wasn't on the file input itself
+            if (e.target !== essayImageInput) {
+                essayImageInput.click();
+            }
+        });
+    }
+
     // Drag and Drop Logic
     if (uploadArea) {
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
