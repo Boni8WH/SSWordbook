@@ -12236,8 +12236,13 @@ def essay_grade():
                 img_byte_arr.close()
                 img_input.close()
                 
-                content_parts.append({'inline_data': {'mime_type': 'image/png', 'data': img_data}})
-                print(f"Adding problem image to Gemini prompt: {essay_image.image_format}")
+                # Use types.Part for safer handling
+                if len(img_data) > 0:
+                    content_parts.append(types.Part.from_bytes(data=img_data, mime_type='image/png'))
+                    print(f"Adding problem image to Gemini prompt: {essay_image.image_format}")
+                else:
+                    print("⚠️ Image data is empty, skipping.")
+                    
             except Exception as img_err:
                 print(f"Error loading problem image: {img_err}")
 
@@ -12256,11 +12261,23 @@ def essay_grade():
         
         try:
             print(f"🤖 User-AI Trying with Primary Model: {current_model}")
+            
+            # Debugging types before call
+            # print(f"DEBUG: content_parts types: {[type(x) for x in content_parts]}")
+            
             response = client.models.generate_content(
                 model=current_model,
                 contents=content_parts,
                 config=generation_config
             )
+        except TypeError as te:
+            print(f"❌ TypeError during generation: {te}")
+            # 詳細なデバッグ情報を出力
+            import traceback
+            traceback.print_exc()
+            print(f"DEBUG: content_parts: {content_parts}")
+            raise te
+            
         except Exception as e_primary:
             error_str = str(e_primary)
             if '429' in error_str or 'RESOURCE_EXHAUSTED' in error_str:
