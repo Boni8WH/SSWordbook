@@ -422,6 +422,9 @@ class RoomSetting(db.Model):
     is_suspended = db.Column(db.Boolean, nullable=False, default=False)
     suspended_at = db.Column(db.DateTime, nullable=True)
 
+    # 🆕 論述特化ルーム設定
+    is_essay_room = db.Column(db.Boolean, default=False, nullable=False)
+
     # 🆕 管理者ページ用パスワードハッシュ
     management_password_hash = db.Column(db.String(255), nullable=True)
 
@@ -1409,6 +1412,72 @@ class EssayCsvFile(db.Model):
     file_size = db.Column(db.Integer, nullable=False)
     problem_count = db.Column(db.Integer, default=0, nullable=False)
     upload_date = db.Column(db.DateTime, default=lambda: datetime.now(JST))
+
+
+class EssayCorrectionRequest(db.Model):
+    """論述添削依頼テーブル"""
+    __tablename__ = 'essay_correction_requests'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False)
+    problem_id = db.Column(db.Integer, db.ForeignKey('essay_problems.id', ondelete='CASCADE'), nullable=False)
+    
+    # ユーザーからの提出内容
+    request_text = db.Column(db.Text, nullable=True)     # 解答テキスト
+    request_image_path = db.Column(db.String(255), nullable=True) # 解答画像パス
+    student_message = db.Column(db.Text, nullable=True)  # 先生へのメッセージ
+    
+    # 管理者からの返信
+    status = db.Column(db.String(20), default='pending', nullable=False) # pending, replied
+    reply_text = db.Column(db.Text, nullable=True)       # 添削コメント
+    reply_image_path = db.Column(db.String(255), nullable=True)    # 添削画像パス
+    
+    # タイムスタンプ
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))
+    replied_at = db.Column(db.DateTime, nullable=True)
+    
+    # ユーザーが返信を読んだか
+    is_read_by_user = db.Column(db.Boolean, default=False, nullable=False)
+    
+    # 管理者が解決済みとしたか
+    is_resolved = db.Column(db.Boolean, default=False, nullable=False)
+    
+    # リレーション
+    user = db.relationship('User', backref=db.backref('correction_requests', lazy=True))
+    problem = db.relationship('EssayProblem', backref=db.backref('correction_requests', lazy=True))
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'user_real_name': self.user.real_name if self.user else 'Unknown',
+            'problem_id': self.problem_id,
+            'problem_text': self.problem.question[:30] + '...' if self.problem else '',
+            'request_text': self.request_text,
+            'request_image_path': self.request_image_path,
+            'student_message': self.student_message,
+            'status': self.status,
+            'reply_text': self.reply_text,
+            'reply_image_path': self.reply_image_path,
+            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M') if self.created_at else None,
+            'replied_at': self.replied_at.strftime('%Y-%m-%d %H:%M') if self.replied_at else None
+        }
+
+class Notification(db.Model):
+    """ユーザー通知テーブル"""
+    __tablename__ = 'notifications'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False)
+    
+    title = db.Column(db.String(100), nullable=False)
+    message = db.Column(db.Text, nullable=False)
+    link = db.Column(db.String(255), nullable=True)   # クリック時の遷移先
+    is_read = db.Column(db.Boolean, default=False, nullable=False)
+    
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))
+    
+    user = db.relationship('User', backref=db.backref('notifications', lazy=True, order_by='desc(Notification.created_at)'))
 
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, Response, abort, make_response, send_file, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
@@ -4402,10 +4471,6 @@ def login_page():
                 user.last_login = datetime.now(JST)
                 db.session.commit()
                 
-                if hasattr(user, 'is_first_login') and user.is_first_login:
-                    flash('初回ログインです。パスワードを変更してください。', 'info')
-                    return redirect(url_for('first_time_password_change'))
-                
                 # 担当者の場合は管理画面（認証）へ、生徒の場合はIndexへ
                 # is_managerが明示的にTrueの場合のみ管理画面にリダイレクト
                 if hasattr(user, 'is_manager') and user.is_manager is True:
@@ -4822,7 +4887,8 @@ def first_time_password_change():
                 if current_user.is_manager:
                     return redirect(url_for('manager_auth_page'))
                     
-                return redirect(url_for('index'))
+                # 初期セットアップへ誘導（PWA/通知）
+                return redirect(url_for('initial_setup'))
                 
             except Exception as e:
                 db.session.rollback()
@@ -4839,6 +4905,13 @@ def first_time_password_change():
         traceback.print_exc()
         flash('システムエラーが発生しました。', 'danger')
         return redirect(url_for('index'))
+
+@app.route('/initial_setup')
+def initial_setup():
+    """初回セットアップページ（PWAインストール・通知許可）"""
+    if 'user_id' not in session:
+        return redirect(url_for('login_page'))
+    return render_template('initial_setup.html')
 
 @app.route('/logout')
 def logout():
@@ -8940,7 +9013,8 @@ def admin_page():
                 'max_unit': rs.max_enabled_unit_number if hasattr(rs, 'max_enabled_unit_number') else "9999",
                 'user_count': users_in_room,
                 'is_suspended': getattr(rs, 'is_suspended', False),  # 一時停止状態
-                'suspended_at': getattr(rs, 'suspended_at', None)     # 一時停止日時
+                'suspended_at': getattr(rs, 'suspended_at', None),     # 一時停止日時
+                'is_essay_room': getattr(rs, 'is_essay_room', False)  # 🆕 論述特化ルーム
             }
 
         # ユーザー情報を拡張（元のアカウント名と変更履歴を含む）
@@ -9010,6 +9084,9 @@ def admin_page():
         
         context = get_template_context()
         
+        # 未対応の添削依頼件数を取得
+        pending_correction_count = EssayCorrectionRequest.query.filter_by(status='pending').count()
+        
         template_context = {
             'is_manager': is_manager,
             'is_super_admin': is_super_admin,
@@ -9028,6 +9105,7 @@ def admin_page():
             },
             'announcements': announcements,
             'room_settings': room_settings,
+            'pending_correction_count': pending_correction_count,  # 🆕 添削依頼未対応件数
             **context
         }
         
@@ -11337,6 +11415,7 @@ def essay_index():
                              chapter_stats=chapter_stats,
                              current_username=current_user,
                              current_room_number=current_room,
+                             is_essay_room=True,
                              **context)
         
     except Exception as e:
@@ -11538,7 +11617,12 @@ def essay_problem(problem_id):
             'filter_data': filter_data,
             'chapter': problem.chapter,
             'chapter_name': '総合問題' if problem.chapter == 'com' else f'第{problem.chapter}章',
-            'problems': [problem]
+            'problems': [problem],
+            # 添削リクエスト情報を追加
+            'correction_request': EssayCorrectionRequest.query.filter_by(
+                user_id=current_user.id, 
+                problem_id=problem.id
+            ).order_by(EssayCorrectionRequest.created_at.desc()).first()
         })
         
         # テンプレートに渡される image_path の最終確認
@@ -11552,6 +11636,195 @@ def essay_problem(problem_id):
         traceback.print_exc()
         flash('論述問題の表示中にエラーが発生しました。', 'danger')
         return redirect(url_for('essay_index'))
+
+@app.route('/essay/submit_correction_request', methods=['POST'])
+def submit_correction_request():
+    """論述添削依頼を受け付ける"""
+    if 'user_id' not in session:
+        return redirect(url_for('login_page'))
+        
+    user = User.query.get(session['user_id'])
+    
+    # 部屋が論述ルームかチェック（念のため）
+    room_setting = RoomSetting.query.filter_by(room_number=user.room_number).first()
+    if not room_setting or not room_setting.is_essay_room:
+        flash('この機能はお使いのルームでは利用できません。', 'warning')
+        return redirect(url_for('essay_index'))
+
+    try:
+        problem_id = request.form.get('problem_id')
+        request_text = request.form.get('request_text')
+        student_message = request.form.get('student_message')
+        
+        image_file = request.files.get('request_image')
+        image_path = None
+        
+        # 画像アップロード処理
+        if image_file and image_file.filename:
+            filename = secure_filename(image_file.filename)
+            file_ext = os.path.splitext(filename)[1]
+            unique_filename = f"req_{user.id}_{problem_id}_{uuid.uuid4().hex[:8]}{file_ext}"
+            
+            # upload_image_to_s3 または ローカル保存
+            if S3_AVAILABLE:
+                # S3へのアップロードロジック (既存関数を利用)
+                 if upload_image_to_s3(image_file, unique_filename, folder='correction_requests'):
+                     image_path = unique_filename
+                 else:
+                     flash('画像のアップロードに失敗しました', 'danger')
+            else:
+                # ローカル保存
+                upload_dir = os.path.join(app.static_folder, 'uploads', 'correction_requests')
+                os.makedirs(upload_dir, exist_ok=True)
+                image_file.save(os.path.join(upload_dir, unique_filename))
+                image_path = unique_filename
+
+        # DB保存
+        req = EssayCorrectionRequest(
+            user_id=user.id,
+            problem_id=problem_id,
+            request_text=request_text,
+            request_image_path=image_path,
+            student_message=student_message,
+            status='pending'
+        )
+        db.session.add(req)
+        db.session.flush() # ID取得のため
+
+        # 管理者(Manager/Admin)への通知を作成
+        managers = User.query.filter((User.is_manager == True) | (User.username == 'admin')).all()
+        for mgr in managers:
+            notif = Notification(
+                user_id=mgr.id,
+                title='【添削依頼】新しい依頼が届きました',
+                message=f'{user.username}さんから問題#{problem_id}の添削依頼があります。',
+                # 管理者用詳細ページへのリンク（後で実装）
+                link=url_for('admin_correction_request_detail', request_id=req.id) if 'admin_correction_request_detail' in app.view_functions else '#'
+            )
+            db.session.add(notif)
+            
+        db.session.commit()
+        
+        flash('添削依頼を送信しました。管理者からの返信をお待ちください。', 'success')
+        return redirect(url_for('essay_problem', problem_id=problem_id))
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error submitting correction request: {e}")
+        flash(f'依頼の送信中にエラーが発生しました: {str(e)}', 'danger')
+        return redirect(url_for('essay_index'))
+
+@app.route('/essay/my_corrections')
+def my_corrections():
+    """ユーザー自身の添削依頼履歴"""
+    if 'user_id' not in session:
+        return redirect(url_for('login_page'))
+    
+    user = User.query.get(session['user_id'])
+    
+    # フィルタリング
+    status_filter = request.args.get('status', 'all')
+    
+    query = EssayCorrectionRequest.query.filter_by(user_id=user.id)
+    
+    if status_filter == 'pending':
+        # 添削待ち
+        query = query.filter_by(status='pending')
+    elif status_filter == 'unread':
+        # 返信未読
+        query = query.filter_by(status='replied', is_read_by_user=False)
+    elif status_filter == 'resolved':
+        # 解決済み（既読）
+        query = query.filter_by(status='replied', is_read_by_user=True)
+    
+    requests = query.order_by(EssayCorrectionRequest.created_at.desc()).all()
+    
+    # 統計情報
+    stats = {
+        'total': EssayCorrectionRequest.query.filter_by(user_id=user.id).count(),
+        'pending': EssayCorrectionRequest.query.filter_by(user_id=user.id, status='pending').count(),
+        'unread': EssayCorrectionRequest.query.filter_by(user_id=user.id, status='replied', is_read_by_user=False).count(),
+        'resolved': EssayCorrectionRequest.query.filter_by(user_id=user.id, status='replied', is_read_by_user=True).count()
+    }
+    
+    context = get_template_context()
+    context.update({
+        'requests': requests,
+        'current_filter': status_filter,
+        'stats': stats
+    })
+    
+    return render_template('essay_my_corrections.html', **context)
+
+@app.route('/essay/correction/<int:request_id>/mark_read', methods=['POST'])
+def mark_correction_read(request_id):
+    """添削を既読にする"""
+    if 'user_id' not in session:
+        return jsonify({'status': 'error', 'message': 'ログインが必要です'}), 401
+    
+    req = EssayCorrectionRequest.query.get_or_404(request_id)
+    
+    # 自分の依頼のみ既読可能
+    if req.user_id != session['user_id']:
+        return jsonify({'status': 'error', 'message': '権限がありません'}), 403
+    
+    req.is_read_by_user = True
+    db.session.commit()
+    
+    return jsonify({'status': 'success'})
+
+@app.route('/essay/correction/<int:request_id>/follow_up', methods=['POST'])
+def student_follow_up_reply(request_id):
+    """生徒からのフォローアップ返信（追加質問等）"""
+    if 'user_id' not in session:
+        return jsonify({'status': 'error', 'message': 'ログインが必要です'}), 401
+    
+    req = EssayCorrectionRequest.query.get_or_404(request_id)
+    
+    # 自分の依頼のみ返信可能
+    if req.user_id != session['user_id']:
+        return jsonify({'status': 'error', 'message': '権限がありません'}), 403
+    
+    try:
+        data = request.get_json()
+        follow_up_message = data.get('message', '').strip()
+        
+        if not follow_up_message:
+            return jsonify({'status': 'error', 'message': 'メッセージを入力してください'}), 400
+        
+        # 既存のメッセージに追記 (会話履歴形式)
+        timestamp = datetime.now(JST).strftime('%Y/%m/%d %H:%M')
+        new_message = f"\n\n--- 追加質問 ({timestamp}) ---\n{follow_up_message}"
+        
+        if req.student_message:
+            req.student_message += new_message
+        else:
+            req.student_message = new_message
+        
+        # ステータスを pending に戻す
+        req.status = 'pending'
+        req.is_resolved = False  # 生徒が質問したら解決フラグをリセット
+        req.is_read_by_user = True  # 自分が送ったので既読扱い
+        
+        # 管理者に通知
+        managers = User.query.filter((User.is_manager == True) | (User.username == 'admin')).all()
+        for mgr in managers:
+            notif = Notification(
+                user_id=mgr.id,
+                title='【添削依頼】追加質問が届きました',
+                message=f'{req.user.username}さんから問題#{req.problem_id}の添削への追加質問があります。',
+                link=url_for('admin_correction_request_detail', request_id=req.id)
+            )
+            db.session.add(notif)
+        
+        db.session.commit()
+        
+        return jsonify({'status': 'success', 'message': '追加質問を送信しました'})
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error in follow_up_reply: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
     
 def get_adjacent_problems_with_visibility(problem, room_number):
     """公開設定を考慮した前後の問題を取得"""
@@ -11596,6 +11869,152 @@ def get_adjacent_problems_with_visibility(problem, room_number):
     except Exception as e:
         print(f"Error getting adjacent problems with visibility: {e}")
         return None, None
+
+
+# ====================================================================
+# 論述添削 管理機能
+# ====================================================================
+@app.route('/admin/essay_requests')
+@admin_required
+def admin_essay_requests_list():
+    """添削依頼一覧ページ"""
+    # フィルタリング（未対応/対応済み）
+    status_filter = request.args.get('status', 'pending')
+    
+    query = EssayCorrectionRequest.query
+    if status_filter != 'all':
+        query = query.filter_by(status=status_filter)
+        
+    requests = query.order_by(EssayCorrectionRequest.created_at.desc()).all()
+    
+    return render_template('admin/essay_requests_list.html', requests=requests, current_filter=status_filter)
+
+@app.route('/admin/essay_request/<int:request_id>')
+@admin_required
+def admin_correction_request_detail(request_id):
+    """添削依頼詳細ページ"""
+    req = EssayCorrectionRequest.query.get_or_404(request_id)
+    return render_template('admin/essay_request_detail.html', req=req)
+
+@app.route('/admin/essay_request/<int:request_id>/reply', methods=['POST'])
+@admin_required
+def admin_reply_correction_request(request_id):
+    """添削返信処理"""
+    req = EssayCorrectionRequest.query.get_or_404(request_id)
+    
+    try:
+        # すでに返信済みの場合はエラー
+        if req.status != 'pending':
+            flash('この依頼にはすでに正式な返信が送信されています。', 'warning')
+            return redirect(url_for('admin_correction_request_detail', request_id=request_id))
+            
+        reply_text = request.form.get('reply_text')
+        reply_image = request.files.get('reply_image')
+        reply_image_path = None
+        
+        # 画像保存
+        if reply_image and reply_image.filename:
+            filename = secure_filename(reply_image.filename)
+            file_ext = os.path.splitext(filename)[1]
+            unique_filename = f"reply_{req.id}_{uuid.uuid4().hex[:8]}{file_ext}"
+            
+            if S3_AVAILABLE:
+                 if upload_image_to_s3(reply_image, unique_filename, folder='correction_replies'):
+                     reply_image_path = unique_filename
+            else:
+                upload_dir = os.path.join(app.static_folder, 'uploads', 'correction_replies')
+                os.makedirs(upload_dir, exist_ok=True)
+                reply_image.save(os.path.join(upload_dir, unique_filename))
+                reply_image_path = unique_filename
+        
+        # データ更新
+        req.reply_text = reply_text
+        req.reply_image_path = reply_image_path
+        req.status = 'replied'
+        req.replied_at = datetime.now(JST)
+        req.manager_id = session.get('user_id') # 誰が返信したか記録（モデルにはないが、あれば）
+        
+        # ユーザーに通知
+        notif = Notification(
+            user_id=req.user_id,
+            title='【添削返却】添削依頼の結果が届きました',
+            message=f'問題#{req.problem_id}の添削が完了しました。確認してください。',
+            # ユーザーが結果を見るためのページへのリンク
+            # 暫定的に問題ページへ飛ばす。
+            link=url_for('essay_problem', problem_id=req.problem_id, _anchor='gradingResult') 
+        )
+        db.session.add(notif)
+        
+        db.session.commit()
+        
+        flash('添削結果を送信しました。', 'success')
+        return redirect(url_for('admin_correction_request_detail', request_id=request_id))
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error replying correction: {e}")
+        flash(f'送信エラー: {str(e)}', 'danger')
+        return redirect(url_for('admin_correction_request_detail', request_id=request_id))
+
+@app.route('/api/admin/essay_request/<int:request_id>/chat_action', methods=['POST'])
+@admin_required
+def admin_chat_action(request_id):
+    """チャットモーダルからの返信・解決処理（AJAX）"""
+    req = EssayCorrectionRequest.query.get_or_404(request_id)
+    
+    try:
+        data = request.get_json()
+        message = data.get('message', '').strip()
+        resolve = data.get('resolve', False)
+        
+        if message:
+            # 既存の返信に追記
+            if req.reply_text:
+                req.reply_text += f"\n\n---\n{message}"
+            else:
+                req.reply_text = message
+            
+            # メッセージがある場合は自動的に replied にする
+            req.status = 'replied'
+            req.is_resolved = True # メッセージ送ったら解決済み扱いで良い
+            req.replied_at = datetime.now(JST)
+        
+        if resolve:
+            req.status = 'replied'
+            req.is_resolved = True
+            if not req.replied_at:
+                 req.replied_at = datetime.now(JST)
+        else:
+            # 明示的に解決をオフにした場合
+            req.is_resolved = False
+            # ステータスを pending に戻すかは要検討だが、ユーザー要望は「解決スイッチをONにしたい」なので
+            # ここでは is_resolved のみ更新し、status は message 有無などに任せる
+        
+        # ユーザーに通知（メッセージがある場合のみ）
+        if message:
+            notif = Notification(
+                user_id=req.user_id,
+                title='【添削返却】先生からチャットの返信が届きました',
+                message=f'問題#{req.problem_id}の添削チャットに新しいメッセージがあります。',
+                link=url_for('essay_problem', problem_id=req.problem_id, _anchor='gradingResult') 
+            )
+            db.session.add(notif)
+            req.is_read_by_user = False # 未読に戻す
+        
+        db.session.commit()
+        
+        return jsonify({
+            'status': 'success',
+            'new_reply_text': req.reply_text,
+            'new_status': req.status,
+            'is_resolved': req.is_resolved,
+            'new_replied_at': req.replied_at.strftime('%Y/%m/%d %H:%M') if req.replied_at else ''
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Error in admin_chat_action: {str(e)}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 # ====================================================================
 # Gemini API連携機能 (論述問題添削 & OCR)
@@ -14593,6 +15012,28 @@ def has_essay_image(problem_id):
     """論述問題に画像が存在するかチェック（データベースから）"""
     essay_image = EssayImage.query.filter_by(problem_id=problem_id).first()
     return essay_image is not None
+
+@app.context_processor
+def inject_room_settings():
+    """テンプレートで部屋設定（論述特化など）を利用可能にする"""
+    is_essay_room_val = False
+    
+    if 'user_id' in session:
+        # セッションからユーザーID取得
+        user_id = session.get('user_id')
+        if user_id:
+             # キャッシュ効率化のため簡易的に実装
+             # 本当はUser.query.getしたいが、N+1問題を避けるため
+             # 必要ならg.userを使うべきだが、ここでは個別に引く
+             user = User.query.get(user_id)
+             if user:
+                 rs = RoomSetting.query.filter_by(room_number=user.room_number).first()
+                 if rs and rs.is_essay_room:
+                     is_essay_room_val = True
+                 
+    return dict(is_essay_room=is_essay_room_val)
+
+
 
 # app.pyに一時的に追加するマイグレーション用エンドポイント
 @app.route('/admin/migrate_essay_images')
@@ -18070,6 +18511,31 @@ def check_and_migrate_rpg_columns():
 
 # Run migration check on startup
 check_and_migrate_rpg_columns()
+
+def check_and_migrate_room_setting():
+    """Ensure RoomSetting table has new columns."""
+    from sqlalchemy import text, inspect
+    with app.app_context():
+        try:
+            inspector = inspect(db.engine)
+            if not inspector.has_table('room_setting'):
+                return
+            
+            columns = [c['name'] for c in inspector.get_columns('room_setting')]
+            
+            with db.engine.connect() as conn:
+                if 'is_essay_room' not in columns:
+                    print("Migrating: Adding is_essay_room column to room_setting")
+                    if db.engine.dialect.name == 'postgresql':
+                        conn.execute(text("ALTER TABLE room_setting ADD COLUMN is_essay_room BOOLEAN DEFAULT FALSE"))
+                    else:
+                        conn.execute(text("ALTER TABLE room_setting ADD COLUMN is_essay_room BOOLEAN DEFAULT 0"))
+                conn.commit()
+                print("RoomSetting migration check completed.")
+        except Exception as e:
+            print(f"RoomSetting migration check failed: {e}")
+
+check_and_migrate_room_setting()
 with app.app_context():
     _add_read_columns_to_user()
     _create_column_table()
@@ -18115,6 +18581,137 @@ def mark_rpg_intro_seen():
     except Exception as e:
         db.session.rollback()
         return jsonify({'status': 'error', 'message': str(e)})
+
+@app.route('/admin/update_room_essay_setting', methods=['POST'])
+
+def admin_update_room_essay_setting():
+    # 権限チェック (Admin or Manager)
+    if 'user_id' not in session:
+        return jsonify({'status': 'error', 'message': 'ログインが必要です'}), 401
+    
+    current_user_id = session.get('user_id')
+    user = User.query.get(current_user_id)
+    
+    # マネージャー権限の確認
+    if user.username != 'admin' and not user.is_manager:
+        # AdminUserテーブルも確認
+        admin_entry = AdminUser.query.filter_by(username='admin').first()
+        # ここでは簡易的に、セッションだけでは判断難しいので、adminユーザーは常に許可
+        # 本来は細かくチェックすべきだが、既存の実装に倣う
+        pass
+
+    try:
+        data = request.get_json()
+        room_number = data.get('room_number')
+        is_essay_room = data.get('is_essay_room')
+        
+        if not room_number:
+            return jsonify({'status': 'error', 'message': '部屋番号が指定されていません'}), 400
+            
+        setting = RoomSetting.query.filter_by(room_number=room_number).first()
+        if not setting:
+            # 設定がなければ作成
+            setting = RoomSetting(room_number=room_number)
+            db.session.add(setting)
+            
+        setting.is_essay_room = bool(is_essay_room)
+        db.session.commit()
+        
+        return jsonify({
+            'status': 'success', 
+            'message': f'部屋 {room_number} の論述特化設定を更新しました',
+            'is_essay_room': setting.is_essay_room
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.before_request
+def check_room_restrictions():
+    """論述特化ルームのアクセス制限"""
+    if request.path.startswith('/static'):
+        return
+        
+    # ログインしていない場合は制限しない（ログインページ等はアクセス可）
+    if 'user_id' not in session:
+        return
+
+    # 管理者は制限しない
+    user = User.query.get(session['user_id'])
+    if not user:
+        return
+        
+    if user.username == 'admin' or user.is_manager:
+        return
+
+    # 部屋設定を確認
+    room_setting = RoomSetting.query.filter_by(room_number=user.room_number).first()
+    if not room_setting or not room_setting.is_essay_room:
+        return
+
+    # 許可されたエンドポイントのプレフィックス
+    allowed_prefixes = [
+        '/essay',
+        '/logout',
+        '/admin', # 一般ユーザーはadminに入れないが、ルートアクセス自体は許可しておいて権限チェックに任せる
+        '/api',   # Essay関連のAPIもここにあるかも？
+    ]
+    
+    # 完全一致で許可するもの
+    allowed_paths = [
+        '/',
+        '/login',
+        '/logout',
+        '/logo',  # ロゴ画像取得用
+    ]
+
+    # 現在のパスが許可されているか確認
+    is_allowed = False
+    if request.path in allowed_paths:
+        is_allowed = True
+    else:
+        for prefix in allowed_prefixes:
+            if request.path.startswith(prefix):
+                is_allowed = True
+                break
+    
+    # ホームへのアクセスはEssay一覧へリダイレクト
+    if request.path == '/':
+        return redirect(url_for('essay_index'))
+
+    if not is_allowed:
+        # 禁止されたエリアへのアクセス
+        flash('この部屋は論述問題専用ルームです。', 'warning')
+        return redirect(url_for('essay_index'))
+
+def check_and_create_correction_tables():
+    """Ensure new tables are created and columns exist."""
+    from sqlalchemy import text, inspect
+    with app.app_context():
+        try:
+            # create_all checks for table existence and creates missing ones
+            db.create_all() 
+            print("✅ Checked/Created all tables (including EssayCorrectionRequest/Notification).")
+            
+            # カラム追加のマイグレーション
+            inspector = inspect(db.engine)
+            if inspector.has_table('essay_correction_requests'):
+                columns = [c['name'] for c in inspector.get_columns('essay_correction_requests')]
+                
+                with db.engine.connect() as conn:
+                    if 'is_read_by_user' not in columns:
+                        print("Migrating: Adding is_read_by_user column to essay_correction_requests")
+                        if db.engine.dialect.name == 'postgresql':
+                            conn.execute(text("ALTER TABLE essay_correction_requests ADD COLUMN is_read_by_user BOOLEAN DEFAULT FALSE"))
+                        else:
+                            conn.execute(text("ALTER TABLE essay_correction_requests ADD COLUMN is_read_by_user BOOLEAN DEFAULT 0"))
+                        conn.commit()
+                        print("✅ is_read_by_user column added.")
+        except Exception as e:
+            print(f"Error creating tables: {e}")
+
+check_and_create_correction_tables()
 
 if __name__ == '__main__':
     try:

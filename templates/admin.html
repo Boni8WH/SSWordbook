@@ -547,8 +547,18 @@
                         else '未認証' }}
                     </div>
                     {% endif %}
-                    <a href="{{ url_for('admin_ranking_page') }}" class="btn btn-success btn-sm">
+                    <a href="{{ url_for('admin_ranking_page') }}" class="btn btn-success btn-sm me-2">
                         <i class="fas fa-trophy"></i> 全員ランキング
+                    </a>
+                    <a href="{{ url_for('admin_essay_requests_list') }}"
+                        class="btn btn-warning btn-sm position-relative">
+                        <i class="fas fa-chalkboard-teacher"></i> 論述添削依頼
+                        {% if pending_correction_count > 0 %}
+                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+                            {{ pending_correction_count }}
+                            <span class="visually-hidden">未対応</span>
+                        </span>
+                        {% endif %}
                     </a>
                 </div>
             </div>
@@ -1316,6 +1326,7 @@
                                                 <th>部屋番号</th>
                                                 <th>有効単元設定</th>
                                                 <th>使用CSVファイル</th>
+                                                <th>論述特化</th>
                                                 {% if not is_manager %}
                                                 <th>管理パスワード</th>
                                                 {% endif %}
@@ -1392,6 +1403,19 @@
                                                         現在の設定: <code
                                                             id="current_csv_{{ room_num }}">{{ room_csv_settings.get(room_num, 'words.csv') }}</code>
                                                     </small>
+                                                </td>
+                                                </td>
+                                                <td class="text-center">
+                                                    <div class="form-check form-switch d-flex justify-content-center">
+                                                        <input class="form-check-input" type="checkbox"
+                                                            id="isEssayRoom_{{ room_num }}" {% if
+                                                            room_data.get(room_num, {}).get('is_essay_room', False)
+                                                            %}checked{% endif %}>
+                                                        <label class="form-check-label visually-hidden"
+                                                            for="isEssayRoom_{{ room_num }}">
+                                                            論述特化
+                                                        </label>
+                                                    </div>
                                                 </td>
                                                 {% if not is_manager %}
                                                 <td>
@@ -3489,6 +3513,14 @@
                                 body: JSON.stringify({
                                     room_number: roomNumber,
                                     csv_filename: csvFilename
+                                })
+                            }),
+                            fetch('/admin/update_room_essay_setting', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    room_number: roomNumber,
+                                    is_essay_room: document.getElementById('isEssayRoom_' + roomNumber).checked
                                 })
                             }),
                             fetch('/admin/update_room_management_password', {

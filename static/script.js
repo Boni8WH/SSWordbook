@@ -335,11 +335,17 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         updateIncorrectOnlyRadio();
-        loadUserData();
-        loadWordDataFromServer();
+
+        // ログイン時のみデータをロードする
+        if (window.appInfoFromFlask && window.appInfoFromFlask.isLoggedIn) {
+            loadUserData();
+            loadWordDataFromServer();
+            checkAnnouncementStatus(); // 🆕 お知らせ状態チェック
+        } else {
+            console.log("Not logged in, skipping data load.");
+        }
 
         setupEventListeners();
-        checkAnnouncementStatus(); // 🆕 お知らせ状態チェック
 
         setTimeout(() => {
             loadSelectionState();
@@ -2977,6 +2983,8 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 function initNotificationSettings() {
+    if (!window.appInfoFromFlask || !window.appInfoFromFlask.isLoggedIn) return; // ログインしていない場合は何もしない
+
     const saveBtn = document.getElementById('saveSettingsBtn');
     if (!saveBtn) return; // 設定モーダルがないページでは何もしない
 
@@ -3165,6 +3173,8 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function checkRpgStatus() {
+    if (!window.appInfoFromFlask || !window.appInfoFromFlask.isLoggedIn) return; // Login check
+
     fetch('/api/rpg/status')
         .then(res => res.json())
         .then(data => {
@@ -3676,6 +3686,8 @@ let isTyping = false;
 const TYPE_SPEED = 30; // ms per char
 
 function checkAndPlayRpgIntro() {
+    if (!window.appInfoFromFlask || !window.appInfoFromFlask.isLoggedIn) return; // Login check
+
     // 範囲選択画面にいるかチェック
     const ts = new Date().getTime(); // 🆕 Cache busting
     fetch('/api/check_rpg_intro_eligibility?t=' + ts)

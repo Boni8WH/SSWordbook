@@ -1,0 +1,379 @@
+{% extends "base.html" %}
+
+{% block title %}添削依頼詳細 #{{ req.id }} - 管理画面{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="mb-4">
+        <a href="{{ url_for('admin_essay_requests_list') }}" class="btn btn-outline-secondary btn-sm mb-3">
+            <i class="fas fa-arrow-left"></i> 一覧に戻る
+        </a>
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div>
+                <h2 class="d-inline-block mb-0">
+                    添削依頼 #{{ req.id }}
+                    {% if req.status == 'pending' %}
+                    <span class="badge bg-warning text-dark fs-6 ms-2">未対応</span>
+                    {% else %}
+                    <span class="badge bg-success fs-6 ms-2">対応済み</span>
+                    {% endif %}
+                </h2>
+                <button type="button" class="btn btn-info btn-sm ms-3 position-relative" id="openChatModalBtn">
+                    <i class="fas fa-comments"></i> チャット履歴
+                    {% if req.status == 'pending' %}
+                    <span id="unreadBadge"
+                        class="position-absolute top-0 start-100 translate-middle p-2 bg-danger border border-light rounded-circle">
+                        <span class="visually-hidden">New Message</span>
+                    </span>
+                    {% endif %}
+                </button>
+            </div>
+            <div class="text-muted text-end">
+                <div>ユーザー: <strong>{{ req.user.username }}</strong> ({{ req.user.room_number }})</div>
+                <div>送信日時: {{ req.created_at.strftime('%Y/%m/%d %H:%M') }}</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- 提出内容 -->
+        <div class="col-md-6 mb-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-file-alt"></i> 提出内容</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="fw-bold text-muted small">対象問題:</label>
+                        <div>{{ req.problem.question | safe }}</div>
+                    </div>
+                    <hr>
+                    <div class="mb-3">
+                        <label class="fw-bold text-muted small">生徒の解答:</label>
+                        <div class="p-3 bg-light rounded" style="white-space: pre-wrap; line-height: 1.6;">{{
+                            req.request_text }}</div>
+                    </div>
+                    {% if req.request_image_path %}
+                    <div class="mb-3">
+                        <label class="fw-bold text-muted small">提出画像:</label>
+                        <div class="mt-2">
+                            <img src="{{ url_for('static', filename='uploads/correction_requests/' + req.request_image_path) }}"
+                                class="img-fluid rounded border shadow-sm" alt="Student Submission"
+                                style="max-height: 400px; cursor: pointer;" onclick="window.open(this.src)">
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- 添削・返信フォーム -->
+        <div class="col-md-6 mb-4">
+            <div class="card h-100 shadow-sm border-success">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="fas fa-edit"></i> 添削・返信</h5>
+                </div>
+                <div class="card-body">
+                    <form action="{{ url_for('admin_reply_correction_request', request_id=req.id) }}" method="POST"
+                        enctype="multipart/form-data">
+                        <div class="mb-4">
+                            <label for="reply_text" class="form-label fw-bold">添削コメント・フィードバック</label>
+                            <textarea name="reply_text" id="reply_text" class="form-control" rows="12" required
+                                placeholder="添削のアドバイスや、採点結果などを記入してください...">{{ req.reply_text }}</textarea>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">添削画像 (任意)</label>
+                            {% if req.reply_image_path %}
+                            <div class="mb-2">
+                                <span class="badge bg-info">現在の画像: {{ req.reply_image_path }}</span>
+                                <div class="mt-1">
+                                    <img src="{{ url_for('static', filename='uploads/correction_replies/' + req.reply_image_path) }}"
+                                        class="img-thumbnail" style="max-height: 100px;">
+                                </div>
+                            </div>
+                            {% endif %}
+                            <input type="file" name="reply_image" class="form-control" accept="image/*">
+                            <small class="text-muted">手書きの添削写真などをアップロードできます</small>
+                        </div>
+
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-success py-2 fw-bold" {% if req.status !='pending'
+                                %}disabled{% endif %}>
+                                <i class="fas fa-paper-plane"></i>
+                                {% if req.status == 'pending' %}
+                                正式な返信を送信
+                                {% else %}
+                                正式な返信は送信済みです
+                                {% endif %}
+                            </button>
+                        </div>
+                        <small class="text-muted d-block text-center mt-2">
+                            ※送信するとステータスが「対応済み」になり、生徒に通知されます
+                        </small>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- チャットモーダル -->
+<div class="modal fade" id="adminChatModal" tabindex="-1" aria-labelledby="adminChatModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title" id="adminChatModalLabel"><i class="fas fa-comments"></i> 会話履歴 - 添削依頼 #{{ req.id
+                    }}</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                    aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- チャット形式の会話履歴 -->
+                <div id="adminChatContainer"
+                    style="max-height: 400px; overflow-y: auto; background: #f5f5f5; border-radius: 8px; padding: 15px;"
+                    data-request-id="{{ req.id }}" data-status="{{ req.status }}"
+                    data-is-resolved="{{ 'true' if req.is_resolved else 'false' }}"
+                    data-student-message="{{ req.student_message if req.student_message else '' }}"
+                    data-reply-text="{{ req.reply_text if req.reply_text else '' }}"
+                    data-created-at="{{ req.created_at.strftime('%Y/%m/%d %H:%M') }}"
+                    data-replied-at="{{ req.replied_at.strftime('%Y/%m/%d %H:%M') if req.replied_at else '' }}">
+                    <!-- JSで動的に生成 -->
+                </div>
+
+                <!-- 簡易返信フォーム -->
+                <div class="mt-3 p-3 bg-light rounded border">
+                    <label class="fw-bold small"><i class="fas fa-reply"></i> クイック返信</label>
+                    <div class="mt-2">
+                        <textarea id="adminQuickReply" class="form-control" rows="3"
+                            placeholder="生徒へのクイック返信を入力..."></textarea>
+                        <div class="d-flex justify-content-between align-items-center mt-2">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="resolveRequestCheckbox">
+                                <label class="form-check-label small" for="resolveRequestCheckbox">解決済みにする
+                                    (返信不要な場合スイッチON)</label>
+                            </div>
+                            <button type="button" class="btn btn-primary" id="sendAdminQuickReplyBtn">
+                                <i class="fas fa-paper-plane"></i> 送信する
+                            </button>
+                        </div>
+                    </div>
+                    <small class="d-block text-muted mt-1">※チャット履歴にも反映され、生徒へ通知されます</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        var container = document.getElementById('adminChatContainer');
+        if (!container) return;
+
+        function escapeHtml(text) {
+            var div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function createChatBubble(message, isStudent, timestamp) {
+            var bubble = document.createElement('div');
+            bubble.style.cssText = 'max-width: 85%; margin-bottom: 12px; ' + (isStudent ? 'margin-right: auto;' : 'margin-left: auto;');
+
+            var inner = document.createElement('div');
+            inner.style.cssText = 'padding: 10px 14px; border-radius: 16px; ' +
+                (isStudent
+                    ? 'background: #007bff; color: white; border-bottom-left-radius: 4px;'
+                    : 'background: #28a745; color: white; border-bottom-right-radius: 4px;');
+
+            var label = isStudent ? '👤 生徒' : '👨‍🏫 先生（あなた）';
+            inner.innerHTML = '<div style="font-size: 0.75rem; opacity: 0.8; margin-bottom: 4px;">' + label + ' ' + (timestamp || '') + '</div>' +
+                '<div style="white-space: pre-wrap; line-height: 1.5;">' + escapeHtml(message) + '</div>';
+            bubble.appendChild(inner);
+            return bubble;
+        }
+
+        function parseConversation() {
+            var messages = [];
+            var studentMessage = container.dataset.studentMessage;
+            var replyText = container.dataset.replyText;
+            var created = container.dataset.createdAt;
+            var replied = container.dataset.repliedAt;
+
+            if (studentMessage) {
+                var parts = studentMessage.split(/\n\n--- 追加質問 \(([^)]+)\) ---\n/);
+
+                if (parts[0].trim()) {
+                    messages.push({ text: parts[0].trim(), isStudent: true, time: created });
+                }
+
+                if (replyText) {
+                    messages.push({ text: replyText, isStudent: false, time: replied });
+                }
+
+                for (var i = 1; i < parts.length; i += 2) {
+                    var time = parts[i];
+                    var text = parts[i + 1];
+                    if (text && text.trim()) {
+                        messages.push({ text: text.trim(), isStudent: true, time: time });
+                    }
+                }
+            } else if (replyText) {
+                messages.push({ text: replyText, isStudent: false, time: replied });
+            }
+
+            return messages;
+        }
+
+        function renderChat() {
+            container.innerHTML = '';
+            var conversation = parseConversation();
+
+            if (conversation.length === 0) {
+                container.innerHTML = '<p class="text-muted text-center">会話履歴はありません</p>';
+            } else {
+                conversation.forEach(function (msg) {
+                    container.appendChild(createChatBubble(msg.text, msg.isStudent, msg.time));
+                });
+            }
+
+            container.scrollTop = container.scrollHeight;
+        }
+
+        var chatBtn = document.getElementById('openChatModalBtn');
+        if (chatBtn) {
+            chatBtn.addEventListener('click', function () {
+                renderChat();
+
+                // Resolvedフラグに基づいてチェックボックスの初期状態を設定
+                var resolveCheckbox = document.getElementById('resolveRequestCheckbox');
+                if (resolveCheckbox) {
+                    resolveCheckbox.checked = (container.dataset.isResolved === 'true');
+                }
+
+                var unreadBadge = document.getElementById('unreadBadge');
+                if (unreadBadge) {
+                    unreadBadge.style.display = 'none';
+                }
+
+                var modalElement = document.getElementById('adminChatModal');
+                var modal = new bootstrap.Modal(modalElement);
+                modal.show();
+            });
+        }
+
+        // 「解決済みにする」スイッチの変更を監視して即時実行
+        var resolveCheckbox = document.getElementById('resolveRequestCheckbox');
+        if (resolveCheckbox) {
+            resolveCheckbox.addEventListener('change', function () {
+                if (this.checked) {
+                    // ONになったら即座に解決して一覧へ
+                    executeChatAction('', true);
+                }
+            });
+        }
+
+        var quickReplyBtn = document.getElementById('sendAdminQuickReplyBtn');
+        if (quickReplyBtn) {
+            quickReplyBtn.addEventListener('click', function () {
+                var message = document.getElementById('adminQuickReply').value.trim();
+                if (!message) {
+                    alert('メッセージを入力してください');
+                    return;
+                }
+                // 返信時は自動的に解決扱いにする
+                executeChatAction(message, true);
+            });
+        }
+
+        function executeChatAction(message, resolve) {
+            var btn = document.getElementById('sendAdminQuickReplyBtn');
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 送信中...';
+            }
+
+            var requestId = container.dataset.requestId;
+            var listUrl = "{{ url_for('admin_essay_requests_list') }}";
+
+            fetch('/api/admin/essay_request/' + requestId + '/chat_action', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    message: message,
+                    resolve: resolve
+                })
+            })
+                .then(function (response) { return response.json(); })
+                .then(function (data) {
+                    if (data.status === 'success') {
+                        // (変更) 解決しても一覧へ戻らず、その場で更新する
+                        container.dataset.replyText = data.new_reply_text;
+                        container.dataset.repliedAt = data.new_replied_at;
+                        container.dataset.status = data.new_status;
+                        container.dataset.isResolved = data.is_resolved ? 'true' : 'false';
+                        renderChat();
+                        document.getElementById('adminQuickReply').value = '';
+                        updateTopStatusBadge(data.new_status);
+
+                        // 返信ボタンを無効化（1回きり制限に従う場合）
+                        // ※チャットモーダル内は制限対象外だが、正式な返信ボタンの状態を同期させる必要があるかもしれない
+                        // location.reload(); // 手っ取り早く同期させる場合はリロードも検討
+
+                        // チェックボックスの状態を同期
+                        var resolveCheckbox = document.getElementById('resolveRequestCheckbox');
+                        if (resolveCheckbox) {
+                            resolveCheckbox.checked = data.is_resolved;
+                        }
+
+                        if (btn) {
+                            btn.disabled = false;
+                            btn.innerHTML = '<i class="fas fa-paper-plane"></i> 送信する';
+                        }
+
+                        // 解決フラグがTrueかつチャットからの送信でない（スイッチ操作のみ）の場合は、
+                        // もしかしたら通知を出したほうが親切
+                        if (resolve && !message) {
+                            alert('解決済みに更新しました');
+                        }
+                    } else {
+                        alert('エラー: ' + data.message);
+                        if (btn) {
+                            btn.disabled = false;
+                            btn.innerHTML = '<i class="fas fa-paper-plane"></i> 送信する';
+                        }
+                    }
+                })
+                .catch(function (error) {
+                    console.error('Error:', error);
+                    alert('通信エラーが発生しました');
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = '<i class="fas fa-paper-plane"></i> 送信する';
+                    }
+                });
+        }
+
+        function updateTopStatusBadge(status) {
+            var h2 = document.querySelector('h2');
+            if (!h2) return;
+
+            var badge = h2.querySelector('.badge');
+            if (!badge) return;
+
+            if (status === 'replied') {
+                badge.className = 'badge bg-success fs-6 ms-2';
+                badge.textContent = '対応済み';
+            } else {
+                badge.className = 'badge bg-warning text-dark fs-6 ms-2';
+                badge.textContent = '未対応';
+            }
+        }
+    });
+</script>
+{% endblock %}

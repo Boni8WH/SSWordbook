@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+
+{% block title %}論述添削依頼一覧 - 管理画面{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-inbox"></i> 論述添削依頼一覧</h2>
+        <a href="{{ url_for('admin_page') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> 管理画面へ戻る
+        </a>
+    </div>
+
+    <!-- フィルタ -->
+    <div class="mb-4">
+        <div class="btn-group" role="group">
+            <a href="{{ url_for('admin_essay_requests_list', status='pending') }}"
+                class="btn btn-{{ 'primary' if current_filter == 'pending' else 'outline-primary' }}">
+                未対応
+            </a>
+            <a href="{{ url_for('admin_essay_requests_list', status='replied') }}"
+                class="btn btn-{{ 'success' if current_filter == 'replied' else 'outline-success' }}">
+                対応済み
+            </a>
+            <a href="{{ url_for('admin_essay_requests_list', status='all') }}"
+                class="btn btn-{{ 'secondary' if current_filter == 'all' else 'outline-secondary' }}">
+                すべて
+            </a>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="bg-light">
+                        <tr>
+                            <th>ID</th>
+                            <th>送信日時</th>
+                            <th>ユーザー</th>
+                            <th>問題</th>
+                            <th>メッセージ</th>
+                            <th>ステータス</th>
+                            <th>アクション</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if requests %}
+                        {% for req in requests %}
+                        <tr>
+                            <td>#{{ req.id }}</td>
+                            <td>{{ req.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                            <td>
+                                {{ req.user.username }}
+                                <br>
+                                <span class="text-muted small">({{ req.user.room_number }})</span>
+                            </td>
+                            <td>
+                                <a href="{{ url_for('essay_problem', problem_id=req.problem_id) }}" target="_blank">
+                                    問題 #{{ req.problem_id }}
+                                </a>
+                            </td>
+                            <td>
+                                {{ req.student_message[:30] }}{% if req.student_message|length > 30 %}...{% endif %}
+                                {% if req.request_image_path %}
+                                <div class="mt-1"><span class="badge bg-info"><i class="fas fa-image"></i> 画像あり</span>
+                                </div>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if req.status == 'pending' %}
+                                <span class="badge bg-warning text-dark">未対応</span>
+                                {% else %}
+                                <span class="badge bg-success">対応済み</span>
+                                <div class="small text-muted mt-1">{{ req.replied_at.strftime('%Y-%m-%d %H:%M') if
+                                    req.replied_at else '' }}</div>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a href="{{ url_for('admin_correction_request_detail', request_id=req.id) }}"
+                                    class="btn btn-sm btn-primary">
+                                    詳細 / 返信
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        {% else %}
+                        <tr>
+                            <td colspan="7" class="text-center py-5">
+                                <p class="text-muted mb-0">依頼はありません。</p>
+                            </td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
