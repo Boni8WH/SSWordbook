@@ -144,6 +144,13 @@
                 <!-- 簡易返信フォーム -->
                 <div class="mt-3 p-3 bg-light rounded border">
                     <label class="fw-bold small"><i class="fas fa-reply"></i> クイック返信</label>
+                    {% if req.status == 'pending' %}
+                    <div class="alert alert-warning mt-2 mb-0">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        最初の返信は「<strong>正式な返信を送信</strong>」ボタンから行ってください。<br>
+                        <small>チャットでの返信は正式な返信後に解禁されます。</small>
+                    </div>
+                    {% else %}
                     <div class="mt-2">
                         <textarea id="adminQuickReply" class="form-control" rows="3"
                             placeholder="生徒へのクイック返信を入力..."></textarea>
@@ -159,6 +166,7 @@
                         </div>
                     </div>
                     <small class="d-block text-muted mt-1">※チャット履歴にも反映され、生徒へ通知されます</small>
+                    {% endif %}
                 </div>
             </div>
             <div class="modal-footer">

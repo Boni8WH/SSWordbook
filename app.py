@@ -3743,6 +3743,69 @@ def send_correction_notification_email(user, request):
         print(f"❌ 添削完了通知送信エラー: {e}")
         return False
 
+def send_chat_notification_email(recipient_email, sender_name, problem_id, message_preview, is_from_student=True):
+    """チャットメッセージ通知メールを送信"""
+    try:
+        app_info = AppInfo.get_current_info()
+        mail_sender = app.config.get('MAIL_DEFAULT_SENDER')
+        
+        if is_from_student:
+            # 生徒からのメッセージ（管理者向け）
+            subject = f"[{app_info.app_name}] 添削チャット: {sender_name}さんから新しいメッセージ"
+            target_url = url_for('admin_correction_request_detail', request_id=problem_id, _external=True)
+            body = f"""
+{app_info.app_name} 添削チャット通知
+
+{sender_name}さんから添削チャットに新しいメッセージが届きました。
+
+--- メッセージ内容 ---
+{message_preview[:200]}{'...' if len(message_preview) > 200 else ''}
+---
+
+確認はこちら:
+{target_url}
+
+--------------------------------------------------
+{app_info.app_name}
+--------------------------------------------------
+"""
+        else:
+            # 先生からのメッセージ（生徒向け）
+            subject = f"[{app_info.app_name}] 添削チャット: 先生から新しいメッセージ"
+            target_url = url_for('my_corrections', _external=True)
+            body = f"""
+{app_info.app_name} 添削チャット通知
+
+先生から添削チャットに新しいメッセージが届きました。
+
+--- メッセージ内容 ---
+{message_preview[:200]}{'...' if len(message_preview) > 200 else ''}
+---
+
+確認はこちら:
+{target_url}
+
+--------------------------------------------------
+{app_info.app_name}
+--------------------------------------------------
+"""
+        
+        msg = Message(
+            subject=subject,
+            recipients=[recipient_email],
+            body=body,
+            sender=mail_sender
+        )
+        
+        mail.send(msg)
+        print(f"✅ チャット通知メール送信: {recipient_email}")
+        return True
+        
+    except Exception as e:
+        print(f"❌ チャット通知メール送信エラー: {e}")
+        return False
+
+
 @app.route('/admin/initialize_user_stats', methods=['POST'])
 def admin_initialize_user_stats():
     """管理者用：ユーザー統計の強制初期化"""
@@ -11973,6 +12036,16 @@ def student_follow_up_reply(request_id):
                 link=url_for('admin_correction_request_detail', request_id=req.id)
             )
             db.session.add(notif)
+            
+            # メール通知を送信（管理者がメール通知を有効にしている場合）
+            if mgr.email_notification_enabled and mgr.notification_email:
+                send_chat_notification_email(
+                    recipient_email=mgr.notification_email,
+                    sender_name=req.user.username,
+                    problem_id=req.id,
+                    message_preview=follow_up_message,
+                    is_from_student=True
+                )
         
         db.session.commit()
         
@@ -12166,6 +12239,17 @@ def admin_chat_action(request_id):
             )
             db.session.add(notif)
             req.is_read_by_user = False # 未読に戻す
+            
+            # メール通知を送信（ユーザーがメール通知を有効にしている場合）
+            user = User.query.get(req.user_id)
+            if user and user.email_notification_enabled and user.notification_email:
+                send_chat_notification_email(
+                    recipient_email=user.notification_email,
+                    sender_name="先生",
+                    problem_id=req.id,
+                    message_preview=message,
+                    is_from_student=False
+                )
         
         db.session.commit()
         
