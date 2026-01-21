@@ -3609,6 +3609,38 @@ def send_password_reset_email(user, email, token):
         
         raise e
 
+def send_admin_notification_email(subject, body):
+    """管理者へ通知メールを送信"""
+    try:
+        # AppInfoから連絡先メールアドレスを取得
+        app_info = AppInfo.get_current_info()
+        recipient = app_info.contact_email
+        
+        # 連絡先が設定されていない場合はデフォルト送信者を使用
+        if not recipient:
+            recipient = app.config.get('MAIL_DEFAULT_SENDER')
+            
+        if not recipient:
+            print("❌ 管理者通知メール送信スキップ: 送信先アドレスが設定されていません")
+            return False
+            
+        mail_sender = app.config.get('MAIL_DEFAULT_SENDER')
+        
+        msg = Message(
+            subject=f"[{app_info.app_name}] {subject}",
+            recipients=[recipient],
+            body=body,
+            sender=mail_sender
+        )
+        
+        mail.send(msg)
+        print(f"✅ 管理者通知メール送信成功: {recipient}")
+        return True
+        
+    except Exception as e:
+        print(f"❌ 管理者通知メール送信エラー: {e}")
+        return False
+
 @app.route('/admin/initialize_user_stats', methods=['POST'])
 def admin_initialize_user_stats():
     """管理者用：ユーザー統計の強制初期化"""
@@ -11704,6 +11736,25 @@ def submit_correction_request():
             db.session.add(notif)
             
         db.session.commit()
+        
+        # 管理者へメール通知
+        try:
+            email_subject = "添削依頼のお知らせ"
+            detail_url = url_for('admin_correction_request_detail', request_id=req.id, _external=True) if 'admin_correction_request_detail' in app.view_functions else '管理画面をご確認ください'
+            
+            email_body = f"""
+以下のユーザーから新しい添削依頼が届きました。
+
+ユーザー: {user.username} (部屋番号: {user.room_number})
+問題番号: {problem_id}
+依頼内容: {request_text if request_text else '（本文なし）'}
+
+詳細は管理画面をご確認ください。
+{detail_url}
+"""
+            send_admin_notification_email(email_subject, email_body)
+        except Exception as e_mail:
+            print(f"⚠️ メール通知送信失敗: {e_mail}")
         
         flash('添削依頼を送信しました。管理者からの返信をお待ちください。', 'success')
         return redirect(url_for('essay_problem', problem_id=problem_id))
