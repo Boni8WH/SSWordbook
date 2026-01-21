@@ -62,7 +62,9 @@
                             </td>
                             <td>
                                 {{ req.student_message[:30] }}{% if req.student_message|length > 30 %}...{% endif %}
-                                {% if req.request_image_path %}
+                                {% set req_images = req.db_images | selectattr('image_type', 'equalto', 'request') |
+                                list %}
+                                {% if req_images %}
                                 <div class="mt-1"><span class="badge bg-info"><i class="fas fa-image"></i> 画像あり</span>
                                 </div>
                                 {% endif %}

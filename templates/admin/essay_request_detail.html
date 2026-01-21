@@ -58,13 +58,16 @@
                         <div class="p-3 bg-light rounded" style="white-space: pre-wrap; line-height: 1.6;">{{
                             req.request_text }}</div>
                     </div>
-                    {% if req.request_image_path %}
+                    {% set request_images = req.db_images | selectattr('image_type', 'equalto', 'request') | list %}
+                    {% if request_images %}
                     <div class="mb-3">
                         <label class="fw-bold text-muted small">提出画像:</label>
                         <div class="mt-2">
-                            <img src="{{ url_for('static', filename='uploads/correction_requests/' + req.request_image_path) }}"
+                            {% for img in request_images %}
+                            <img src="{{ url_for('serve_correction_image', image_id=img.id) }}"
                                 class="img-fluid rounded border shadow-sm" alt="Student Submission"
                                 style="max-height: 400px; cursor: pointer;" onclick="window.open(this.src)">
+                            {% endfor %}
                         </div>
                     </div>
                     {% endif %}
@@ -89,12 +92,15 @@
 
                         <div class="mb-4">
                             <label class="form-label fw-bold">添削画像 (任意)</label>
-                            {% if req.reply_image_path %}
+                            {% set reply_images = req.db_images | selectattr('image_type', 'equalto', 'reply') | list %}
+                            {% if reply_images %}
                             <div class="mb-2">
-                                <span class="badge bg-info">現在の画像: {{ req.reply_image_path }}</span>
+                                <span class="badge bg-info">現在の画像: 添削済み画像あり</span>
                                 <div class="mt-1">
-                                    <img src="{{ url_for('static', filename='uploads/correction_replies/' + req.reply_image_path) }}"
+                                    {% for img in reply_images %}
+                                    <img src="{{ url_for('serve_correction_image', image_id=img.id) }}"
                                         class="img-thumbnail" style="max-height: 100px;">
+                                    {% endfor %}
                                 </div>
                             </div>
                             {% endif %}
