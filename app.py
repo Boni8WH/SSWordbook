@@ -16674,9 +16674,10 @@ def test_notification():
     
     data = request.get_json() or {}
     notification_type = data.get('type', 'push')  # 'push' or 'email'
+    email_from_request = data.get('email')
     
-    # Email notification test
-    if notification_type == 'email':
+    # Email notification test - check both 'type' and 'email' presence for backwards compatibility
+    if notification_type == 'email' or email_from_request:
         email = data.get('email') or user.notification_email
         if not email:
             return jsonify({'status': 'error', 'message': 'メールアドレスが設定されていません'}), 400
