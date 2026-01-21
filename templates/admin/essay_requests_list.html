@@ -77,10 +77,16 @@
                                 {% endif %}
                             </td>
                             <td>
-                                <a href="{{ url_for('admin_correction_request_detail', request_id=req.id) }}"
-                                    class="btn btn-sm btn-primary">
-                                    詳細 / 返信
-                                </a>
+                                <div class="btn-group" role="group">
+                                    <a href="{{ url_for('admin_correction_request_detail', request_id=req.id) }}"
+                                        class="btn btn-sm btn-primary">
+                                        詳細 / 返信
+                                    </a>
+                                    <button type="button" class="btn btn-sm btn-danger"
+                                        onclick="confirmDelete({{ req.id }}, '{{ req.user.username }}', {{ req.problem_id }})">
+                                        <i class="fas fa-trash-alt"></i>
+                                    </button>
+                                </div>
                             </td>
                         </tr>
                         {% endfor %}
@@ -97,4 +103,46 @@
         </div>
     </div>
 </div>
+
+<!-- 削除確認モーダル -->
+<div class="modal fade" id="deleteConfirmModal" tabindex="-1" aria-labelledby="deleteConfirmModalLabel"
+    aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteConfirmModalLabel">
+                    <i class="fas fa-exclamation-triangle"></i> 削除の確認
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                    aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p id="deleteConfirmMessage">この添削依頼を削除しますか？</p>
+                <div class="alert alert-warning">
+                    <i class="fas fa-info-circle"></i> 削除すると元に戻せません。関連する画像や返信内容もすべて削除されます。
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+                <form id="deleteForm" method="POST" style="display: inline;">
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fas fa-trash-alt"></i> 削除する
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function confirmDelete(requestId, username, problemId) {
+        var msg = '添削依頼 #' + requestId + ' を削除しますか？\n\n';
+        msg += '・ユーザー: ' + username + '\n';
+        msg += '・問題ID: #' + problemId;
+        document.getElementById('deleteConfirmMessage').innerText = msg;
+        document.getElementById('deleteForm').action = '/api/admin/essay_request/' + requestId + '/delete';
+        var modal = new bootstrap.Modal(document.getElementById('deleteConfirmModal'));
+        modal.show();
+    }
+</script>
 {% endblock %}

@@ -2298,7 +2298,14 @@ async function fetchAnnouncements() {
 
         if (data.status === 'success') {
             if (data.announcements.length === 0) {
-                announcementsList.innerHTML = '<p class="text-muted" style="font-size: 0.9em;">現在お知らせはありません。</p>';
+                announcementsList.innerHTML = `
+                    <p class="text-muted" style="font-size: 0.9em;">現在お知らせはありません。</p>
+                    <div style="text-align: right; margin-top: 10px; padding-right: 5px;">
+                        <a href="/announcements" class="text-decoration-none" style="font-size: 0.9em; color: #3498db; font-weight: bold;">
+                            <i class="fas fa-list-ul me-1"></i>過去のお知らせを見る
+                        </a>
+                    </div>
+                `;
             } else {
                 let html = '<div class="accordion-list" style="display: flex; flex-direction: column; gap: 8px;">';
                 data.announcements.forEach(ann => {
@@ -2988,12 +2995,46 @@ function initNotificationSettings() {
     const saveBtn = document.getElementById('saveSettingsBtn');
     if (!saveBtn) return; // 設定モーダルがないページでは何もしない
 
-    // 設定読み込み
+    // メール通知トグルのイベントリスナーを即座に登録（fetch完了前でも動作するように）
+    const emailToggle = document.getElementById('emailNotificationToggle');
+    const emailArea = document.getElementById('emailInputArea');
+    const emailInput = document.getElementById('notificationEmail');
+    const testEmailBtn = document.getElementById('testEmailBtn');
+
+    // 重複登録防止
+    if (emailToggle && !emailToggle.dataset.listenerAttached) {
+        emailToggle.dataset.listenerAttached = 'true';
+        emailToggle.addEventListener('change', function (e) {
+            const isChecked = e.target.checked;
+            if (emailArea) {
+                emailArea.style.display = isChecked ? 'block' : 'none';
+            }
+        });
+    }
+
+    if (emailInput && !emailInput.dataset.listenerAttached) {
+        emailInput.dataset.listenerAttached = 'true';
+        emailInput.addEventListener('input', function (e) {
+            if (testEmailBtn) {
+                testEmailBtn.disabled = !e.target.value.trim();
+            }
+        });
+    }
+
+    // 通知トグルのイベントリスナーも即座に登録
+    const toggle = document.getElementById('notificationToggle');
+    if (toggle && !toggle.dataset.listenerAttached) {
+        toggle.dataset.listenerAttached = 'true';
+        toggle.addEventListener('change', function (e) {
+            toggleTimeInput(e.target.checked);
+        });
+    }
+
+    // 設定読み込み（初期値の設定のみ）
     fetch('/api/notification_settings')
         .then(res => res.json())
         .then(data => {
             if (data.status === 'success') {
-                const toggle = document.getElementById('notificationToggle');
                 const timeInput = document.getElementById('notificationTime');
 
                 if (toggle) toggle.checked = data.enabled;
@@ -3002,49 +3043,26 @@ function initNotificationSettings() {
                 // トグル状態に応じて時間入力の有効/無効切り替え
                 toggleTimeInput(data.enabled);
 
-                if (toggle) {
-                    toggle.addEventListener('change', (e) => {
-                        toggleTimeInput(e.target.checked);
-                    });
-                }
-
                 if (data.enabled && Notification.permission === 'granted') {
                     registerServiceWorker().catch(err => console.error('Auto-register SW failed:', err));
                 }
 
-                // メール設定の反映
-                const emailToggle = document.getElementById('emailNotificationToggle');
-                const emailInput = document.getElementById('notificationEmail');
-                const emailArea = document.getElementById('emailInputArea');
-                const testEmailBtn = document.getElementById('testEmailBtn');
-
+                // メール設定の初期値反映
                 if (emailToggle) {
                     emailToggle.checked = data.email_enabled || false;
-                    // トグル変更時の処理
-                    emailToggle.addEventListener('change', (e) => {
-                        const isChecked = e.target.checked;
-                        if (emailArea) {
-                            emailArea.style.display = isChecked ? 'block' : 'none';
-                        }
-                    });
-                    // 初期表示
+                    // 初期表示状態を設定
                     if (emailArea) {
                         emailArea.style.display = (data.email_enabled) ? 'block' : 'none';
                     }
                 }
                 if (emailInput) {
                     emailInput.value = data.email || '';
-                    // 入力イベントでテストボタンの有効/無効を切り替え
-                    emailInput.addEventListener('input', (e) => {
-                        if (testEmailBtn) {
-                            testEmailBtn.disabled = !e.target.value.trim();
-                        }
-                    });
                     if (testEmailBtn) testEmailBtn.disabled = !emailInput.value.trim();
                 }
             }
         })
         .catch(err => console.error('設定読み込みエラー:', err));
+
 
     // 通知テストボタン（WebPush）
     const testBtn = document.getElementById('testNotificationBtn');
@@ -3080,9 +3098,9 @@ function initNotificationSettings() {
         });
     }
 
-    // テストメール送信ボタン
-    const testEmailBtn = document.getElementById('testEmailBtn');
-    if (testEmailBtn) {
+    // テストメール送信ボタン（testEmailBtnは上で既に取得済み）
+    if (testEmailBtn && !testEmailBtn.dataset.clickListenerAttached) {
+        testEmailBtn.dataset.clickListenerAttached = 'true';
         testEmailBtn.addEventListener('click', function () {
             const emailInput = document.getElementById('notificationEmail');
             const email = emailInput ? emailInput.value : '';
