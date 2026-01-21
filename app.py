@@ -11,6 +11,7 @@ import string
 import uuid
 import io
 import pickle 
+import numpy as np
 
 from io import StringIO, BytesIO
 from datetime import datetime, timedelta
@@ -11655,9 +11656,12 @@ def essay_ocr():
         # === OCR: モデルフォールバックロジック ===
         current_model = 'gemini-2.0-flash'
         response = None
+        
+        # Use types.Part explicitly to avoid mixed type issues
+        from google.genai import types
         content_payload = [
-            prompt,
-            {'inline_data': {'mime_type': 'image/png', 'data': img_byte_arr}}
+            types.Part.from_text(text=prompt),
+            types.Part.from_bytes(data=img_byte_arr, mime_type='image/png')
         ]
         
         try:
@@ -12215,11 +12219,13 @@ def essay_grade():
         ]
 
         # コンテンツパーツの構築 (プロンプト + 教科書ファイル + 画像(あれば))
-        content_parts = [prompt]
+        # Use types.Part explicitly to avoid mixed types
+        content_parts = [types.Part.from_text(text=prompt)]
         
         # 教科書データ（抜粋）を追加
         if relevant_context:
-            content_parts.append(f"【教科書データ（抜粋）】\n{relevant_context}")
+            context_text = f"【教科書データ（抜粋）】\n{relevant_context}"
+            content_parts.append(types.Part.from_text(text=context_text))
 
         # 画像データの取得
         essay_image = EssayImage.query.filter_by(problem_id=problem_id).first()
@@ -12249,10 +12255,12 @@ def essay_grade():
         # 生成実行
         # Generation Config for stricter adherence
         # Generation Config
+        # Convert safety_settings to tuple to avoid potential unhashable list issues
+        # (Some SDK internals may try to hash the config object)
         generation_config = types.GenerateContentConfig(
             temperature=0.4,
             max_output_tokens=8192,
-            safety_settings=safety_settings
+            safety_settings=tuple(safety_settings)  # Use tuple instead of list
         )
 
         # === 頑健な生成ロジック (Model Fallback) ===
@@ -12353,9 +12361,17 @@ def essay_grade():
                     """
                     
                     try:
-                        repair_response = model.generate_content(
-                            repair_prompt,
-                            generation_config={"temperature": 0.1, "max_output_tokens": 500}
+                        # Fix: Use client.models.generate_content instead of undefined 'model'
+                        # Fix: Use types.GenerateContentConfig instead of dict
+                        repair_config = types.GenerateContentConfig(
+                            temperature=0.1, 
+                            max_output_tokens=500
+                        )
+                        
+                        repair_response = client.models.generate_content(
+                            model='gemini-2.0-flash',
+                            contents=repair_prompt,
+                            config=repair_config
                         )
                         repaired_text = repair_response.text.strip()
                         
