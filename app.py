@@ -268,10 +268,14 @@ class User(db.Model):
     incorrect_words = db.Column(JSONEncodedDict, default=[])
     last_login = db.Column(db.DateTime, default=lambda: datetime.now(JST))
     
-    # 通知設定
+    # 通知設定 (WebPush)
     notification_enabled = db.Column(db.Boolean, default=True, nullable=False)
     notification_time = db.Column(db.String(5), default="21:00", nullable=False)
     push_subscription = db.Column(JSONEncodedDict, nullable=True)
+
+    # 通知設定 (Email)
+    email_notification_enabled = db.Column(db.Boolean, default=False, nullable=False)
+    notification_email = db.Column(db.String(120), nullable=True)
 
     # RPG称号
     equipped_rpg_enemy_id = db.Column(db.Integer, db.ForeignKey('rpg_enemy.id'), nullable=True)
@@ -738,6 +742,29 @@ def _add_notification_columns_to_user():
                 raise e
     except Exception as e:
         print(f"⚠️ Userマイグレーションエラー (全体): {e}")
+
+def _add_email_notification_columns_to_user():
+    """Userテーブルにメール通知用カラムを追加するマイグレーション関数"""
+    try:
+        inspector = inspect(db.engine)
+        columns = [c['name'] for c in inspector.get_columns('user')]
+        
+        with db.engine.connect() as conn:
+            # トランザクション開始
+            with conn.begin():
+                # email_notification_enabled
+                if 'email_notification_enabled' not in columns:
+                    print("🔄 email_notification_enabledカラムを追加します...")
+                    conn.execute(text("ALTER TABLE \"user\" ADD COLUMN email_notification_enabled BOOLEAN DEFAULT FALSE"))
+
+                # notification_email
+                if 'notification_email' not in columns:
+                    print("🔄 notification_emailカラムを追加します...")
+                    conn.execute(text("ALTER TABLE \"user\" ADD COLUMN notification_email VARCHAR(120)"))
+                
+                print("✅ Userテーブルのメール通知マイグレーション完了")
+    except Exception as e:
+        print(f"⚠️ Userメール通知マイグレーションエラー: {e}")
 
 def _add_equipped_title_column_to_user():
     """Userテーブルにequipped_rpg_enemy_idカラムを追加するマイグレーション関数"""
@@ -3075,6 +3102,7 @@ def create_tables_and_admin_user():
             _create_rpg_enemy_table()
             # _seed_initial_rpg_enemy() # 確実に初期データを投入 - 無効化
             _add_score_column_to_rpg_enemy() # NEW
+            _add_email_notification_columns_to_user() # 🆕 メール通知カラム追加
             _add_equipped_title_column_to_user() # 🆕 追加
             _add_rpg_intro_seen_column_to_user() # 🆕 RPGイントロ表示フラグ追加（管理者ユーザークエリ前に実行必須）
             _add_announcement_viewed_column_to_user() # 🆕 お知らせ閲覧日時カラム追加
@@ -3639,6 +3667,79 @@ def send_admin_notification_email(subject, body):
         
     except Exception as e:
         print(f"❌ 管理者通知メール送信エラー: {e}")
+        return False
+
+def send_test_notification_email(email):
+    """ユーザーへのテスト通知メールを送信"""
+    try:
+        app_info = AppInfo.get_current_info()
+        mail_sender = app.config.get('MAIL_DEFAULT_SENDER')
+        
+        subject = f"[{app_info.app_name}] 通知テスト"
+        body = f"""
+{app_info.app_name} の通知テストメールです。
+
+このメールが届いている場合、通知設定は正しく機能しています。
+今後、添削依頼の完了通知などがこのメールアドレスに送信されます。
+
+--------------------------------------------------
+{app_info.app_name}
+URL: {url_for('index', _external=True)}
+--------------------------------------------------
+"""
+        
+        msg = Message(
+            subject=subject,
+            recipients=[email],
+            body=body,
+            sender=mail_sender
+        )
+        
+        mail.send(msg)
+        print(f"✅ テスト通知メール送信成功: {email}")
+        return True
+        
+        print(f"❌ テスト通知メール送信エラー: {e}")
+        return False
+
+def send_correction_notification_email(user, request):
+    """添削完了通知メールを送信"""
+    try:
+        app_info = AppInfo.get_current_info()
+        mail_sender = app.config.get('MAIL_DEFAULT_SENDER')
+        
+        subject = f"[{app_info.app_name}] 添削完了のお知らせ"
+        
+        # ユーザーに結果を見てもらうためのURL
+        # 特定の問題の特定のセクションへのリンクなどが理想的
+        target_url = url_for('essay_problem', problem_id=request.problem_id, _anchor='gradingResult', _external=True)
+        
+        body = f"""
+{user.username} 様
+
+{app_info.app_name} をご利用いただきありがとうございます。
+ご依頼いただいた論述問題（#{request.problem_id}）の添削が完了しました。
+
+講師からのコメントや修正内容を確認してください：
+{target_url}
+
+--------------------------------------------------
+{app_info.app_name}
+--------------------------------------------------
+"""
+        msg = Message(
+            subject=subject,
+            recipients=[user.notification_email],
+            body=body,
+            sender=mail_sender
+        )
+        
+        mail.send(msg)
+        print(f"✅ 添削完了通知送信: {user.notification_email}")
+        return True
+        
+    except Exception as e:
+        print(f"❌ 添削完了通知送信エラー: {e}")
         return False
 
 @app.route('/admin/initialize_user_stats', methods=['POST'])
@@ -11440,6 +11541,10 @@ def essay_index():
         
         app.logger.info(f"✅ 論述問題章一覧を生成しました（{len(chapter_stats)}章）")
         
+        # 部屋設定を取得して論述専門部屋かどうかを判定
+        room_setting = RoomSetting.query.filter_by(room_number=current_room).first()
+        is_essay_room_flag = room_setting.is_essay_room if room_setting else False
+
         # テンプレートコンテキストを取得
         context = get_template_context()
         
@@ -11447,7 +11552,7 @@ def essay_index():
                              chapter_stats=chapter_stats,
                              current_username=current_user,
                              current_room_number=current_room,
-                             is_essay_room=True,
+                             is_essay_room=is_essay_room_flag,
                              **context)
         
     except Exception as e:
@@ -11997,6 +12102,15 @@ def admin_reply_correction_request(request_id):
         db.session.add(notif)
         
         db.session.commit()
+
+        # メール通知
+        try:
+            # リレーションまたはクエリでユーザー取得
+            target_user = User.query.get(req.user_id)
+            if target_user and target_user.email_notification_enabled and target_user.notification_email:
+                send_correction_notification_email(target_user, req)
+        except Exception as e:
+            print(f"⚠️ メール通知送信失敗: {e}")
         
         flash('添削結果を送信しました。', 'success')
         return redirect(url_for('admin_correction_request_detail', request_id=request_id))
@@ -18763,6 +18877,81 @@ def check_and_create_correction_tables():
             print(f"Error creating tables: {e}")
 
 check_and_create_correction_tables()
+
+
+# =========================================================
+# 通知設定API
+# =========================================================
+@app.route('/api/notification_settings', methods=['GET'])
+def get_notification_settings():
+    if not session.get('user_id'):
+        return jsonify({'status': 'error', 'message': 'ログインが必要です'}), 401
+    
+    user = User.query.get(session['user_id'])
+    if not user:
+        return jsonify({'status': 'error', 'message': 'ユーザーが見つかりません'}), 404
+        
+    return jsonify({
+        'status': 'success',
+        # WebPush settings (Existing logic assumed based on script.js)
+        'enabled': user.notification_enabled,
+        'time': user.notification_time,
+        # Email settings (New)
+        'email_enabled': user.email_notification_enabled,
+        'email': user.notification_email or ''
+    })
+
+@app.route('/api/update_notification_settings', methods=['POST'])
+def update_notification_settings():
+    if not session.get('user_id'):
+        return jsonify({'status': 'error', 'message': 'ログインが必要です'}), 401
+    
+    data = request.get_json()
+    user = User.query.get(session['user_id'])
+    
+    try:
+        # Existing WebPush settings
+        if 'enabled' in data:
+            user.notification_enabled = bool(data['enabled'])
+        if 'time' in data:
+            user.notification_time = str(data['time'])
+            
+        # New Email settings
+        if 'email_enabled' in data:
+            user.email_notification_enabled = bool(data['email_enabled'])
+        if 'email' in data:
+            user.notification_email = str(data['email']).strip()
+            
+        db.session.commit()
+        return jsonify({'status': 'success', 'message': '設定を保存しました'})
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error updating API settings: {e}")
+        return jsonify({'status': 'error', 'message': '保存中にエラーが発生しました'}), 500
+
+@app.route('/api/test_notification', methods=['POST'])
+def test_notification():
+    if not session.get('user_id'):
+        return jsonify({'status': 'error', 'message': 'ログインが必要です'}), 401
+        
+    data = request.get_json() or {}
+    email = data.get('email')
+    
+    # メールアドレスが指定されていない場合はユーザー設定を使用
+    if not email:
+        user = User.query.get(session['user_id'])
+        email = user.notification_email
+        
+    if not email:
+        return jsonify({'status': 'error', 'message': 'メールアドレスが設定されていません'}), 400
+        
+    success = send_test_notification_email(email)
+    
+    if success:
+        return jsonify({'status': 'success', 'message': 'テストメールを送信しました'})
+    else:
+        return jsonify({'status': 'error', 'message': '送信に失敗しました'}), 500
 
 if __name__ == '__main__':
     try:

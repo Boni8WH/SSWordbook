@@ -240,6 +240,32 @@
                             「今日の10問」が未完了の場合、この時間に通知します。
                         </div>
                     </div>
+                    {% if is_essay_room %}
+                    <hr>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">メール通知設定</label>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="emailNotificationToggle">
+                            <label class="form-check-label" for="emailNotificationToggle">メール通知を有効にする</label>
+                        </div>
+                        <div class="mt-2" id="emailInputArea" style="display: none;">
+                            <div class="input-group mb-2">
+                                <span class="input-group-text"><i class="fas fa-envelope"></i></span>
+                                <input type="email" class="form-control" id="notificationEmail"
+                                    placeholder="メールアドレスを入力">
+                            </div>
+                            <div class="text-end">
+                                <button type="button" class="btn btn-outline-secondary btn-sm" id="testEmailBtn"
+                                    disabled>
+                                    <i class="fas fa-paper-plane me-1"></i> テストメール送信
+                                </button>
+                            </div>
+                            <div class="form-text text-muted">
+                                添削完了時などに上記アドレスへメールでお知らせします。
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
                 </div>
                 <div class="mb-3 text-center">
                     <button type="button" class="btn btn-outline-info btn-sm" id="testNotificationBtn">
