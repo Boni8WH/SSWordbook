@@ -880,6 +880,9 @@
                     <button type="button" class="btn btn-sm btn-outline-secondary"
                         onclick="document.execCommand('underline', false, null);"><i class="fas fa-underline"></i>
                         下線</button>
+                    <button type="button" class="btn btn-sm btn-outline-danger ms-2" id="resetUnderlineBtn"
+                        onclick="resetAllUnderlines();"><i class="fas fa-eraser"></i>
+                        下線リセット</button>
                     <span class="text-muted ms-2 small">※文字を選択してボタンを押すと下線が引けます</span>
                 </div>
                 <div id="richTextEditor" class="rich-text-editor" contenteditable="true"
@@ -1234,6 +1237,30 @@
             });
         }
     });
+
+    // 下線リセット関数
+    function resetAllUnderlines() {
+        var editor = document.getElementById('richTextEditor');
+        if (!editor) return;
+
+        // すべての<u>タグを検索
+        var underlines = editor.querySelectorAll('u');
+        underlines.forEach(function (u) {
+            // <u>タグの中身をテキストノードとして親に挿入
+            while (u.firstChild) {
+                u.parentNode.insertBefore(u.firstChild, u);
+            }
+            // 空になった<u>タグを削除
+            u.remove();
+        });
+
+        // 文字数カウントを更新
+        var text = editor.innerText.replace(/\s+/g, '');
+        var charCount = document.getElementById('charCount');
+        if (charCount) {
+            charCount.textContent = text.length + '文字';
+        }
+    }
 
     function showAnswer(problemId) {
         var answerSection = document.getElementById('answerSection');
