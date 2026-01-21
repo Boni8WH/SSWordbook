@@ -1106,7 +1106,8 @@
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
-                        <button type="submit" class="btn btn-warning text-dark font-weight-bold">
+                        <button type="submit" class="btn btn-warning text-dark font-weight-bold"
+                            id="submitCorrectionBtn">
                             <i class="fas fa-paper-plane"></i> 依頼を送信
                         </button>
                     </div>
@@ -1129,7 +1130,6 @@
     style="display: none;"></div>
 
 <script>
-
     document.addEventListener('DOMContentLoaded', function () {
         // HTMLのdata属性からJavaScript変数を取得
         var problemData = document.getElementById('problem-data');
@@ -1212,17 +1212,24 @@
             console.error('星評価要素が見つかりません');
         }
 
-        // 添削依頼フォームのバリデーション
+        // 添削依頼フォームのバリデーションと二重送信防止
         const essayForm = document.getElementById('essayCorrectionForm');
         if (essayForm) {
             essayForm.addEventListener('submit', function (e) {
                 const text = this.querySelector('textarea[name="request_text"]').value.trim();
                 const image = this.querySelector('input[name="request_image"]').files.length;
+                const submitBtn = document.getElementById('submitCorrectionBtn');
 
                 if (!text && image === 0) {
                     e.preventDefault();
                     alert('答案テキストを入力するか、答案画像を添付してください。');
                     return false;
+                }
+
+                // 二重送信防止：ボタンを無効化
+                if (submitBtn) {
+                    submitBtn.disabled = true;
+                    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 送信中...';
                 }
             });
         }
