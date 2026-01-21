@@ -1490,6 +1490,20 @@ class EssayCorrectionRequest(db.Model):
             'replied_at': self.replied_at.strftime('%Y-%m-%d %H:%M') if self.replied_at else None
         }
 
+class CorrectionRequestImage(db.Model):
+    """添削依頼の画像をDBに保存するテーブル"""
+    __tablename__ = 'correction_request_images'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    request_id = db.Column(db.Integer, db.ForeignKey('essay_correction_requests.id', ondelete='CASCADE'), nullable=False)
+    image_type = db.Column(db.String(20), nullable=False)  # 'request' (生徒提出) or 'reply' (添削返却)
+    image_data = deferred(db.Column(db.LargeBinary, nullable=False))  # 画像バイナリ
+    image_format = db.Column(db.String(10), nullable=False, default='PNG')  # PNG, JPEG など
+    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(JST))
+    
+    # リレーション
+    correction_request = db.relationship('EssayCorrectionRequest', backref=db.backref('db_images', lazy=True, cascade='all, delete-orphan'))
+
 class Notification(db.Model):
     """ユーザー通知テーブル"""
     __tablename__ = 'notifications'
@@ -3638,36 +3652,46 @@ def send_password_reset_email(user, email, token):
         raise e
 
 def send_admin_notification_email(subject, body):
-    """管理者へ通知メールを送信"""
-    try:
-        # AppInfoから連絡先メールアドレスを取得
-        app_info = AppInfo.get_current_info()
-        recipient = app_info.contact_email
-        
-        # 連絡先が設定されていない場合はデフォルト送信者を使用
-        if not recipient:
-            recipient = app.config.get('MAIL_DEFAULT_SENDER')
-            
-        if not recipient:
-            print("❌ 管理者通知メール送信スキップ: 送信先アドレスが設定されていません")
-            return False
-            
-        mail_sender = app.config.get('MAIL_DEFAULT_SENDER')
-        
-        msg = Message(
-            subject=f"[{app_info.app_name}] {subject}",
-            recipients=[recipient],
-            body=body,
-            sender=mail_sender
-        )
-        
-        mail.send(msg)
-        print(f"✅ 管理者通知メール送信成功: {recipient}")
-        return True
-        
-    except Exception as e:
-        print(f"❌ 管理者通知メール送信エラー: {e}")
-        return False
+    """管理者へ通知メールを非同期送信（バックグラウンドスレッドで実行）"""
+    import threading
+    
+    def _send_email_thread():
+        """スレッドで実行されるメール送信処理"""
+        with app.app_context():
+            try:
+                # AppInfoから連絡先メールアドレスを取得
+                app_info = AppInfo.get_current_info()
+                recipient = app_info.contact_email
+                
+                # 連絡先が設定されていない場合はデフォルト送信者を使用
+                if not recipient:
+                    recipient = app.config.get('MAIL_DEFAULT_SENDER')
+                    
+                if not recipient:
+                    print("❌ 管理者通知メール送信スキップ: 送信先アドレスが設定されていません")
+                    return
+                    
+                mail_sender = app.config.get('MAIL_DEFAULT_SENDER')
+                
+                msg = Message(
+                    subject=f"[{app_info.app_name}] {subject}",
+                    recipients=[recipient],
+                    body=body,
+                    sender=mail_sender
+                )
+                
+                mail.send(msg)
+                print(f"✅ 管理者通知メール送信成功 (非同期): {recipient}")
+                
+            except Exception as e:
+                print(f"❌ 管理者通知メール送信エラー (非同期): {e}")
+    
+    # バックグラウンドスレッドでメール送信を実行
+    thread = threading.Thread(target=_send_email_thread)
+    thread.daemon = True  # メインスレッド終了時に一緒に終了
+    thread.start()
+    print("📧 管理者通知メール送信をバックグラウンドで開始")
+    return True
 
 def send_test_notification_email(email):
     """ユーザーへのテスト通知メールを送信"""
@@ -11858,39 +11882,52 @@ def submit_correction_request():
         student_message = request.form.get('student_message')
         
         image_file = request.files.get('request_image')
-        image_path = None
+        has_image = False
+        image_data = None
+        image_format = None
         
-        # 画像アップロード処理
+        # 画像処理（DBに保存するため、バイナリとして読み込む）
         if image_file and image_file.filename:
             filename = secure_filename(image_file.filename)
-            file_ext = os.path.splitext(filename)[1]
-            unique_filename = f"req_{user.id}_{problem_id}_{uuid.uuid4().hex[:8]}{file_ext}"
+            file_ext = os.path.splitext(filename)[1].lower().lstrip('.')
             
-            # upload_image_to_s3 または ローカル保存
-            if S3_AVAILABLE:
-                # S3へのアップロードロジック (既存関数を利用)
-                 if upload_image_to_s3(image_file, unique_filename, folder='correction_requests'):
-                     image_path = unique_filename
-                 else:
-                     flash('画像のアップロードに失敗しました', 'danger')
+            # 画像フォーマットの正規化
+            if file_ext in ['jpg', 'jpeg']:
+                image_format = 'JPEG'
+            elif file_ext == 'png':
+                image_format = 'PNG'
+            elif file_ext == 'gif':
+                image_format = 'GIF'
+            elif file_ext == 'webp':
+                image_format = 'WEBP'
             else:
-                # ローカル保存
-                upload_dir = os.path.join(app.static_folder, 'uploads', 'correction_requests')
-                os.makedirs(upload_dir, exist_ok=True)
-                image_file.save(os.path.join(upload_dir, unique_filename))
-                image_path = unique_filename
+                image_format = 'PNG'  # デフォルト
+            
+            # 画像バイナリを読み込み
+            image_data = image_file.read()
+            has_image = True
 
         # DB保存
         req = EssayCorrectionRequest(
             user_id=user.id,
             problem_id=problem_id,
             request_text=request_text,
-            request_image_path=image_path,
+            request_image_path=None,  # 旧フィールドは使用しない
             student_message=student_message,
             status='pending'
         )
         db.session.add(req)
         db.session.flush() # ID取得のため
+        
+        # 画像をDBに保存
+        if has_image and image_data:
+            img_record = CorrectionRequestImage(
+                request_id=req.id,
+                image_type='request',
+                image_data=image_data,
+                image_format=image_format
+            )
+            db.session.add(img_record)
 
         # 管理者(Manager/Admin)への通知を作成
         managers = User.query.filter((User.is_manager == True) | (User.username == 'admin')).all()
@@ -12127,6 +12164,28 @@ def admin_essay_requests_list():
     
     return render_template('admin/essay_requests_list.html', requests=requests, current_filter=status_filter)
 
+@app.route('/correction_image/<int:image_id>')
+def serve_correction_image(image_id):
+    """DBから添削画像を配信"""
+    from io import BytesIO
+    
+    img = CorrectionRequestImage.query.get_or_404(image_id)
+    
+    # MIMEタイプの決定
+    mime_types = {
+        'PNG': 'image/png',
+        'JPEG': 'image/jpeg',
+        'GIF': 'image/gif',
+        'WEBP': 'image/webp'
+    }
+    mime_type = mime_types.get(img.image_format, 'image/png')
+    
+    return Response(
+        img.image_data,
+        mimetype=mime_type,
+        headers={'Cache-Control': 'max-age=86400'}  # 24時間キャッシュ
+    )
+
 @app.route('/admin/essay_request/<int:request_id>')
 @admin_required
 def admin_correction_request_detail(request_id):
@@ -12148,29 +12207,44 @@ def admin_reply_correction_request(request_id):
             
         reply_text = request.form.get('reply_text')
         reply_image = request.files.get('reply_image')
-        reply_image_path = None
+        reply_image_data = None
+        reply_image_format = None
         
-        # 画像保存
+        # 画像処理（DBに保存するため、バイナリとして読み込む）
         if reply_image and reply_image.filename:
             filename = secure_filename(reply_image.filename)
-            file_ext = os.path.splitext(filename)[1]
-            unique_filename = f"reply_{req.id}_{uuid.uuid4().hex[:8]}{file_ext}"
+            file_ext = os.path.splitext(filename)[1].lower().lstrip('.')
             
-            if S3_AVAILABLE:
-                 if upload_image_to_s3(reply_image, unique_filename, folder='correction_replies'):
-                     reply_image_path = unique_filename
+            # 画像フォーマットの正規化
+            if file_ext in ['jpg', 'jpeg']:
+                reply_image_format = 'JPEG'
+            elif file_ext == 'png':
+                reply_image_format = 'PNG'
+            elif file_ext == 'gif':
+                reply_image_format = 'GIF'
+            elif file_ext == 'webp':
+                reply_image_format = 'WEBP'
             else:
-                upload_dir = os.path.join(app.static_folder, 'uploads', 'correction_replies')
-                os.makedirs(upload_dir, exist_ok=True)
-                reply_image.save(os.path.join(upload_dir, unique_filename))
-                reply_image_path = unique_filename
+                reply_image_format = 'PNG'
+            
+            reply_image_data = reply_image.read()
         
         # データ更新
         req.reply_text = reply_text
-        req.reply_image_path = reply_image_path
+        req.reply_image_path = None  # 旧フィールドは使用しない
         req.status = 'replied'
         req.replied_at = datetime.now(JST)
         req.manager_id = session.get('user_id') # 誰が返信したか記録（モデルにはないが、あれば）
+        
+        # 返信画像をDBに保存
+        if reply_image_data:
+            img_record = CorrectionRequestImage(
+                request_id=req.id,
+                image_type='reply',
+                image_data=reply_image_data,
+                image_format=reply_image_format
+            )
+            db.session.add(img_record)
         
         # ユーザーに通知
         notif = Notification(

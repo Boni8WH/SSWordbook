@@ -76,7 +76,9 @@
                                 <p class="mb-0 small" style="white-space: pre-wrap;">{{ req.reply_text[:100] if
                                     req.reply_text else '' }}{% if req.reply_text and req.reply_text|length > 100
                                     %}...{% endif %}</p>
-                                {% if req.reply_image_path %}
+                                {% set reply_imgs = req.db_images | selectattr('image_type', 'equalto', 'reply') | list
+                                %}
+                                {% if reply_imgs %}
                                 <span class="badge bg-info mt-1"><i class="fas fa-image"></i> 添削画像あり</span>
                                 {% endif %}
                             </div>
@@ -91,10 +93,12 @@
                                 data-created="{{ req.created_at.strftime('%Y/%m/%d %H:%M') }}"
                                 data-replied="{{ req.replied_at.strftime('%Y/%m/%d %H:%M') if req.replied_at else '' }}"
                                 data-message="{{ req.student_message or '' }}"
-                                data-request-text="{{ req.request_text or '' }}"
-                                data-request-image="{{ url_for('static', filename='uploads/correction_requests/' + req.request_image_path) if req.request_image_path else '' }}"
-                                data-reply-text="{{ req.reply_text or '' }}"
-                                data-reply-image="{{ url_for('static', filename='uploads/correction_replies/' + req.reply_image_path) if req.reply_image_path else '' }}">
+                                data-request-text="{{ req.request_text or '' }}" {% set req_imgs=req.db_images |
+                                selectattr('image_type', 'equalto' , 'request' ) | list %}
+                                data-request-image="{{ url_for('serve_correction_image', image_id=req_imgs[0].id) if req_imgs else '' }}"
+                                data-reply-text="{{ req.reply_text or '' }}" {% set rpl_imgs=req.db_images |
+                                selectattr('image_type', 'equalto' , 'reply' ) | list %}
+                                data-reply-image="{{ url_for('serve_correction_image', image_id=rpl_imgs[0].id) if rpl_imgs else '' }}">
                                 <i class="fas fa-eye"></i> 詳細
                             </button>
                             {% if req.status == 'replied' and not req.is_read_by_user %}
