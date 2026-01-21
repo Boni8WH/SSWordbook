@@ -5,9 +5,14 @@
 {% block content %}
 <div class="container mt-4">
     <div class="mb-4">
-        <a href="{{ url_for('admin_essay_requests_list') }}" class="btn btn-outline-secondary btn-sm mb-3">
-            <i class="fas fa-arrow-left"></i> 一覧に戻る
-        </a>
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <a href="{{ url_for('admin_essay_requests_list') }}" class="btn btn-outline-secondary btn-sm">
+                <i class="fas fa-arrow-left"></i> 一覧に戻る
+            </a>
+            <button type="button" class="btn btn-danger btn-sm" onclick="confirmDeleteDetail()">
+                <i class="fas fa-trash-alt"></i> この依頼を削除
+            </button>
+        </div>
         <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
             <div>
                 <h2 class="d-inline-block mb-0">
@@ -383,5 +388,47 @@
             }
         }
     });
+
+    // 削除確認関数
+    function confirmDeleteDetail() {
+        var modal = new bootstrap.Modal(document.getElementById('deleteConfirmDetailModal'));
+        modal.show();
+    }
 </script>
+
+<!-- 削除確認モーダル -->
+<div class="modal fade" id="deleteConfirmDetailModal" tabindex="-1" aria-labelledby="deleteConfirmDetailModalLabel"
+    aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteConfirmDetailModalLabel">
+                    <i class="fas fa-exclamation-triangle"></i> 削除の確認
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                    aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>添削依頼 #{{ req.id }} を削除しますか？</p>
+                <ul class="mb-3">
+                    <li>ユーザー: <strong>{{ req.user.username }}</strong></li>
+                    <li>問題ID: #{{ req.problem_id }}</li>
+                    <li>ステータス: {{ '未対応' if req.status == 'pending' else '対応済み' }}</li>
+                </ul>
+                <div class="alert alert-warning">
+                    <i class="fas fa-info-circle"></i> 削除すると元に戻せません。関連する画像や返信内容もすべて削除されます。
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+                <form action="{{ url_for('admin_delete_correction_request', request_id=req.id) }}" method="POST"
+                    style="display: inline;">
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fas fa-trash-alt"></i> 削除する
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}

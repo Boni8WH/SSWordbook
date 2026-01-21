@@ -12274,6 +12274,51 @@ def admin_chat_action(request_id):
         app.logger.error(f"Error in admin_chat_action: {str(e)}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
+@app.route('/api/admin/essay_request/<int:request_id>/delete', methods=['POST'])
+@admin_required
+def admin_delete_correction_request(request_id):
+    """添削依頼を削除する（管理者のみ）"""
+    try:
+        req = EssayCorrectionRequest.query.get_or_404(request_id)
+        
+        # 画像ファイルがあれば削除（オプション）
+        if req.request_image_path:
+            try:
+                image_path = os.path.join(app.static_folder, 'uploads', 'correction_requests', req.request_image_path)
+                if os.path.exists(image_path):
+                    os.remove(image_path)
+            except Exception as img_err:
+                app.logger.warning(f"画像削除エラー (request): {img_err}")
+        
+        if req.reply_image_path:
+            try:
+                reply_image_path = os.path.join(app.static_folder, 'uploads', 'correction_replies', req.reply_image_path)
+                if os.path.exists(reply_image_path):
+                    os.remove(reply_image_path)
+            except Exception as img_err:
+                app.logger.warning(f"画像削除エラー (reply): {img_err}")
+        
+        db.session.delete(req)
+        db.session.commit()
+        
+        app.logger.info(f"添削依頼 #{request_id} を削除しました")
+        
+        # AJAXリクエストかどうかで分岐
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.is_json:
+            return jsonify({'status': 'success', 'message': '添削依頼を削除しました'})
+        else:
+            flash('添削依頼を削除しました。', 'success')
+            return redirect(url_for('admin_essay_requests_list'))
+    
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"添削依頼削除エラー: {e}")
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.is_json:
+            return jsonify({'status': 'error', 'message': str(e)}), 500
+        else:
+            flash(f'削除エラー: {str(e)}', 'danger')
+            return redirect(url_for('admin_essay_requests_list'))
+
 # ====================================================================
 # Gemini API連携機能 (論述問題添削 & OCR)
 # ====================================================================
@@ -18960,6 +19005,7 @@ def check_room_restrictions():
         '/logout',
         '/logo',  # ロゴ画像取得用
         '/change_username',  # アカウント名変更
+        '/announcements',  # 過去のお知らせ一覧
     ]
 
     # 現在のパスが許可されているか確認
