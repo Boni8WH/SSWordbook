@@ -3699,6 +3699,7 @@ URL: {url_for('index', _external=True)}
         print(f"✅ テスト通知メール送信成功: {email}")
         return True
         
+    except Exception as e:
         print(f"❌ テスト通知メール送信エラー: {e}")
         return False
 
