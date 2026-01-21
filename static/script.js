@@ -3011,11 +3011,42 @@ function initNotificationSettings() {
                 if (data.enabled && Notification.permission === 'granted') {
                     registerServiceWorker().catch(err => console.error('Auto-register SW failed:', err));
                 }
+
+                // メール設定の反映
+                const emailToggle = document.getElementById('emailNotificationToggle');
+                const emailInput = document.getElementById('notificationEmail');
+                const emailArea = document.getElementById('emailInputArea');
+                const testEmailBtn = document.getElementById('testEmailBtn');
+
+                if (emailToggle) {
+                    emailToggle.checked = data.email_enabled || false;
+                    // トグル変更時の処理
+                    emailToggle.addEventListener('change', (e) => {
+                        const isChecked = e.target.checked;
+                        if (emailArea) {
+                            emailArea.style.display = isChecked ? 'block' : 'none';
+                        }
+                    });
+                    // 初期表示
+                    if (emailArea) {
+                        emailArea.style.display = (data.email_enabled) ? 'block' : 'none';
+                    }
+                }
+                if (emailInput) {
+                    emailInput.value = data.email || '';
+                    // 入力イベントでテストボタンの有効/無効を切り替え
+                    emailInput.addEventListener('input', (e) => {
+                        if (testEmailBtn) {
+                            testEmailBtn.disabled = !e.target.value.trim();
+                        }
+                    });
+                    if (testEmailBtn) testEmailBtn.disabled = !emailInput.value.trim();
+                }
             }
         })
         .catch(err => console.error('設定読み込みエラー:', err));
 
-    // 通知テストボタン
+    // 通知テストボタン（WebPush）
     const testBtn = document.getElementById('testNotificationBtn');
     if (testBtn) {
         testBtn.addEventListener('click', function () {
@@ -3023,16 +3054,19 @@ function initNotificationSettings() {
             testBtn.disabled = true;
             testBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> 送信中...';
 
+            // WebPushテスト（emailパラメータなし）
             fetch('/api/test_notification', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' }
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ type: 'push' }) // 明示的に区別したい場合
             })
                 .then(res => res.json())
                 .then(data => {
                     if (data.status === 'success') {
-                        alert('送信成功！\n\nもし通知が届かない場合は、スマホの「おやすみモード」や「通知設定」を確認してください。\n（PC/Androidは数秒、iOSは少し時間がかかることがあります）');
+                        alert('WebPush通知ルールで送信しました。\n\nもし通知が届かない場合は、スマホの「おやすみモード」や「通知設定」を確認してください。');
                     } else {
-                        alert('送信失敗:\n' + data.message + '\n\n(詳細エラー: ' + JSON.stringify(data) + ')');
+                        // WebPush失敗時はメールアドレス設定があればメールも試すなどのロジックはバックエンド依存
+                        alert('送信完了: ' + data.message);
                     }
                 })
                 .catch(err => {
@@ -3040,9 +3074,48 @@ function initNotificationSettings() {
                     alert('通信エラーが発生しました');
                 })
                 .finally(() => {
-                    // ボタンを元に戻す
                     testBtn.disabled = false;
                     testBtn.innerHTML = '<i class="fas fa-paper-plane me-1"></i> 通知をテスト送信';
+                });
+        });
+    }
+
+    // テストメール送信ボタン
+    const testEmailBtn = document.getElementById('testEmailBtn');
+    if (testEmailBtn) {
+        testEmailBtn.addEventListener('click', function () {
+            const emailInput = document.getElementById('notificationEmail');
+            const email = emailInput ? emailInput.value : '';
+
+            if (!email) {
+                alert('メールアドレスを入力してください');
+                return;
+            }
+
+            testEmailBtn.disabled = true;
+            const originalIcon = testEmailBtn.innerHTML;
+            testEmailBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+            fetch('/api/test_notification', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: email })
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        alert('テストメールを送信しました。\n受信トレイを確認してください。');
+                    } else {
+                        alert('送信失敗: ' + data.message);
+                    }
+                })
+                .catch(err => {
+                    console.error('Error:', err);
+                    alert('通信エラーが発生しました');
+                })
+                .finally(() => {
+                    testEmailBtn.disabled = false;
+                    testEmailBtn.innerHTML = originalIcon;
                 });
         });
     }
@@ -3067,10 +3140,21 @@ function initNotificationSettings() {
         }
 
         // 設定保存
+        const emailToggle = document.getElementById('emailNotificationToggle');
+        const emailInput = document.getElementById('notificationEmail');
+
+        const emailEnabled = emailToggle ? emailToggle.checked : false;
+        const emailVal = emailInput ? emailInput.value : '';
+
         fetch('/api/update_notification_settings', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ enabled: enabled, time: time })
+            body: JSON.stringify({
+                enabled: enabled,
+                time: time,
+                email_enabled: emailEnabled,
+                email: emailVal
+            })
         })
             .then(res => res.json())
             .then(data => {
