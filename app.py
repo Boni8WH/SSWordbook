@@ -3716,12 +3716,12 @@ def send_correction_notification_email(user, request):
         target_url = url_for('essay_problem', problem_id=request.problem_id, _anchor='gradingResult', _external=True)
         
         body = f"""
-{user.username} 様
+{user.username}！
 
-{app_info.app_name} をご利用いただきありがとうございます。
-ご依頼いただいた論述問題（#{request.problem_id}）の添削が完了しました。
+{app_info.app_name}です！
+論述問題（#{request.problem_id}）の添削が完了しました。
 
-講師からのコメントや修正内容を確認してください：
+添削結果を確認してください：
 {target_url}
 
 --------------------------------------------------
@@ -12036,16 +12036,24 @@ def student_follow_up_reply(request_id):
                 link=url_for('admin_correction_request_detail', request_id=req.id)
             )
             db.session.add(notif)
-            
-            # メール通知を送信（管理者がメール通知を有効にしている場合）
-            if mgr.email_notification_enabled and mgr.notification_email:
-                send_chat_notification_email(
-                    recipient_email=mgr.notification_email,
-                    sender_name=req.user.username,
-                    problem_id=req.id,
-                    message_preview=follow_up_message,
-                    is_from_student=True
-                )
+        
+        # 管理者へメール通知（AppInfoのcontact_emailに送信 = 常に有効）
+        target_url = url_for('admin_correction_request_detail', request_id=req.id, _external=True)
+        email_subject = f"添削チャット: {req.user.username}さんからコメント"
+        email_body = f"""
+添削チャットにコメントが届きました。
+
+送信者: {req.user.username}
+問題ID: #{req.problem_id}
+
+--- メッセージ内容 ---
+{follow_up_message[:300]}{'...' if len(follow_up_message) > 300 else ''}
+---
+
+確認はこちら:
+{target_url}
+"""
+        send_admin_notification_email(email_subject, email_body)
         
         db.session.commit()
         
