@@ -22,10 +22,10 @@ workers = 1
 threads = 4
 
 # Worker recycle (メモリリーク防止)
-# 各ワーカーを1000リクエスト処理後に自動再起動してメモリをクリア
-max_requests = 1000
-# ランダムジッター（800-1200リクエストの間でランダムに再起動）
-max_requests_jitter = 200
+# 各ワーカーを500リクエスト処理後に自動再起動してメモリをクリア (1000 -> 500 へ変更)
+max_requests = 500
+# ランダムジッター（100リクエストの揺らぎを持たせる）
+max_requests_jitter = 100
 
 # Bind address
 bind = "0.0.0.0:" + os.environ.get("PORT", "10000")

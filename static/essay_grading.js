@@ -335,7 +335,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
             // 2. Ad Wait Promise (The monetization guard)
             const adWaitPromise = new Promise((resolve) => {
-                // 広告の有無に関わらず、即座に完了とする（ユーザー要望によりタイマー削除）
+                // 広告の有無に関わらず、即座に完了とする
                 resolve();
             });
 
