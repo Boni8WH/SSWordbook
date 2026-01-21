@@ -955,6 +955,13 @@
             <i class="fas fa-running"></i> 準備運動！
         </button>
 
+        {% if is_essay_room %}
+        <button class="btn btn-outline-warning action-btn" data-bs-toggle="modal"
+            data-bs-target="#correctionRequestModal">
+            <i class="fas fa-user-edit"></i> 添削依頼
+        </button>
+        {% endif %}
+
         <div class="answer-button-container action-btn">
             <button class="answer-control-btn" id="showAnswerBtn">
                 <i class="fas fa-eye"></i>
@@ -1056,6 +1063,58 @@
             {% endif %}
         </div>
     </div>
+
+    <!-- 添削依頼モーダル -->
+    {% if is_essay_room %}
+    <div class="modal fade" id="correctionRequestModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <form id="essayCorrectionForm" action="{{ url_for('submit_correction_request') }}" method="POST"
+                    enctype="multipart/form-data">
+                    <div class="modal-header bg-warning">
+                        <h5 class="modal-title text-dark"><i class="fas fa-user-edit"></i> 添削を依頼する</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <input type="hidden" name="problem_id" value="{{ problem.id }}">
+
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle"></i> あなたの答案を管理者に送信して添削を受けることができます。
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">答案テキスト (任意)</label>
+                            <textarea class="form-control" name="request_text" rows="8"
+                                placeholder="ここに答案を入力してください。入力済みの内容は「現在の下書き」ボタンで取り込めます。"></textarea>
+                            <button type="button" class="btn btn-sm btn-outline-secondary mt-1"
+                                onclick="document.getElementsByName('request_text')[0].value = document.getElementById('richTextEditor').innerText.trim();">
+                                <i class="fas fa-copy"></i> 現在の下書きを入力
+                            </button>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">答案画像 (任意)</label>
+                            <input type="file" class="form-control" name="request_image" accept="image/*">
+                            <div class="form-text">手書きの答案を撮影した画像などをアップロードできます。</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">先生へのメッセージ (任意)</label>
+                            <textarea class="form-control" name="student_message" rows="3"
+                                placeholder="質問や特に見てほしいポイントなどがあれば記入してください"></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+                        <button type="submit" class="btn btn-warning text-dark font-weight-bold">
+                            <i class="fas fa-paper-plane"></i> 依頼を送信
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endif %}
 </div>
 {% endblock %}
 
@@ -1151,6 +1210,21 @@
         if (stars.length > 0) {
         } else {
             console.error('星評価要素が見つかりません');
+        }
+
+        // 添削依頼フォームのバリデーション
+        const essayForm = document.getElementById('essayCorrectionForm');
+        if (essayForm) {
+            essayForm.addEventListener('submit', function (e) {
+                const text = this.querySelector('textarea[name="request_text"]').value.trim();
+                const image = this.querySelector('input[name="request_image"]').files.length;
+
+                if (!text && image === 0) {
+                    e.preventDefault();
+                    alert('答案テキストを入力するか、答案画像を添付してください。');
+                    return false;
+                }
+            });
         }
     });
 

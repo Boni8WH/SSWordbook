@@ -57,6 +57,19 @@
         transform: translateY(-2px);
     }
 
+    /* 今日の10問ボタン用 */
+    #dailyQuizButton {
+        transition: all 0.3s ease;
+        background: #f1c40f;
+        border: none;
+    }
+
+    #dailyQuizButton:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 5px 15px rgba(241, 196, 15, 0.4) !important;
+        background: #f39c12;
+    }
+
     /* 章グリッド */
     .chapter-grid {
         display: grid;
@@ -429,17 +442,47 @@
 <div class="essay-container">
     <div class="essay-header">
         <h1><i class="fas fa-edit"></i> 論述問題集</h1>
-        <p class="essay-description">
-            過去の入試問題から厳選された論述問題を章別に学習できます。<br>
-            各問題で「理解した」マークを付けて、学習進捗を管理しましょう。
-        </p>
         <div class="back-to-main">
+            {% if is_essay_room %}
+            <!-- 今日の10問ボタン (論述ルーム用) -->
+            <button id="dailyQuizButton" class="btn btn-warning" style="margin-right: 10px;">
+                <i class="fas fa-stopwatch"></i> 今日の10問
+            </button>
+            <a href="{{ url_for('my_corrections') }}" class="btn btn-outline-warning" style="margin-right: 10px;">
+                <i class="fas fa-history"></i> 添削履歴
+            </a>
+            {% endif %}
             <button id="openEssaySearchButton" class="btn" style="margin-right: 10px;">
                 <i class="fas fa-search"></i> 問題検索
             </button>
-            <a href="{{ url_for('index') }}" class="btn">
-                <i class="fas fa-arrow-left"></i> {{ app_name }}に戻る
-            </a>
+        </div>
+    </div>
+
+    <!-- 通知設定のお願いモーダル -->
+    <div class="modal fade" id="notificationPromptModal" tabindex="-1" aria-hidden="true"
+        data-is-essay-room="{{ 'true' if is_essay_room else 'false' }}">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header border-0 pb-0">
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body text-center pt-0 pb-4">
+                    <i class="fas fa-bell fa-4x text-warning mb-3"></i>
+                    <h4 class="modal-title fw-bold mb-3">通知設定のお願い</h4>
+                    <p class="text-muted mb-4">
+                        添削完了のお知らせを受け取るために、<br>
+                        通知の許可をお願いします。
+                    </p>
+                    <div class="d-grid gap-2 col-10 mx-auto">
+                        <button type="button" class="btn btn-primary btn-lg" id="enableNotificationsBtn">
+                            通知を許可する
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">
+                            あとで設定する
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -685,6 +728,44 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function () {
+        // 通知設定モーダル制御
+        const modalEl = document.getElementById('notificationPromptModal');
+        const isEssayRoom = modalEl ? modalEl.getAttribute('data-is-essay-room') === 'true' : false;
+
+        console.log('[EssayNotification] Init', { isEssayRoom, hasNotificationAPI: 'Notification' in window, permission: Notification.permission });
+
+        if (isEssayRoom && 'Notification' in window) {
+            // まだ許可も拒否もしていない場合のみ表示
+            if (Notification.permission === 'default') {
+                // セッションストレージでこのセッション内での表示制御（うざったくないように）
+                if (!sessionStorage.getItem('notificationPromptShown')) {
+                    const notificationModal = new bootstrap.Modal(document.getElementById('notificationPromptModal'));
+                    setTimeout(() => {
+                        notificationModal.show();
+                        sessionStorage.setItem('notificationPromptShown', 'true');
+                    }, 1500); // ページ読み込み完了から少し遅らせて表示
+                }
+            }
+        }
+
+        const enableNotificationsBtn = document.getElementById('enableNotificationsBtn');
+        if (enableNotificationsBtn) {
+            enableNotificationsBtn.addEventListener('click', function () {
+                // 既存のregisterServiceWorker関数を使用（script.jsで定義されている前提）
+                if (typeof registerServiceWorker === 'function') {
+                    registerServiceWorker().then(() => {
+                        const modalEl = document.getElementById('notificationPromptModal');
+                        const modal = bootstrap.Modal.getInstance(modalEl);
+                        modal.hide();
+                        // 成功メッセージ出してもいいかも
+                    });
+                } else {
+                    console.error('registerServiceWorker function not found');
+                    // フォールバック: 単純に許可だけ求める
+                    Notification.requestPermission();
+                }
+            });
+        }
 
 
         // 章カードのクリックイベントを設定
@@ -869,4 +950,5 @@
 
     });
 </script>
+
 {% endblock %}

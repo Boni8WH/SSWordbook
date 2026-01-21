@@ -68,6 +68,23 @@
                     <span class="navbar-toggler-icon"></span>
                 </button>
                 <div class="collapse navbar-collapse" id="navbarNav">
+                    {% if is_essay_room %}
+                    {# 論述特化ルーム: シンプルなヘッダー（設定とログアウトのみ） #}
+                    <ul class="navbar-nav ms-auto mobile-icon-nav">
+                        <li class="nav-item">
+                            <button class="nav-link btn btn-outline-secondary btn-sm me-1" data-bs-toggle="modal"
+                                data-bs-target="#settingsModal" title="設定">
+                                <i class="fas fa-cog"></i>
+                            </button>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link btn btn-danger btn-sm" href="{{ url_for('logout') }}" title="ログアウト">
+                                <i class="fas fa-sign-out-alt"></i>
+                            </a>
+                        </li>
+                    </ul>
+                    {% else %}
+                    {# 通常ルーム: フル機能ヘッダー #}
                     {% if is_logged_in and not is_admin_logged_in and not is_manager_logged_in %} {# 一般ユーザーがログインしている場合
                     #}
                     <div class="navbar-nav me-auto">
@@ -177,6 +194,7 @@
                             </a>
                         </li>
                     </ul>
+                    {% endif %}
                     {% endif %}
                 </div>
             </div>
