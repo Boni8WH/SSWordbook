@@ -18959,6 +18959,7 @@ def check_room_restrictions():
         '/login',
         '/logout',
         '/logo',  # ロゴ画像取得用
+        '/change_username',  # アカウント名変更
     ]
 
     # 現在のパスが許可されているか確認
