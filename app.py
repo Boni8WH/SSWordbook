@@ -11650,11 +11650,30 @@ def essay_index():
     
 @app.route('/essay/university')
 def essay_university_index():
-    """大学別論述問題一覧ページ（AJAX検索・高度なフィルター対応）"""
+    """大学別論述問題一覧ページ（AJAX検索・高度なフィルター対応・公開設定対応）"""
     if not session.get('user_id'):
         return redirect(url_for('login_page'))
 
     user_id = session.get('user_id')
+    
+    # ユーザーの部屋番号を取得
+    user = User.query.get(user_id)
+    if not user:
+        flash('ユーザー情報が見つかりません。', 'error')
+        return redirect(url_for('index'))
+    
+    current_room = user.room_number
+    
+    # 公開設定を取得
+    visibility_settings = {}
+    try:
+        settings = EssayVisibilitySetting.query.filter_by(room_number=current_room).all()
+        for setting in settings:
+            key = (setting.chapter, setting.problem_type)
+            visibility_settings[key] = setting.is_visible
+    except Exception as e:
+        app.logger.error(f"公開設定取得エラー (essay_university): {e}")
+        db.session.rollback()
 
     # クエリパラメータの取得
     selected_universities = request.args.getlist('university[]')
@@ -11727,7 +11746,24 @@ def essay_university_index():
         query = query.filter(EssayProgress.review_flag == True)
         
     # 並び順: 年度（新しい順） > 大学（辞書順） > タイプ
-    problems = query.order_by(EssayProblem.year.desc(), EssayProblem.university, EssayProblem.type).all()
+    all_problems = query.order_by(EssayProblem.year.desc(), EssayProblem.university, EssayProblem.type).all()
+
+    # 公開設定でフィルタリング
+    # visibility_settings がある場合のみフィルタリングを適用
+    # 設定がない（空辞書）の場合は全て表示
+    if visibility_settings:
+        problems = []
+        for problem in all_problems:
+            key = (problem.chapter, problem.type)
+            # 設定が存在する場合はその値を使用、存在しない場合はデフォルト公開（True）
+            is_visible = visibility_settings.get(key, True)
+            if is_visible:
+                problems.append(problem)
+        
+        app.logger.info(f"📊 公開設定適用: {len(all_problems)}件 → {len(problems)}件 (部屋: {current_room})")
+    else:
+        problems = all_problems
+        app.logger.info(f"📊 公開設定なし: 全{len(problems)}件表示 (部屋: {current_room})")
 
     # 各問題に進捗情報を付加（テンプレート表示用）
     # JOINしていない場合でも、個別に取得するか、あるいはJOIN済みのオブジェクトを利用するか
