@@ -35,7 +35,7 @@
             </div>
             <div class="text-muted text-end">
                 <div>ユーザー: <strong>{{ req.user.username }}</strong> ({{ req.user.room_number }})</div>
-                <div>送信日時: {{ req.created_at.strftime('%Y/%m/%d %H:%M') }}</div>
+                <div>送信日時: {{ req.created_at | to_jst }}</div>
             </div>
         </div>
     </div>
@@ -147,8 +147,8 @@
                     data-is-resolved="{{ 'true' if req.is_resolved else 'false' }}"
                     data-student-message="{{ req.student_message if req.student_message else '' }}"
                     data-reply-text="{{ req.reply_text if req.reply_text else '' }}"
-                    data-created-at="{{ req.created_at.strftime('%Y/%m/%d %H:%M') }}"
-                    data-replied-at="{{ req.replied_at.strftime('%Y/%m/%d %H:%M') if req.replied_at else '' }}">
+                    data-created-at="{{ req.created_at | to_jst }}"
+                    data-replied-at="{{ req.replied_at | to_jst if req.replied_at else '' }}">
                     <!-- JSで動的に生成 -->
                 </div>
 

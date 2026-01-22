@@ -49,7 +49,7 @@
                                 {% else %}
                                 <span class="badge bg-success"><i class="fas fa-check"></i> 解決済み</span>
                                 {% endif %}
-                                <small class="text-muted">{{ req.created_at.strftime('%Y/%m/%d %H:%M') }}</small>
+                                <small class="text-muted">{{ req.created_at | to_jst }}</small>
                             </div>
 
                             <h6 class="mb-1">
@@ -89,9 +89,8 @@
                             <button class="btn btn-sm btn-primary detail-modal-btn" style="white-space: nowrap;"
                                 data-id="{{ req.id }}" data-problem-id="{{ req.problem_id }}"
                                 data-problem-info="{{ req.problem.university if req.problem else '' }} {{ req.problem.year if req.problem else '' }}年"
-                                data-status="{{ req.status }}"
-                                data-created="{{ req.created_at.strftime('%Y/%m/%d %H:%M') }}"
-                                data-replied="{{ req.replied_at.strftime('%Y/%m/%d %H:%M') if req.replied_at else '' }}"
+                                data-status="{{ req.status }}" data-created="{{ req.created_at | to_jst }}"
+                                data-replied="{{ req.replied_at | to_jst if req.replied_at else '' }}"
                                 data-message="{{ req.student_message or '' }}"
                                 data-request-text="{{ req.request_text or '' }}" {% set req_imgs=req.db_images |
                                 selectattr('image_type', 'equalto' , 'request' ) | list %}
