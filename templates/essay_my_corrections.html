@@ -292,7 +292,7 @@
                 // 提出テキスト
                 const requestTextContainer = document.getElementById('modalRequestTextContainer');
                 if (data.requestText) {
-                    document.getElementById('modalRequestText').textContent = data.requestText;
+                    document.getElementById('modalRequestText').innerHTML = data.requestText;
                     requestTextContainer.style.display = 'block';
                 } else {
                     requestTextContainer.style.display = 'none';
