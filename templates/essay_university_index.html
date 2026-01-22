@@ -360,6 +360,34 @@
         .university-list-container {
             max-height: 200px;
         }
+
+        /* スマホでタッチ後にhover状態が残る問題を修正 */
+        #clearFiltersBtn {
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* スマホではBootstrapのhoverを無効化 */
+        #clearFiltersBtn:hover {
+            background-color: transparent;
+            color: #6c757d;
+            border-color: #6c757d;
+        }
+
+        /* JSで制御するタッチフィードバッククラス */
+        #clearFiltersBtn.pressing {
+            background-color: #6c757d !important;
+            color: white !important;
+            border-color: #6c757d !important;
+        }
+    }
+
+    /* PCではBootstrapの通常動作を維持 */
+    @media (hover: hover) {
+        #clearFiltersBtn:hover {
+            background-color: #6c757d;
+            color: white;
+            border-color: #6c757d;
+        }
     }
 </style>
 {% endblock %}
@@ -702,7 +730,10 @@
         clearBtn.addEventListener('click', () => {
             searchForm.reset();
             // 手動でcheckedを外す必要がある場合やselectをリセット
-            document.querySelectorAll('input[type="checkbox"]').forEach(el => el.checked = false);
+            document.querySelectorAll('input[type="checkbox"]').forEach(el => {
+                el.checked = false;
+                el.removeAttribute('checked'); // 属性も明示的に削除
+            });
             document.querySelectorAll('select').forEach(el => el.selectedIndex = 0);
 
             // UIリセット
@@ -713,7 +744,23 @@
             localStorage.removeItem(STORAGE_KEY); // 保存データも削除
 
             performSearch();
+
+            // スマホでボタンのフォーカス状態が残るのを防ぐ
+            clearBtn.blur();
         });
+
+        // スマホ用：タッチ中の視覚フィードバック
+        clearBtn.addEventListener('touchstart', function () {
+            this.classList.add('pressing');
+        }, { passive: true });
+
+        clearBtn.addEventListener('touchend', function () {
+            this.classList.remove('pressing');
+        }, { passive: true });
+
+        clearBtn.addEventListener('touchcancel', function () {
+            this.classList.remove('pressing');
+        }, { passive: true });
 
         // --- 5. Mobile Toggle ---
         const mobileToggle = document.getElementById('mobileFilterToggle');
