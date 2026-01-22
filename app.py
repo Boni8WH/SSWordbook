@@ -12024,8 +12024,15 @@ def submit_correction_request():
                 image_format = 'PNG'  # デフォルト
             
             # 画像バイナリを読み込み
+            image_file.seek(0)
             image_data = image_file.read()
-            has_image = True
+            
+            if len(image_data) > 0:
+                has_image = True
+            else:
+                print("⚠️ Uploaded image is empty")
+                has_image = False
+
 
         # DB保存
         req = EssayCorrectionRequest(
@@ -19190,6 +19197,7 @@ def check_room_restrictions():
         '/logout',
         '/admin', # 一般ユーザーはadminに入れないが、ルートアクセス自体は許可しておいて権限チェックに任せる
         '/api',   # Essay関連のAPIもここにあるかも？
+        '/correction_image', # 添削画像の表示用
     ]
     
     # 完全一致で許可するもの
