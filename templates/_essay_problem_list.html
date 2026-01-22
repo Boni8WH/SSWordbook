@@ -1,0 +1,48 @@
+{% if problems %}
+<div class="problem-list">
+    {% for problem in problems %}
+    <div class="problem-card">
+        <div class="problem-card-header">
+            <div class="problem-univ-year">
+                {{ problem.university }}
+                <span style="font-size: 0.9em; font-weight: 500; margin-left: 5px;">{{ problem.year }}年</span>
+            </div>
+            <span class="problem-chapter">
+                {% if problem.chapter == 'com' %}総合{% else %}第{{ problem.chapter }}章{% endif %}
+            </span>
+        </div>
+
+        <div style="display:flex; gap:10px; align-items:center; margin-bottom:10px; flex-wrap: wrap;">
+            <span class="problem-type-badge">Type {{ problem.type }}</span>
+
+            <!-- ステータスバッジ（オプション） -->
+            {% if problem.progress %}
+            {% if problem.progress.understood %}
+            <span style="background:#d4edda; color:#155724; padding:2px 8px; border-radius:10px; font-size:0.8rem;">
+                <i class="fas fa-check-circle"></i> 理解済み
+            </span>
+            {% endif %}
+            {% if problem.progress.review_flag %}
+            <span style="background:#fff3cd; color:#856404; padding:2px 8px; border-radius:10px; font-size:0.8rem;">
+                <i class="fas fa-flag"></i> 復習
+            </span>
+            {% endif %}
+            {% endif %}
+        </div>
+
+        <div class="problem-question-preview">
+            {{ problem.question[:150] }}{% if problem.question|length > 150 %}...{% endif %}
+        </div>
+
+        <a href="{{ url_for('essay_problem', problem_id=problem.id) }}" class="problem-link">
+            問題に挑戦 <i class="fas fa-arrow-right"></i>
+        </a>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="no-results">
+    <i class="fas fa-search" style="font-size: 3rem; margin-bottom: 15px; display: block; opacity: 0.3;"></i>
+    <p>条件に一致する問題が見つかりませんでした。</p>
+</div>
+{% endif %}
