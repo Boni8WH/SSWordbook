@@ -12201,7 +12201,7 @@ def admin_reply_correction_request(request_id):
     
     try:
         # すでに返信済みの場合はエラー
-        if req.status != 'pending':
+        if req.replied_at:
             flash('この依頼にはすでに正式な返信が送信されています。', 'warning')
             return redirect(url_for('admin_correction_request_detail', request_id=request_id))
             
