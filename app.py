@@ -11648,6 +11648,126 @@ def essay_index():
         flash('章一覧の取得に失敗しました。', 'error')
         return redirect(url_for('index'))
     
+@app.route('/essay/university')
+def essay_university_index():
+    """大学別論述問題一覧ページ（AJAX検索・高度なフィルター対応）"""
+    if not session.get('user_id'):
+        return redirect(url_for('login_page'))
+
+    user_id = session.get('user_id')
+
+    # クエリパラメータの取得
+    selected_universities = request.args.getlist('university[]')
+    selected_types = request.args.getlist('type[]')
+    
+    # 年度範囲
+    year_from = request.args.get('year_from', type=int)
+    year_to = request.args.get('year_to', type=int)
+
+    # 状態フィルター
+    exclude_understood = request.args.get('exclude_understood') == 'true'
+    only_review = request.args.get('only_review') == 'true'
+
+    # AJAXリクエストかどうか判定
+    is_ajax = (request.headers.get('X-Requested-With') == 'XMLHttpRequest')
+    
+    # フィルタリング用の全選択肢を取得（初回ロード時のみ必要だが、構造上常に渡す）
+    # 大学名（辞書順）
+    all_universities_query = db.session.query(EssayProblem.university).distinct().order_by(EssayProblem.university).all()
+    all_universities = [u[0] for u in all_universities_query if u[0]]
+    
+    # 年度（降順）
+    all_years_query = db.session.query(EssayProblem.year).distinct().order_by(EssayProblem.year.desc()).all()
+    all_years = [y[0] for y in all_years_query if y[0]]
+    
+    # タイプ（辞書順）
+    all_types_query = db.session.query(EssayProblem.type).distinct().order_by(EssayProblem.type).all()
+    all_types = [t[0] for t in all_types_query if t[0]]
+
+    # 問題の検索
+    # 大学・タイプ・年度のいずれかが指定されている、または状態フィルタが有効な場合は検索実行
+    # 初期表示で全件表示させてもよいが、重くなるので何かしらの条件がある場合のみ（または全件表示が良いならここを調整）
+    # ユーザー要望的に「自動検索」なので、初期ロード時は全件表示か、デフォルトフィルターで表示が自然
+    # ここでは「何も指定がなければ全件表示（ただし上限設けるなどの考慮も可）」とします
+    
+    query = db.session.query(EssayProblem).filter(EssayProblem.enabled == True)
+    
+    # 状態フィルターがある場合はJOINが必要
+    if exclude_understood or only_review:
+        # LEFT JOIN essay_progress
+        query = query.outerjoin(
+            EssayProgress, 
+            (EssayProgress.problem_id == EssayProblem.id) & (EssayProgress.user_id == user_id)
+        )
+
+    # 大学フィルター
+    if selected_universities:
+        query = query.filter(EssayProblem.university.in_(selected_universities))
+    
+    # 年度フィルター (範囲)
+    if year_from:
+        query = query.filter(EssayProblem.year >= year_from)
+    if year_to:
+        query = query.filter(EssayProblem.year <= year_to)
+    
+    # タイプフィルター
+    if selected_types:
+        query = query.filter(EssayProblem.type.in_(selected_types))
+        
+    # 状態フィルターロジック
+    if exclude_understood:
+        # 理解済み(understood=True)を除外
+        # NULL (未実施) または False (未理解) のものを残す
+        query = query.filter(
+            (EssayProgress.understood == None) | (EssayProgress.understood == False)
+        )
+    
+    if only_review:
+        # 復習フラグ(review_flag=True)のみ
+        query = query.filter(EssayProgress.review_flag == True)
+        
+    # 並び順: 年度（新しい順） > 大学（辞書順） > タイプ
+    problems = query.order_by(EssayProblem.year.desc(), EssayProblem.university, EssayProblem.type).all()
+
+    # 各問題に進捗情報を付加（テンプレート表示用）
+    # JOINしていない場合でも、個別に取得するか、あるいはJOIN済みのオブジェクトを利用するか
+    # sqlalchemyのオブジェクトならrelationshipでアクセスできるか確認が必要だが、
+    # ここではN+1問題を避けるため、まとめて取得してマッピングするのが効率的
+    
+    # 表示する問題IDのリスト
+    problem_ids = [p.id for p in problems]
+    progress_map = {}
+    if problem_ids:
+        progresses = EssayProgress.query.filter(
+            EssayProgress.user_id == user_id,
+            EssayProgress.problem_id.in_(problem_ids)
+        ).all()
+        for prog in progresses:
+            progress_map[prog.problem_id] = prog
+            
+    # 問題オブジェクトにprogress属性を一時的にセット
+    for p in problems:
+        p.progress = progress_map.get(p.id)
+
+    # AJAXの場合は部分HTMLを返す
+    if is_ajax:
+        return render_template('_essay_problem_list.html', problems=problems)
+
+    return render_template(
+        'essay_university_index.html',
+        all_universities=all_universities,
+        all_years=all_years,
+        all_types=all_types,
+        problems=problems,
+        # 初期値としてのパラメータ（テンプレート再描画時に保持）
+        selected_universities=selected_universities,
+        selected_types=selected_types,
+        year_from=year_from,
+        year_to=year_to,
+        exclude_understood=exclude_understood,
+        only_review=only_review
+    )
+
 @app.route('/essay/chapter/<chapter>')
 def essay_chapter(chapter):
     """章別論述問題一覧（公開設定対応版）"""

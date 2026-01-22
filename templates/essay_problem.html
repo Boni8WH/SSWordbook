@@ -116,6 +116,18 @@
         color: white;
     }
 
+    .back-to-custom-search {
+        background: #764ba2;
+        /* 同系色だが少し違う色（グラデーションのもう片方） */
+        color: white;
+        border-color: #764ba2;
+    }
+
+    .back-to-custom-search:hover {
+        background: #6a4292;
+        color: white;
+    }
+
     /* 問題文セクション */
     .question-section {
         background: #f8f9fa;
@@ -816,11 +828,18 @@
         </span>
         {% endif %}
 
-        <a href="{{ url_for('essay_chapter', chapter=problem.chapter) if problem.chapter else url_for('essay_index') }}"
-            class="nav-button back-to-chapter">
-            <i class="fas fa-list"></i>
-            {% if problem.chapter == 'com' %}総合問題一覧に戻る{% else %}第{{ problem.chapter }}章一覧に戻る{% endif %}
-        </a>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;">
+            <a href="{{ url_for('essay_chapter', chapter=problem.chapter) if problem.chapter else url_for('essay_index') }}"
+                class="nav-button back-to-chapter">
+                <i class="fas fa-list"></i>
+                {% if problem.chapter == 'com' %}総合問題一覧に戻る{% else %}第{{ problem.chapter }}章一覧に戻る{% endif %}
+            </a>
+
+            <a href="{{ url_for('essay_university_index') }}" class="nav-button back-to-custom-search">
+                <i class="fas fa-search-plus"></i>
+                カスタム検索に戻る
+            </a>
+        </div>
 
         {% if next_problem %}
         <a href="{{ url_for('essay_problem', problem_id=next_problem.id) }}" class="nav-button">

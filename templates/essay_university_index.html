@@ -1,0 +1,738 @@
+{% extends "base.html" %}
+
+{% block title %}カスタム論述問題検索{% endblock %}
+
+
+{% block head_extra %}
+<style>
+    .university-search-container {
+        display: grid;
+        grid-template-columns: 320px 1fr;
+        gap: 30px;
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+        align-items: start;
+    }
+
+    /* フィルターサイドバー */
+    .filter-sidebar {
+        background: white;
+        padding: 0;
+        border-radius: 12px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+        border: 1px solid #e9ecef;
+
+        /* Desktop: Sticky & Scrollable */
+        position: sticky;
+        top: 20px;
+        max-height: calc(100vh - 40px);
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* Mobile Toggle Header */
+    .mobile-filter-header {
+        display: none;
+        padding: 15px 20px;
+        background: #f8f9fa;
+        border-bottom: 1px solid #e9ecef;
+        cursor: pointer;
+        justify-content: space-between;
+        align-items: center;
+        border-radius: 12px 12px 0 0;
+        font-weight: 700;
+        color: #495057;
+    }
+
+    .mobile-filter-header:hover {
+        background: #e9ecef;
+    }
+
+    /* Sidebar Content Wrapper */
+    .filter-content-wrapper {
+        padding: 20px;
+        overflow-y: auto;
+        /* Custom Scrollbar */
+        scrollbar-width: thin;
+        scrollbar-color: #cbd3da #f1f3f5;
+    }
+
+    .filter-content-wrapper::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .filter-content-wrapper::-webkit-scrollbar-thumb {
+        background-color: #cbd3da;
+        border-radius: 3px;
+    }
+
+    .filter-section {
+        margin-bottom: 25px;
+        border-bottom: 1px solid #f1f3f5;
+        padding-bottom: 20px;
+    }
+
+    .filter-section:last-child {
+        border-bottom: none;
+        margin-bottom: 0;
+        padding-bottom: 0;
+    }
+
+    .filter-title {
+        font-weight: 700;
+        margin-bottom: 15px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: #495057;
+    }
+
+    /* 選択済みタグエリア */
+    .selected-tags-area {
+        margin-bottom: 15px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .selected-univ-tag {
+        background: #e3f2fd;
+        color: #1565c0;
+        padding: 4px 10px;
+        border-radius: 15px;
+        font-size: 0.85rem;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        border: 1px solid #90caf9;
+    }
+
+    .selected-univ-tag i {
+        cursor: pointer;
+        font-size: 0.8rem;
+    }
+
+    .selected-univ-tag i:hover {
+        color: #d32f2f;
+    }
+
+    /* 大学リスト（デフォルト非表示） */
+    .university-list-container {
+        display: none;
+        /* デフォルト非表示 */
+        max-height: 300px;
+        overflow-y: auto;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        padding: 10px;
+        background: #f8f9fa;
+        margin-top: 10px;
+    }
+
+    .university-list-container.show {
+        display: block;
+    }
+
+    .search-box {
+        width: 100%;
+        padding: 8px 12px;
+        border: 1px solid #ced4da;
+        border-radius: 6px;
+        margin-bottom: 5px;
+        font-size: 0.9rem;
+    }
+
+    .search-hint {
+        font-size: 0.75rem;
+        color: #6c757d;
+        margin-bottom: 10px;
+    }
+
+    .checkbox-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 0;
+        cursor: pointer;
+    }
+
+    .checkbox-item:hover {
+        background-color: #e9ecef;
+    }
+
+    .checkbox-item input {
+        cursor: pointer;
+    }
+
+    .checkbox-item label {
+        cursor: pointer;
+        flex: 1;
+        font-size: 0.95rem;
+        color: #343a40;
+    }
+
+    /* バッジスタイル */
+    .filter-badge-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .type-checkbox {
+        display: none;
+    }
+
+    .filter-badge {
+        display: inline-block;
+        padding: 6px 12px;
+        border-radius: 20px;
+        background: #f1f3f5;
+        color: #495057;
+        font-size: 0.9rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        border: 1px solid #dee2e6;
+    }
+
+    .type-checkbox:checked+.filter-badge {
+        background: #667eea;
+        color: white;
+        border-color: #667eea;
+    }
+
+    /* Clear Button Area */
+    .sidebar-footer {
+        padding: 15px 20px;
+        background: #f8f9fa;
+        border-top: 1px solid #e9ecef;
+        border-radius: 0 0 12px 12px;
+        text-align: center;
+    }
+
+    /* 結果表示エリア */
+    .results-area {
+        min-height: 400px;
+    }
+
+    .results-header {
+        margin-bottom: 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .problem-card {
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        border: 1px solid #e9ecef;
+        transition: all 0.3s ease;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .problem-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        border-color: #667eea;
+    }
+
+    .problem-card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        border-bottom: 1px solid #f1f3f5;
+        padding-bottom: 10px;
+        margin-bottom: 5px;
+    }
+
+    .problem-univ-year {
+        font-weight: 700;
+        font-size: 1.1rem;
+        color: #2c3e50;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .problem-type-badge {
+        background: #e3f2fd;
+        color: #1976d2;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 0.8rem;
+        font-weight: 600;
+    }
+
+    .problem-chapter {
+        font-size: 0.85rem;
+        color: #6c757d;
+        background: #f8f9fa;
+        padding: 2px 8px;
+        border-radius: 10px;
+        border: 1px solid #dee2e6;
+    }
+
+    .problem-question-preview {
+        color: #495057;
+        font-size: 0.95rem;
+        line-height: 1.6;
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        /* 標準プロパティも併記 */
+        line-clamp: 3;
+    }
+
+    .problem-link {
+        align-self: flex-end;
+        background: white;
+        color: #667eea;
+        border: 1px solid #667eea;
+        padding: 8px 20px;
+        border-radius: 20px;
+        text-decoration: none;
+        font-size: 0.9rem;
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
+
+    .problem-link:hover {
+        background: #667eea;
+        color: white;
+    }
+
+    .no-results {
+        text-align: center;
+        padding: 50px;
+        color: #6c757d;
+        background: #f8f9fa;
+        border-radius: 12px;
+        border: 2px dashed #dee2e6;
+    }
+
+    /* Mobile Layout */
+    @media (max-width: 768px) {
+        .university-search-container {
+            grid-template-columns: 1fr;
+            padding: 10px;
+        }
+
+        .filter-sidebar {
+            position: relative;
+            /* Remove sticky on mobile */
+            top: 0;
+            max-height: none;
+            /* Auto height */
+            margin-bottom: 20px;
+        }
+
+        .mobile-filter-header {
+            display: flex;
+            /* Show toggle header */
+        }
+
+        /* Collapsible Content */
+        .filter-content-wrapper {
+            display: none;
+            /* Hidden by default on mobile */
+            padding-bottom: 0;
+        }
+
+        .filter-content-wrapper.open {
+            display: block;
+        }
+
+        /* Footer always visible? No, inside collapsible or separate? 
+           Request: "Collapsible. When collapsed, Select Univ [Header] and Clear Button visible."
+           So Footer should be outside the collapsible wrapper.
+        */
+        .sidebar-footer {
+            display: block;
+            /* Always visible */
+        }
+
+        .university-list-container {
+            max-height: 200px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="university-search-container">
+    <!-- サイドバー：フィルター -->
+    <div class="filter-sidebar">
+        <!-- Mobile Toggle Header -->
+        <div class="mobile-filter-header" id="mobileFilterToggle">
+            <span><i class="fas fa-search-plus"></i> カスタム検索・条件</span>
+            <i class="fas fa-chevron-down" id="toggleIcon"></i>
+        </div>
+
+        <form id="searchForm" style="display: flex; flex-direction: column; flex: 1; overflow: hidden;">
+            <!-- Scrollable Content -->
+            <div class="filter-content-wrapper" id="filterContent">
+                <!-- 大学フィルター -->
+                <div class="filter-section">
+                    <div class="filter-title"><i class="fas fa-university"></i> 大学を選択</div>
+
+                    <!-- 選択済みタグ表示エリア -->
+                    <div class="selected-tags-area" id="selectedTags">
+                        <!-- JSで動的に追加 -->
+                    </div>
+
+                    <input type="text" id="univSearchInput" class="search-box" placeholder="大学名を検索...">
+                    <div class="search-hint">※検索して候補を表示</div>
+
+                    <div class="university-list-container" id="univList">
+                        {% for univ in all_universities %}
+                        <div class="checkbox-item univ-item" data-name="{{ univ }}">
+                            <label>
+                                <input type="checkbox" name="university[]" value="{{ univ }}"
+                                    class="filter-input univ-checkbox" {% if univ in selected_universities %}checked{%
+                                    endif %}>
+                                {{ univ }}
+                            </label>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- 年度フィルター (範囲指定) -->
+                <div class="filter-section">
+                    <div class="filter-title"><i class="fas fa-calendar-alt"></i> 年度範囲</div>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <select name="year_from" class="form-select filter-input">
+                            <option value="">指定なし</option>
+                            {% for year in all_years %}
+                            <option value="{{ year }}" {% if year_from==year %}selected{% endif %}>{{ year }}年</option>
+                            {% endfor %}
+                        </select>
+                        <span>〜</span>
+                        <select name="year_to" class="form-select filter-input">
+                            <option value="">指定なし</option>
+                            {% for year in all_years %}
+                            <option value="{{ year }}" {% if year_to==year %}selected{% endif %}>{{ year }}年</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <!-- タイプフィルター -->
+                <div class="filter-section">
+                    <div class="filter-title"><i class="fas fa-tag"></i> 問題タイプ</div>
+                    <div class="filter-badge-container">
+                        {% for type in all_types %}
+                        <label>
+                            <input type="checkbox" name="type[]" value="{{ type }}" class="type-checkbox filter-input"
+                                {% if type in selected_types %}checked{% endif %}>
+                            <span class="filter-badge">Type {{ type }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- 状態フィルター (トグル) -->
+                <div class="filter-section">
+                    <div class="filter-title"><i class="fas fa-tasks"></i> 状態</div>
+                    <div class="status-filters">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input filter-input" type="checkbox" id="excludeUnderstood"
+                                name="exclude_understood" value="true" {% if exclude_understood %}checked{% endif %}>
+                            <label class="form-check-label" for="excludeUnderstood">理解済みを表示しない</label>
+                        </div>
+                        <div class="form-check form-switch mt-2">
+                            <input class="form-check-input filter-input" type="checkbox" id="onlyReview"
+                                name="only_review" value="true" {% if only_review %}checked{% endif %}>
+                            <label class="form-check-label" for="onlyReview">復習リストのみ表示</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer (Fixed logic) -->
+            <div class="sidebar-footer">
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="clearFiltersBtn"
+                    style="width: 100%;">条件をクリア</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- メインコンテンツ：結果一覧 -->
+    <div class="results-area">
+        <div class="results-header">
+            <h2 style="display: flex; align-items: center; gap: 15px;">
+                検索結果
+                <span id="resultCount"
+                    style="font-size: 0.6em; background: #667eea; color: white; padding: 4px 12px; border-radius: 20px; vertical-align: middle;">
+                    {{ problems|length }}件
+                </span>
+            </h2>
+            <div id="loadingIndicator" style="display: none; margin-left: 15px;">
+                <div class="spinner-border text-primary spinner-border-sm" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+            </div>
+        </div>
+
+        <div id="resultsContent">
+            {% include '_essay_problem_list.html' %}
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // --- 1. 大学名検索 & リスト表示制御 ---
+        const univSearchInput = document.getElementById('univSearchInput');
+        const univList = document.getElementById('univList');
+        const univItems = univList.getElementsByClassName('univ-item');
+        const univCheckboxes = document.querySelectorAll('.univ-checkbox');
+        const selectedTagsArea = document.getElementById('selectedTags');
+
+        // 初期表示時、検索ボックスが空ならリストを隠す
+        // ただし、既にチェックされている項目がある場合は...タグ表示で対応するのでリストは隠してOK
+        // (ユーザー要望:「検索をかけてヒットした大学があれば...表示」)
+
+        univSearchInput.addEventListener('input', function (e) {
+            const searchTerm = e.target.value.toLowerCase();
+            let hitCount = 0;
+
+            if (searchTerm.length === 0) {
+                univList.classList.remove('show'); // 空なら隠す
+                return;
+            }
+
+            Array.from(univItems).forEach(item => {
+                const univName = item.getAttribute('data-name').toLowerCase();
+                if (univName.includes(searchTerm)) {
+                    item.style.display = '';
+                    hitCount++;
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+
+            if (hitCount > 0) {
+                univList.classList.add('show');
+            } else {
+                univList.classList.remove('show');
+            }
+        });
+
+        // --- 2. 選択済みタグの管理 ---
+        function updateSelectedTags() {
+            selectedTagsArea.innerHTML = ''; // Clear
+            let hasChecked = false;
+
+            univCheckboxes.forEach(cb => {
+                if (cb.checked) {
+                    hasChecked = true;
+                    const univName = cb.value;
+
+                    const tag = document.createElement('div');
+                    tag.className = 'selected-univ-tag';
+                    tag.innerHTML = `
+                        ${univName}
+                        <i class="fas fa-times" data-value="${univName}"></i>
+                    `;
+                    selectedTagsArea.appendChild(tag);
+                }
+            });
+
+            // タグの削除イベント
+            tagRemoveBtns = selectedTagsArea.querySelectorAll('.fa-times');
+            tagRemoveBtns.forEach(btn => {
+                btn.addEventListener('click', function (e) {
+                    const val = this.getAttribute('data-value');
+                    // Checkboxを外す
+                    const targetCb = document.querySelector(`.univ-checkbox[value="${val}"]`);
+                    if (targetCb) {
+                        targetCb.checked = false;
+                        // 変更イベント発火 (自動検索のため)
+                        targetCb.dispatchEvent(new Event('change'));
+                        // タグ更新
+                        updateSelectedTags();
+                    }
+                });
+            });
+        }
+
+        // Checkbox変更時にタグ更新
+        univCheckboxes.forEach(cb => {
+            cb.addEventListener('change', updateSelectedTags);
+        });
+
+        // 初期ロード時にもタグ生成
+        updateSelectedTags();
+
+
+        // --- 3. 自動検索と状態保存 (AJAX + localStorage) ---
+        const searchForm = document.getElementById('searchForm');
+        const filterInputs = document.querySelectorAll('.filter-input');
+        const resultsContent = document.getElementById('resultsContent');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const resultCount = document.getElementById('resultCount');
+        const clearBtn = document.getElementById('clearFiltersBtn');
+        let debounceTimer;
+
+        // 状態保存のキー
+        const STORAGE_KEY = 'essay_university_filters';
+
+        // フィルター状態を保存
+        function saveFilters() {
+            const formData = new FormData(searchForm);
+            const params = new URLSearchParams(formData);
+
+            // チェックボックスの状態を明示的に取得（FormDataだけでは不十分な場合があるため）
+            const filters = {
+                universities: Array.from(document.querySelectorAll('input[name="university[]"]:checked')).map(el => el.value),
+                types: Array.from(document.querySelectorAll('input[name="type[]"]:checked')).map(el => el.value),
+                year_from: document.querySelector('select[name="year_from"]').value,
+                year_to: document.querySelector('select[name="year_to"]').value,
+                exclude_understood: document.querySelector('input[name="exclude_understood"]').checked,
+                only_review: document.querySelector('input[name="only_review"]').checked
+            };
+
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(filters));
+        }
+
+        // フィルター状態を復元
+        function loadFilters() {
+            const savedData = localStorage.getItem(STORAGE_KEY);
+            if (!savedData) return false;
+
+            try {
+                const filters = JSON.parse(savedData);
+
+                // URLパラメータがある場合は復元しない（URL優先）
+                const urlParams = new URLSearchParams(window.location.search);
+                if (urlParams.toString()) return false;
+
+                // チェックボックスの復元
+                document.querySelectorAll('input[name="university[]"]').forEach(el => {
+                    el.checked = filters.universities.includes(el.value);
+                });
+                document.querySelectorAll('input[name="type[]"]').forEach(el => {
+                    el.checked = filters.types.includes(el.value);
+                });
+
+                // セレクトボックスの復元
+                if (filters.year_from) document.querySelector('select[name="year_from"]').value = filters.year_from;
+                if (filters.year_to) document.querySelector('select[name="year_to"]').value = filters.year_to;
+
+                // トグルの復元
+                if (filters.exclude_understood !== undefined) {
+                    document.querySelector('input[name="exclude_understood"]').checked = filters.exclude_understood;
+                }
+                if (filters.only_review !== undefined) {
+                    document.querySelector('input[name="only_review"]').checked = filters.only_review;
+                }
+
+                return true;
+            } catch (e) {
+                console.error('Failed to load filters:', e);
+                return false;
+            }
+        }
+
+        function performSearch() {
+            loadingIndicator.style.display = 'inline-block';
+
+            saveFilters(); // 検索実行時に保存
+
+            const formData = new FormData(searchForm);
+            const params = new URLSearchParams(formData);
+
+            fetch(`{{ url_for('essay_university_index') }}?` + params.toString(), {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            })
+                .then(response => response.text())
+                .then(html => {
+                    resultsContent.innerHTML = html;
+                    loadingIndicator.style.display = 'none';
+
+                    // ヒット数をカウントして更新
+                    const count = resultsContent.querySelectorAll('.problem-card').length;
+                    if (resultCount) {
+                        resultCount.textContent = count + '件';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    loadingIndicator.style.display = 'none';
+                });
+        }
+
+        // 入力変更で検索実行
+        filterInputs.forEach(input => {
+            input.addEventListener('change', () => {
+                clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(performSearch, 300);
+            });
+        });
+
+        // --- 4. 初期化処理 (復元 -> タグ更新 -> 検索) ---
+        // ページロード時に復元を試みる
+        if (loadFilters()) {
+            updateSelectedTags(); // タグ表示も更新
+            performSearch();      // 検索実行
+        } else {
+            // 復元しなかった場合（初回 or URLパラメータあり）でも初期化のために一度呼ぶか、
+            // もしURLパラメータがあるならサーバー側でレンダリングされているはずなのでAJAX不要？
+            // -> サーバーサイドでレンダリングされているならAJAX不要だが、タグ更新は必要
+            updateSelectedTags();
+
+            // URLパラメータもLocalStorageもない完全な初回ロードなどの場合、全件表示されているので何もしない
+            // ただし、URLパラメータがある場合はLocalStorageを更新しておくべきか？
+            // -> ユーザーがURLで直接アクセスしてきた場合、それを「最新の状態」として保存するのが親切
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.toString()) {
+                // HTML上のフォームはサーバーサイドレンダリングで正しい状態になっているはずなので、そのまま保存
+                saveFilters();
+            }
+        }
+
+        // --- 5. クリアボタン ---
+        clearBtn.addEventListener('click', () => {
+            searchForm.reset();
+            // 手動でcheckedを外す必要がある場合やselectをリセット
+            document.querySelectorAll('input[type="checkbox"]').forEach(el => el.checked = false);
+            document.querySelectorAll('select').forEach(el => el.selectedIndex = 0);
+
+            // UIリセット
+            univSearchInput.value = '';
+            univList.classList.remove('show');
+            updateSelectedTags();
+
+            localStorage.removeItem(STORAGE_KEY); // 保存データも削除
+
+            performSearch();
+        });
+
+        // --- 5. Mobile Toggle ---
+        const mobileToggle = document.getElementById('mobileFilterToggle');
+        const filterContent = document.getElementById('filterContent');
+        const toggleIcon = document.getElementById('toggleIcon');
+
+        if (mobileToggle) {
+            mobileToggle.addEventListener('click', function () {
+                filterContent.classList.toggle('open');
+                // アイコン回転など
+                if (filterContent.classList.contains('open')) {
+                    toggleIcon.classList.remove('fa-chevron-down');
+                    toggleIcon.classList.add('fa-chevron-up');
+                } else {
+                    toggleIcon.classList.remove('fa-chevron-up');
+                    toggleIcon.classList.add('fa-chevron-down');
+                }
+            });
+        }
+    });
+</script>
+{% endblock %}

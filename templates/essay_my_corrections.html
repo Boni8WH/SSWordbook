@@ -93,8 +93,14 @@
                                 data-replied="{{ req.replied_at | to_jst if req.replied_at else '' }}"
                                 data-message="{{ req.student_message or '' }}"
                                 data-request-text="{{ req.request_text or '' }}" {% set req_imgs=req.db_images |
-                                selectattr('image_type', 'equalto' , 'request' ) | list %}
-                                data-request-image="{{ url_for('serve_correction_image', image_id=req_imgs[0].id) if req_imgs else '' }}"
+                                selectattr('image_type', 'equalto' , 'request' ) | list %} {% set request_image_url=''
+                                %} {% if req_imgs %} {% set request_image_url=url_for('serve_correction_image',
+                                image_id=req_imgs[0].id) %} {% elif req.request_image_path %} {% if
+                                req.request_image_path.startswith('http') %} {% set
+                                request_image_url=req.request_image_path %} {% else %} {% set
+                                request_image_url=url_for('static', filename='uploads/essay_images/' +
+                                req.request_image_path) %} {% endif %} {% endif %}
+                                data-request-image="{{ request_image_url }}"
                                 data-reply-text="{{ req.reply_text or '' }}" {% set rpl_imgs=req.db_images |
                                 selectattr('image_type', 'equalto' , 'reply' ) | list %}
                                 data-reply-image="{{ url_for('serve_correction_image', image_id=rpl_imgs[0].id) if rpl_imgs else '' }}">
