@@ -445,9 +445,11 @@
         <div class="back-to-main">
             {% if is_essay_room %}
             <!-- 今日の10問ボタン (論述ルーム用) -->
+            {% if not is_all_unlocked %}
             <button id="dailyQuizButton" class="btn btn-warning" style="margin-right: 10px;">
                 <i class="fas fa-stopwatch"></i> 今日の10問
             </button>
+            {% endif %}
             <a href="{{ url_for('my_corrections') }}" class="btn btn-outline-warning" style="margin-right: 10px;">
                 <i class="fas fa-history"></i> 添削履歴
             </a>
