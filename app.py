@@ -144,6 +144,40 @@ def strip_tags(html_text):
     return s.get_data()
 
 # ====================================================================
+# Helper: Linkify HTML Filter
+# ====================================================================
+def linkify_html(text):
+    """
+    HTML内の単純なURLのみをリンク化するフィルタ
+    既存の <a href="..."> や <img src="..."> 内のURLは無視する
+    """
+    if not text:
+        return ""
+    
+    # HTMLタグで分割 (タグ部分とそれ以外)
+    # 偶数インデックス: テキスト, 奇数インデックス: タグ
+    parts = re.split(r'(<[^>]+>)', str(text))
+    
+    for i, part in enumerate(parts):
+        # タグでない部分（テキスト）のみ処理
+        if i % 2 == 0 and part:
+            # URL正規表現 (http/https)
+            # 既存のHTMLタグ内ではない純粋なテキスト中のURLを置換
+            # URLの末尾に来がちな記号を除外する工夫が必要だが、簡易的に実装
+            url_pattern = r'(https?://[a-zA-Z0-9.\-_~:/?#\[\]@!$&\'()*+,;=%]+)'
+            
+            def replace_link(match):
+                url = match.group(0)
+                return f'<a href="{url}" target="_blank" rel="noopener noreferrer">{url}</a>'
+            
+            parts[i] = re.sub(url_pattern, replace_link, part)
+            
+    return "".join(parts)
+
+
+
+
+# ====================================================================
 # 大学群の定義 (AI検索用)
 # ====================================================================
 UNIVERSITY_GROUPS = {
@@ -1575,6 +1609,9 @@ logger.info(f"ログレベル設定: {logging.getLevelName(log_level)} ({'本番
 
 # ===== Flaskアプリの作成 =====
 app = Flask(__name__)
+# カスタムフィルタ登録
+app.jinja_env.filters['linkify_html'] = linkify_html
+
 app.config['SECRET_KEY'] = 'your_secret_key_here_please_change_this_in_production'
 basedir = os.path.abspath(os.path.dirname(__file__))
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
