@@ -806,12 +806,18 @@
                                                     // リンクを挿入
                                                     range.insertNode(link);
 
-                                                    // エディタの内容をtextareaに同期
-                                                    const editor = document.getElementById('announcementContent_editor');
-                                                    const textarea = document.getElementById('announcementContent');
-                                                    if (editor && textarea) {
-                                                        textarea.value = editor.innerHTML;
-                                                        textarea.dispatchEvent(new Event('input', { bubbles: true }));
+                                                    // 挿入先のエディタを特定（Rangeのコンテナから遡る）
+                                                    let container = range.commonAncestorContainer;
+                                                    if (container.nodeType === 3) container = container.parentNode;
+                                                    const editor = container.closest('[id$="_editor"]');
+
+                                                    if (editor) {
+                                                        const textareaId = editor.id.replace('_editor', '');
+                                                        const textarea = document.getElementById(textareaId);
+                                                        if (textarea) {
+                                                            textarea.value = editor.innerHTML;
+                                                            textarea.dispatchEvent(new Event('input', { bubbles: true }));
+                                                        }
                                                     }
                                                 }
 
@@ -978,7 +984,13 @@
                                     <input type="text" class="form-control" id="editAnnTitle" name="title" required>
                                 </div>
                                 <div class="mb-3">
-                                    <label for="editAnnContent" class="form-label">内容</label>
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <label for="editAnnContent" class="form-label mb-0">内容</label>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary"
+                                            onmousedown="saveSelectionBeforeClick()" onclick="openLinkModal()">
+                                            <i class="fas fa-link"></i> リンク挿入
+                                        </button>
+                                    </div>
                                     <textarea class="form-control" id="editAnnContent" name="content" rows="4"
                                         required></textarea>
                                 </div>
