@@ -71,7 +71,13 @@ document.addEventListener('DOMContentLoaded', function () {
     // Click handler for Safari PWA mode (Add to Dock) - label clicks don't work reliably
     if (uploadArea && essayImageInput) {
         uploadArea.addEventListener('click', function (e) {
-            // Prevent triggering twice if clicking directly on the label
+            // Prevent triggering twice if clicking on the label or its children
+            // The label already triggers the file input via 'for' attribute
+            const label = uploadArea.querySelector('label[for="essayImageInput"]');
+            if (label && (e.target === label || label.contains(e.target))) {
+                // Let the label handle the click naturally
+                return;
+            }
             // Only trigger if the click wasn't on the file input itself
             if (e.target !== essayImageInput) {
                 essayImageInput.click();
