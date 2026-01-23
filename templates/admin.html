@@ -780,8 +780,25 @@
                                                 document.getElementById('linkUrlInput').value = '';
 
                                                 // モーダルを表示
-                                                const modal = new bootstrap.Modal(document.getElementById('linkInputModal'));
+                                                const modalEl = document.getElementById('linkInputModal');
+
+                                                // 重なり順の制御: 他のモーダルの上で開くためにbody直下に移動
+                                                if (modalEl.parentNode !== document.body) {
+                                                    document.body.appendChild(modalEl);
+                                                }
+
+                                                const modal = new bootstrap.Modal(modalEl);
                                                 modal.show();
+
+                                                // バックドロップのz-indexも調整
+                                                setTimeout(() => {
+                                                    const backdrops = document.querySelectorAll('.modal-backdrop');
+                                                    if (backdrops.length > 1) {
+                                                        // 既存のモーダルのz-index（通常は1050辺り）より高く設定
+                                                        backdrops[backdrops.length - 1].style.zIndex = '1060';
+                                                        modalEl.style.zIndex = '1070';
+                                                    }
+                                                }, 50);
                                             }
 
                                             function insertLinkFromModal() {
@@ -831,33 +848,6 @@
                                                 modal.hide();
                                             }
                                         </script>
-                                    </div>
-
-                                    <!-- Link Input Modal -->
-                                    <div class="modal fade" id="linkInputModal" tabindex="-1"
-                                        aria-labelledby="linkInputModalLabel" aria-hidden="true">
-                                        <div class="modal-dialog">
-                                            <div class="modal-content">
-                                                <div class="modal-header">
-                                                    <h5 class="modal-title" id="linkInputModalLabel">リンクの挿入</h5>
-                                                    <button type="button" class="btn-close" data-bs-dismiss="modal"
-                                                        aria-label="Close"></button>
-                                                </div>
-                                                <div class="modal-body">
-                                                    <div class="mb-3">
-                                                        <label for="linkUrlInput" class="form-label">URLを入力</label>
-                                                        <input type="url" class="form-control" id="linkUrlInput"
-                                                            placeholder="https://example.com">
-                                                    </div>
-                                                </div>
-                                                <div class="modal-footer">
-                                                    <button type="button" class="btn btn-secondary"
-                                                        data-bs-dismiss="modal">キャンセル</button>
-                                                    <button type="button" class="btn btn-primary"
-                                                        onclick="insertLinkFromModal()">挿入</button>
-                                                </div>
-                                            </div>
-                                        </div>
                                     </div>
                             </div>
                             <div class="mb-3">
@@ -8528,4 +8518,27 @@
         }
 
     </script>
+
+    <!-- Link Input Modal -->
+    <div class="modal fade" id="linkInputModal" tabindex="-1" aria-labelledby="linkInputModalLabel" aria-hidden="true"
+        style="z-index: 2000;">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="linkInputModalLabel">リンクの挿入</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="linkUrlInput" class="form-label">URLを入力</label>
+                        <input type="url" class="form-control" id="linkUrlInput" placeholder="https://example.com">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+                    <button type="button" class="btn btn-primary" onclick="insertLinkFromModal()">挿入</button>
+                </div>
+            </div>
+        </div>
+    </div>
     {% endblock %}
