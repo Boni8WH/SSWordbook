@@ -3736,8 +3736,8 @@ def send_correction_notification_email(user, request):
         subject = f"[{app_info.app_name}] 添削完了のお知らせ"
         
         # ユーザーに結果を見てもらうためのURL
-        # 特定の問題の特定のセクションへのリンクなどが理想的
-        target_url = url_for('essay_problem', problem_id=request.problem_id, _anchor='gradingResult', _external=True)
+        # 添削履歴ページへのリンク
+        target_url = url_for('my_corrections', _external=True) + f"#request-{request.id}"
         
         body = f"""
 {user.username}！
