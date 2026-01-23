@@ -1406,15 +1406,27 @@
                                                 </td>
                                                 </td>
                                                 <td class="text-center">
-                                                    <div class="form-check form-switch d-flex justify-content-center">
-                                                        <input class="form-check-input" type="checkbox"
-                                                            id="isEssayRoom_{{ room_num }}" {% if
-                                                            room_data.get(room_num, {}).get('is_essay_room', False)
-                                                            %}checked{% endif %}>
-                                                        <label class="form-check-label visually-hidden"
-                                                            for="isEssayRoom_{{ room_num }}">
-                                                            論述特化
-                                                        </label>
+                                                    <div class="d-flex flex-column align-items-start pl-3">
+                                                        <div class="form-check form-switch mb-2">
+                                                            <input class="form-check-input" type="checkbox"
+                                                                id="isEssayRoom_{{ room_num }}" {% if
+                                                                room_data.get(room_num, {}).get('is_essay_room', False)
+                                                                %}checked{% endif %}>
+                                                            <label class="form-check-label"
+                                                                for="isEssayRoom_{{ room_num }}">
+                                                                論述特化
+                                                            </label>
+                                                        </div>
+                                                        <div class="form-check form-switch">
+                                                            <input class="form-check-input" type="checkbox"
+                                                                id="isAllUnlocked_{{ room_num }}" {% if
+                                                                room_data.get(room_num, {}).get('is_all_unlocked',
+                                                                False) %}checked{% endif %}>
+                                                            <label class="form-check-label"
+                                                                for="isAllUnlocked_{{ room_num }}">
+                                                                すべて解放
+                                                            </label>
+                                                        </div>
                                                     </div>
                                                 </td>
                                                 {% if not is_manager %}
@@ -3520,7 +3532,8 @@
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({
                                     room_number: roomNumber,
-                                    is_essay_room: document.getElementById('isEssayRoom_' + roomNumber).checked
+                                    is_essay_room: document.getElementById('isEssayRoom_' + roomNumber).checked,
+                                    is_all_unlocked: document.getElementById('isAllUnlocked_' + roomNumber).checked
                                 })
                             }),
                             fetch('/admin/update_room_management_password', {
@@ -3725,6 +3738,22 @@
                 'btn-warning'
             );
         }
+
+        // 🆕 "すべて解放"がオンの場合、自動的に"論述特化"もオンにする
+        document.addEventListener('DOMContentLoaded', function () {
+            const allUnlockedCheckboxes = document.querySelectorAll('input[id^="isAllUnlocked_"]');
+            allUnlockedCheckboxes.forEach(checkbox => {
+                checkbox.addEventListener('change', function () {
+                    if (this.checked) {
+                        const roomNum = this.id.split('_')[1];
+                        const essayRoomCheckbox = document.getElementById('isEssayRoom_' + roomNum);
+                        if (essayRoomCheckbox) {
+                            essayRoomCheckbox.checked = true;
+                        }
+                    }
+                });
+            });
+        });
 
         function cleanupOrphanedTokens(event) {
             if (event) event.preventDefault();

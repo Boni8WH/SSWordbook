@@ -428,6 +428,8 @@ class RoomSetting(db.Model):
 
     # 🆕 論述特化ルーム設定
     is_essay_room = db.Column(db.Boolean, default=False, nullable=False)
+    # 🆕 すべて解放ルーム設定
+    is_all_unlocked = db.Column(db.Boolean, default=False, nullable=False)
 
     # 🆕 管理者ページ用パスワードハッシュ
     management_password_hash = db.Column(db.String(255), nullable=True)
@@ -837,6 +839,25 @@ def _add_read_columns_to_user():
             
     except Exception as e:
         print(f"⚠️ Userマイグレーションエラー (read_columns): {e}")
+
+def _add_all_unlocked_column_to_room_setting():
+    """RoomSettingテーブルにis_all_unlockedカラムを追加するマイグレーション関数"""
+    try:
+        inspector = inspect(db.engine)
+        # room_settingテーブルのカラムを取得
+        columns = [col['name'] for col in inspector.get_columns('room_setting')]
+        
+        if 'is_all_unlocked' not in columns:
+            print("🔄 RoomSetting: is_all_unlockedカラムを追加します...")
+            with db.engine.connect() as conn:
+                with conn.begin(): # トランザクション
+                    conn.execute(text("ALTER TABLE room_setting ADD COLUMN is_all_unlocked BOOLEAN DEFAULT FALSE NOT NULL"))
+            print("✅ RoomSetting: is_all_unlockedカラム追加完了")
+        else:
+            print("✅ RoomSetting: is_all_unlockedカラムは既に存在します")
+            
+    except Exception as e:
+        print(f"⚠️ RoomSettingマイグレーションエラー (is_all_unlocked): {e}")
 
 # 🆕 コラム用モデル
 class Column(db.Model):
@@ -3737,7 +3758,7 @@ def send_correction_notification_email(user, request):
         
         # ユーザーに結果を見てもらうためのURL
         # 添削履歴ページへのリンク
-        target_url = url_for('my_corrections', _external=True) + f"#request-{request.id}"
+        target_url = url_for('my_corrections', _external=True)
         
         body = f"""
 {user.username}！
@@ -9235,7 +9256,8 @@ def admin_page():
                 'user_count': users_in_room,
                 'is_suspended': getattr(rs, 'is_suspended', False),  # 一時停止状態
                 'suspended_at': getattr(rs, 'suspended_at', None),     # 一時停止日時
-                'is_essay_room': getattr(rs, 'is_essay_room', False)  # 🆕 論述特化ルーム
+                'is_essay_room': getattr(rs, 'is_essay_room', False),  # 🆕 論述特化ルーム
+                'is_all_unlocked': getattr(rs, 'is_all_unlocked', False)  # 🆕 すべて解放
             }
 
         # ユーザー情報を拡張（元のアカウント名と変更履歴を含む）
@@ -15568,10 +15590,17 @@ def inject_room_settings():
              user = User.query.get(user_id)
              if user:
                  rs = RoomSetting.query.filter_by(room_number=user.room_number).first()
-                 if rs and rs.is_essay_room:
-                     is_essay_room_val = True
+                 if rs:
+                     if rs.is_essay_room:
+                         is_essay_room_val = True
+                     # "すべて解放"の場合は、is_essay_roomフラグがTrueでもナビバーなどを通常通り表示させたい
+                     if rs.is_all_unlocked:
+                         # テンプレート側で is_essay_room と is_all_unlocked の組み合わせで判断する
+                         pass
+                     
+                     return dict(is_essay_room=is_essay_room_val, is_all_unlocked=rs.is_all_unlocked)
                  
-    return dict(is_essay_room=is_essay_room_val)
+    return dict(is_essay_room=is_essay_room_val, is_all_unlocked=False)
 
 
 
@@ -19192,12 +19221,24 @@ def admin_update_room_essay_setting():
             db.session.add(setting)
             
         setting.is_essay_room = bool(is_essay_room)
+        
+        # 🆕 すべて解放設定の保存
+        is_all_unlocked = data.get('is_all_unlocked')
+        # 明示的にNoneでない場合のみ更新
+        if is_all_unlocked is not None:
+             setting.is_all_unlocked = bool(is_all_unlocked)
+             
+        # "すべて解放"がオンの場合、自動的に"論述特化"もオンにする
+        if setting.is_all_unlocked:
+            setting.is_essay_room = True
+             
         db.session.commit()
         
         return jsonify({
             'status': 'success', 
             'message': f'部屋 {room_number} の論述特化設定を更新しました',
-            'is_essay_room': setting.is_essay_room
+            'is_essay_room': setting.is_essay_room,
+            'is_all_unlocked': setting.is_all_unlocked
         })
         
     except Exception as e:
@@ -19225,6 +19266,10 @@ def check_room_restrictions():
     # 部屋設定を確認
     room_setting = RoomSetting.query.filter_by(room_number=user.room_number).first()
     if not room_setting or not room_setting.is_essay_room:
+        return
+
+    # 🆕 すべて解放ルームなら制限しない
+    if room_setting.is_all_unlocked:
         return
 
     # 許可されたエンドポイントのプレフィックス
@@ -19292,6 +19337,9 @@ def check_and_create_correction_tables():
             print(f"Error creating tables: {e}")
 
 check_and_create_correction_tables()
+
+with app.app_context():
+    _add_all_unlocked_column_to_room_setting() # 🆕
 
 
 if __name__ == '__main__':
