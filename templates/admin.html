@@ -433,12 +433,23 @@
         margin-top: 0 !important;
         max-width: none;
         padding: 0;
+        overflow: visible;
+    }
+
+    /* Tabs Layout Fix */
+    .tab-content {
+        width: 100%;
+    }
+
+    /* Strict display toggling to prevent ghost frames */
+    .tab-pane:not(.active) {
+        display: none !important;
     }
 </style>
 
 </div> <!-- Close Base Container -->
 
-<div class="d-flex w-100">
+<div class="d-flex w-100" id="wrapper">
     <!-- Overlay for mobile sidebar -->
     <div class="sidebar-overlay" onclick="toggleSidebar()"></div>
 
@@ -507,6 +518,10 @@
                 <i class="fas fa-chart-bar me-2"></i> ユーザー統計
             </a>
             {% endif %}
+
+            <a class="sidebar-link" id="tab-link-map-quiz" data-bs-toggle="pill" href="#section-map-quiz" role="tab">
+                <i class="fas fa-map-marked-alt me-2"></i> 地図クイズ管理
+            </a>
 
             {% if not is_manager %}
             <div class="sidebar-heading">システム</div>
@@ -2396,6 +2411,181 @@
 
             <!-- データベース管理セクション -->
             {% if not is_manager %}
+            <div class="tab-pane fade" id="section-map-quiz" role="tabpanel">
+                <!-- CSRF Token for JS calls -->
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() if csrf_token else '' }}">
+
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                        <h3><i class="fas fa-map-marked-alt"></i> 地図クイズ管理</h3>
+                    </div>
+                    <div class="card-body">
+                        <!-- Helper / Introduction -->
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle"></i> 地図画像をアップロードし、その上に「地点（ピン）」を配置して問題を作成します。
+                        </div>
+
+                        <!-- Map Upload Form -->
+                        <div class="mb-4 p-3 bg-light rounded border">
+                            <h5><i class="fas fa-upload"></i> 新しい地図を登録</h5>
+                            <form id="mapUploadForm" action="{{ url_for('admin_add_map_image') }}" method="POST"
+                                enctype="multipart/form-data" class="row g-3">
+                                <div class="col-md-4">
+                                    <input type="text" name="name" class="form-control" placeholder="地図名（例：19世紀ヨーロッパ）"
+                                        required>
+                                </div>
+                                <div class="col-md-3">
+                                    <input type="text" name="genre" class="form-control" list="genreList"
+                                        placeholder="ジャンル（任意）">
+                                    <datalist id="genreList">
+                                        {% for g in map_genres %}
+                                        <option value="{{ g }}">
+                                            {% endfor %}
+                                    </datalist>
+                                </div>
+                                <div class="col-md-3">
+                                    <input type="file" name="file" class="form-control" accept="image/*" required>
+                                </div>
+                                <div class="col-md-2">
+                                    <button type="submit" class="btn btn-primary w-100">アップロード</button>
+                                </div>
+                            </form>
+                        </div>
+
+                        <hr>
+
+                        <!-- Map Selection & Visual Editor -->
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h5 class="mb-0"><i class="fas fa-layer-group"></i> 構成編集</h5>
+                                    <div>
+                                        <button class="btn btn-sm btn-outline-success" onclick="showAddGenreModal()"><i
+                                                class="fas fa-folder-plus"></i></button>
+                                        <button class="btn btn-sm btn-outline-primary"
+                                            onclick="loadSortableMapList()"><i class="fas fa-sync"></i></button>
+                                    </div>
+                                </div>
+                                <div id="genreSortableList" class="accordion list-group"
+                                    style="max-height: 600px; overflow-y: auto;">
+                                    <!-- Populated by JS -->
+                                    <div class="text-center p-3"><i class="fas fa-spinner fa-spin"></i> Loading...</div>
+                                </div>
+                            </div>
+
+                            <div class="col-md-9">
+                                <div id="mapEditorContainer" style="display: none;">
+                                    <div class="d-flex justify-content-between align-items-center mb-2 bg-white p-2 border rounded sticky-top"
+                                        style="z-index: 10;">
+                                        <h5 id="currentMapName" class="m-0">地図名</h5>
+                                        <div>
+                                            <div class="form-check form-switch d-inline-block me-3">
+                                                <input class="form-check-input" type="checkbox" id="showPinNamesToggle"
+                                                    checked onchange="togglePinNames()">
+                                                <label class="form-check-label" for="showPinNamesToggle">地名表示</label>
+                                            </div>
+                                            <button class="btn btn-sm btn-danger me-2"
+                                                onclick="deleteCurrentMap()">地図削除</button>
+                                        </div>
+                                    </div>
+
+                                    <!-- Canvas/Image Container -->
+                                    <div class="position-relative border shadow-sm"
+                                        style="width: 100%; background: #eee; overflow: hidden;">
+                                        <!-- Container for maintaining aspect ratio or scrolling -->
+                                        <div class="position-relative" id="mapImageWrapper">
+                                            <img id="editorMapImage" src=""
+                                                style="width: 100%; display: block; cursor: crosshair;"
+                                                onclick="onMapClick(event)">
+                                            <!-- Pins will be placed here absolutely -->
+                                            <div id="editorPinsContainer"></div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Pin Click Helper Text -->
+                                    <div class="text-muted small mt-1">
+                                        <i class="fas fa-mouse-pointer"></i>
+                                        地図上をクリックして新しい地点（ピン）を追加、または既存のピンをクリックして編集します。
+                                    </div>
+                                </div>
+                                <div id="mapEditorPlaceholder"
+                                    class="text-center text-muted py-5 bg-light border rounded">
+                                    <i class="fas fa-map fa-3x mb-3 text-secondary"></i><br>
+                                    左のリストから地図を選択してください
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pin Edit Modal (Using Bootstrap Modal instead of inline card for better UX) -->
+            <div class="modal fade" id="pinEditModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">地点の編集</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <input type="hidden" id="currentPinX">
+                            <input type="hidden" id="currentPinY">
+                            <input type="hidden" id="currentPinId">
+                            <input type="hidden" id="currentMapId">
+
+                            <div class="mb-3">
+                                <label class="form-label">座標</label>
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text">X:</span>
+                                    <input type="text" id="displayPinX" class="form-control" readonly>
+                                    <span class="input-group-text">%</span>
+                                    <span class="input-group-text">Y:</span>
+                                    <input type="text" id="displayPinY" class="form-control" readonly>
+                                    <span class="input-group-text">%</span>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">地点名（正解ラベル）</label>
+                                <input type="text" id="pinNameInput" class="form-control" placeholder="例：パリ" required>
+                            </div>
+
+                            <hr>
+                            <h6><i class="fas fa-question-circle"></i> 関連する問題</h6>
+                            <div id="pinProblemsList" class="mb-2">
+                                <!-- Problems listed here -->
+                            </div>
+
+                            <div class="card card-body bg-light mb-2">
+                                <h6>問題の追加</h6>
+                                <input type="text" id="newProblemText" class="form-control mb-1"
+                                    placeholder="問題文（例：フランス革命勃発の地は？）">
+                                <textarea id="newProblemExplanation" class="form-control mb-1" placeholder="解説（任意）"
+                                    rows="2"></textarea>
+                                <div class="d-flex align-items-center mt-1">
+                                    <select id="newProblemDifficulty" class="form-select form-select-sm me-2"
+                                        style="width: auto;">
+                                        <option value="1">易（★1）</option>
+                                        <option value="2" selected>標準（★2）</option>
+                                        <option value="3">難（★3）</option>
+                                    </select>
+                                    <button class="btn btn-sm btn-outline-primary"
+                                        onclick="addProblemToPin()">追加</button>
+                                </div>
+                            </div>
+
+                        </div>
+                        <div class="modal-footer justify-content-between">
+                            <button type="button" class="btn btn-danger" onclick="deletePin()">この地点を削除</button>
+                            <div>
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
+                                <button type="button" class="btn btn-primary" onclick="savePinData()">地点名を保存</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div class="tab-pane fade" id="section-database-management" role="tabpanel">
                 <div class="card shadow-sm mb-4">
                     <div class="card-header bg-white">
@@ -8541,4 +8731,6 @@
             </div>
         </div>
     </div>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    <script src="{{ url_for('static', filename='js/admin_map_quiz.js') }}"></script>
     {% endblock %}

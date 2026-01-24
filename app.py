@@ -653,6 +653,51 @@ class RpgEnemy(db.Model):
             'defeated_url': url_for('serve_rpg_image', enemy_id=self.id, image_type='defeated')
         }
 
+class MapGenre(db.Model):
+    """地図ジャンル管理"""
+    __tablename__ = 'map_genre'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), unique=True, nullable=False)
+    display_order = db.Column(db.Integer, default=0)
+    
+    maps = db.relationship('MapImage', backref='genre_obj', order_by='MapImage.display_order')
+
+class MapImage(db.Model):
+    """地図画像管理"""
+    __tablename__ = 'map_image'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    genre = db.Column(db.String(100), nullable=True) # Deprecated string genre
+    genre_id = db.Column(db.Integer, db.ForeignKey('map_genre.id'), nullable=True) # Link to MapGenre
+    display_order = db.Column(db.Integer, default=0)
+    filename = db.Column(db.String(255), nullable=False)
+    is_active = db.Column(db.Boolean, default=False) # Public/Private status
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))
+    
+    locations = db.relationship('MapLocation', backref='map_image', cascade='all, delete-orphan')
+
+class MapLocation(db.Model):
+    """地図上の地点（ピン）"""
+    __tablename__ = 'map_location'
+    id = db.Column(db.Integer, primary_key=True)
+    map_image_id = db.Column(db.Integer, db.ForeignKey('map_image.id'), nullable=False)
+    name = db.Column(db.String(100), nullable=False) # 地点名（正解ラベル）
+    x_coordinate = db.Column(db.Float, nullable=False) # % (0.0-100.0)
+    y_coordinate = db.Column(db.Float, nullable=False) # % (0.0-100.0)
+    
+    problems = db.relationship('MapQuizProblem', backref='location', cascade='all, delete-orphan')
+
+class MapQuizProblem(db.Model):
+    """地点に関連する問題"""
+    __tablename__ = 'map_quiz_problem'
+    id = db.Column(db.Integer, primary_key=True)
+    map_location_id = db.Column(db.Integer, db.ForeignKey('map_location.id'), nullable=False)
+    question_text = db.Column(db.Text, nullable=False)
+    explanation = db.Column(db.Text, nullable=True)
+    difficulty = db.Column(db.Integer, default=2) # 1:Easy, 2:Standard, 3:Hard
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))
+
+
 # Helper to determine database type for migrations
 def _is_postgres():
     return db.engine.dialect.name == 'postgresql'
@@ -14265,6 +14310,390 @@ def admin_essay_problems():
             'message': '問題一覧の取得中にエラーが発生しました'
         }), 500
 
+# ====================================================================
+# 地図クイズ管理関連 (Map Quiz Admin)
+# ====================================================================
+
+@app.route('/admin/map_quiz/add_map', methods=['POST'])
+def admin_add_map_image():
+    if not session.get('user_id'): # 簡易権限チェック
+         return redirect(url_for('login'))
+        
+    try:
+        name = request.form.get('name')
+        file = request.files.get('file')
+        
+        if not name or not file:
+            flash('地図名とファイルは必須です', 'error')
+            return redirect(url_for('admin_page'))
+            
+        filename = secure_filename(file.filename)
+        unique_filename = f"map_{int(time.time())}_{filename}"
+        
+        # Save to uploads/maps
+        upload_dir = os.path.join(app.root_path, 'uploads', 'maps')
+        os.makedirs(upload_dir, exist_ok=True)
+        file.save(os.path.join(upload_dir, unique_filename))
+        
+        # Save to DB
+        # Logic: If genre matches existing MapGenre, use ID. If new, create MapGenre.
+        genre_name = request.form.get('genre', '').strip()
+        genre_id = None
+        
+        if genre_name:
+            existing_genre = MapGenre.query.filter_by(name=genre_name).first()
+            if existing_genre:
+                genre_id = existing_genre.id
+            else:
+                # Create new
+                max_order = db.session.query(func.max(MapGenre.display_order)).scalar() or 0
+                new_genre_obj = MapGenre(name=genre_name, display_order=max_order + 1)
+                db.session.add(new_genre_obj)
+                db.session.commit()
+                genre_id = new_genre_obj.id
+        
+        # New map logic using genre_id (display_order defaults to 0 or push to bottom)
+        # Default is_active=False as per user request
+        new_map = MapImage(name=name, genre_id=genre_id, filename=unique_filename, is_active=False)
+        db.session.add(new_map)
+        db.session.commit()
+        
+        flash(f'地図「{name}」を追加しました', 'success')
+        return redirect(url_for('admin_page', _anchor='section-map-quiz'))
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'エラーが発生しました: {e}', 'error')
+        return redirect(url_for('admin_page'))
+
+@app.route('/serve_map_image/<path:filename>')
+def serve_map_image(filename):
+    # 画像配信用
+    directory = os.path.join(app.root_path, 'uploads', 'maps')
+    return send_from_directory(directory, filename)
+
+# API Endpoints for Admin UI
+@app.route('/admin/api/map_quiz/maps')
+def api_get_maps():
+    maps = MapImage.query.order_by(MapImage.created_at.desc()).all()
+    return jsonify({'maps': [{'id': m.id, 'name': m.name, 'filename': m.filename} for m in maps]})
+
+@app.route('/admin/api/map_quiz/map/<int:map_id>/delete', methods=['POST'])
+def api_delete_map(map_id):
+    map_obj = MapImage.query.get(map_id)
+    if not map_obj:
+         return jsonify({'status': 'error', 'message': 'Map not found'})
+    try:
+        # Delete file
+        file_path = os.path.join(app.root_path, 'uploads', 'maps', map_obj.filename)
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        
+        db.session.delete(map_obj)
+        db.session.commit()
+        return jsonify({'status': 'success'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'status': 'error', 'message': str(e)})
+
+@app.route('/admin/api/map_quiz/genres')
+def api_get_map_genres():
+    genres = MapGenre.query.order_by(MapGenre.display_order).all()
+    others_maps = MapImage.query.filter(MapImage.genre_id == None).all()
+    
+    result = []
+    for g in genres:
+        maps = g.maps # Now a list, no .all() needed
+        result.append({
+            'id': g.id,
+            'name': g.name,
+            'maps': [{'id': m.id, 'name': m.name, 'is_active': m.is_active} for m in maps]
+        })
+    if others_maps:
+        result.append({
+            'id': 'others',
+            'name': 'その他',
+            'maps': [{'id': m.id, 'name': m.name, 'is_active': m.is_active} for m in others_maps]
+        })
+    return jsonify({'genres': result})
+
+@app.route('/admin/api/map_quiz/map/<int:map_id>/toggle_status', methods=['POST'])
+def api_toggle_map_status(map_id):
+    map_obj = MapImage.query.get(map_id)
+    if not map_obj:
+        return jsonify({'status': 'error', 'message': 'Map not found'})
+    
+    try:
+        data = request.get_json()
+        new_status = data.get('is_active')
+        if new_status is not None:
+             map_obj.is_active = bool(new_status)
+             db.session.commit()
+             return jsonify({'status': 'success', 'is_active': map_obj.is_active})
+        return jsonify({'status': 'error', 'message': 'Invalid data'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'status': 'error', 'message': str(e)})
+
+@app.route('/admin/api/map_quiz/genre/reorder', methods=['POST'])
+def api_reorder_map_genres():
+    data = request.get_json()
+    try:
+        ordered_ids = data.get('ordered_ids', [])
+        for index, genre_id in enumerate(ordered_ids):
+            genre = MapGenre.query.get(genre_id)
+            if genre:
+                genre.display_order = index
+        db.session.commit()
+        return jsonify({'status': 'success'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'status': 'error', 'message': str(e)})
+
+@app.route('/admin/api/map_quiz/map/reorder', methods=['POST'])
+def api_reorder_maps():
+    data = request.get_json()
+    try:
+        ordered_ids = data.get('ordered_ids', [])
+        for index, map_id in enumerate(ordered_ids):
+            map_obj = MapImage.query.get(map_id)
+            if map_obj:
+                map_obj.display_order = index
+        db.session.commit()
+        return jsonify({'status': 'success'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'status': 'error', 'message': str(e)})
+
+@app.route('/admin/api/map_quiz/genre/add', methods=['POST'])
+def api_add_map_genre():
+    data = request.get_json()
+    try:
+        name = data.get('name')
+        if not name: return jsonify({'status': 'error', 'message': 'Name required'})
+        if MapGenre.query.filter_by(name=name).first():
+            return jsonify({'status': 'error', 'message': 'Genre exists'})
+        max_order = db.session.query(func.max(MapGenre.display_order)).scalar() or 0
+        new_genre = MapGenre(name=name, display_order=max_order + 1)
+        db.session.add(new_genre)
+        db.session.commit()
+        return jsonify({'status': 'success', 'id': new_genre.id})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'status': 'error', 'message': str(e)})
+
+@app.route('/admin/api/map_quiz/genre/edit', methods=['POST'])
+def api_edit_map_genre():
+    data = request.get_json()
+    try:
+        genre = MapGenre.query.get(data.get('id'))
+        if genre:
+            genre.name = data.get('name')
+            db.session.commit()
+            return jsonify({'status': 'success'})
+        return jsonify({'status': 'error', 'message': 'Not found'})
+    except Exception as e: return jsonify({'status': 'error', 'message': str(e)})
+
+@app.route('/admin/api/map_quiz/genre/delete', methods=['POST'])
+def api_delete_map_genre():
+    data = request.get_json()
+    try:
+        genre = MapGenre.query.get(data.get('id'))
+        if not genre: return jsonify({'status': 'error'})
+        maps = MapImage.query.filter_by(genre_id=genre.id).all()
+        for m in maps: m.genre_id = None
+        db.session.delete(genre)
+        db.session.commit()
+        return jsonify({'status': 'success'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'status': 'error', 'message': str(e)})
+
+@app.route('/admin/api/map_quiz/map/<int:map_id>/locations')
+def api_get_map_locations(map_id):
+    locs = MapLocation.query.filter_by(map_image_id=map_id).all()
+    return jsonify({'locations': [{
+        'id': l.id, 
+        'name': l.name, 
+        'x': l.x_coordinate, 
+        'y': l.y_coordinate
+    } for l in locs]})
+
+@app.route('/admin/api/map_quiz/location/add', methods=['POST'])
+def api_add_map_location():
+    data = request.get_json()
+    try:
+        loc = MapLocation(
+            map_image_id=data['map_id'],
+            name=data['name'],
+            x_coordinate=float(data['x']),
+            y_coordinate=float(data['y'])
+        )
+        db.session.add(loc)
+        db.session.commit()
+        return jsonify({'status': 'success', 'location': {'id': loc.id}})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'status': 'error', 'message': str(e)})
+
+@app.route('/admin/api/map_quiz/location/<int:loc_id>/update', methods=['POST'])
+def api_update_map_location(loc_id):
+    loc = MapLocation.query.get(loc_id)
+    if not loc:
+        return jsonify({'status': 'error', 'message': 'Location not found'})
+    data = request.get_json()
+    try:
+        loc.name = data.get('name', loc.name)
+        if 'x' in data: loc.x_coordinate = float(data['x'])
+        if 'y' in data: loc.y_coordinate = float(data['y'])
+        db.session.commit()
+        return jsonify({'status': 'success', 'location': {'id': loc.id}})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'status': 'error', 'message': str(e)})
+
+@app.route('/admin/api/map_quiz/location/<int:loc_id>/delete', methods=['POST'])
+def api_delete_map_location(loc_id):
+    loc = MapLocation.query.get(loc_id)
+    if not loc:
+        return jsonify({'status': 'error', 'message': 'Location not found'})
+    try:
+        db.session.delete(loc)
+        db.session.commit()
+        return jsonify({'status': 'success'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'status': 'error', 'message': str(e)})
+
+@app.route('/admin/api/map_quiz/location/<int:loc_id>/problems')
+def api_get_location_problems(loc_id):
+    probs = MapQuizProblem.query.filter_by(map_location_id=loc_id).all()
+    return jsonify({'problems': [{
+        'id': p.id,
+        'question': p.question_text,
+        'explanation': p.explanation,
+        'difficulty': p.difficulty # Return difficulty
+    } for p in probs]})
+
+@app.route('/admin/api/map_quiz/problem/add', methods=['POST'])
+def api_add_map_problem():
+    data = request.get_json()
+    try:
+        prob = MapQuizProblem(
+            map_location_id=data['location_id'],
+            question_text=data['question'],
+            explanation=data.get('explanation', ''),
+            difficulty=int(data.get('difficulty', 2)) # Default 2
+        )
+        db.session.add(prob)
+        db.session.commit()
+        return jsonify({'status': 'success', 'problem': {'id': prob.id}})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'status': 'error', 'message': str(e)})
+
+@app.route('/admin/api/map_quiz/problem/<int:prob_id>/delete', methods=['POST'])
+def api_delete_problem(prob_id):
+    prob = MapQuizProblem.query.get(prob_id)
+    try:
+        db.session.delete(prob)
+        db.session.commit()
+        return jsonify({'status': 'success'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'status': 'error', 'message': str(e)})
+
+# ====================================================================
+# 地図クイズユーザー画面 (Map Quiz User)
+# ====================================================================
+
+@app.route('/map_quiz')
+def map_quiz_index():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    # Fetch Genres sorted by order
+    genres = MapGenre.query.order_by(MapGenre.display_order).all()
+    
+    # Filter maps to only those that are active
+    active_genres = []
+    for g in genres:
+        # Relationship maps is ordered by MapImage.display_order
+        active_maps = [m for m in g.maps if m.is_active]
+        if active_maps:
+             # We create a simple object to mimic the genre but with filtered maps
+             active_genres.append({
+                 'id': g.id,
+                 'name': g.name,
+                 'maps': active_maps
+             })
+    
+    # Fetch maps with no genre and are active
+    others_maps = MapImage.query.filter(MapImage.genre_id == None, MapImage.is_active == True).order_by(MapImage.display_order).all()
+    
+    return render_template('map_quiz_index.html', genres=active_genres, others_maps=others_maps)
+
+@app.route('/map_quiz/play/<int:map_id>')
+def map_quiz_play(map_id):
+    map_obj = MapImage.query.get_or_404(map_id)
+    # Security: If not active and not admin, block
+    if not map_obj.is_active and not session.get('is_admin'):
+         flash('この地図は現在非公開です', 'warning')
+         return redirect(url_for('map_quiz_index'))
+         
+    return render_template('map_quiz_play.html', map_id=map_id, map_name=map_obj.name)
+
+@app.route('/api/map_quiz/map/<int:map_id>/play_data')
+def api_get_map_play_data(map_id):
+    map_obj = MapImage.query.get_or_404(map_id)
+    
+    # Security: If not active and not admin, block
+    if not map_obj.is_active and not session.get('is_admin'):
+         return jsonify({'status': 'error', 'message': 'Map is private'})
+    
+    # Filter by Difficulty
+    difficulty = request.args.get('difficulty', type=int)
+    
+    query = MapQuizProblem.query.join(MapLocation).filter(MapLocation.map_image_id == map_id)
+    
+    if difficulty and difficulty > 0:
+        query = query.filter(MapQuizProblem.difficulty == difficulty)
+    
+    problems = query.all()
+    locations = map_obj.locations
+    
+    return jsonify({
+        'status': 'success',
+        'map': {'id': map_obj.id, 'name': map_obj.name, 'filename': map_obj.filename},
+        'locations': [{'id': l.id, 'x': l.x_coordinate, 'y': l.y_coordinate, 'name': l.name} for l in locations],
+        'problems': [{
+            'id': p.id, 
+            'location_id': p.map_location_id, 
+            'question': p.question_text, 
+            'explanation': p.explanation,
+            'difficulty': p.difficulty if p.difficulty is not None else 2
+        } for p in problems]
+    })
+
+@app.route('/api/map_quiz/map/<int:map_id>/difficulty_counts')
+def api_get_map_difficulty_counts(map_id):
+    map_obj = MapImage.query.get_or_404(map_id)
+    
+    # Base query for problems associated with this map
+    base_query = MapQuizProblem.query.join(MapLocation).filter(MapLocation.map_image_id == map_id)
+    
+    counts = {
+        'total': base_query.count(),
+        'easy': base_query.filter(MapQuizProblem.difficulty == 1).count(),
+        'standard': base_query.filter(MapQuizProblem.difficulty == 2).count(),
+        'hard': base_query.filter(MapQuizProblem.difficulty == 3).count()
+    }
+    
+    return jsonify({
+        'status': 'success',
+        'map_id': map_id,
+        'counts': counts
+    })
 @app.route('/admin/essay/download_csv')
 def admin_essay_download_csv():
     """論述問題一覧をCSVとしてダウンロード"""
@@ -19377,6 +19806,35 @@ check_and_create_correction_tables()
 
 with app.app_context():
     _add_all_unlocked_column_to_room_setting() # 🆕
+
+def _create_map_quiz_tables():
+    """Map Quiz related tables migration"""
+    try:
+        inspector = inspect(db.engine)
+        table_names = inspector.get_table_names()
+        
+        with db.engine.connect() as conn:
+            if 'map_image' not in table_names:
+                print("🔄 map_image table creating...")
+                MapImage.__table__.create(db.engine)
+                print("✅ map_image table created")
+                
+            if 'map_location' not in table_names:
+                print("🔄 map_location table creating...")
+                MapLocation.__table__.create(db.engine)
+                print("✅ map_location table created")
+                
+            if 'map_quiz_problem' not in table_names:
+                print("🔄 map_quiz_problem table creating...")
+                MapQuizProblem.__table__.create(db.engine)
+                print("✅ map_quiz_problem table created")
+
+    except Exception as e:
+        print(f"⚠️ Map Quiz tables migration error: {e}")
+
+with app.app_context():
+    _create_map_quiz_tables()
+
 
 
 if __name__ == '__main__':
