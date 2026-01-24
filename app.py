@@ -14375,8 +14375,14 @@ def serve_map_image(filename):
 # API Endpoints for Admin UI
 @app.route('/admin/api/map_quiz/maps')
 def api_get_maps():
-    maps = MapImage.query.order_by(MapImage.created_at.desc()).all()
-    return jsonify({'maps': [{'id': m.id, 'name': m.name, 'filename': m.filename} for m in maps]})
+    try:
+        if not session.get('user_id'):
+            return jsonify({'status': 'error', 'message': 'Unauthorized'}), 401
+        maps = MapImage.query.order_by(MapImage.created_at.desc()).all()
+        return jsonify({'maps': [{'id': m.id, 'name': m.name, 'filename': m.filename} for m in maps]})
+    except Exception as e:
+        logger.error(f"Error in api_get_maps: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/admin/api/map_quiz/map/<int:map_id>/delete', methods=['POST'])
 def api_delete_map(map_id):
@@ -14398,24 +14404,30 @@ def api_delete_map(map_id):
 
 @app.route('/admin/api/map_quiz/genres')
 def api_get_map_genres():
-    genres = MapGenre.query.order_by(MapGenre.display_order).all()
-    others_maps = MapImage.query.filter(MapImage.genre_id == None).all()
-    
-    result = []
-    for g in genres:
-        maps = g.maps # Now a list, no .all() needed
-        result.append({
-            'id': g.id,
-            'name': g.name,
-            'maps': [{'id': m.id, 'name': m.name, 'is_active': m.is_active} for m in maps]
-        })
-    if others_maps:
-        result.append({
-            'id': 'others',
-            'name': 'その他',
-            'maps': [{'id': m.id, 'name': m.name, 'is_active': m.is_active} for m in others_maps]
-        })
-    return jsonify({'genres': result})
+    try:
+        if not session.get('user_id'):
+            return jsonify({'status': 'error', 'message': 'Unauthorized'}), 401
+        genres = MapGenre.query.order_by(MapGenre.display_order).all()
+        others_maps = MapImage.query.filter(MapImage.genre_id == None).all()
+        
+        result = []
+        for g in genres:
+            maps = g.maps # Now a list, no .all() needed
+            result.append({
+                'id': g.id,
+                'name': g.name,
+                'maps': [{'id': m.id, 'name': m.name, 'is_active': m.is_active} for m in maps]
+            })
+        if others_maps:
+            result.append({
+                'id': 'others',
+                'name': 'その他',
+                'maps': [{'id': m.id, 'name': m.name, 'is_active': m.is_active} for m in others_maps]
+            })
+        return jsonify({'genres': result})
+    except Exception as e:
+        logger.error(f"Error in api_get_map_genres: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/admin/api/map_quiz/map/<int:map_id>/toggle_status', methods=['POST'])
 def api_toggle_map_status(map_id):
@@ -14511,13 +14523,23 @@ def api_delete_map_genre():
 
 @app.route('/admin/api/map_quiz/map/<int:map_id>/locations')
 def api_get_map_locations(map_id):
-    locs = MapLocation.query.filter_by(map_image_id=map_id).all()
-    return jsonify({'locations': [{
-        'id': l.id, 
-        'name': l.name, 
-        'x': l.x_coordinate, 
-        'y': l.y_coordinate
-    } for l in locs]})
+    try:
+        if not session.get('user_id'):
+            return jsonify({'status': 'error', 'message': 'Unauthorized'}), 401
+            
+        locs = MapLocation.query.filter_by(map_image_id=map_id).all()
+        return jsonify({
+            'status': 'success',
+            'locations': [{
+                'id': l.id, 
+                'name': l.name, 
+                'x': l.x_coordinate, 
+                'y': l.y_coordinate
+            } for l in locs]
+        })
+    except Exception as e:
+        logger.error(f"Error in api_get_map_locations: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/admin/api/map_quiz/location/add', methods=['POST'])
 def api_add_map_location():
@@ -14567,13 +14589,19 @@ def api_delete_map_location(loc_id):
 
 @app.route('/admin/api/map_quiz/location/<int:loc_id>/problems')
 def api_get_location_problems(loc_id):
-    probs = MapQuizProblem.query.filter_by(map_location_id=loc_id).all()
-    return jsonify({'problems': [{
-        'id': p.id,
-        'question': p.question_text,
-        'explanation': p.explanation,
-        'difficulty': p.difficulty # Return difficulty
-    } for p in probs]})
+    try:
+        if not session.get('user_id'):
+            return jsonify({'status': 'error', 'message': 'Unauthorized'}), 401
+        probs = MapQuizProblem.query.filter_by(map_location_id=loc_id).all()
+        return jsonify({'problems': [{
+            'id': p.id,
+            'question': p.question_text,
+            'explanation': p.explanation,
+            'difficulty': p.difficulty # Return difficulty
+        } for p in probs]})
+    except Exception as e:
+        logger.error(f"Error in api_get_location_problems: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/admin/api/map_quiz/problem/add', methods=['POST'])
 def api_add_map_problem():
@@ -19808,12 +19836,19 @@ with app.app_context():
     _add_all_unlocked_column_to_room_setting() # 🆕
 
 def _create_map_quiz_tables():
-    """Map Quiz related tables migration"""
+    """Map Quiz related tables and columns migration"""
+    from sqlalchemy import text, inspect
     try:
         inspector = inspect(db.engine)
         table_names = inspector.get_table_names()
         
         with db.engine.connect() as conn:
+            # 1. Table Creation
+            if 'map_genre' not in table_names:
+                print("🔄 map_genre table creating...")
+                MapGenre.__table__.create(db.engine)
+                print("✅ map_genre table created")
+                
             if 'map_image' not in table_names:
                 print("🔄 map_image table creating...")
                 MapImage.__table__.create(db.engine)
@@ -19828,6 +19863,40 @@ def _create_map_quiz_tables():
                 print("🔄 map_quiz_problem table creating...")
                 MapQuizProblem.__table__.create(db.engine)
                 print("✅ map_quiz_problem table created")
+
+            # 2. Column Migrations (Ensure all expected columns exist)
+            tables_to_check = {
+                'map_image': [
+                    ('genre_id', 'INTEGER'),
+                    ('display_order', 'INTEGER DEFAULT 0'),
+                    ('is_active', 'BOOLEAN DEFAULT TRUE')
+                ],
+                'map_location': [
+                    ('map_image_id', 'INTEGER'),
+                    ('name', 'VARCHAR(100)'),
+                    ('x_coordinate', 'FLOAT'),
+                    ('y_coordinate', 'FLOAT')
+                ],
+                'map_quiz_problem': [
+                    ('map_location_id', 'INTEGER'),
+                    ('question_text', 'TEXT'),
+                    ('explanation', 'TEXT'),
+                    ('difficulty', 'INTEGER DEFAULT 2')
+                ]
+            }
+
+            for table, columns in tables_to_check.items():
+                if table in inspector.get_table_names():
+                    existing_cols = [c['name'] for c in inspector.get_columns(table)]
+                    for col_name, col_type in columns:
+                        if col_name not in existing_cols:
+                            print(f"Migrating: Adding {col_name} to {table}")
+                            try:
+                                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {col_name} {col_type}"))
+                                conn.commit()
+                                print(f"✅ Column {col_name} added to {table}")
+                            except Exception as alter_e:
+                                print(f"⚠️ Error adding {col_name} to {table}: {alter_e}")
 
     except Exception as e:
         print(f"⚠️ Map Quiz tables migration error: {e}")

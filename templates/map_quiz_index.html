@@ -1,10 +1,38 @@
 {% extends "base.html" %}
 
+{% block head_extra %}
+<link href="https://fonts.googleapis.com/css2?family=Yuji+Boku&family=Kaisei+Tokumin:wght@400;700&display=swap"
+    rel="stylesheet">
+<style>
+    .map-quiz-title {
+        font-family: 'Yuji Boku', serif;
+        font-size: 2.2rem;
+        background: linear-gradient(135deg, #0d6efd 0%, #003d99 100%);
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+        display: inline-flex;
+        align-items: center;
+        letter-spacing: 0.05em;
+    }
+
+    .map-quiz-title i {
+        -webkit-text-fill-color: #0d6efd;
+        /* Reset for icon */
+        margin-right: 12px;
+        filter: drop-shadow(2px 2px 2px rgba(0, 0, 0, 0.1));
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container mt-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2><i class="fas fa-globe-americas text-primary"></i> 地図の極み</h2>
-        <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">ホームへ戻る</a>
+        <h2 class="map-quiz-title"><i class="fas fa-globe-americas"></i>地図の深淵</h2>
+        <a href="{{ url_for('index') }}" class="btn btn-outline-secondary rounded-pill px-4">
+            <i class="fas fa-home me-1"></i> ホーム
+        </a>
     </div>
 
     <div class="alert alert-light border shadow-sm">
