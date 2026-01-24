@@ -146,7 +146,7 @@
             pinBtn.onclick = (e) => onPinClick(e, loc.id);
 
             // Icon: anchor bottom-center to wrapper (0,0)
-            const iconHtml = `<i class="fas fa-map-marker-alt text-danger fa-5x" style="position: absolute; left: 0; top: 0; transform: translate(-50%, -100%); filter: drop-shadow(0 4px 6px rgba(0,0,0,0.5)); transition: all 0.2s;"></i>`;
+            const iconHtml = `<i class="fas fa-map-marker-alt text-danger fa-2x" style="position: absolute; left: 0; top: 0; transform: translate(-50%, -100%); filter: drop-shadow(0 2px 3px rgba(0,0,0,0.5)); transition: all 0.2s;"></i>`;
 
             // Label (Only if name is not empty)
             let labelHtml = '';
@@ -184,7 +184,7 @@
 
         // Reset Pin Styles
         document.querySelectorAll('.game-pin i').forEach(icon => {
-            icon.className = 'fas fa-map-marker-alt text-danger fa-5x';
+            icon.className = 'fas fa-map-marker-alt text-danger fa-2x';
         });
 
         document.getElementById('gameArea').classList.remove('disable-clicks');
@@ -207,12 +207,12 @@
         const correctPin = document.getElementById(`pin-${correctLocId}`).querySelector('i');
 
         if (isCorrect) {
-            clickedPin.className = 'fas fa-map-marker-alt text-success fa-7x'; // Green & Bigger
+            clickedPin.className = 'fas fa-map-marker-alt text-success fa-3x'; // Green & Bigger
             playAudio('correct');
             mqCorrectCount++;
         } else {
-            clickedPin.className = 'fas fa-map-marker-alt text-secondary fa-5x'; // Grey
-            correctPin.className = 'fas fa-map-marker-alt text-success fa-7x'; // Show correct one
+            clickedPin.className = 'fas fa-map-marker-alt text-secondary fa-2x'; // Grey
+            correctPin.className = 'fas fa-map-marker-alt text-success fa-3x'; // Show correct one
             correctPin.classList.add('fa-bounce');
             playAudio('wrong');
 
