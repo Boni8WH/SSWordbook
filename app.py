@@ -19866,6 +19866,10 @@ def _create_map_quiz_tables():
 
             # 2. Column Migrations (Ensure all expected columns exist)
             tables_to_check = {
+                'map_genre': [
+                    ('name', 'VARCHAR(100)'),
+                    ('display_order', 'INTEGER DEFAULT 0')
+                ],
                 'map_image': [
                     ('genre_id', 'INTEGER'),
                     ('display_order', 'INTEGER DEFAULT 0'),
