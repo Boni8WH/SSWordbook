@@ -213,6 +213,9 @@
             correctLabel.style.display = 'block';
         }
 
+        const clickedPin = document.getElementById(`pin-${locId}`).querySelector('i');
+        const correctPin = document.getElementById(`pin-${correctLocId}`).querySelector('i');
+
         if (isCorrect) {
             clickedPin.className = 'fas fa-map-marker-alt text-success fa-3x'; // Green & Bigger
             playAudio('correct');
@@ -249,7 +252,7 @@
 
             // If location name is empty, don't show "Correct is XX"
             if (correctLoc.name && correctLoc.name.trim() !== "") {
-                feedbackHtml = `<div class="mb-1"><i class="fas fa-times-circle"></i> 不正解... <span class="fw-bold text-success">正解は「${correctLoc.name}」</span>です。</div>`;
+                feedbackHtml = `<div class="mb-1"><i class="fas fa-times-circle"></i> 不正解... </div>`;
                 feedbackHtml += `<div class="mb-2 small text-muted">あなたが選択したのは「${clickedName}」です。</div>`;
                 feedbackHtml += explanationContent;
             } else {
