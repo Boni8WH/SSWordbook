@@ -19947,14 +19947,6 @@ def _create_map_quiz_tables():
         # 3. Data Migration (Optional: Copy from old tables to new mq_ tables if empty)
         try:
             # Check if old tables exist
-            if 'map_image' in table_names and 'mq_image' in table_names:
-                checker = db.session.execute(text("SELECT count(*) FROM mq_image")).scalar()
-                if checker == 0:
-                     print("🔄 Migrating data from map_image to mq_image...")
-                     db.session.execute(text("INSERT INTO mq_image (id, name, genre_id, display_order, filename, image_data, is_active, created_at) SELECT id, name, genre_id, display_order, filename, image_data, is_active, created_at FROM map_image"))
-                     db.session.commit()
-                     print("✅ map_image data migrated to mq_image")
-            
             if 'map_genre' in table_names and 'mq_genre' in table_names:
                 checker = db.session.execute(text("SELECT count(*) FROM mq_genre")).scalar()
                 if checker == 0:
@@ -19962,6 +19954,14 @@ def _create_map_quiz_tables():
                      db.session.execute(text("INSERT INTO mq_genre (id, name, display_order) SELECT id, name, display_order FROM map_genre"))
                      db.session.commit()
                      print("✅ map_genre data migrated to mq_genre")
+
+            if 'map_image' in table_names and 'mq_image' in table_names:
+                checker = db.session.execute(text("SELECT count(*) FROM mq_image")).scalar()
+                if checker == 0:
+                     print("🔄 Migrating data from map_image to mq_image...")
+                     db.session.execute(text("INSERT INTO mq_image (id, name, genre_id, display_order, filename, image_data, is_active, created_at) SELECT id, name, genre_id, display_order, filename, image_data, is_active, created_at FROM map_image"))
+                     db.session.commit()
+                     print("✅ map_image data migrated to mq_image")
         except Exception as data_e:
             print(f"⚠️ Data migration error: {data_e}")
             db.session.rollback()
