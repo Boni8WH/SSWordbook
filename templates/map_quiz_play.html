@@ -23,7 +23,8 @@
     </div>
 
     <!-- Map Area -->
-    <div class="position-relative flex-grow-1 bg-secondary overflow-hidden" id="gameArea" style="cursor: grab;">
+    <div class="position-relative flex-grow-1 bg-secondary overflow-hidden" id="gameArea"
+        style="cursor: grab; touch-action: none;">
         <div id="mapWrapper" style="transform-origin: 0 0; position: absolute; top: 0; left: 0;">
             <img id="gameMapImage" src="" style="display: block; max-width: none;" draggable="false">
             <div id="gamePinsContainer"></div>
@@ -383,8 +384,8 @@
     }
 
     function initPanZoom() {
+        // Mouse Events
         gameArea.onmousedown = function (e) {
-            // ... (keep existing)
             e.preventDefault();
             startX = e.clientX - pointX;
             startY = e.clientY - pointY;
@@ -413,7 +414,6 @@
 
             (delta > 0) ? (scale *= 1.2) : (scale /= 1.2);
 
-            // Limits
             if (scale < 0.1) scale = 0.1;
             if (scale > 5) scale = 5;
 
@@ -422,10 +422,106 @@
 
             setTransform();
         };
+
+        // Touch Events (Mobile Support)
+        gameArea.addEventListener('touchstart', handleTouchStart, { passive: false });
+        gameArea.addEventListener('touchmove', handleTouchMove, { passive: false });
+        gameArea.addEventListener('touchend', handleTouchEnd);
+    }
+
+    // Touch State
+    let lastTouchX = 0;
+    let lastTouchY = 0;
+    let initialPinchDistance = null;
+    let initialScale = 1;
+
+    function handleTouchStart(e) {
+        if (e.touches.length === 1) {
+            // Single touch - Pan
+            const touch = e.touches[0];
+            startX = touch.clientX - pointX;
+            startY = touch.clientY - pointY;
+            panning = true;
+        } else if (e.touches.length === 2) {
+            // key: Multi touch - Pinch Zoom
+            panning = false;
+            initialPinchDistance = getDistance(e.touches);
+            initialScale = scale;
+        }
+    }
+
+    function handleTouchMove(e) {
+        e.preventDefault(); // Prevent scrolling
+
+        if (e.touches.length === 1 && panning) {
+            // Pan
+            const touch = e.touches[0];
+            pointX = touch.clientX - startX;
+            pointY = touch.clientY - startY;
+            setTransform();
+        } else if (e.touches.length === 2 && initialPinchDistance) {
+            // Pinch Zoom
+            const currentDistance = getDistance(e.touches);
+            const zoomFactor = currentDistance / initialPinchDistance;
+
+            // Calculate center point between two fingers
+            const center = getCenter(e.touches);
+            const cx = center.x;
+            const cy = center.y;
+
+            // Calculate world coordinates of that center
+            const wx = (cx - pointX) / scale;
+            const wy = (cy - pointY) / scale;
+
+            // Apply new scale
+            let newScale = initialScale * zoomFactor;
+
+            // Limits
+            if (newScale < 0.1) newScale = 0.1;
+            if (newScale > 5) newScale = 5;
+
+            scale = newScale;
+
+            // Adjust pointX/Y to keep world center at screen center
+            pointX = cx - wx * scale;
+            pointY = cy - wy * scale;
+
+            setTransform();
+        }
+    }
+
+    function handleTouchEnd(e) {
+        if (e.touches.length < 2) {
+            initialPinchDistance = null;
+        }
+        if (e.touches.length === 0) {
+            panning = false;
+        }
+    }
+
+    // Helper: Distance between two touch points
+    function getDistance(touches) {
+        const dx = touches[0].clientX - touches[1].clientX;
+        const dy = touches[0].clientY - touches[1].clientY;
+        return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    // Helper: Center point between two touch points
+    function getCenter(touches) {
+        return {
+            x: (touches[0].clientX + touches[1].clientX) / 2,
+            y: (touches[0].clientY + touches[1].clientY) / 2
+        };
     }
 
     function setTransform() {
         mapWrapper.style.transform = "translate(" + pointX + "px, " + pointY + "px) scale(" + scale + ")";
+
+        // Counter-scale pins
+        const invScale = 1 / scale;
+        document.querySelectorAll('.game-pin').forEach(pin => {
+            pin.style.transform = `scale(${invScale})`;
+        });
     }
 
     function zoomMap(factor) {
