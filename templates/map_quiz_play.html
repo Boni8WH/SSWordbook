@@ -1,0 +1,522 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid p-0" style="height: calc(100vh - 56px); display: flex; flex-direction: column;">
+    <!-- Quiz Header / Question Area -->
+    <div class="p-3 shadow-sm"
+        style="flex-shrink: 0; z-index: 1000; background-color: #ffffff !important; color: #212529 !important; border-bottom: 1px solid #dee2e6;">
+        <div class="container d-flex justify-content-between align-items-center">
+            <div style="flex: 1;">
+                <span class="badge bg-secondary mb-1" id="progressBadge">Question 1</span>
+                <h4 id="questionText" class="mb-0 fw-bold">Loading...</h4>
+                <div id="explanationText" class="mt-2 text-danger fw-bold" style="display: none;"></div>
+            </div>
+            <div class="text-end ms-3">
+                <div class="form-check form-switch mb-2">
+                    <input class="form-check-input" type="checkbox" id="userShowLabelsToggle" onchange="toggleLabels()">
+                    <label class="form-check-label small" for="userShowLabelsToggle"
+                        style="color: #212529;">地名表示</label>
+                </div>
+                <a href="{{ url_for('map_quiz_index') }}" class="btn btn-sm btn-outline-secondary">終了</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Map Area -->
+    <div class="position-relative flex-grow-1 bg-secondary overflow-hidden" id="gameArea" style="cursor: grab;">
+        <div id="mapWrapper" style="transform-origin: 0 0; position: absolute; top: 0; left: 0;">
+            <img id="gameMapImage" src="" style="display: block; max-width: none;" draggable="false">
+            <div id="gamePinsContainer"></div>
+        </div>
+
+        <!-- Zoom Controls -->
+        <div class="position-absolute bottom-0 end-0 mb-4 me-3 d-flex flex-column gap-2" style="z-index: 500;">
+            <button class="btn btn-light shadow rounded-circle p-0 d-flex align-items-center justify-content-center"
+                style="width: 40px; height: 40px;" onclick="zoomMap(1.2)" title="拡大">
+                <i class="fas fa-plus"></i>
+            </button>
+            <button class="btn btn-light shadow rounded-circle p-0 d-flex align-items-center justify-content-center"
+                style="width: 40px; height: 40px;" onclick="zoomMap(0.8)" title="縮小">
+                <i class="fas fa-minus"></i>
+            </button>
+        </div>
+
+        <!-- Next Button Overlay -->
+        <div id="nextButtonContainer" class="position-absolute bottom-0 start-50 translate-middle-x mb-5"
+            style="display: none; z-index: 9999; padding-bottom: 20px;">
+            <button class="btn btn-lg btn-primary rounded-pill px-5 shadow" onclick="nextQuestion()"
+                style="border: 2px solid #fff;">
+                次の問題へ <i class="fas fa-arrow-right"></i>
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Game State (Renamed to prevent collision with script.js)
+    const MAP_ID = {{ map_id }};
+    let mqQuizData = null;
+    let mqQuestions = []; // List of problems
+    let mqCurrentIndex = 0;
+    let mqCurrentQuestion = null;
+    let showLabels = false;
+
+    // Lock for multi-click prevention
+    let mqIsAnswered = false;
+
+    // Result Tracking
+    let mqCorrectCount = 0;
+    let mqIncorrectQuestions = []; // objects { question, correctName, explanation }
+
+    // Zoom/Pan State (Simple implementation)
+    let scale = 1;
+    let panning = false;
+    let pointX = 0;
+    let pointY = 0;
+    let startX = 0;
+    let startY = 0;
+
+    const gameArea = document.getElementById('gameArea');
+    const mapWrapper = document.getElementById('mapWrapper');
+
+    document.addEventListener('DOMContentLoaded', function () {
+        initGame();
+        initPanZoom();
+    });
+
+    async function initGame() {
+        try {
+            console.log("Fetching quiz data for map " + MAP_ID);
+            // Get difficulty from URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const difficulty = urlParams.get('difficulty');
+            let apiUrl = `/api/map_quiz/map/${MAP_ID}/play_data`;
+            if (difficulty) {
+                apiUrl += `?difficulty=${difficulty}`;
+            }
+
+            const response = await fetch(apiUrl);
+            const data = await response.json();
+            console.log("Quiz Data:", data);
+
+            if (data.status === 'error') throw new Error(data.message);
+
+            mqQuizData = data;
+
+            // Set Map Image
+            document.getElementById('gameMapImage').src = `/serve_map_image/${data.map.filename}`;
+            document.getElementById('gameMapImage').onload = () => {
+                fitMapToScreen();
+            };
+
+            // Render Pins
+            renderPins();
+
+            // Prepare Questions (Shuffle)
+            mqQuestions = shuffle(data.problems);
+
+            if (mqQuestions.length === 0) {
+                document.getElementById('questionText').innerText = '問題がありません';
+            } else {
+                showQuestion(0);
+            }
+
+        } catch (e) {
+            alert('ロードエラー: ' + e.message);
+        }
+    }
+
+    function renderPins() {
+        const container = document.getElementById('gamePinsContainer');
+        container.innerHTML = '';
+
+        mqQuizData.locations.forEach(loc => {
+            const pinBtn = document.createElement('div');
+            pinBtn.className = 'game-pin';
+            pinBtn.id = `pin-${loc.id}`;
+            pinBtn.style.position = 'absolute';
+            pinBtn.style.left = `${loc.x}%`;
+            pinBtn.style.top = `${loc.y}%`;
+            // Wrapper 0 size, no transform on wrapper
+            pinBtn.style.width = '0';
+            pinBtn.style.height = '0';
+            pinBtn.style.overflow = 'visible';
+            pinBtn.style.cursor = 'pointer';
+            pinBtn.onclick = (e) => onPinClick(e, loc.id);
+
+            // Icon: anchor bottom-center to wrapper (0,0)
+            const iconHtml = `<i class="fas fa-map-marker-alt text-danger fa-5x" style="position: absolute; left: 0; top: 0; transform: translate(-50%, -100%); filter: drop-shadow(0 4px 6px rgba(0,0,0,0.5)); transition: all 0.2s;"></i>`;
+
+            // Label (Only if name is not empty)
+            let labelHtml = '';
+            if (loc.name && loc.name.trim() !== "") {
+                labelHtml = `<div class="pin-label badge bg-light text-dark border shadow-sm" style="position: absolute; left: 15px; top: -35px; font-size: 14px; white-space: nowrap; display: ${showLabels ? 'block' : 'none'};">${loc.name}</div>`;
+            }
+
+            pinBtn.innerHTML = iconHtml + labelHtml;
+            container.appendChild(pinBtn);
+        });
+    }
+
+    function showQuestion(index) {
+        mqCurrentIndex = index;
+        mqCurrentQuestion = mqQuestions[index];
+        mqIsAnswered = false; // Reset lock
+
+        document.getElementById('progressBadge').innerText = `Q ${index + 1} / ${mqQuestions.length}`;
+
+        // Debug/Fallback for empty question
+        let qText = mqCurrentQuestion.question;
+        if (!qText) {
+            console.warn("Question text is empty for ID:", mqCurrentQuestion.id);
+            qText = "(問題文が読み込めませんでした)";
+        }
+
+        const qTextEl = document.getElementById('questionText');
+        qTextEl.innerText = qText;
+
+        // Force text visibility style if needed
+        qTextEl.style.color = '#212529'; // Ensure dark on white
+
+        document.getElementById('explanationText').style.display = 'none';
+        document.getElementById('nextButtonContainer').style.display = 'none';
+
+        // Reset Pin Styles
+        document.querySelectorAll('.game-pin i').forEach(icon => {
+            icon.className = 'fas fa-map-marker-alt text-danger fa-5x';
+        });
+
+        document.getElementById('gameArea').classList.remove('disable-clicks');
+    }
+
+    function onPinClick(e, locId) {
+        e.stopPropagation();
+        if (!mqCurrentQuestion) return;
+        if (mqIsAnswered) return; // Prevent multi click
+
+        mqIsAnswered = true; // Lock
+
+        // Check Answer
+        const isCorrect = (locId === mqCurrentQuestion.location_id);
+        const correctLocId = mqCurrentQuestion.location_id;
+        const correctLoc = mqQuizData.locations.find(l => l.id === correctLocId);
+
+        // Visual Feedback
+        const clickedPin = document.getElementById(`pin-${locId}`).querySelector('i');
+        const correctPin = document.getElementById(`pin-${correctLocId}`).querySelector('i');
+
+        if (isCorrect) {
+            clickedPin.className = 'fas fa-map-marker-alt text-success fa-7x'; // Green & Bigger
+            playAudio('correct');
+            mqCorrectCount++;
+        } else {
+            clickedPin.className = 'fas fa-map-marker-alt text-secondary fa-5x'; // Grey
+            correctPin.className = 'fas fa-map-marker-alt text-success fa-7x'; // Show correct one
+            correctPin.classList.add('fa-bounce');
+            playAudio('wrong');
+
+            // Record incorrect answer
+            mqIncorrectQuestions.push({
+                question: mqCurrentQuestion.question || "(問題文なし)",
+                correctName: correctLoc.name || "",
+                explanation: mqCurrentQuestion.explanation || ""
+            });
+        }
+
+        // Show Explanation
+        const explain = document.getElementById('explanationText');
+
+        let feedbackHtml = "";
+        let explanationContent = mqCurrentQuestion.explanation || "";
+
+        if (isCorrect) {
+            feedbackHtml = `<i class="fas fa-check-circle"></i> 正解！ ${explanationContent}`;
+        } else {
+            // If location name is empty, don't show "Correct is XX"
+            if (correctLoc.name && correctLoc.name.trim() !== "") {
+                feedbackHtml = `<i class="fas fa-times-circle"></i> 不正解... 正解は「${correctLoc.name}」です。<br>${explanationContent}`;
+            } else {
+                feedbackHtml = `<i class="fas fa-times-circle"></i> 不正解... <br>${explanationContent}`;
+            }
+        }
+
+        explain.innerHTML = feedbackHtml;
+        explain.style.display = 'block';
+
+        // Show Next Button
+        document.getElementById('nextButtonContainer').style.display = 'block';
+    }
+
+    function nextQuestion() {
+        if (mqCurrentIndex < mqQuestions.length - 1) {
+            showQuestion(mqCurrentIndex + 1);
+        } else {
+            showResult();
+        }
+    }
+
+    function showResult() {
+        const total = mqQuestions.length;
+        const correct = mqCorrectCount;
+        const percentage = total === 0 ? 0 : Math.round((correct / total) * 100);
+
+        document.getElementById('resultScore').innerText = correct;
+        document.getElementById('resultTotal').innerText = total;
+        document.getElementById('resultPercentage').innerText = `正解率: ${percentage}%`;
+
+        // Message & Icon Logic
+        const msgEl = document.getElementById('resultMessage');
+        const iconEl = document.getElementById('resultIcon');
+
+        iconEl.style.display = 'none';
+
+        if (percentage === 100) {
+            msgEl.innerText = "Perfect!! 素晴らしい！";
+            msgEl.className = "fw-bold text-warning";
+            iconEl.className = "fas fa-crown fa-4x text-warning mb-3";
+            iconEl.style.display = 'inline-block';
+            // Start confetti here if implemented
+        } else if (percentage >= 80) {
+            msgEl.innerText = "Great Job! あと少し！";
+            msgEl.className = "fw-bold text-primary";
+            iconEl.className = "fas fa-star fa-4x text-primary mb-3";
+            iconEl.style.display = 'inline-block';
+        } else if (percentage >= 60) {
+            msgEl.innerText = "Good! その調子！";
+            msgEl.className = "fw-bold text-success";
+        } else {
+            msgEl.innerText = "Fight! 次は頑張ろう";
+            msgEl.className = "fw-bold text-secondary";
+        }
+
+        const wrongList = document.getElementById('wrongAnswersList');
+        const wrongSection = document.getElementById('wrongAnswersSection');
+
+        wrongList.innerHTML = '';
+
+        if (mqIncorrectQuestions.length > 0) {
+            mqIncorrectQuestions.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'list-group-item bg-transparent border-bottom';
+
+                let correctInfo = '';
+                if (item.correctName) {
+                    correctInfo = `<div class="mt-1"><span class="badge bg-success bg-opacity-10 text-success">正解</span> <span class="fw-bold">${item.correctName}</span></div>`;
+                }
+
+                let explanation = '';
+                if (item.explanation) {
+                    explanation = `<div class="mt-1 small text-muted"><i class="fas fa-lightbulb text-warning me-1"></i>${item.explanation}</div>`;
+                }
+
+                div.innerHTML = `
+                    <div class="fw-bold text-dark">${item.question}</div>
+                    ${correctInfo}
+                    ${explanation}
+                `;
+                wrongList.appendChild(div);
+            });
+            wrongSection.style.display = 'block';
+        } else {
+            wrongSection.style.display = 'none';
+        }
+
+        // Show Overlay (explicitly set flex to use flex utilities)
+        document.getElementById('resultOverlay').style.display = 'flex';
+    }
+
+    function toggleLabels() {
+        showLabels = document.getElementById('userShowLabelsToggle').checked;
+        document.querySelectorAll('.pin-label').forEach(el => {
+            el.style.display = showLabels ? 'block' : 'none';
+        });
+    }
+
+    // Helper: Shuffle Array
+    function shuffle(array) {
+        let currentIndex = array.length, randomIndex;
+        while (currentIndex != 0) {
+            randomIndex = Math.floor(Math.random() * currentIndex);
+            currentIndex--;
+            [array[currentIndex], array[randomIndex]] = [
+                array[randomIndex], array[currentIndex]];
+        }
+        return array;
+    }
+
+    // Helper: Audio (Placeholder)
+    function playAudio(type) {
+        // Implement audio if available
+    }
+
+    // Zoom/Pan Implementation
+    function fitMapToScreen() {
+        const img = document.getElementById('gameMapImage');
+        const container = document.getElementById('gameArea');
+
+        if (!img.naturalWidth) return;
+
+        const containerW = container.clientWidth;
+        const containerH = container.clientHeight;
+        const imgW = img.naturalWidth;
+        const imgH = img.naturalHeight;
+
+        // Calculate scale to "contain" the image
+        // Use 0.95 factor to leave a small margin
+        const scaleX = (containerW * 0.95) / imgW;
+        const scaleY = (containerH * 0.95) / imgH;
+        scale = Math.min(scaleX, scaleY); // Fit entirely visible
+
+        // Initial centering
+        // Because transform-origin is 0 0, we calculate the top-left offset
+        const scaledW = imgW * scale;
+        const scaledH = imgH * scale;
+
+        pointX = (containerW - scaledW) / 2;
+        pointY = (containerH - scaledH) / 2;
+
+        // Reset pan limits or start positions if needed
+        startX = 0;
+        startY = 0;
+
+        setTransform();
+    }
+
+    function initPanZoom() {
+        gameArea.onmousedown = function (e) {
+            // ... (keep existing)
+            e.preventDefault();
+            startX = e.clientX - pointX;
+            startY = e.clientY - pointY;
+            panning = true;
+            gameArea.style.cursor = 'grabbing';
+        };
+
+        gameArea.onmouseup = function (e) {
+            panning = false;
+            gameArea.style.cursor = 'grab';
+        };
+
+        gameArea.onmousemove = function (e) {
+            e.preventDefault();
+            if (!panning) return;
+            pointX = e.clientX - startX;
+            pointY = e.clientY - startY;
+            setTransform();
+        };
+
+        gameArea.onwheel = function (e) {
+            e.preventDefault();
+            const xs = (e.clientX - pointX) / scale,
+                ys = (e.clientY - pointY) / scale,
+                delta = -e.deltaY;
+
+            (delta > 0) ? (scale *= 1.2) : (scale /= 1.2);
+
+            // Limits
+            if (scale < 0.1) scale = 0.1;
+            if (scale > 5) scale = 5;
+
+            pointX = e.clientX - xs * scale;
+            pointY = e.clientY - ys * scale;
+
+            setTransform();
+        };
+    }
+
+    function setTransform() {
+        mapWrapper.style.transform = "translate(" + pointX + "px, " + pointY + "px) scale(" + scale + ")";
+    }
+
+    function zoomMap(factor) {
+        const container = document.getElementById('gameArea');
+        const cx = container.clientWidth / 2;
+        const cy = container.clientHeight / 2;
+
+        // Calculate world coordinates of center
+        const wx = (cx - pointX) / scale;
+        const wy = (cy - pointY) / scale;
+
+        scale *= factor;
+
+        // Limits
+        if (scale < 0.1) scale = 0.1;
+        if (scale > 5) scale = 5;
+
+        // Adjust pointX/Y to keep world center at screen center
+        pointX = cx - wx * scale;
+        pointY = cy - wy * scale;
+
+        setTransform();
+    }
+</script>
+
+<!-- Result Overlay -->
+<div id="resultOverlay" class="position-absolute top-0 start-0 w-100 h-100 justify-content-center align-items-center"
+    style="display: none; z-index: 10000; background-color: rgba(255, 255, 255, 0.95); backdrop-filter: blur(5px);">
+
+    <div class="card border-0 shadow-lg rounded-4 overflow-hidden"
+        style="max-width: 600px; width: 90%; max-height: 90vh; display: flex; flex-direction: column;">
+        <div class="card-header bg-primary text-white text-center py-4 border-0">
+            <h2 class="fw-bold mb-0"><i class="fas fa-flag-checkered me-2"></i> 結果発表</h2>
+        </div>
+
+        <div class="card-body p-4 p-md-5 text-center overflow-auto" style="flex: 1;">
+
+            <!-- Result Icon/Message -->
+            <div class="mb-4">
+                <i id="resultIcon" class="fas fa-crown fa-4x text-warning mb-3" style="display: none;"></i>
+                <h3 id="resultMessage" class="fw-bold text-dark"></h3>
+            </div>
+
+            <!-- Score Display -->
+            <div class="d-flex justify-content-center align-items-baseline mb-4">
+                <span id="resultScore" class="display-1 fw-bold text-primary" style="line-height: 1;">0</span>
+                <span class="fs-2 text-muted mx-2">/</span>
+                <span id="resultTotal" class="fs-2 text-muted">0</span>
+            </div>
+
+            <p id="resultPercentage" class="text-muted mb-4 fs-5"></p>
+
+            <!-- Wrong Answers Section -->
+            <div id="wrongAnswersSection" class="text-start mb-4 bg-light rounded-3 p-3" style="display: none;">
+                <h5 class="text-danger fw-bold mb-3 border-bottom pb-2">
+                    <i class="fas fa-exclamation-triangle me-2"></i> 復習しよう
+                </h5>
+                <div id="wrongAnswersList" class="list-group list-group-flush bg-transparent">
+                    <!-- Wrong answers injected here -->
+                </div>
+            </div>
+
+            <!-- Buttons -->
+            <div class="d-grid gap-3 d-sm-flex justify-content-center mt-auto">
+                <button class="btn btn-primary btn-lg rounded-pill px-5 shadow-sm hover-shadow"
+                    onclick="location.reload()">
+                    <i class="fas fa-redo me-2"></i>
+                </button>
+                <a href="{{ url_for('map_quiz_index') }}"
+                    class="btn btn-outline-secondary btn-lg rounded-pill px-5 shadow-sm">
+                    <i class="fas fa-map me-2"></i> 地図選択
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Override base container to allow full screen */
+    body>.container {
+        max-width: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        width: 100% !important;
+    }
+
+    .disable-clicks {
+        pointer-events: none;
+    }
+</style>
+
+{% block footer %}{% endblock %}
+{% block info_icon %}{% endblock %}
+{% endblock %}
