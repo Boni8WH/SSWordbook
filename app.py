@@ -671,6 +671,7 @@ class MapImage(db.Model):
     genre_id = db.Column(db.Integer, db.ForeignKey('map_genre.id'), nullable=True) # Link to MapGenre
     display_order = db.Column(db.Integer, default=0)
     filename = db.Column(db.String(255), nullable=False)
+    image_data = db.Column(db.LargeBinary, nullable=True) # BLOB storage for persistence
     is_active = db.Column(db.Boolean, default=False) # Public/Private status
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))
     
@@ -14329,14 +14330,17 @@ def admin_add_map_image():
             
         filename = secure_filename(file.filename)
         unique_filename = f"map_{int(time.time())}_{filename}"
+
+        # Read file data for DB storage
+        file_content = file.read()
+        file.seek(0) # Reset pointer to save to disk as well (fallback)
         
-        # Save to uploads/maps
+        # Save to disk as well
         upload_dir = os.path.join(app.root_path, 'uploads', 'maps')
         os.makedirs(upload_dir, exist_ok=True)
         file.save(os.path.join(upload_dir, unique_filename))
         
-        # Save to DB
-        # Logic: If genre matches existing MapGenre, use ID. If new, create MapGenre.
+        # Save to DB logic
         genre_name = request.form.get('genre', '').strip()
         genre_id = None
         
@@ -14345,16 +14349,19 @@ def admin_add_map_image():
             if existing_genre:
                 genre_id = existing_genre.id
             else:
-                # Create new
                 max_order = db.session.query(func.max(MapGenre.display_order)).scalar() or 0
                 new_genre_obj = MapGenre(name=genre_name, display_order=max_order + 1)
                 db.session.add(new_genre_obj)
                 db.session.commit()
                 genre_id = new_genre_obj.id
         
-        # New map logic using genre_id (display_order defaults to 0 or push to bottom)
-        # Default is_active=False as per user request
-        new_map = MapImage(name=name, genre_id=genre_id, filename=unique_filename, is_active=False)
+        new_map = MapImage(
+            name=name, 
+            genre_id=genre_id, 
+            filename=unique_filename, 
+            image_data=file_content, # Persistent BLOB
+            is_active=False
+        )
         db.session.add(new_map)
         db.session.commit()
         
@@ -14368,7 +14375,14 @@ def admin_add_map_image():
 
 @app.route('/serve_map_image/<path:filename>')
 def serve_map_image(filename):
-    # 画像配信用
+    # Try serving from DB first (Persistent)
+    map_obj = MapImage.query.filter_by(filename=filename).first()
+    if map_obj and map_obj.image_data:
+        import mimetypes
+        mime_type, _ = mimetypes.guess_type(filename)
+        return Response(map_obj.image_data, mimetype=mime_type or 'image/png')
+        
+    # Fallback to filesystem
     directory = os.path.join(app.root_path, 'uploads', 'maps')
     return send_from_directory(directory, filename)
 
@@ -19893,7 +19907,8 @@ def _create_map_quiz_tables():
                 'map_image': [
                     ('genre_id', 'INTEGER'),
                     ('display_order', 'INTEGER DEFAULT 0'),
-                    ('is_active', 'BOOLEAN DEFAULT TRUE')
+                    ('is_active', 'BOOLEAN DEFAULT TRUE'),
+                    ('image_data', 'BYTEA' if db.engine.dialect.name == 'postgresql' else 'BLOB')
                 ],
                 'map_location': [
                     ('map_image_id', 'INTEGER'),
@@ -19928,6 +19943,25 @@ def _create_map_quiz_tables():
                                      db.engine.connect().execute(text(f"ALTER TABLE {table} ADD COLUMN {col_name} {col_type}"))
                                      print(f"✅ Column {col_name} added via direct engine execution")
                                 except: pass
+
+        # 3. Post-Migration: Sync existing filesystem images to DB
+        try:
+            maps_to_sync = MapImage.query.filter(MapImage.image_data == None).all()
+            if maps_to_sync:
+                upload_dir = os.path.join(app.root_path, 'uploads', 'maps')
+                synced_count = 0
+                for m in maps_to_sync:
+                    file_path = os.path.join(upload_dir, m.filename)
+                    if os.path.exists(file_path):
+                        with open(file_path, 'rb') as f:
+                            m.image_data = f.read()
+                        synced_count += 1
+                if synced_count > 0:
+                    db.session.commit()
+                    print(f"✅ Auto-migrated {synced_count} images from local disk to DB")
+        except Exception as sync_e:
+            print(f"⚠️ Image sync error: {sync_e}")
+            db.session.rollback()
 
     except Exception as e:
         print(f"⚠️ Map Quiz tables migration error: {e}")
