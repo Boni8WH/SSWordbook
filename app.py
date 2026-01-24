@@ -14543,10 +14543,13 @@ def api_get_map_locations(map_id):
 
 @app.route('/admin/api/map_quiz/location/add', methods=['POST'])
 def api_add_map_location():
-    data = request.get_json()
     try:
+        if not session.get('user_id'):
+            return jsonify({'status': 'error', 'message': 'Unauthorized'}), 401
+            
+        data = request.get_json()
         loc = MapLocation(
-            map_image_id=data['map_id'],
+            map_image_id=int(data['map_id']), # Explicitly cast to int
             name=data['name'],
             x_coordinate=float(data['x']),
             y_coordinate=float(data['y'])
@@ -14556,6 +14559,7 @@ def api_add_map_location():
         return jsonify({'status': 'success', 'location': {'id': loc.id}})
     except Exception as e:
         db.session.rollback()
+        logger.error(f"Error in api_add_map_location: {e}")
         return jsonify({'status': 'error', 'message': str(e)})
 
 @app.route('/admin/api/map_quiz/location/<int:loc_id>/update', methods=['POST'])
@@ -14605,10 +14609,13 @@ def api_get_location_problems(loc_id):
 
 @app.route('/admin/api/map_quiz/problem/add', methods=['POST'])
 def api_add_map_problem():
-    data = request.get_json()
     try:
+        if not session.get('user_id'):
+            return jsonify({'status': 'error', 'message': 'Unauthorized'}), 401
+            
+        data = request.get_json()
         prob = MapQuizProblem(
-            map_location_id=data['location_id'],
+            map_location_id=int(data['location_id']), # Casting to int
             question_text=data['question'],
             explanation=data.get('explanation', ''),
             difficulty=int(data.get('difficulty', 2)) # Default 2
@@ -14618,7 +14625,20 @@ def api_add_map_problem():
         return jsonify({'status': 'success', 'problem': {'id': prob.id}})
     except Exception as e:
         db.session.rollback()
+        logger.error(f"Error in api_add_map_problem: {e}")
         return jsonify({'status': 'error', 'message': str(e)})
+
+@app.route('/admin/api/map_quiz/debug/repair_db')
+def api_repair_map_quiz_db():
+    """Manually trigger map quiz synchronization"""
+    if not session.get('is_admin'):
+        return "Unauthorized", 401
+    try:
+        _create_map_quiz_tables()
+        return "Database repair completed. Check logs for details."
+    except Exception as e:
+        logger.error(f"Error in manual repair: {e}")
+        return f"Repair failed: {e}", 500
 
 @app.route('/admin/api/map_quiz/problem/<int:prob_id>/delete', methods=['POST'])
 def api_delete_problem(prob_id):
@@ -19894,13 +19914,20 @@ def _create_map_quiz_tables():
                     existing_cols = [c['name'] for c in inspector.get_columns(table)]
                     for col_name, col_type in columns:
                         if col_name not in existing_cols:
-                            print(f"Migrating: Adding {col_name} to {table}")
+                            print(f"Migrating: Adding {col_name} to {table}...")
                             try:
-                                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {col_name} {col_type}"))
-                                conn.commit()
+                                # Use db.session.execute to handle transactions correctly
+                                db.session.execute(text(f"ALTER TABLE {table} ADD COLUMN {col_name} {col_type}"))
+                                db.session.commit()
                                 print(f"✅ Column {col_name} added to {table}")
                             except Exception as alter_e:
+                                db.session.rollback()
                                 print(f"⚠️ Error adding {col_name} to {table}: {alter_e}")
+                                # Try without commit if session is weird
+                                try:
+                                     db.engine.connect().execute(text(f"ALTER TABLE {table} ADD COLUMN {col_name} {col_type}"))
+                                     print(f"✅ Column {col_name} added via direct engine execution")
+                                except: pass
 
     except Exception as e:
         print(f"⚠️ Map Quiz tables migration error: {e}")
