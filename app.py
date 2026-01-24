@@ -655,7 +655,7 @@ class RpgEnemy(db.Model):
 
 class MapGenre(db.Model):
     """地図ジャンル管理"""
-    __tablename__ = 'map_genre'
+    __tablename__ = 'mq_genre'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), unique=True, nullable=False)
     display_order = db.Column(db.Integer, default=0)
@@ -664,11 +664,11 @@ class MapGenre(db.Model):
 
 class MapImage(db.Model):
     """地図画像管理"""
-    __tablename__ = 'map_image'
+    __tablename__ = 'mq_image'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     genre = db.Column(db.String(100), nullable=True) # Deprecated string genre
-    genre_id = db.Column(db.Integer, db.ForeignKey('map_genre.id'), nullable=True) # Link to MapGenre
+    genre_id = db.Column(db.Integer, db.ForeignKey('mq_genre.id'), nullable=True) # Link to MapGenre
     display_order = db.Column(db.Integer, default=0)
     filename = db.Column(db.String(255), nullable=False)
     image_data = db.Column(db.LargeBinary, nullable=True) # BLOB storage for persistence
@@ -679,9 +679,9 @@ class MapImage(db.Model):
 
 class MapLocation(db.Model):
     """地図上の地点（ピン）"""
-    __tablename__ = 'map_location'
+    __tablename__ = 'mq_location'
     id = db.Column(db.Integer, primary_key=True)
-    map_image_id = db.Column(db.Integer, db.ForeignKey('map_image.id'), nullable=False)
+    map_image_id = db.Column(db.Integer, db.ForeignKey('mq_image.id'), nullable=False)
     name = db.Column(db.String(100), nullable=False) # 地点名（正解ラベル）
     x_coordinate = db.Column(db.Float, nullable=False) # % (0.0-100.0)
     y_coordinate = db.Column(db.Float, nullable=False) # % (0.0-100.0)
@@ -690,9 +690,9 @@ class MapLocation(db.Model):
 
 class MapQuizProblem(db.Model):
     """地点に関連する問題"""
-    __tablename__ = 'map_quiz_problem'
+    __tablename__ = 'mq_problem'
     id = db.Column(db.Integer, primary_key=True)
-    map_location_id = db.Column(db.Integer, db.ForeignKey('map_location.id'), nullable=False)
+    map_location_id = db.Column(db.Integer, db.ForeignKey('mq_location.id'), nullable=False)
     question_text = db.Column(db.Text, nullable=False)
     explanation = db.Column(db.Text, nullable=True)
     difficulty = db.Column(db.Integer, default=2) # 1:Easy, 2:Standard, 3:Hard
@@ -19878,45 +19878,45 @@ def _create_map_quiz_tables():
         
         with db.engine.connect() as conn:
             # 1. Table Creation
-            if 'map_genre' not in table_names:
-                print("🔄 map_genre table creating...")
+            if 'mq_genre' not in table_names:
+                print("🔄 mq_genre table creating...")
                 MapGenre.__table__.create(db.engine)
-                print("✅ map_genre table created")
+                print("✅ mq_genre table created")
                 
-            if 'map_image' not in table_names:
-                print("🔄 map_image table creating...")
+            if 'mq_image' not in table_names:
+                print("🔄 mq_image table creating...")
                 MapImage.__table__.create(db.engine)
-                print("✅ map_image table created")
+                print("✅ mq_image table created")
                 
-            if 'map_location' not in table_names:
-                print("🔄 map_location table creating...")
+            if 'mq_location' not in table_names:
+                print("🔄 mq_location table creating...")
                 MapLocation.__table__.create(db.engine)
-                print("✅ map_location table created")
+                print("✅ mq_location table created")
                 
-            if 'map_quiz_problem' not in table_names:
-                print("🔄 map_quiz_problem table creating...")
+            if 'mq_problem' not in table_names:
+                print("🔄 mq_problem table creating...")
                 MapQuizProblem.__table__.create(db.engine)
-                print("✅ map_quiz_problem table created")
+                print("✅ mq_problem table created")
 
             # 2. Column Migrations (Ensure all expected columns exist)
             tables_to_check = {
-                'map_genre': [
+                'mq_genre': [
                     ('name', 'VARCHAR(100)'),
                     ('display_order', 'INTEGER DEFAULT 0')
                 ],
-                'map_image': [
+                'mq_image': [
                     ('genre_id', 'INTEGER'),
                     ('display_order', 'INTEGER DEFAULT 0'),
                     ('is_active', 'BOOLEAN DEFAULT TRUE'),
                     ('image_data', 'BYTEA' if db.engine.dialect.name == 'postgresql' else 'BLOB')
                 ],
-                'map_location': [
+                'mq_location': [
                     ('map_image_id', 'INTEGER'),
                     ('name', 'VARCHAR(100)'),
                     ('x_coordinate', 'FLOAT'),
                     ('y_coordinate', 'FLOAT')
                 ],
-                'map_quiz_problem': [
+                'mq_problem': [
                     ('map_location_id', 'INTEGER'),
                     ('question_text', 'TEXT'),
                     ('explanation', 'TEXT'),
@@ -19943,6 +19943,28 @@ def _create_map_quiz_tables():
                                      db.engine.connect().execute(text(f"ALTER TABLE {table} ADD COLUMN {col_name} {col_type}"))
                                      print(f"✅ Column {col_name} added via direct engine execution")
                                 except: pass
+
+        # 3. Data Migration (Optional: Copy from old tables to new mq_ tables if empty)
+        try:
+            # Check if old tables exist
+            if 'map_image' in table_names and 'mq_image' in table_names:
+                checker = db.session.execute(text("SELECT count(*) FROM mq_image")).scalar()
+                if checker == 0:
+                     print("🔄 Migrating data from map_image to mq_image...")
+                     db.session.execute(text("INSERT INTO mq_image (id, name, genre_id, display_order, filename, image_data, is_active, created_at) SELECT id, name, genre_id, display_order, filename, image_data, is_active, created_at FROM map_image"))
+                     db.session.commit()
+                     print("✅ map_image data migrated to mq_image")
+            
+            if 'map_genre' in table_names and 'mq_genre' in table_names:
+                checker = db.session.execute(text("SELECT count(*) FROM mq_genre")).scalar()
+                if checker == 0:
+                     print("🔄 Migrating data from map_genre to mq_genre...")
+                     db.session.execute(text("INSERT INTO mq_genre (id, name, display_order) SELECT id, name, display_order FROM map_genre"))
+                     db.session.commit()
+                     print("✅ map_genre data migrated to mq_genre")
+        except Exception as data_e:
+            print(f"⚠️ Data migration error: {data_e}")
+            db.session.rollback()
 
         # 3. Post-Migration: Sync existing filesystem images to DB
         try:
