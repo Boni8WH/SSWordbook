@@ -249,8 +249,8 @@ async function selectMap(mapId) {
 
     try {
         // We'll rely on the map list endpoint for metadata for now, or assume we have it.
-        // Actually, let's just fetch the map list again and find it, mirroring old logic.
         const listRes = await fetch(`${API_BASE}/maps`);
+        if (!listRes.ok) throw new Error(`Fetch maps failed: ${listRes.status}`);
         const listData = await listRes.json();
         currentMap = listData.maps.find(m => m.id === mapId);
 
@@ -267,14 +267,21 @@ async function selectMap(mapId) {
 
         // Load Pins
         const pinRes = await fetch(`${API_BASE}/map/${mapId}/locations`);
+        if (!pinRes.ok) {
+            throw new Error(`HTTP ${pinRes.status}`);
+        }
         const pinData = await pinRes.json();
-        currentPins = pinData.locations;
 
+        if (pinData.status === 'error') {
+            throw new Error(pinData.message);
+        }
+
+        currentPins = pinData.locations || [];
         renderEditorPins();
 
     } catch (e) {
         console.error(e);
-        alert("Map Load Error");
+        alert("Map Load Error: " + e.message);
     }
 }
 
