@@ -284,8 +284,8 @@
         if (!isVisible) {
             // Auto Focus Logic
             // If scale is too high, zoom out for context
-            if (scale > 3.0) {
-                scale = 2.0;
+            if (scale > 1.5) {
+                scale = 1.5;
             } else if (scale < 0.5) {
                 // If too zoomed out (unlikely to be invisible but possible), zoom in a bit
                 scale = Math.max(scale, 1.0);
