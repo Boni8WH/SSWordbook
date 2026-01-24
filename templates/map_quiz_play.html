@@ -12,11 +12,6 @@
                 <div id="explanationText" class="mt-2 text-danger fw-bold" style="display: none;"></div>
             </div>
             <div class="text-end ms-3">
-                <div class="form-check form-switch mb-2">
-                    <input class="form-check-input" type="checkbox" id="userShowLabelsToggle" onchange="toggleLabels()">
-                    <label class="form-check-label small" for="userShowLabelsToggle"
-                        style="color: #212529;">地名表示</label>
-                </div>
                 <a href="{{ url_for('map_quiz_index') }}" class="btn btn-sm btn-outline-secondary">終了</a>
             </div>
         </div>
@@ -60,7 +55,7 @@
     let mqQuestions = []; // List of problems
     let mqCurrentIndex = 0;
     let mqCurrentQuestion = null;
-    let showLabels = false;
+    // let showLabels = false; // Removed toggle logic
 
     // Lock for multi-click prevention
     let mqIsAnswered = false;
@@ -151,7 +146,8 @@
             // Label (Only if name is not empty)
             let labelHtml = '';
             if (loc.name && loc.name.trim() !== "") {
-                labelHtml = `<div class="pin-label badge bg-light text-dark border shadow-sm" style="position: absolute; left: 15px; top: -35px; font-size: 14px; white-space: nowrap; display: ${showLabels ? 'block' : 'none'};">${loc.name}</div>`;
+                // Labels hidden by default
+                labelHtml = `<div class="pin-label badge bg-light text-dark border shadow-sm" id="label-${loc.id}" style="position: absolute; left: 15px; top: -35px; font-size: 14px; white-space: nowrap; display: none;">${loc.name}</div>`;
             }
 
             pinBtn.innerHTML = iconHtml + labelHtml;
@@ -188,6 +184,9 @@
         });
 
         document.getElementById('gameArea').classList.remove('disable-clicks');
+
+        // Reset Map View
+        fitMapToScreen();
     }
 
     function onPinClick(e, locId) {
@@ -203,8 +202,11 @@
         const correctLoc = mqQuizData.locations.find(l => l.id === correctLocId);
 
         // Visual Feedback
-        const clickedPin = document.getElementById(`pin-${locId}`).querySelector('i');
-        const correctPin = document.getElementById(`pin-${correctLocId}`).querySelector('i');
+        // Show Correct Label
+        const correctLabel = document.getElementById(`label-${correctLocId}`);
+        if (correctLabel) {
+            correctLabel.style.display = 'block';
+        }
 
         if (isCorrect) {
             clickedPin.className = 'fas fa-map-marker-alt text-success fa-3x'; // Green & Bigger
@@ -215,6 +217,10 @@
             correctPin.className = 'fas fa-map-marker-alt text-success fa-3x'; // Show correct one
             correctPin.classList.add('fa-bounce');
             playAudio('wrong');
+
+            // Find clicked location name for feedback
+            const clickedLoc = mqQuizData.locations.find(l => l.id === locId);
+            const clickedName = clickedLoc ? clickedLoc.name : "不明な地点";
 
             // Record incorrect answer
             mqIncorrectQuestions.push({
@@ -233,9 +239,14 @@
         if (isCorrect) {
             feedbackHtml = `<i class="fas fa-check-circle"></i> 正解！ ${explanationContent}`;
         } else {
+            const clickedLoc = mqQuizData.locations.find(l => l.id === locId);
+            const clickedName = clickedLoc ? clickedLoc.name : "不明な地点";
+
             // If location name is empty, don't show "Correct is XX"
             if (correctLoc.name && correctLoc.name.trim() !== "") {
-                feedbackHtml = `<i class="fas fa-times-circle"></i> 不正解... 正解は「${correctLoc.name}」です。<br>${explanationContent}`;
+                feedbackHtml = `<div class="mb-1"><i class="fas fa-times-circle"></i> 不正解... <span class="fw-bold text-success">正解は「${correctLoc.name}」</span>です。</div>`;
+                feedbackHtml += `<div class="mb-2 small text-muted">あなたが選択したのは「${clickedName}」です。</div>`;
+                feedbackHtml += explanationContent;
             } else {
                 feedbackHtml = `<i class="fas fa-times-circle"></i> 不正解... <br>${explanationContent}`;
             }
@@ -284,8 +295,8 @@
         if (!isVisible) {
             // Auto Focus Logic
             // If scale is too high, zoom out for context
-            if (scale > 1.5) {
-                scale = 1.5;
+            if (scale > 0.5) {
+                scale = 0.5;
             } else if (scale < 0.5) {
                 // If too zoomed out (unlikely to be invisible but possible), zoom in a bit
                 scale = Math.max(scale, 1.0);
@@ -304,10 +315,30 @@
             mapWrapper.style.transition = "transform 0.5s ease-out";
             setTransform();
 
-            // Remove transition after animation so manual pan isn't laggy
+            // Step 2: After a pause, zoom out to show full map (if we zoomed/panned)
             setTimeout(() => {
-                mapWrapper.style.transition = "";
-            }, 550);
+                const targetState = calculateFitState();
+                if (!targetState) {
+                    // Cleanup if calc failed
+                    mapWrapper.style.transition = "";
+                    return;
+                }
+
+                // Slow transition for zoom out
+                mapWrapper.style.transition = "transform 3.0s ease-in-out";
+
+                scale = targetState.scale;
+                pointX = targetState.pointX;
+                pointY = targetState.pointY;
+
+                setTransform();
+
+                // Cleanup transition
+                setTimeout(() => {
+                    mapWrapper.style.transition = "";
+                }, 3000);
+
+            }, 800); // Wait 800ms before starting zoom out
         }
     }
 
@@ -389,12 +420,7 @@
         document.getElementById('resultOverlay').style.display = 'flex';
     }
 
-    function toggleLabels() {
-        showLabels = document.getElementById('userShowLabelsToggle').checked;
-        document.querySelectorAll('.pin-label').forEach(el => {
-            el.style.display = showLabels ? 'block' : 'none';
-        });
-    }
+    // Toggle Labels Removed
 
     // Helper: Shuffle Array
     function shuffle(array) {
@@ -414,11 +440,11 @@
     }
 
     // Zoom/Pan Implementation
-    function fitMapToScreen() {
+    function calculateFitState() {
         const img = document.getElementById('gameMapImage');
         const container = document.getElementById('gameArea');
 
-        if (!img.naturalWidth) return;
+        if (!img.naturalWidth) return null;
 
         const containerW = container.clientWidth;
         const containerH = container.clientHeight;
@@ -429,15 +455,30 @@
         // Use 0.95 factor to leave a small margin
         const scaleX = (containerW * 0.95) / imgW;
         const scaleY = (containerH * 0.95) / imgH;
-        scale = Math.min(scaleX, scaleY); // Fit entirely visible
+        const targetScale = Math.min(scaleX, scaleY); // Fit entirely visible
 
         // Initial centering
         // Because transform-origin is 0 0, we calculate the top-left offset
-        const scaledW = imgW * scale;
-        const scaledH = imgH * scale;
+        const scaledW = imgW * targetScale;
+        const scaledH = imgH * targetScale;
 
-        pointX = (containerW - scaledW) / 2;
-        pointY = (containerH - scaledH) / 2;
+        const targetPointX = (containerW - scaledW) / 2;
+        const targetPointY = (containerH - scaledH) / 2;
+
+        return {
+            scale: targetScale,
+            pointX: targetPointX,
+            pointY: targetPointY
+        };
+    }
+
+    function fitMapToScreen() {
+        const state = calculateFitState();
+        if (!state) return;
+
+        scale = state.scale;
+        pointX = state.pointX;
+        pointY = state.pointY;
 
         // Reset pan limits or start positions if needed
         startX = 0;
