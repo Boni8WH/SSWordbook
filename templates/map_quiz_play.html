@@ -183,6 +183,11 @@
             icon.className = 'fas fa-map-marker-alt text-danger fa-lg';
         });
 
+        // Reset Labels (Hide all)
+        document.querySelectorAll('.pin-label').forEach(label => {
+            label.style.display = 'none';
+        });
+
         document.getElementById('gameArea').classList.remove('disable-clicks');
 
         // Reset Map View
@@ -303,8 +308,8 @@
         if (!isVisible) {
             // Auto Focus Logic
             // If scale is too high, zoom out for context
-            if (scale > 1.5) {
-                scale = 1.5;
+            if (scale > 0.5) {
+                scale = 0.5;
             } else if (scale < 0.5) {
                 // If too zoomed out (unlikely to be invisible but possible), zoom in a bit
                 scale = Math.max(scale, 1.0);
