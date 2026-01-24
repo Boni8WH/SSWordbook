@@ -244,8 +244,71 @@
         explain.innerHTML = feedbackHtml;
         explain.style.display = 'block';
 
+        // Auto-focus Correct Pin if off-screen
+        ensurePinVisible(correctLocId);
+
         // Show Next Button
         document.getElementById('nextButtonContainer').style.display = 'block';
+    }
+
+    function ensurePinVisible(locId) {
+        const loc = mqQuizData.locations.find(l => l.id === locId);
+        if (!loc) return;
+
+        const container = document.getElementById('gameArea');
+        const img = document.getElementById('gameMapImage');
+
+        const containerW = container.clientWidth;
+        const containerH = container.clientHeight;
+        const imgW = img.naturalWidth;
+        const imgH = img.naturalHeight;
+
+        // Current Pin Screen Coordinates
+        // loc.x/y are percentages (0-100)
+        const pinImgX = (loc.x / 100) * imgW;
+        const pinImgY = (loc.y / 100) * imgH;
+
+        const screenX = pointX + (pinImgX * scale);
+        const screenY = pointY + (pinImgY * scale);
+
+        const padding = 60; // Margin from edge
+
+        // Check if visible
+        const isVisible = (
+            screenX >= padding &&
+            screenX <= (containerW - padding) &&
+            screenY >= padding &&
+            screenY <= (containerH - padding)
+        );
+
+        if (!isVisible) {
+            // Auto Focus Logic
+            // If scale is too high, zoom out for context
+            if (scale > 3.0) {
+                scale = 2.0;
+            } else if (scale < 0.5) {
+                // If too zoomed out (unlikely to be invisible but possible), zoom in a bit
+                scale = Math.max(scale, 1.0);
+            }
+
+            // Target: Center of container
+            const targetX = containerW / 2;
+            const targetY = containerH / 2;
+
+            // Calculate new pointX/Y
+            // targetX = newPointX + (pinImgX * scale)
+            pointX = targetX - (pinImgX * scale);
+            pointY = targetY - (pinImgY * scale);
+
+            // Add transition for smooth slide
+            mapWrapper.style.transition = "transform 0.5s ease-out";
+            setTransform();
+
+            // Remove transition after animation so manual pan isn't laggy
+            setTimeout(() => {
+                mapWrapper.style.transition = "";
+            }, 550);
+        }
     }
 
     function nextQuestion() {
