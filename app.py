@@ -14654,6 +14654,31 @@ def api_repair_map_quiz_db():
         logger.error(f"Error in manual repair: {e}")
         return f"Repair failed: {e}", 500
 
+@app.route('/admin/api/map_quiz/problem/<int:prob_id>/update', methods=['POST'])
+def api_update_map_quiz_problem(prob_id):
+    if not session.get('admin_logged_in'):
+        return jsonify({'status': 'error', 'message': 'Unauthorized'}), 403
+
+    problem = MapQuizProblem.query.get_or_404(prob_id)
+    data = request.get_json()
+    
+    question = data.get('question')
+    explanation = data.get('explanation')
+    difficulty = data.get('difficulty')
+    
+    if not question:
+        return jsonify({'status': 'error', 'message': 'Question is required'})
+    
+    try:
+        problem.question_text = question
+        problem.explanation = explanation
+        problem.difficulty = int(difficulty)
+        db.session.commit()
+        return jsonify({'status': 'success', 'problem': {'id': problem.id, 'question': problem.question_text}})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'status': 'error', 'message': str(e)})
+
 @app.route('/admin/api/map_quiz/problem/<int:prob_id>/delete', methods=['POST'])
 def api_delete_problem(prob_id):
     prob = MapQuizProblem.query.get(prob_id)
@@ -14748,7 +14773,8 @@ def api_get_map_difficulty_counts(map_id):
         'total': base_query.count(),
         'easy': base_query.filter(MapQuizProblem.difficulty == 1).count(),
         'standard': base_query.filter(MapQuizProblem.difficulty == 2).count(),
-        'hard': base_query.filter(MapQuizProblem.difficulty == 3).count()
+        'hard': base_query.filter(MapQuizProblem.difficulty == 3).count(),
+        'master': base_query.filter(MapQuizProblem.difficulty == 4).count()
     }
     
     return jsonify({

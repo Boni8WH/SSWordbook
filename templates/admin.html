@@ -2491,21 +2491,40 @@
 
                                     <!-- Canvas/Image Container -->
                                     <div class="position-relative border shadow-sm"
-                                        style="width: 100%; background: #eee; overflow: hidden;">
+                                        style="width: 100%; height: 600px; background: #eee; overflow: hidden;"
+                                        id="adminMapContainer">
                                         <!-- Container for maintaining aspect ratio or scrolling -->
-                                        <div class="position-relative" id="mapImageWrapper">
+                                        <div class="position-relative" id="mapImageWrapper"
+                                            style="transform-origin: 0 0;">
                                             <img id="editorMapImage" src=""
                                                 style="width: 100%; display: block; cursor: crosshair;"
-                                                onclick="onMapClick(event)">
+                                                draggable="false">
                                             <!-- Pins will be placed here absolutely -->
                                             <div id="editorPinsContainer"></div>
+                                        </div>
+
+                                        <!-- Zoom Controls -->
+                                        <div class="position-absolute bottom-0 end-0 mb-3 me-3 d-flex flex-column gap-2"
+                                            style="z-index: 100;">
+                                            <button class="btn btn-light shadow-sm border" onclick="zoomEditorMap(1.2)"
+                                                title="拡大">
+                                                <i class="fas fa-plus"></i>
+                                            </button>
+                                            <button class="btn btn-light shadow-sm border" onclick="zoomEditorMap(0.8)"
+                                                title="縮小">
+                                                <i class="fas fa-minus"></i>
+                                            </button>
+                                            <button class="btn btn-light shadow-sm border" onclick="resetEditorZoom()"
+                                                title="リセット">
+                                                <i class="fas fa-compress"></i>
+                                            </button>
                                         </div>
                                     </div>
 
                                     <!-- Pin Click Helper Text -->
                                     <div class="text-muted small mt-1">
                                         <i class="fas fa-mouse-pointer"></i>
-                                        地図上をクリックして新しい地点（ピン）を追加、または既存のピンをクリックして編集します。
+                                        地図上をクリックして新しい地点を追加、ドラッグで位置調整、クリックで編集。マウスホイールでズーム可能。
                                     </div>
                                 </div>
                                 <div id="mapEditorPlaceholder"
@@ -2568,6 +2587,7 @@
                                         <option value="1">易（★1）</option>
                                         <option value="2" selected>標準（★2）</option>
                                         <option value="3">難（★3）</option>
+                                        <option value="4">最難関（★4 趣味）</option>
                                     </select>
                                     <button class="btn btn-sm btn-outline-primary"
                                         onclick="addProblemToPin()">追加</button>

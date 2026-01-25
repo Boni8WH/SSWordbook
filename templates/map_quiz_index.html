@@ -157,6 +157,10 @@
                     <button id="difficulty-btn-3" class="btn btn-outline-danger btn-lg" onclick="startMapQuiz(3)">
                         <i class="fas fa-skull"></i> 難（むずかしい）
                     </button>
+                    <button id="difficulty-btn-4" class="btn btn-outline-dark btn-lg" onclick="startMapQuiz(4)"
+                        style="border-color: #6610f2; color: #6610f2;">
+                        <i class="fas fa-crown"></i> 最難関（趣味レベル）
+                    </button>
                     <button id="difficulty-btn-all" class="btn btn-secondary btn-lg" onclick="startMapQuiz(0)">
                         <i class="fas fa-layer-group"></i> すべて（All）
                     </button>
@@ -206,6 +210,7 @@
                     document.getElementById('difficulty-btn-1').style.display = counts.easy > 0 ? 'block' : 'none';
                     document.getElementById('difficulty-btn-2').style.display = counts.standard > 0 ? 'block' : 'none';
                     document.getElementById('difficulty-btn-3').style.display = counts.hard > 0 ? 'block' : 'none';
+                    document.getElementById('difficulty-btn-4').style.display = counts.master > 0 ? 'block' : 'none';
 
                     // "All" button remains visible if total > 0
                     document.getElementById('difficulty-btn-all').style.display = 'block';
