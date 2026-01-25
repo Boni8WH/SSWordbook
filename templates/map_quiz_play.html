@@ -178,9 +178,15 @@
         document.getElementById('explanationText').style.display = 'none';
         document.getElementById('nextButtonContainer').style.display = 'none';
 
-        // Reset Pin Styles
-        document.querySelectorAll('.game-pin i').forEach(icon => {
-            icon.className = 'fas fa-map-marker-alt text-danger fa-lg';
+        // Reset Pin Styles & Visibility
+        document.querySelectorAll('.game-pin').forEach(pin => {
+            pin.style.display = 'block'; // Ensure visible
+            // Reset icon inside
+            const icon = pin.querySelector('i');
+            if (icon) {
+                icon.className = 'fas fa-map-marker-alt text-danger fa-lg';
+                icon.classList.remove('fa-bounce');
+            }
         });
 
         // Reset Labels (Hide all)
@@ -225,7 +231,11 @@
             clickedPin.className = 'fas fa-map-marker-alt text-success fa-3x'; // Green & Bigger
             playAudio('correct');
             mqCorrectCount++;
+
+            // Auto-focus Correct Pin if off-screen (keep existing logic for correct)
+            ensurePinVisible(correctLocId);
         } else {
+            // Incorrect Logic
             clickedPin.className = 'fas fa-map-marker-alt text-secondary fa-lg'; // Grey
             correctPin.className = 'fas fa-map-marker-alt text-success fa-3x'; // Show correct one
             correctPin.classList.add('fa-bounce');
@@ -241,6 +251,21 @@
                 correctName: correctLoc.name || "",
                 explanation: mqCurrentQuestion.explanation || ""
             });
+
+            // NEW: Filter Pins (Hide all except clicked and correct)
+            document.querySelectorAll('.game-pin').forEach(pin => {
+                const pid = pin.id;
+                if (pid !== `pin-${locId}` && pid !== `pin-${correctLocId}`) {
+                    pin.style.display = 'none';
+                }
+            });
+
+            // NEW: Reset View to Full Map (Smoothly)
+            mapWrapper.style.transition = "transform 1.0s ease-in-out";
+            fitMapToScreen();
+            setTimeout(() => {
+                mapWrapper.style.transition = "";
+            }, 1000);
         }
 
         // Show Explanation
@@ -267,9 +292,6 @@
 
         explain.innerHTML = feedbackHtml;
         explain.style.display = 'block';
-
-        // Auto-focus Correct Pin if off-screen
-        ensurePinVisible(correctLocId);
 
         // Show Next Button
         document.getElementById('nextButtonContainer').style.display = 'block';
