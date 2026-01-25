@@ -340,6 +340,7 @@ function renderEditorPins() {
         icon.style.position = 'absolute';
         icon.style.left = '0';
         icon.style.top = '0';
+        icon.style.transformOrigin = '50% 100%'; // Anchor at bottom center to prevent drift on scale
         icon.style.transform = 'translate(-50%, -100%)';
         icon.style.display = 'block';
         icon.style.pointerEvents = 'auto'; // Important for handling events on icon
