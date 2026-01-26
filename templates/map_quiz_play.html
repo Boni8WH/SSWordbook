@@ -295,6 +295,17 @@
 
         // Show Next Button
         document.getElementById('nextButtonContainer').style.display = 'block';
+
+        // Record Result to Server
+        fetch('/api/map_quiz/record_result', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                location_id: mqCurrentQuestion.location_id,
+                problem_id: mqCurrentQuestion.id, // 🆕 追加
+                is_correct: isCorrect
+            })
+        }).catch(err => console.error("Failed to record result:", err));
     }
 
     function ensurePinVisible(locId) {

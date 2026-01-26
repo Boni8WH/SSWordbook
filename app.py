@@ -698,6 +698,20 @@ class MapQuizProblem(db.Model):
     difficulty = db.Column(db.Integer, default=2) # 1:Easy, 2:Standard, 3:Hard
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))
 
+class MapQuizLog(db.Model):
+    """地図クイズの解答記録"""
+    __tablename__ = 'mq_log'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False)
+    map_location_id = db.Column(db.Integer, db.ForeignKey('mq_location.id', ondelete='CASCADE'), nullable=False)
+    map_quiz_problem_id = db.Column(db.Integer, db.ForeignKey('mq_problem.id', ondelete='CASCADE'), nullable=True) # 🆕 問題ID
+    is_correct = db.Column(db.Boolean, nullable=False)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))
+
+    user = db.relationship('User', backref=db.backref('map_quiz_logs', lazy=True, cascade="all, delete-orphan"))
+    location = db.relationship('MapLocation', backref=db.backref('logs', lazy=True, cascade="all, delete-orphan"))
+    problem = db.relationship('MapQuizProblem', backref=db.backref('logs', lazy=True, cascade="all, delete-orphan"))
+
 
 # Helper to determine database type for migrations
 def _is_postgres():
@@ -764,6 +778,26 @@ def _create_rpg_enemy_table():
 
     except Exception as e:
         print(f"⚠️ rpg_enemyテーブル作成エラー: {e}")
+
+def _create_map_quiz_log_table():
+    """MapQuizLogテーブルを作成・更新する"""
+    try:
+        inspector = inspect(db.engine)
+        if 'mq_log' not in inspector.get_table_names():
+            print("🔄 mq_logテーブルを作成します...")
+            MapQuizLog.__table__.create(db.engine)
+            print("✅ mq_logテーブル作成完了")
+        else:
+            # 既存テーブルへのカラム追加チェック
+            columns = [c['name'] for c in inspector.get_columns('mq_log')]
+            if 'map_quiz_problem_id' not in columns:
+                print("🔄 mq_log: map_quiz_problem_idを追加します...")
+                with db.engine.connect() as conn:
+                    conn.execute(text("ALTER TABLE mq_log ADD COLUMN map_quiz_problem_id INTEGER"))
+                    conn.commit()
+                print("✅ mq_log: map_quiz_problem_id追加完了")
+    except Exception as e:
+        print(f"⚠️ mq_logテーブル作成/更新エラー: {e}")
 
 
 
@@ -3226,6 +3260,7 @@ def create_tables_and_admin_user():
             _add_announcement_viewed_column_to_user() # 🆕 お知らせ閲覧日時カラム追加
             _create_user_announcement_reads_table() # 🆕 お知らせ個別既読テーブル作成
             _create_rpg_rematch_history_table() # 🆕 再戦履歴テーブル作成
+            _create_map_quiz_log_table()       # 🆕 地図クイズログテーブル作成
             
             # 管理者ユーザー確認/作成
             try:
@@ -14978,23 +15013,146 @@ def api_get_map_play_data(map_id):
 @app.route('/api/map_quiz/map/<int:map_id>/difficulty_counts')
 def api_get_map_difficulty_counts(map_id):
     map_obj = MapImage.query.get_or_404(map_id)
+    user_id = session.get('user_id')
     
     # Base query for problems associated with this map
     base_query = MapQuizProblem.query.join(MapLocation).filter(MapLocation.map_image_id == map_id)
     
-    counts = {
-        'total': base_query.count(),
-        'easy': base_query.filter(MapQuizProblem.difficulty == 1).count(),
-        'standard': base_query.filter(MapQuizProblem.difficulty == 2).count(),
-        'hard': base_query.filter(MapQuizProblem.difficulty == 3).count(),
-        'master': base_query.filter(MapQuizProblem.difficulty == 4).count()
-    }
-    
+    # 習得済み問題のIDリストを取得 (直近3回連続正解)
+    mastered_problem_ids = []
+    if user_id:
+        try:
+            # SQLite/Postgres共通のWindow Functionを使用したクエリ
+            # 各問題の直近3件の正誤を取得
+            mastery_query = text("""
+                WITH last_logs AS (
+                    SELECT 
+                        map_quiz_problem_id, 
+                        is_correct,
+                        ROW_NUMBER() OVER (PARTITION BY map_quiz_problem_id ORDER BY created_at DESC) as rn
+                    FROM mq_log
+                    WHERE user_id = :uid
+                )
+                SELECT map_quiz_problem_id
+                FROM last_logs
+                WHERE rn <= 3
+                GROUP BY map_quiz_problem_id
+                HAVING COUNT(*) >= 3 AND MIN(CASE WHEN is_correct THEN 1 ELSE 0 END) = 1
+            """)
+            result = db.session.execute(mastery_query, {'uid': user_id})
+            mastered_problem_ids = [row[0] for row in result]
+        except Exception as e:
+            logger.error(f"Error calculating mastery: {e}")
+
+    def get_counts(diff=None):
+        q = base_query
+        if diff:
+            q = q.filter(MapQuizProblem.difficulty == diff)
+        
+        total = q.count()
+        # 習得済みカウント: 該当難易度の問題のうち、mastered_problem_idsに含まれるもの
+        mastered = q.filter(MapQuizProblem.id.in_(mastered_problem_ids)).count() if mastered_problem_ids else 0
+        
+        return {'total': total, 'mastered': mastered}
+
     return jsonify({
         'status': 'success',
         'map_id': map_id,
-        'counts': counts
+        'counts': {
+            'total': get_counts(),
+            'easy': get_counts(1),
+            'standard': get_counts(2),
+            'hard': get_counts(3),
+            'master': get_counts(4)
+        }
     })
+
+@app.route('/api/map_quiz/record_result', methods=['POST'])
+def api_record_map_quiz_result():
+    if 'user_id' not in session:
+        return jsonify({'status': 'error', 'message': 'Not logged in'}), 401
+    
+    data = request.json
+    location_id = data.get('location_id')
+    problem_id = data.get('problem_id')
+    is_correct = data.get('is_correct')
+    
+    if location_id is None or is_correct is None:
+        return jsonify({'status': 'error', 'message': 'Missing data'}), 400
+    
+    try:
+        log = MapQuizLog(
+            user_id=session['user_id'],
+            map_location_id=location_id,
+            map_quiz_problem_id=problem_id,
+            is_correct=bool(is_correct)
+        )
+        db.session.add(log)
+        db.session.commit()
+        return jsonify({'status': 'success'})
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error recording map quiz result: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/map_quiz/stats')
+def api_get_map_stats():
+    if 'user_id' not in session:
+        return jsonify({'status': 'error', 'message': 'Not logged in'}), 401
+    
+    user_id = session['user_id']
+    
+    # 全地図の総問題数を取得 (難易度問わず)
+    map_totals = db.session.query(
+        MapImage.id,
+        func.count(MapQuizProblem.id).label('total')
+    ).join(MapLocation, MapImage.id == MapLocation.map_image_id)\
+     .join(MapQuizProblem, MapLocation.id == MapQuizProblem.map_location_id)\
+     .group_by(MapImage.id).all()
+    
+    total_map_dict = {m.id: m.total for m in map_totals}
+    
+    # 習得済み問題のカウント（3連続正解）
+    mastered_counts = {}
+    try:
+        mastery_query = text("""
+            WITH last_logs AS (
+                SELECT 
+                    mq_log.map_quiz_problem_id, 
+                    mq_log.is_correct,
+                    mq_image.id as map_id,
+                    ROW_NUMBER() OVER (PARTITION BY mq_log.map_quiz_problem_id ORDER BY mq_log.created_at DESC) as rn
+                FROM mq_log
+                JOIN mq_location ON mq_log.map_location_id = mq_location.id
+                JOIN mq_image ON mq_location.map_image_id = mq_image.id
+                WHERE mq_log.user_id = :uid
+            ),
+            mastered_probs AS (
+                SELECT map_id, map_quiz_problem_id
+                FROM last_logs
+                WHERE rn <= 3
+                GROUP BY map_id, map_quiz_problem_id
+                HAVING COUNT(*) >= 3 AND MIN(CASE WHEN is_correct THEN 1 ELSE 0 END) = 1
+            )
+            SELECT map_id, COUNT(*) as mastered_count
+            FROM mastered_probs
+            GROUP BY map_id
+        """)
+        result = db.session.execute(mastery_query, {'uid': user_id})
+        mastered_counts = {row.map_id: row.mastered_count for row in result}
+    except Exception as e:
+        logger.error(f"Error calculating global map stats: {e}")
+    
+    stats = {}
+    # 全ての地図IDを網羅
+    all_maps = MapImage.query.filter_by(is_active=True).all()
+    for m in all_maps:
+        stats[m.id] = {
+            'total': total_map_dict.get(m.id, 0),
+            'mastered': mastered_counts.get(m.id, 0)
+        }
+    
+    return jsonify({'status': 'success', 'stats': stats})
 @app.route('/admin/essay/download_csv')
 def admin_essay_download_csv():
     """論述問題一覧をCSVとしてダウンロード"""
@@ -20136,6 +20294,11 @@ def _create_map_quiz_tables():
                 print("🔄 mq_problem table creating...")
                 MapQuizProblem.__table__.create(db.engine)
                 print("✅ mq_problem table created")
+
+            if 'mq_log' not in table_names:
+                print("🔄 mq_log table creating...")
+                MapQuizLog.__table__.create(db.engine)
+                print("✅ mq_log table created")
 
             # 2. Column Migrations (Ensure all expected columns exist)
             tables_to_check = {

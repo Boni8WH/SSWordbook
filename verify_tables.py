@@ -5,7 +5,7 @@ def check_tables():
     with app.app_context():
         inspector = inspect(db.engine)
         tables = inspector.get_table_names()
-        required_tables = ['map_image', 'map_location', 'map_quiz_problem']
+        required_tables = ['map_image', 'map_location', 'map_quiz_problem', 'mq_log']
         
         all_exist = True
         for table in required_tables:
