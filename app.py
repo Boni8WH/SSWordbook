@@ -14712,9 +14712,9 @@ def api_crop_map_image(map_id):
             old_filename = map_obj.filename
             map_obj.filename = new_filename
             
-            # CRITICAL: Clear image_data if it exists, otherwise serve_map_image serves OLD persistent data
-            if map_obj.image_data:
-                map_obj.image_data = None
+            # CRITICAL_FIX: Read the file back and save to DB for persistence
+            with open(new_file_path, 'rb') as f:
+                map_obj.image_data = f.read()
                 
             # Note: Commit happens later
             
@@ -14780,6 +14780,92 @@ def api_repair_map_quiz_db():
     except Exception as e:
         logger.error(f"Error in manual repair: {e}")
         return f"Repair failed: {e}", 500
+
+@app.route('/admin/api/map_quiz/map/<int:map_id>/replace_image', methods=['POST'])
+def api_replace_map_image(map_id):
+    if not session.get('admin_logged_in'):
+        return jsonify({'status': 'error', 'message': 'Unauthorized'}), 403
+    
+    map_obj = MapImage.query.get_or_404(map_id)
+    
+    if 'file' not in request.files:
+        return jsonify({'status': 'error', 'message': 'No file part'})
+    
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'status': 'error', 'message': 'No selected file'})
+        
+    try:
+        # Generate new filename
+        filename = secure_filename(file.filename)
+        new_filename = f"map_{int(time.time())}_{filename}"
+        
+        # Read file data
+        file_content = file.read()
+        file.seek(0)
+        
+        # Save to disk (fallback)
+        upload_dir = os.path.join(app.root_path, 'uploads', 'maps')
+        os.makedirs(upload_dir, exist_ok=True)
+        file.save(os.path.join(upload_dir, new_filename))
+        
+        # Update DB
+        old_filename = map_obj.filename
+        map_obj.filename = new_filename
+        map_obj.image_data = file_content # Save to DB!
+        
+        db.session.commit()
+        
+        # Cleanup old file
+        try:
+            old_path = os.path.join(upload_dir, old_filename)
+            if os.path.exists(old_path) and old_filename != new_filename:
+                os.remove(old_path)
+        except:
+            pass
+            
+        return jsonify({'status': 'success', 'filename': new_filename})
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error replacing map image: {e}")
+        return jsonify({'status': 'error', 'message': str(e)})
+
+@app.route('/admin/api/map_quiz/health_check')
+def api_map_quiz_health_check():
+    """Check for maps with missing image data in DB"""
+    if not session.get('admin_logged_in'):
+        return jsonify({'status': 'error', 'message': 'Unauthorized'}), 401
+        
+    try:
+        maps = MapImage.query.all()
+        issues = []
+        
+        for m in maps:
+            # Check DB data
+            has_db_data = m.image_data is not None and len(m.image_data) > 0
+            
+            # Check File (optional context)
+            file_path = os.path.join(app.root_path, 'uploads', 'maps', m.filename)
+            has_file = os.path.exists(file_path)
+            
+            if not has_db_data:
+                status = "MISSING_DB_DATA"
+                if not has_file:
+                    status = "CRITICAL_MISSING_BOTH"
+                
+                issues.append({
+                    'id': m.id,
+                    'name': m.name,
+                    'filename': m.filename,
+                    'status': status
+                })
+                
+        return jsonify({'status': 'success', 'issues': issues})
+        
+    except Exception as e:
+        logger.error(f"Health check error: {e}")
+        return jsonify({'status': 'error', 'message': str(e)})
 
 @app.route('/admin/api/map_quiz/problem/<int:prob_id>/update', methods=['POST'])
 def api_update_map_quiz_problem(prob_id):

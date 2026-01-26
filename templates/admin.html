@@ -2420,6 +2420,9 @@
                 <div class="card shadow-sm mb-4">
                     <div class="card-header bg-white d-flex justify-content-between align-items-center">
                         <h3><i class="fas fa-map-marked-alt"></i> 地図クイズ管理</h3>
+                        <button class="btn btn-sm btn-outline-danger" onclick="checkMapHealth()">
+                            <i class="fas fa-heartbeat"></i> DB整合性チェック
+                        </button>
                     </div>
                     <div class="card-body">
                         <!-- Helper / Introduction -->
@@ -2495,6 +2498,14 @@
                                                 onclick="toggleCropMode()">
                                                 <i class="fas fa-crop-alt"></i> トリミング
                                             </button>
+
+                                            <!-- Replace Image Button -->
+                                            <button class="btn btn-sm btn-outline-info" onclick="triggerReplaceImage()">
+                                                <i class="fas fa-image"></i> 画像置換
+                                            </button>
+                                            <input type="file" id="replaceImageInput" style="display: none;"
+                                                accept="image/*" onchange="uploadReplaceImage(this)">
+
                                             <div id="cropControls" style="display: none;"
                                                 class="btn-group btn-group-sm">
                                                 <button class="btn btn-success" onclick="saveCrop()">
