@@ -14642,6 +14642,129 @@ def api_add_map_problem():
         logger.error(f"Error in api_add_map_problem: {e}")
         return jsonify({'status': 'error', 'message': str(e)})
 
+@app.route('/admin/api/map_quiz/map/<int:map_id>/crop', methods=['POST'])
+def api_crop_map_image(map_id):
+    if not session.get('admin_logged_in') and not session.get('manager_logged_in'):
+        return jsonify({'status': 'error', 'message': 'Unauthorized'}), 403
+
+    map_obj = MapImage.query.get_or_404(map_id)
+    data = request.get_json()
+    
+    # Crop Data: x, y, width, height (natural pixels)
+    crop_x = int(data.get('x', 0))
+    crop_y = int(data.get('y', 0))
+    crop_w = int(data.get('width', 0))
+    crop_h = int(data.get('height', 0))
+    
+    if crop_w <= 0 or crop_h <= 0:
+        return jsonify({'status': 'error', 'message': 'Invalid crop dimensions'})
+    
+    try:
+        from PIL import Image
+        
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], 'maps', map_obj.filename)
+        if not os.path.exists(file_path):
+             # Try to restore from BLOB if file is missing
+             if map_obj.image_data:
+                 try:
+                     with open(file_path, 'wb') as f:
+                         f.write(map_obj.image_data)
+                 except Exception as restore_err:
+                     logger.error(f"Failed to restore map from BLOB: {restore_err}")
+                     return jsonify({'status': 'error', 'message': 'File not found and restore failed'})
+             else:
+                 return jsonify({'status': 'error', 'message': 'File not found'})
+             
+        # 1. Use PIL to open and crop
+        with Image.open(file_path) as img:
+            original_w, original_h = img.size
+            
+            # Helper: Clamp coordinates to image bounds
+            # This prevents black areas if crop box goes outside
+            safe_x = max(0, min(crop_x, original_w))
+            safe_y = max(0, min(crop_y, original_h))
+            safe_w = min(crop_w, original_w - safe_x)
+            safe_h = min(crop_h, original_h - safe_y)
+            
+            if safe_w <= 0 or safe_h <= 0:
+                return jsonify({'status': 'error', 'message': 'Invalid crop area (outside image)'})
+            
+            # Use a copy to crop and save
+            # Using safe coordinates
+            cropped_img = img.crop((safe_x, safe_y, safe_x + safe_w, safe_y + safe_h))
+            
+            # Save as NEW file to avoid cache/lock issues
+            # Get extension from format or original filename
+            _, ext = os.path.splitext(map_obj.filename)
+            if not ext:
+                ext = f".{img.format.lower()}" if img.format else '.png' # Fallback
+                
+            new_filename = f"map_{int(time.time())}{ext}"
+            new_file_path = os.path.join(app.config['UPLOAD_FOLDER'], 'maps', new_filename)
+            
+            cropped_img.save(new_file_path, format=img.format)
+            
+            # Update DB
+            old_filename = map_obj.filename
+            map_obj.filename = new_filename
+            
+            # CRITICAL: Clear image_data if it exists, otherwise serve_map_image serves OLD persistent data
+            if map_obj.image_data:
+                map_obj.image_data = None
+                
+            # Note: Commit happens later
+            
+            # Delete old file (optional, but good for cleanup)
+            # Don't delete immediately if it fails?
+            # We can delete after commit.
+            old_file_path = file_path
+            
+        # 2. Recalculate Pins
+        locations = MapLocation.query.filter_by(map_image_id=map_id).all()
+        removed_count = 0
+        updated_count = 0
+        
+        for loc in locations:
+            old_px_x = (loc.x_coordinate / 100.0) * original_w
+            old_px_y = (loc.y_coordinate / 100.0) * original_h
+            
+            # Use SAFE coordinates for adjustment
+            new_px_x = old_px_x - safe_x
+            new_px_y = old_px_y - safe_y
+            
+            # Check if inside new bounds
+            if 0 <= new_px_x <= safe_w and 0 <= new_px_y <= safe_h:
+                # Update
+                new_pct_x = (new_px_x / safe_w) * 100.0
+                new_pct_y = (new_px_y / safe_h) * 100.0
+                loc.x_coordinate = new_pct_x
+                loc.y_coordinate = new_pct_y
+                updated_count += 1
+            else:
+                # Delete
+                db.session.delete(loc)
+                removed_count += 1
+                
+        db.session.commit()
+        
+        # Cleanup old file
+        try:
+            if os.path.exists(old_file_path) and old_filename != map_obj.filename:
+                os.remove(old_file_path)
+        except Exception as delete_err:
+            logger.warning(f"Failed to delete old map file: {delete_err}")
+        
+        return jsonify({
+            'status': 'success', 
+            'message': f'Cropped. Updated {updated_count} pins, Removed {removed_count} pins.',
+            'filename': map_obj.filename
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Crop error: {e}")
+        return jsonify({'status': 'error', 'message': str(e)})
+
 @app.route('/admin/api/map_quiz/debug/repair_db')
 def api_repair_map_quiz_db():
     """Manually trigger map quiz synchronization"""
