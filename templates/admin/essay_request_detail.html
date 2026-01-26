@@ -2,6 +2,16 @@
 
 {% block title %}添削依頼詳細 #{{ req.id }} - 管理画面{% endblock %}
 
+{% block head_extra %}
+<link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+<style>
+    .ql-editor {
+        min-height: 300px;
+        background-color: white;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container mt-4">
     <div class="mb-4">
@@ -85,8 +95,8 @@
                         enctype="multipart/form-data">
                         <div class="mb-4">
                             <label for="reply_text" class="form-label fw-bold">添削コメント・フィードバック</label>
-                            <textarea name="reply_text" id="reply_text" class="form-control" rows="12" required
-                                placeholder="添削のアドバイスや、採点結果などを記入してください...">{{ req.reply_text }}</textarea>
+                            <input type="hidden" name="reply_text" id="reply_text_input">
+                            <div id="editor-container" style="height: 300px;">{{ req.reply_text | safe }}</div>
                         </div>
 
                         <div class="mb-4">
@@ -186,8 +196,36 @@
     </div>
 </div>
 
+<script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function () {
+        // Quillエディタの初期化
+        var quill = new Quill('#editor-container', {
+            theme: 'snow',
+            modules: {
+                toolbar: [
+                    [{ 'header': [1, 2, 3, false] }],
+                    ['bold', 'italic', 'underline', 'strike'],
+                    [{ 'color': [] }, { 'background': [] }],
+                    [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+                    ['link', 'clean']
+                ]
+            }
+        });
+
+        // フォーム送信時にQuillの内容をhidden inputに設定
+        var form = document.querySelector('form[action*="admin_reply_correction_request"]');
+        if (form) {
+            form.addEventListener('submit', function (e) {
+                var replyTextInput = document.querySelector('input[name="reply_text"]');
+                // エディタの内容が空でないか確認（タグのみの場合も考慮）
+                if (quill.getText().trim().length === 0 && !document.querySelector('input[file]').value) {
+                    // 画像もない、テキストもない場合は警告するなど（今回は必須属性がないのでサーバーサイド検証に任せるか、ここでチェック）
+                }
+                replyTextInput.value = quill.root.innerHTML;
+            });
+        }
+
         var container = document.getElementById('adminChatContainer');
         if (!container) return;
 
@@ -208,8 +246,23 @@
                     : 'background: #28a745; color: white; border-bottom-right-radius: 4px;');
 
             var label = isStudent ? '👤 生徒' : '👨‍🏫 先生（あなた）';
+
+            var contentHtml = '';
+            if (!isStudent) {
+                // 管理者（自分）のメッセージはHTMLとして扱う
+                // 過去のプレーンテキストメッセージの改行を保持するために
+                // HTMLタグが含まれていない場合は改行を<br>に変換する簡易判定
+                if (!message.includes('<') && !message.includes('>')) {
+                    contentHtml = escapeHtml(message).replace(/\n/g, '<br>');
+                } else {
+                    contentHtml = message;
+                }
+            } else {
+                contentHtml = escapeHtml(message);
+            }
+
             inner.innerHTML = '<div style="font-size: 0.75rem; opacity: 0.8; margin-bottom: 4px;">' + label + ' ' + (timestamp || '') + '</div>' +
-                '<div style="white-space: pre-wrap; line-height: 1.5;">' + escapeHtml(message) + '</div>';
+                '<div style="word-break: break-word;">' + contentHtml + '</div>';
             bubble.appendChild(inner);
             return bubble;
         }
@@ -317,13 +370,21 @@
             var requestId = container.dataset.requestId;
             var listUrl = "{{ url_for('admin_essay_requests_list') }}";
 
+            // Textareaからの入力はプレーンテキストなので、送信前にHTMLっぽく変換（改行反映）しておくのが無難か
+            // APIの実装が見えないので、安全側に倒して「改行を<br>」に変換してから送る？
+            // いえ、Adminのメイン返信がHTMLになるなら、ここも合わせるべき。
+            var formattedMessage = message;
+            if (message) {
+                formattedMessage = message.replace(/[&<>"']/g, function (m) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m]; }).replace(/\n/g, '<br>');
+            }
+
             fetch('/api/admin/essay_request/' + requestId + '/chat_action', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    message: message,
+                    message: formattedMessage,
                     resolve: resolve
                 })
             })
@@ -339,10 +400,6 @@
                         document.getElementById('adminQuickReply').value = '';
                         updateTopStatusBadge(data.new_status);
 
-                        // 返信ボタンを無効化（1回きり制限に従う場合）
-                        // ※チャットモーダル内は制限対象外だが、正式な返信ボタンの状態を同期させる必要があるかもしれない
-                        // location.reload(); // 手っ取り早く同期させる場合はリロードも検討
-
                         // チェックボックスの状態を同期
                         var resolveCheckbox = document.getElementById('resolveRequestCheckbox');
                         if (resolveCheckbox) {
@@ -354,8 +411,6 @@
                             btn.innerHTML = '<i class="fas fa-paper-plane"></i> 送信する';
                         }
 
-                        // 解決フラグがTrueかつチャットからの送信でない（スイッチ操作のみ）の場合は、
-                        // もしかしたら通知を出したほうが親切
                         if (resolve && !message) {
                             alert('解決済みに更新しました');
                         }
