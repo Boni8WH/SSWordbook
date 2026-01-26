@@ -802,6 +802,97 @@ async function deletePin() {
     } catch (error) { alert('Error: ' + error.message); }
 }
 
+async function deleteCurrentMap() {
+    if (!currentMap) return;
+    if (!confirm(`地図「${currentMap.name}」を削除しますか？\n登録された地点と問題も全て削除されます。`)) return;
+
+    try {
+        const response = await fetch(`${API_BASE}/map/${currentMap.id}/delete`, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': getCsrfToken() }
+        });
+        const res = await response.json();
+        if (res.status === 'success') {
+            currentMap = null;
+            document.getElementById('mapEditorContainer').style.display = 'none';
+            document.getElementById('mapEditorPlaceholder').style.display = 'block';
+            loadSortableMapList();
+        } else {
+            alert('Error: ' + res.message);
+        }
+    } catch (e) { alert('Error: ' + e.message); }
+}
+
+
+// --- Image Replace & Health Logic ---
+
+function triggerReplaceImage() {
+    if (!currentMap) return;
+    document.getElementById('replaceImageInput').click();
+}
+
+async function uploadReplaceImage(input) {
+    if (!input.files || !input.files[0]) return;
+    const file = input.files[0];
+
+    if (!confirm(`「${currentMap.name}」の画像を置換しますか？\nピンや問題データは維持されますが、画像サイズが変わるとピンの位置がずれる可能性があります。`)) {
+        input.value = '';
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+        const response = await fetch(`${API_BASE}/map/${currentMap.id}/replace_image`, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': getCsrfToken() },
+            body: formData
+        });
+
+        const res = await response.json();
+        if (res.status === 'success') {
+            alert('画像を置換しました');
+            // Reload map image
+            const img = document.getElementById('editorMapImage');
+            img.src = `/serve_map_image/${res.filename}?t=${new Date().getTime()}`;
+            // Update currentMap object filename if needed
+            currentMap.filename = res.filename;
+        } else {
+            alert('Error: ' + res.message);
+        }
+    } catch (e) {
+        alert('Error: ' + e.message);
+    } finally {
+        input.value = '';
+    }
+}
+
+async function checkMapHealth() {
+    try {
+        const response = await fetch(`${API_BASE}/health_check`);
+        const res = await response.json();
+
+        if (res.status === 'success') {
+            const issues = res.issues;
+            if (issues.length === 0) {
+                alert('すべての地図データは正常です。\n（DB内に画像データが存在します）');
+            } else {
+                let msg = `【重要】${issues.length}件の地図に問題が見つかりました。\nこれらは画像ファイルが消失している可能性があります。\n\n`;
+                issues.forEach(i => {
+                    msg += `・ID:${i.id} ${i.name} (${i.status})\n`;
+                });
+                msg += '\n「画像置換」機能を使って復旧してください。';
+                alert(msg);
+            }
+        } else {
+            alert('Error: ' + res.message);
+        }
+    } catch (e) {
+        alert('Error: ' + e.message);
+    }
+}
+
 async function addProblemToPin() {
     let pinId = document.getElementById('currentPinId').value;
 
