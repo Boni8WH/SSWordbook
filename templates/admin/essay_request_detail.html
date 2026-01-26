@@ -91,8 +91,8 @@
                     <h5 class="mb-0"><i class="fas fa-edit"></i> 添削・返信</h5>
                 </div>
                 <div class="card-body">
-                    <form action="{{ url_for('admin_reply_correction_request', request_id=req.id) }}" method="POST"
-                        enctype="multipart/form-data">
+                    <form id="replyForm" action="{{ url_for('admin_reply_correction_request', request_id=req.id) }}"
+                        method="POST" enctype="multipart/form-data">
                         <div class="mb-4">
                             <label for="reply_text" class="form-label fw-bold">添削コメント・フィードバック</label>
                             <input type="hidden" name="reply_text" id="reply_text_input">
@@ -214,15 +214,24 @@
         });
 
         // フォーム送信時にQuillの内容をhidden inputに設定
-        var form = document.querySelector('form[action*="admin_reply_correction_request"]');
+        var form = document.getElementById('replyForm');
         if (form) {
             form.addEventListener('submit', function (e) {
                 var replyTextInput = document.querySelector('input[name="reply_text"]');
-                // エディタの内容が空でないか確認（タグのみの場合も考慮）
-                if (quill.getText().trim().length === 0 && !document.querySelector('input[file]').value) {
-                    // 画像もない、テキストもない場合は警告するなど（今回は必須属性がないのでサーバーサイド検証に任せるか、ここでチェック）
+
+                // エディタの内容をHTMLとして取得
+                var htmlContent = quill.root.innerHTML;
+
+                // 空送信チェック（画像がある場合は許容するなど要件によるが、念のため）
+                if (quill.getText().trim().length === 0 && !document.querySelector('input[type="file"]').value) {
+                    // テキストも画像もない場合警告？
+                    // e.preventDefault();
+                    // alert('内容を入力してください');
+                    // return;
                 }
-                replyTextInput.value = quill.root.innerHTML;
+
+                replyTextInput.value = htmlContent;
+                // console.log("Submitting:", replyTextInput.value); // Debug
             });
         }
 
