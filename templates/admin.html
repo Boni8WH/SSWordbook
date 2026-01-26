@@ -2,6 +2,8 @@
 {% block title %}管理者ページ - {{ app_name }}{% endblock %}
 
 {% block content %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
 <style>
     /* Admin Sidebar Layout Styles */
     :root {
@@ -2478,14 +2480,39 @@
                                     <div class="d-flex justify-content-between align-items-center mb-2 bg-white p-2 border rounded sticky-top"
                                         style="z-index: 10;">
                                         <h5 id="currentMapName" class="m-0">地図名</h5>
-                                        <div>
-                                            <div class="form-check form-switch d-inline-block me-3">
+                                        <div class="d-flex align-items-center gap-2">
+                                            <!-- Zoom Controls -->
+                                            <div class="btn-group btn-group-sm me-2">
+                                                <button class="btn btn-outline-secondary"
+                                                    onclick="zoomEditorMap(0.8)"><i class="fas fa-minus"></i></button>
+                                                <button class="btn btn-outline-secondary"
+                                                    onclick="resetEditorZoom()">Res</button>
+                                                <button class="btn btn-outline-secondary"
+                                                    onclick="zoomEditorMap(1.2)"><i class="fas fa-plus"></i></button>
+                                            </div>
+
+                                            <button id="startCropBtn" class="btn btn-sm btn-outline-warning"
+                                                onclick="toggleCropMode()">
+                                                <i class="fas fa-crop-alt"></i> トリミング
+                                            </button>
+                                            <div id="cropControls" style="display: none;"
+                                                class="btn-group btn-group-sm">
+                                                <button class="btn btn-success" onclick="saveCrop()">
+                                                    <i class="fas fa-check"></i> 確定
+                                                </button>
+                                                <button class="btn btn-secondary" onclick="cancelCrop()">
+                                                    <i class="fas fa-times"></i> キャンセル
+                                                </button>
+                                            </div>
+
+                                            <div class="form-check form-switch d-inline-block ms-2">
                                                 <input class="form-check-input" type="checkbox" id="showPinNamesToggle"
                                                     checked onchange="togglePinNames()">
-                                                <label class="form-check-label" for="showPinNamesToggle">地名表示</label>
+                                                <label class="form-check-label small"
+                                                    for="showPinNamesToggle">地名</label>
                                             </div>
-                                            <button class="btn btn-sm btn-danger me-2"
-                                                onclick="deleteCurrentMap()">地図削除</button>
+                                            <button class="btn btn-sm btn-danger ms-2"
+                                                onclick="deleteCurrentMap()">削除</button>
                                         </div>
                                     </div>
 

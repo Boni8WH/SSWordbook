@@ -597,6 +597,99 @@ function onMapClick(event) {
     });
 }
 
+// Crop State
+let cropper = null;
+
+async function toggleCropMode() {
+    const img = document.getElementById('editorMapImage');
+    const startBtn = document.getElementById('startCropBtn');
+    const controls = document.getElementById('cropControls');
+
+    if (!cropper) {
+        // Init Crop
+        // CRITICAL: Reset zoom/pan transform BEFORE init Cropper
+        // Otherwise cropper coordinates will be skewed by the CSS transform
+        resetEditorZoom();
+
+        startBtn.style.display = 'none';
+        controls.style.display = 'inline-block';
+
+        // Disable Zoom/Pan/Drag interactions
+        // (Cropper.js takes over interactions)
+
+        cropper = new Cropper(img, {
+            viewMode: 1, // Restrict crop box to canvas
+            zoomable: true,
+            movable: true,
+            rotatable: false,
+            scalable: false,
+            ready() {
+                // Adjust cropper container z-index to be above pins?
+                // Actually pins might obscure crop box. 
+                // We should probably hide pins or make them pass-through?
+                // Let's hide pins during crop for clarity.
+                document.getElementById('editorPinsContainer').style.display = 'none';
+            }
+        });
+    }
+}
+
+async function cancelCrop() {
+    if (cropper) {
+        cropper.destroy();
+        cropper = null;
+    }
+    document.getElementById('startCropBtn').style.display = 'inline-block';
+    document.getElementById('cropControls').style.display = 'none';
+    document.getElementById('editorPinsContainer').style.display = 'block';
+    resetEditorZoom(); // Restore normal zoom state
+}
+
+async function saveCrop() {
+    if (!cropper) return;
+    if (!confirm('画像をトリミングしますか？\n既存のピンの位置は再計算されますが、範囲外のピンは削除されます。')) return;
+
+    // Get Data
+    // We need data relative to the *original* image natural size.
+    // cropper.getData(true) returns rounded values
+    const data = cropper.getData(true);
+
+    // { x, y, width, height, rotate, scaleX, scaleY }
+    const cropData = {
+        x: data.x,
+        y: data.y,
+        width: data.width,
+        height: data.height
+    };
+
+    try {
+        const response = await fetch(`${API_BASE}/map/${currentMap.id}/crop`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+            body: JSON.stringify(cropData)
+        });
+
+        const res = await response.json();
+        if (res.status === 'success') {
+            alert('トリミング完了しました');
+            cancelCrop();
+            // Reload map to get new image and pin positions
+            // Force image reload by appending query param
+            const img = document.getElementById('editorMapImage');
+            const newSrc = `/serve_map_image/${res.filename}?t=${new Date().getTime()}`;
+            img.src = newSrc;
+
+            // Wait for load? or just reload pins
+            // Better to re-select map to ensure full refresh of state
+            await loadPins(currentMap.id);
+        } else {
+            alert('Error: ' + res.message);
+        }
+    } catch (e) {
+        alert('Error: ' + e.message);
+    }
+}
+
 function openPinCreate(coords) {
     document.getElementById('currentPinId').value = '';
     document.getElementById('displayPinX').value = coords.x;
