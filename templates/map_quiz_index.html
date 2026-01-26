@@ -1,131 +1,189 @@
 {% extends "base.html" %}
 
 {% block head_extra %}
-<link href="https://fonts.googleapis.com/css2?family=Yuji+Boku&family=Kaisei+Tokumin:wght@400;700&display=swap"
+<link
+    href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@700&family=Yuji+Boku&family=Kaisei+Tokumin:wght@400;700&display=swap"
     rel="stylesheet">
 <style>
+    .map_quiz_header {
+        border-bottom: 1px solid #e0e0e0;
+        padding-bottom: 2rem;
+        margin-bottom: 2rem;
+        text-align: center;
+    }
+
     .map-quiz-title {
-        font-family: 'Yuji Boku', serif;
-        font-size: 2.2rem;
-        background: linear-gradient(135deg, #0d6efd 0%, #003d99 100%);
-        -webkit-background-clip: text;
-        background-clip: text;
-        -webkit-text-fill-color: transparent;
-        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+        font-family: 'Shippori Mincho', serif;
+        font-size: clamp(1.8rem, 8vw, 2.8rem);
+        font-weight: 700;
+        color: #1a1a2e;
+        letter-spacing: 0.12em;
         display: inline-flex;
         align-items: center;
-        letter-spacing: 0.05em;
+        justify-content: center;
+        position: relative;
+        padding: 0 10px;
+        text-shadow: 2px 2px 0px rgba(212, 175, 55, 0.2);
+        max-width: 100%;
+        white-space: nowrap;
+    }
+
+    .map-quiz-title::before,
+    .map-quiz-title::after {
+        content: "";
+        height: 1px;
+        background: linear-gradient(to right, transparent, #d4af37, transparent);
+        flex: 1;
+        min-width: 10px;
+        margin: 0 10px;
+    }
+
+    @media (min-width: 768px) {
+
+        .map-quiz-title::before,
+        .map-quiz-title::after {
+            min-width: 50px;
+            margin: 0 20px;
+        }
     }
 
     .map-quiz-title i {
-        -webkit-text-fill-color: #0d6efd;
-        /* Reset for icon */
-        margin-right: 12px;
-        filter: drop-shadow(2px 2px 2px rgba(0, 0, 0, 0.1));
+        color: #d4af37;
+        margin-right: 0.4em;
+        font-size: 0.8em;
+        filter: drop-shadow(1px 1px 1px rgba(0, 0, 0, 0.2));
+    }
+
+    .map-quiz-subtitle {
+        font-family: 'Kaisei Tokumin', serif;
+        color: #666;
+        font-size: clamp(0.7rem, 3vw, 0.9rem);
+        margin-top: 0.5rem;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        padding: 0 15px;
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="container mt-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="map-quiz-title"><i class="fas fa-globe-americas"></i>地図の深淵</h2>
-        <a href="{{ url_for('index') }}" class="btn btn-outline-secondary rounded-pill px-4">
-            <i class="fas fa-home me-1"></i> ホーム
+<div class="map_quiz_header mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <a href="{{ url_for('index') }}" class="btn btn-sm btn-outline-secondary rounded-pill px-3">
+            <i class="fas fa-arrow-left me-1"></i> ホーム
         </a>
     </div>
-
-    <div class="alert alert-light border shadow-sm">
-        <i class="fas fa-info-circle text-info"></i> 地図を選択してクイズに挑戦しよう！
+    <div class="position-relative">
+        <h2 class="map-quiz-title">
+            <i class="fas fa-compass"></i>地図の深淵
+        </h2>
+        <div class="map-quiz-subtitle">Unveil the Unseen</div>
     </div>
+</div>
 
-    <div class="accordion" id="mapQuizAccordion">
+<div class="alert alert-light border shadow-sm">
+    <i class="fas fa-info-circle text-info"></i> 地図を選択してクイズに挑戦!直近3回連続正解で習得!
+</div>
 
-        {# 1. Sorted Genres #}
-        {% for genre in genres %}
-        {% set map_list = genre.maps %}
-        {% if map_list|length > 0 %}
-        {% set genre_id = 'genre-' ~ genre.id %}
-        <div class="accordion-item shadow-sm mb-3 border-0 rounded overflow-hidden">
-            <h2 class="accordion-header" id="heading-{{ genre_id }}">
-                <button class="accordion-button {{ 'collapsed' if not loop.first }}" type="button"
-                    data-bs-toggle="collapse" data-bs-target="#collapse-{{ genre_id }}"
-                    aria-expanded="{{ 'true' if loop.first else 'false' }}" aria-controls="collapse-{{ genre_id }}"
-                    style="font-weight: bold; background-color: #f8f9fa;">
-                    <i class="fas fa-tag me-2 text-primary"></i> {{ genre.name }}
-                    <span class="badge bg-secondary ms-3 rounded-pill">{{ map_list|length }}</span>
-                </button>
-            </h2>
-            <div id="collapse-{{ genre_id }}" class="accordion-collapse collapse {{ 'show' if loop.first }}"
-                aria-labelledby="heading-{{ genre_id }}">
-                <div class="accordion-body p-0">
-                    <div class="list-group list-group-flush">
-                        {% for map in map_list %}
-                        <div
-                            class="list-group-item list-group-item-action d-flex justify-content-between align-items-center p-3">
-                            <div>
-                                <h6 class="mb-1 fw-bold text-dark">
-                                    <i class="fas fa-map me-2 text-secondary"></i>{{ map.name }}
-                                </h6>
-                                <small class="text-muted">{{ map.locations|length }} 地点</small>
+<div class="accordion" id="mapQuizAccordion">
+
+    {# 1. Sorted Genres #}
+    {% for genre in genres %}
+    {% set map_list = genre.maps %}
+    {% if map_list|length > 0 %}
+    {% set genre_id = 'genre-' ~ genre.id %}
+    <div class="accordion-item shadow-sm mb-3 border-0 rounded overflow-hidden">
+        <h2 class="accordion-header" id="heading-{{ genre_id }}">
+            <button class="accordion-button {{ 'collapsed' if not loop.first }}" type="button" data-bs-toggle="collapse"
+                data-bs-target="#collapse-{{ genre_id }}" aria-expanded="{{ 'true' if loop.first else 'false' }}"
+                aria-controls="collapse-{{ genre_id }}" style="font-weight: bold; background-color: #f8f9fa;">
+                <i class="fas fa-tag me-2 text-primary"></i> {{ genre.name }}
+                <span class="badge bg-secondary ms-3 rounded-pill">{{ map_list|length }}</span>
+            </button>
+        </h2>
+        <div id="collapse-{{ genre_id }}" class="accordion-collapse collapse {{ 'show' if loop.first }}"
+            aria-labelledby="heading-{{ genre_id }}">
+            <div class="accordion-body p-0">
+                <div class="list-group list-group-flush">
+                    {% for map in map_list %}
+                    <div
+                        class="list-group-item list-group-item-action d-flex justify-content-between align-items-center p-3">
+                        <div>
+                            <h6 class="mb-1 fw-bold text-dark">
+                                <i class="fas fa-map me-2 text-secondary"></i>{{ map.name }}
+                            </h6>
+                            <div class="d-flex align-items-center">
+                                <div class="progress flex-grow-1 me-2" style="height: 6px; max-width: 120px;">
+                                    <div id="progress-bar-{{ map.id }}" class="progress-bar bg-success"
+                                        role="progressbar" style="width: 0%;"></div>
+                                </div>
+                                <small class="text-muted" id="progress-text-{{ map.id }}">{{ map.locations|length
+                                    }}地点</small>
                             </div>
-                            <span class="btn btn-sm btn-outline-primary rounded-pill text-nowrap"
-                                onclick="openDifficultyModal({{ map.id }}, '{{ map.name }}')">
-                                <i class="fas fa-play me-1"></i> 挑戦
-                            </span>
                         </div>
-                        {% endfor %}
+                        <span class="btn btn-sm btn-outline-primary rounded-pill text-nowrap"
+                            onclick="openDifficultyModal({{ map.id }}, '{{ map.name }}')">
+                            <i class="fas fa-play me-1"></i> 挑戦
+                        </span>
                     </div>
+                    {% endfor %}
                 </div>
             </div>
         </div>
-        {% endif %}
-        {% endfor %}
+    </div>
+    {% endif %}
+    {% endfor %}
 
-        {# 2. Others (No Genre) #}
-        {% if others_maps and others_maps|length > 0 %}
-        {% set genre_id = 'genre-others' %}
-        <div class="accordion-item shadow-sm mb-3 border-0 rounded overflow-hidden">
-            <h2 class="accordion-header" id="heading-{{ genre_id }}">
-                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
-                    data-bs-target="#collapse-{{ genre_id }}" aria-expanded="false"
-                    aria-controls="collapse-{{ genre_id }}" style="font-weight: bold; background-color: #f8f9fa;">
-                    <i class="fas fa-question-circle me-2 text-secondary"></i> その他
-                    <span class="badge bg-secondary ms-3 rounded-pill">{{ others_maps|length }}</span>
-                </button>
-            </h2>
-            <div id="collapse-{{ genre_id }}" class="accordion-collapse collapse"
-                aria-labelledby="heading-{{ genre_id }}">
-                <div class="accordion-body p-0">
-                    <div class="list-group list-group-flush">
-                        {% for map in others_maps %}
-                        <div
-                            class="list-group-item list-group-item-action d-flex justify-content-between align-items-center p-3">
-                            <div>
-                                <h6 class="mb-1 fw-bold text-dark">
-                                    <i class="fas fa-map me-2 text-secondary"></i>{{ map.name }}
-                                </h6>
-                                <small class="text-muted">{{ map.locations|length }} 地点</small>
+    {# 2. Others (No Genre) #}
+    {% if others_maps and others_maps|length > 0 %}
+    {% set genre_id = 'genre-others' %}
+    <div class="accordion-item shadow-sm mb-3 border-0 rounded overflow-hidden">
+        <h2 class="accordion-header" id="heading-{{ genre_id }}">
+            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                data-bs-target="#collapse-{{ genre_id }}" aria-expanded="false" aria-controls="collapse-{{ genre_id }}"
+                style="font-weight: bold; background-color: #f8f9fa;">
+                <i class="fas fa-question-circle me-2 text-secondary"></i> その他
+                <span class="badge bg-secondary ms-3 rounded-pill">{{ others_maps|length }}</span>
+            </button>
+        </h2>
+        <div id="collapse-{{ genre_id }}" class="accordion-collapse collapse" aria-labelledby="heading-{{ genre_id }}">
+            <div class="accordion-body p-0">
+                <div class="list-group list-group-flush">
+                    {% for map in others_maps %}
+                    <div
+                        class="list-group-item list-group-item-action d-flex justify-content-between align-items-center p-3">
+                        <div>
+                            <h6 class="mb-1 fw-bold text-dark">
+                                <i class="fas fa-map me-2 text-secondary"></i>{{ map.name }}
+                            </h6>
+                            <div class="d-flex align-items-center">
+                                <div class="progress flex-grow-1 me-2" style="height: 6px; max-width: 120px;">
+                                    <div id="progress-bar-{{ map.id }}" class="progress-bar bg-success"
+                                        role="progressbar" style="width: 0%;"></div>
+                                </div>
+                                <small class="text-muted" id="progress-text-{{ map.id }}">{{ map.locations|length
+                                    }}地点</small>
                             </div>
-                            <span class="btn btn-sm btn-outline-primary rounded-pill text-nowrap"
-                                onclick="openDifficultyModal({{ map.id }}, '{{ map.name }}')">
-                                <i class="fas fa-play me-1"></i> 挑戦
-                            </span>
                         </div>
-                        {% endfor %}
+                        <span class="btn btn-sm btn-outline-primary rounded-pill text-nowrap"
+                            onclick="openDifficultyModal({{ map.id }}, '{{ map.name }}')">
+                            <i class="fas fa-play me-1"></i> 挑戦
+                        </span>
                     </div>
+                    {% endfor %}
                 </div>
             </div>
         </div>
-        {% endif %}
-
-        {% if genres|length == 0 and others_maps|length == 0 %}
-        <div class="text-center py-5 text-muted">
-            <i class="fas fa-map fa-3x mb-3"></i><br>
-            登録された地図クイズはまだありません。
-        </div>
-        {% endif %}
     </div>
+    {% endif %}
+
+    {% if genres|length == 0 and others_maps|length == 0 %}
+    <div class="text-center py-5 text-muted">
+        <i class="fas fa-map fa-3x mb-3"></i><br>
+        登録された地図クイズはまだありません。
+    </div>
+    {% endif %}
+</div>
 </div>
 
 <!-- Difficulty Selection Modal -->
@@ -147,22 +205,66 @@
                     <p class="text-muted mt-2 small">問題を読み込み中...</p>
                 </div>
 
-                <div id="difficultyButtons" class="d-grid gap-2 col-10 mx-auto" style="display: none !important;">
-                    <button id="difficulty-btn-1" class="btn btn-outline-success btn-lg" onclick="startMapQuiz(1)">
-                        <i class="fas fa-seedling"></i> 易（やさしい）
+                <div id="difficultyButtons" class="d-grid gap-2 col-10 mx-auto" style="display: none;">
+                    <button id="difficulty-btn-1"
+                        class="btn btn-outline-success btn-lg text-start position-relative overflow-hidden"
+                        onclick="startMapQuiz(1)">
+                        <div class="d-flex justify-content-between align-items-center position-relative"
+                            style="z-index: 2;">
+                            <span><i class="fas fa-seedling me-2"></i>易</span>
+                            <small class="mastery-text">0/0</small>
+                        </div>
+                        <div class="difficulty-progress-bg bg-success opacity-25" id="difficulty-progress-1"
+                            style="position: absolute; top:0; left:0; height:100%; width: 0%; z-index: 1;"></div>
                     </button>
-                    <button id="difficulty-btn-2" class="btn btn-outline-primary btn-lg" onclick="startMapQuiz(2)">
-                        <i class="fas fa-walking"></i> 標準（ふつう）
+
+                    <button id="difficulty-btn-2"
+                        class="btn btn-outline-primary btn-lg text-start position-relative overflow-hidden"
+                        onclick="startMapQuiz(2)">
+                        <div class="d-flex justify-content-between align-items-center position-relative"
+                            style="z-index: 2;">
+                            <span><i class="fas fa-walking me-2"></i>標準</span>
+                            <small class="mastery-text">0/0</small>
+                        </div>
+                        <div class="difficulty-progress-bg bg-primary opacity-25" id="difficulty-progress-2"
+                            style="position: absolute; top:0; left:0; height:100%; width: 0%; z-index: 1;"></div>
                     </button>
-                    <button id="difficulty-btn-3" class="btn btn-outline-danger btn-lg" onclick="startMapQuiz(3)">
-                        <i class="fas fa-skull"></i> 難（むずかしい）
+
+                    <button id="difficulty-btn-3"
+                        class="btn btn-outline-danger btn-lg text-start position-relative overflow-hidden"
+                        onclick="startMapQuiz(3)">
+                        <div class="d-flex justify-content-between align-items-center position-relative"
+                            style="z-index: 2;">
+                            <span><i class="fas fa-skull me-2"></i>難</span>
+                            <small class="mastery-text">0/0</small>
+                        </div>
+                        <div class="difficulty-progress-bg bg-danger opacity-25" id="difficulty-progress-3"
+                            style="position: absolute; top:0; left:0; height:100%; width: 0%; z-index: 1;"></div>
                     </button>
-                    <button id="difficulty-btn-4" class="btn btn-outline-dark btn-lg" onclick="startMapQuiz(4)"
-                        style="border-color: #6610f2; color: #6610f2;">
-                        <i class="fas fa-crown"></i> 最難関（趣味レベル）
+
+                    <button id="difficulty-btn-4"
+                        class="btn btn-outline-dark btn-lg text-start position-relative overflow-hidden"
+                        onclick="startMapQuiz(4)" style="border-color: #6610f2; color: #6610f2;">
+                        <div class="d-flex justify-content-between align-items-center position-relative"
+                            style="z-index: 2;">
+                            <span><i class="fas fa-crown me-2"></i>最難関</span>
+                            <small class="mastery-text">0/0</small>
+                        </div>
+                        <div class="difficulty-progress-bg opacity-25" id="difficulty-progress-4"
+                            style="background-color: #6610f2; position: absolute; top:0; left:0; height:100%; width: 0%; z-index: 1;">
+                        </div>
                     </button>
-                    <button id="difficulty-btn-all" class="btn btn-secondary btn-lg" onclick="startMapQuiz(0)">
-                        <i class="fas fa-layer-group"></i> すべて（All）
+
+                    <button id="difficulty-btn-all"
+                        class="btn btn-secondary btn-lg text-start position-relative overflow-hidden"
+                        onclick="startMapQuiz(0)">
+                        <div class="d-flex justify-content-between align-items-center position-relative"
+                            style="z-index: 2;">
+                            <span><i class="fas fa-layer-group me-2"></i>すべて</span>
+                            <small class="mastery-text">0/0</small>
+                        </div>
+                        <div class="difficulty-progress-bg bg-dark opacity-25" id="difficulty-progress-0"
+                            style="position: absolute; top:0; left:0; height:100%; width: 0%; z-index: 1;"></div>
                     </button>
                 </div>
 
@@ -187,7 +289,7 @@
 
         // Reset UI
         document.getElementById('difficultyLoading').style.display = 'block';
-        document.getElementById('difficultyButtons').style.setProperty('display', 'none', 'important');
+        document.getElementById('difficultyButtons').style.display = 'none';
         document.getElementById('noProblemsMessage').style.display = 'none';
 
         modal.show();
@@ -200,22 +302,44 @@
 
             if (data.status === 'success') {
                 const counts = data.counts;
+                console.log("Difficulty counts data:", counts);
 
-                if (counts.total === 0) {
+                if (counts.total.total === 0) {
                     document.getElementById('noProblemsMessage').style.display = 'block';
                 } else {
-                    document.getElementById('difficultyButtons').style.setProperty('display', 'grid', 'important');
+                    document.getElementById('difficultyButtons').style.display = 'grid';
 
-                    // Show/Hide specific buttons
-                    document.getElementById('difficulty-btn-1').style.display = counts.easy > 0 ? 'block' : 'none';
-                    document.getElementById('difficulty-btn-2').style.display = counts.standard > 0 ? 'block' : 'none';
-                    document.getElementById('difficulty-btn-3').style.display = counts.hard > 0 ? 'block' : 'none';
-                    document.getElementById('difficulty-btn-4').style.display = counts.master > 0 ? 'block' : 'none';
+                    const mappings = [
+                        { key: 'easy', id: '1' },
+                        { key: 'standard', id: '2' },
+                        { key: 'hard', id: '3' },
+                        { key: 'master', id: '4' },
+                        { key: 'total', id: 'all' }
+                    ];
 
-                    // "All" button remains visible if total > 0
-                    document.getElementById('difficulty-btn-all').style.display = 'block';
+                    mappings.forEach(m => {
+                        const countObj = counts[m.key];
+                        const btnId = m.id === 'all' ? 'difficulty-btn-all' : `difficulty-btn-${m.id}`;
+                        const progressId = m.id === 'all' ? '0' : m.id;
+                        const btn = document.getElementById(btnId);
+
+                        if (btn && countObj && countObj.total > 0) {
+                            btn.style.display = 'block';
+                            const masteryText = btn.querySelector('.mastery-text');
+                            const progressBg = document.getElementById(`difficulty-progress-${progressId}`);
+
+                            if (masteryText) masteryText.innerText = `習得: ${countObj.mastered}/${countObj.total}`;
+                            if (progressBg) {
+                                const percent = Math.round((countObj.mastered / countObj.total) * 100);
+                                progressBg.style.width = `${percent}%`;
+                            }
+                        } else if (btn) {
+                            btn.style.display = 'none';
+                        }
+                    });
                 }
             } else {
+                console.error("API error:", data);
                 alert('データ取得エラー');
             }
         } catch (e) {
@@ -232,5 +356,29 @@
         }
         window.location.href = url;
     }
+    async function loadMapStats() {
+        try {
+            const response = await fetch('/api/map_quiz/stats');
+            const data = await response.json();
+            if (data.status === 'success') {
+                for (const [mapId, stat] of Object.entries(data.stats)) {
+                    const bar = document.getElementById(`progress-bar-${mapId}`);
+                    const text = document.getElementById(`progress-text-${mapId}`);
+                    if (bar && text) {
+                        const percent = stat.total > 0 ? Math.round((stat.mastered / stat.total) * 100) : 0;
+                        bar.style.width = `${percent}%`;
+                        text.innerText = `習得: ${stat.mastered}/${stat.total}`;
+                        if (percent === 100) {
+                            bar.classList.add('bg-warning'); // Gold color for 100%
+                        }
+                    }
+                }
+            }
+        } catch (e) {
+            console.error("Failed to load map stats:", e);
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', loadMapStats);
 </script>
 {% endblock %}
