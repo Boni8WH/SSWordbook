@@ -14378,9 +14378,13 @@ def serve_map_image(filename):
     # Try serving from DB first (Persistent)
     map_obj = MapImage.query.filter_by(filename=filename).first()
     if map_obj and map_obj.image_data:
-        import mimetypes
-        mime_type, _ = mimetypes.guess_type(filename)
-        return Response(map_obj.image_data, mimetype=mime_type or 'image/png')
+        import io
+        return send_file(
+            io.BytesIO(map_obj.image_data),
+            mimetype='image/png',
+            as_attachment=False,
+            download_name=map_obj.filename
+        )
         
     # Fallback to filesystem
     directory = os.path.join(app.root_path, 'uploads', 'maps')
