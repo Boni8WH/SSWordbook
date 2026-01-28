@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block title %}お問い合わせ - {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
+                <h2 class="card-title text-center mb-4">
+                    <i class="fas fa-envelope me-2 text-primary"></i>お問い合わせ
+                </h2>
+
+                <p class="text-muted mb-4 text-center">
+                    ご意見、ご要望、不具合の報告などはこちらのフォームからお送りください。<br>
+                    通常、数営業日以内にご返信いたします。
+                </p>
+
+                <div class="alert alert-warning py-2 small text-center mb-4">
+                    <i class="fas fa-exclamation-triangle me-1"></i> 営業・勧誘等のご連絡につきましては、一切返信を差し上げておりませんのでご了承ください。
+                </div>
+
+                <form action="{{ url_for('contact_page') }}" method="POST">
+                    <div class="mb-3">
+                        <label for="name" class="form-label">お名前 <span class="badge bg-danger">必須</span></label>
+                        <input type="text" class="form-control" id="name" name="name" required placeholder="山田 太郎">
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="email" class="form-label">メールアドレス <span class="badge bg-danger">必須</span></label>
+                        <input type="email" class="form-control" id="email" name="email" required
+                            placeholder="example@example.com">
+                        <div class="form-text">返信が必要な場合は、正しいメールアドレスをご入力ください。</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="subject" class="form-label">件名</label>
+                        <input type="text" class="form-control" id="subject" name="subject" placeholder="不具合についてなど">
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="message" class="form-label">お問い合わせ内容 <span class="badge bg-danger">必須</span></label>
+                        <textarea class="form-control" id="message" name="message" rows="5" required
+                            placeholder="こちらにお問い合わせ内容をご記入ください。"></textarea>
+                    </div>
+
+                    <!-- Honeypot field (hidden from users) -->
+                    <div style="display:none;">
+                        <input type="text" name="honeypot" value="">
+                    </div>
+
+                    <div class="d-grid gap-2 mt-4">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="fas fa-paper-plane me-2"></i>送信する
+                        </button>
+                    </div>
+                </form>
+
+                <div class="mt-4 text-center">
+                    <a href="{{ url_for('index') }}" class="btn btn-link text-decoration-none">
+                        <i class="fas fa-arrow-left me-1"></i>トップページへ戻る
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
