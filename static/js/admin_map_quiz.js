@@ -267,6 +267,35 @@ async function deleteGenre(id) {
     loadSortableMapList();
 }
 
+async function editMapName(mapId, currentName) {
+    const newName = prompt("新しい地図名を入力してください:", currentName);
+    if (newName && newName !== currentName) {
+        try {
+            const response = await fetch(`${API_BASE}/map/edit`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+                body: JSON.stringify({ id: mapId, name: newName })
+            });
+            const res = await response.json();
+            if (res.status === 'success') {
+                // Update UI immediately
+                if (currentMap && currentMap.id === mapId) {
+                    currentMap.name = newName;
+                    // Re-render header
+                    document.getElementById('currentMapName').innerHTML =
+                        `${newName} <i class="fas fa-edit ms-2 text-muted pointer" onclick="editMapName(${mapId}, '${newName}')" style="cursor: pointer; font-size: 0.8em;" title="地図名を編集"></i>`;
+                }
+
+                loadSortableMapList(); // Reload list to reflect changes
+            } else {
+                alert('Error: ' + res.message);
+            }
+        } catch (e) {
+            alert('Error: ' + e.message);
+        }
+    }
+}
+
 
 // --- Map Interaction Logic ---
 
@@ -290,7 +319,8 @@ async function selectMap(mapId) {
         // UI Updates
         document.getElementById('mapEditorPlaceholder').style.display = 'none';
         document.getElementById('mapEditorContainer').style.display = 'block';
-        document.getElementById('currentMapName').innerText = currentMap.name;
+        document.getElementById('currentMapName').innerHTML =
+            `${currentMap.name} <i class="fas fa-edit ms-2 text-muted pointer" onclick="editMapName(${currentMap.id}, '${currentMap.name}')" style="cursor: pointer; font-size: 0.8em;" title="地図名を編集"></i>`;
         document.getElementById('currentMapId').value = mapId;
 
         const img = document.getElementById('editorMapImage');
