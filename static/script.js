@@ -1634,17 +1634,17 @@ function handleAnswer(isCorrect) {
         incorrectCount++;
         problemHistory[wordIdentifier].incorrect_attempts++;
 
-        // ★修正: そもそも「上達しかけていた（Streak > 0）」問題を間違えた場合のみクールダウン
-        // （ずっと間違えている問題や、新規の問題はクールダウンしない）
+        // ★修正: 既にリストに入っている かつ 以前に正解したことがある問題のみクールダウン
+        const isAlreadyWeak = incorrectWords.includes(wordIdentifier);
         const wasProgressing = (problemHistory[wordIdentifier].correct_streak > 0);
 
         problemHistory[wordIdentifier].correct_streak = 0;
 
-        if (wasProgressing) {
+        if (isAlreadyWeak && wasProgressing) {
             problemHistory[wordIdentifier].cooldown_until = Date.now() + COOLDOWN_DURATION;
         }
 
-        if (!incorrectWords.includes(wordIdentifier)) {
+        if (!isAlreadyWeak) {
             incorrectWords.push(wordIdentifier);
         }
     }
