@@ -14350,10 +14350,35 @@ def admin_essay_problems():
 # 地図クイズ管理関連 (Map Quiz Admin)
 # ====================================================================
 
+@app.route('/admin/api/map_quiz/map/edit', methods=['POST'])
+def admin_map_quiz_edit_map_name():
+    if not session.get('user_id'):
+        return jsonify({'status': 'error', 'message': 'Unauthorized'}), 401
+
+    data = request.get_json()
+    map_id = data.get('id')
+    new_name = data.get('name')
+
+    if not map_id or not new_name:
+        return jsonify({'status': 'error', 'message': 'Missing parameters'}), 400
+
+    map_obj = MapImage.query.get(map_id)
+    if not map_obj:
+        return jsonify({'status': 'error', 'message': 'Map not found'}), 404
+
+    try:
+        map_obj.name = new_name
+        db.session.commit()
+        return jsonify({'status': 'success'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
 @app.route('/admin/map_quiz/add_map', methods=['POST'])
 def admin_add_map_image():
     if not session.get('user_id'): # 簡易権限チェック
          return redirect(url_for('login'))
+
         
     try:
         name = request.form.get('name')
