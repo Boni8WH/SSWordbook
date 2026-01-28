@@ -822,7 +822,7 @@ function updateIncorrectOnlySelection() {
             rangeSelectionArea.style.display = 'none';
         }
         if (rangeSelectionTitleText) {
-            rangeSelectionTitleText.textContent = '苦手問題モード';
+            rangeSelectionTitleText.textContent = '克服モード';
             rangeSelectionTitleText.style.color = '#e74c3c'; // 赤色強調
         }
 
@@ -1349,7 +1349,7 @@ function startQuiz() {
             // エラーメッセージの詳細化
             if (isUnsolvedOnly) flashMessage('選択範囲に未解答の問題はありません。', 'info');
             else if (isUnmasteredOnly) flashMessage('選択範囲に未マスターの問題はありません。', 'success');
-            else if (isIncorrectOnly) flashMessage('有効な苦手問題がありません。', 'info');
+            else if (isIncorrectOnly) flashMessage('克服リストに対象の問題がありません。', 'info');
             else flashMessage('選択された条件に合う問題がありませんでした。', 'danger');
             return;
         }
@@ -1406,7 +1406,7 @@ function restartWeakProblemsQuiz() {
     });
 
     if (currentWeakProblems.length === 0) {
-        // 苦手問題がなくなった場合
+        // 克服対象の問題がなくなった場合
         // ★修正: 本当に克服したのか、全てクールダウン中なのかを判定
         const allCooldown = incorrectWords.length > 0;
         showNoWeakProblemsMessage(allCooldown);
@@ -1422,7 +1422,7 @@ function restartWeakProblemsQuiz() {
     // ★改善メッセージを控えめに表示
     if (stillWeakFromLastQuiz.length < currentQuizData.length) {
         const improvedCount = currentQuizData.length - stillWeakFromLastQuiz.length;
-        flashMessage(`✨ ${improvedCount}問の苦手問題を克服しました！`, 'success');
+        flashMessage(`✨ ${improvedCount}問を克服しました！`, 'success');
     }
 
     // 新しい苦手問題セットでクイズを開始
@@ -1466,7 +1466,7 @@ function showNoWeakProblemsMessage(isAllCooldown = false) {
             <div style="text-align: center; padding: 25px; background-color: #f8f9fa; border: 2px solid #6c757d; border-radius: 8px; margin: 20px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
                 <div style="font-size: 3em; margin-bottom: 15px;">⏳</div>
                 <h3 style="margin: 0 0 10px 0; color: #6c757d; font-size: 1.4em;">クールダウン中</h3>
-                <p style="color: #495057; margin: 10px 0; font-size: 1.1em;">現在の苦手問題はすべてクールダウン中です。</p>
+                <p style="color: #495057; margin: 10px 0; font-size: 1.1em;">現在の克服対象はすべてクールダウン中です。</p>
                 <p style="color: #6c757d; margin: 15px 0; font-size: 0.95em;">長期記憶ができているか、時間をおいて確認しましょう。</p>
                 <button onclick="backToSelectionScreen()" class="btn btn-secondary" style="margin-top: 15px; padding: 10px 25px; font-weight: 600;">
                     <i class="fas fa-arrow-left"></i> トップに戻る
@@ -1480,14 +1480,14 @@ function showNoWeakProblemsMessage(isAllCooldown = false) {
             <div style="text-align: center; padding: 25px; background-color: #f8f9fa; border: 2px solid #28a745; border-radius: 8px; margin: 20px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
                 <div style="font-size: 3em; margin-bottom: 15px;">🎉</div>
                 <h3 style="margin: 0 0 10px 0; color: #28a745; font-size: 1.4em;">おめでとうございます！</h3>
-                <p style="color: #495057; margin: 10px 0; font-size: 1.1em;">苦手問題を全て克服しました</p>
+                <p style="color: #495057; margin: 10px 0; font-size: 1.1em;">克服リストの全問題をクリアしました！</p>
                 <p style="color: #6c757d; margin: 15px 0; font-size: 0.95em;">新しい問題に挑戦して、さらに学習を進めましょう。</p>
                 <button onclick="backToSelectionScreen()" class="btn btn-success" style="margin-top: 15px; padding: 10px 25px; font-weight: 600;">
                     <i class="fas fa-arrow-left"></i> 新しい範囲を選択する
                 </button>
             </div>
         `;
-        flashMessage('🎉 すべての苦手問題を克服しました！', 'success');
+        flashMessage('🎉 克服リストの全問題をクリアしました！', 'success');
     }
 
     // ★quizResultAreaの先頭に挿入（既存コンテンツの前に）

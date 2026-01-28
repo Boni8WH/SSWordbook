@@ -4,7 +4,7 @@
 {% block content %}
 <div class="container mt-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2><i class="fas fa-crosshairs me-2"></i>苦手問題一覧</h2>
+        <h2><i class="fas fa-crosshairs me-2"></i>克服状況データ</h2>
         <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">
             <i class="fas fa-arrow-left me-1"></i>学習画面に戻る
         </a>
@@ -12,27 +12,60 @@
 
     <ul class="nav nav-tabs mb-4" id="weakProblemTabs" role="tablist">
         <li class="nav-item" role="presentation">
-            <button class="nav-link active" id="my-weak-tab" data-bs-toggle="tab" data-bs-target="#my-weak"
-                type="button" role="tab" aria-controls="my-weak" aria-selected="true">
-                <i class="fas fa-user me-1"></i>自分の苦手問題
+            <button class="nav-link active" id="my-mastery-tab" data-bs-toggle="tab" data-bs-target="#my-mastery"
+                type="button" role="tab" aria-controls="my-mastery" aria-selected="true">
+                <i class="fas fa-check-circle me-1"></i>特訓中：克服リスト
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="my-weak-tab" data-bs-toggle="tab" data-bs-target="#my-weak" type="button"
+                role="tab" aria-controls="my-weak" aria-selected="false">
+                <i class="fas fa-chart-bar me-1"></i>分析：正答率ワースト
             </button>
         </li>
         <li class="nav-item" role="presentation">
             <button class="nav-link" id="everyone-weak-tab" data-bs-toggle="tab" data-bs-target="#everyone-weak"
                 type="button" role="tab" aria-controls="everyone-weak" aria-selected="false">
-                <i class="fas fa-users me-1"></i>みんなの苦手問題
+                <i class="fas fa-users me-1"></i>みんなの正答率ワースト
             </button>
         </li>
     </ul>
 
     <div class="tab-content" id="weakProblemTabContent">
+        <!-- 特訓中：克服リスト -->
+        <div class="tab-pane fade show active" id="my-mastery" role="tabpanel" aria-labelledby="my-mastery-tab">
+            <div class="card shadow-sm border-primary">
+                <div class="card-body">
+                    <h5 class="card-title mb-3 text-primary">現在進行形の特訓リスト</h5>
+                    <p class="text-muted small">
+                        現在「克服モード」の出題対象になっている全ての単語です。<br>
+                        （2回連続正解でリストから卒業します。クールダウン中のものは一時的に出題されません）
+                    </p>
+
+                    <div id="myMasteryLoading" class="text-center py-4">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+
+                    <div id="myMasteryEmpty" class="alert alert-success hidden">
+                        現在、特訓中の問題はありません。全て克服済みです！🎉
+                    </div>
+
+                    <ul id="myMasteryList" class="list-group list-group-flush">
+                        <!-- JavaScriptで挿入 -->
+                    </ul>
+                </div>
+            </div>
+        </div>
+
         <!-- 自分の苦手問題 -->
-        <div class="tab-pane fade show active" id="my-weak" role="tabpanel" aria-labelledby="my-weak-tab">
+        <div class="tab-pane fade" id="my-weak" role="tabpanel" aria-labelledby="my-weak-tab">
             <div class="card shadow-sm">
                 <div class="card-body">
                     <h5 class="card-title mb-3">正答率ワースト20</h5>
-                    <p class="text-muted small">過去の全学習履歴から、正答率が低い順に20問を表示しています。<br>（<span
-                            class="badge bg-danger">苦手</span>バッジがついている問題は、現在「苦手問題モード」の出題対象です）</p>
+                    <p class="text-muted small">過去の全学習履歴から、正答率が低い順に20問を表示しています<br>
+                        「Progress」が表示されている問題は克服モードの対象ですが、クールダウン中のものは出題されません</p>
 
                     <div id="myWeakLoading" class="text-center py-4">
                         <div class="spinner-border text-primary" role="status">
@@ -85,7 +118,13 @@
     document.addEventListener('DOMContentLoaded', function () {
         loadMyWeakProblems();
 
-        // タブ切り替え時にデータをロード（初回のみ）
+        // 克服リストのタブ
+        const masteryTab = document.getElementById('my-mastery-tab');
+
+        // 分析ワーストのタブ
+        const weakTab = document.getElementById('my-weak-tab');
+
+        // みんなのワーストのタブ
         const everyoneTab = document.getElementById('everyone-weak-tab');
         let everyoneLoaded = false;
 
@@ -116,6 +155,10 @@
     }
 
     function loadMyWeakProblems() {
+        const masteryLoading = document.getElementById('myMasteryLoading');
+        const masteryEmpty = document.getElementById('myMasteryEmpty');
+        const masteryList = document.getElementById('myMasteryList');
+
         const loading = document.getElementById('myWeakLoading');
         const empty = document.getElementById('myWeakEmpty');
         const list = document.getElementById('myWeakList');
@@ -124,6 +167,7 @@
             fetch('/api/load_quiz_progress').then(r => r.json()),
             fetch('/api/word_data').then(r => r.json())
         ]).then(([progressData, wordData]) => {
+            if (masteryLoading) masteryLoading.classList.add('hidden');
             loading.classList.add('hidden');
 
             if (progressData.status !== 'success' || !wordData) {
@@ -138,41 +182,61 @@
             let words = Array.isArray(wordData) ? wordData : (wordData.word_data || []);
 
             const allProblemsWithStats = [];
+            const masteryProblems = [];
 
             for (const [problemId, history] of Object.entries(problemHistory)) {
                 const correctAttempts = history.correct_attempts || 0;
                 const incorrectAttempts = history.incorrect_attempts || 0;
                 const totalAttempts = correctAttempts + incorrectAttempts;
 
+                const originalWord = words.find(word => generateProblemId(word) === problemId);
+                if (!originalWord) continue;
+
+                const isCurrentlyWeak = incorrectWords.includes(problemId);
+                const stats = {
+                    question: originalWord.question,
+                    answer: originalWord.answer,
+                    correctAttempts,
+                    incorrectAttempts,
+                    totalAttempts,
+                    accuracyRate: totalAttempts > 0 ? (correctAttempts / totalAttempts * 100) : 100,
+                    isCurrentlyWeak: isCurrentlyWeak,
+                    streak: history.correct_streak || 0,
+                    cooldownUntil: history.cooldown_until || 0
+                };
+
                 if (totalAttempts > 0) {
-                    const accuracyRate = (correctAttempts / totalAttempts * 100);
+                    allProblemsWithStats.push(stats);
+                }
 
-                    const originalWord = words.find(word => generateProblemId(word) === problemId);
-
-                    if (originalWord) {
-                        allProblemsWithStats.push({
-                            question: originalWord.question,
-                            answer: originalWord.answer,
-                            correctAttempts,
-                            incorrectAttempts,
-                            totalAttempts,
-                            accuracyRate,
-                            isCurrentlyWeak: incorrectWords.includes(problemId),
-                            streak: history.correct_streak || 0,
-                            cooldownUntil: history.cooldown_until || 0
-                        });
-                    }
+                if (isCurrentlyWeak) {
+                    masteryProblems.push(stats);
                 }
             }
 
-            // ソート: クールダウン中を後ろに、その中で正答率低い順
+            // 1. 特訓中：克服リストの描画
+            masteryProblems.sort((a, b) => {
+                const now = Date.now();
+                const aCool = (a.cooldownUntil > now);
+                const bCool = (b.cooldownUntil > now);
+                if (aCool !== bCool) return aCool ? 1 : -1;
+                if (a.streak !== b.streak) return a.streak - b.streak;
+                return b.incorrectAttempts - a.incorrectAttempts;
+            });
+
+            if (masteryProblems.length === 0) {
+                if (masteryEmpty) masteryEmpty.classList.remove('hidden');
+            } else {
+                renderList(masteryList, masteryProblems, true, false); // true=personal, false=showRank
+            }
+
+            // 2. 分析：正答率ワーストの描画
             allProblemsWithStats.sort((a, b) => {
                 const now = Date.now();
                 const aCool = (a.cooldownUntil > now);
                 const bCool = (b.cooldownUntil > now);
 
-                if (aCool !== bCool) return aCool ? 1 : -1; // クールダウン中は下へ
-
+                if (aCool !== bCool) return aCool ? 1 : -1;
                 if (a.accuracyRate !== b.accuracyRate) return a.accuracyRate - b.accuracyRate;
                 return b.totalAttempts - a.totalAttempts;
             });
@@ -182,10 +246,11 @@
             if (top20.length === 0) {
                 empty.classList.remove('hidden');
             } else {
-                renderList(list, top20, true);
+                renderList(list, top20, true, true); // true=personal, true=showRank
             }
         }).catch(err => {
             console.error(err);
+            if (masteryLoading) masteryLoading.classList.add('hidden');
             loading.classList.add('hidden');
             empty.textContent = 'エラーが発生しました。';
             empty.classList.remove('hidden');
@@ -203,7 +268,7 @@
                 loading.classList.add('hidden');
 
                 if (data.status === 'success' && data.problems && data.problems.length > 0) {
-                    renderList(list, data.problems, false);
+                    renderList(list, data.problems, false, true); // false=personal, true=showRank
                 } else {
                     empty.classList.remove('hidden');
                 }
@@ -216,7 +281,7 @@
             });
     }
 
-    function renderList(container, items, isPersonal) {
+    function renderList(container, items, isPersonal, showRank = true) {
         container.innerHTML = '';
         const now = Date.now();
 
@@ -224,7 +289,7 @@
             const li = document.createElement('li');
             li.className = 'list-group-item p-3';
 
-            const rankBadge = `<span class="badge bg-primary me-2">${index + 1}位</span>`;
+            const rankBadge = showRank ? `<span class="badge bg-primary me-2">${index + 1}位</span>` : '';
 
             let statusBadge = '';
             let rowClass = '';
@@ -239,9 +304,9 @@
                 } else {
                     // Streaks判定 (レベル表示)
                     if (item.streak === 0) {
-                        statusBadge = `<span class="badge bg-danger ms-2"><i class="fas fa-egg me-1"></i>Lv.0 (卵)</span>`;
+                        statusBadge = `<span class="badge bg-danger ms-2"><i class="fas fa-dot-circle me-1"></i>Progress 0/2</span>`;
                     } else if (item.streak === 1) {
-                        statusBadge = `<span class="badge bg-warning text-dark ms-2"><i class="fas fa-crow me-1"></i>Lv.1 (ヒヨコ)</span>`;
+                        statusBadge = `<span class="badge bg-warning text-dark ms-2"><i class="fas fa-star-half-alt me-1"></i>Progress 1/2</span>`;
                         extraInfo = '<small class="text-success fw-bold ms-2">あと1回で克服！</small>';
                     } else {
                         statusBadge = `<span class="badge bg-success ms-2"><i class="fas fa-check me-1"></i>克服間近</span>`;

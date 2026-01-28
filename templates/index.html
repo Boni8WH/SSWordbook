@@ -43,7 +43,7 @@
                     <label class="filter-option-btn {% if not session.get('user_id') %}disabled{% endif %}">
                         <input type="checkbox" id="incorrectOnlyCheckbox2" {% if not session.get('user_id') %}disabled{%
                             endif %}>
-                        <span><i class="fas fa-crosshairs"></i> 苦手問題</span>
+                        <span><i class="fas fa-crosshairs"></i> 克服モード</span>
                     </label>
                     <label class="filter-option-btn {% if not session.get('user_id') %}disabled{% endif %}">
                         <input type="checkbox" id="unsolvedOnlyCheckbox" {% if not session.get('user_id') %}disabled{%
@@ -112,7 +112,7 @@
             </button>
             <a href="{{ url_for('weak_problems_page') }}" class="btn btn-weak" {% if not session.get('user_id')
                 %}style="display: none;" {% endif %}>
-                <i class="fas fa-crosshairs"></i> 苦手問題一覧
+                <i class="fas fa-crosshairs"></i> 苦手問題
             </a>
             <a href="{{ url_for('essay_index') }}" class="btn btn-essay">
                 <i class="fas fa-edit"></i> 論述問題集
@@ -473,7 +473,7 @@
             if (weakCheckbox && weakCheckbox.checked) {
                 if (rangeSelectionArea) rangeSelectionArea.style.display = 'none';
                 if (rangeSelectionTitleText) {
-                    rangeSelectionTitleText.textContent = '苦手問題モード';
+                    rangeSelectionTitleText.textContent = '克服モード';
                     rangeSelectionTitleText.style.color = '#e74c3c';
                 }
             } else {
@@ -513,7 +513,7 @@
         if (weakCheckbox) {
             weakCheckbox.addEventListener('change', function () {
                 if (this.checked) {
-                    // 苦手問題モードON
+                    // 克服モードON
                     // incorrectOnlyRadio.checked = true; // 廃止：カウント選択を維持する
                     // incorrectOnlyRadio.dispatchEvent(new Event('change', { bubbles: true }));
 
@@ -525,7 +525,7 @@
                         rangeSelectionArea.style.display = 'none';
                     }
                     if (rangeSelectionTitleText) {
-                        rangeSelectionTitleText.textContent = '苦手問題モード';
+                        rangeSelectionTitleText.textContent = '克服モード';
                         rangeSelectionTitleText.style.color = '#e74c3c';
                     }
 
@@ -537,7 +537,7 @@
                     // Note: using direct button click or selectCount(3)
                     selectCount(3);
                 } else {
-                    // 苦手問題モードOFF
+                    // 克服モードOFF
                     // Default back to 10問 if needed, but current selection is fine
                     // selectCount(0); // Optional: keep current count
 
