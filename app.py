@@ -718,6 +718,7 @@ class MapQuizComplete(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False)
     map_image_id = db.Column(db.Integer, db.ForeignKey('mq_image.id', ondelete='CASCADE'), nullable=False)
+    problem_count = db.Column(db.Integer, default=0) # 🆕 登録時の問題数
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))
 
     __table_args__ = (db.UniqueConstraint('user_id', 'map_image_id', name='unique_user_map_complete'),)
@@ -759,6 +760,23 @@ def _add_rpg_image_columns_safe():
             
     except Exception as e:
         print(f"⚠️ RpgEnemy migration warning: {e}")
+
+def _add_mq_complete_columns_safe():
+    """MapQuizCompleteテーブルにproblem_countカラムを追加（安全版）"""
+    try:
+        with db.engine.connect() as conn:
+            inspector = inspect(db.engine)
+            if 'mq_complete' in inspector.get_table_names():
+                columns = [col['name'] for col in inspector.get_columns('mq_complete')]
+                
+                if 'problem_count' not in columns:
+                    print("🔄 MapQuizComplete: problem_countを追加")
+                    conn.execute(text("ALTER TABLE mq_complete ADD COLUMN problem_count INTEGER DEFAULT 0"))
+                    
+                conn.commit()
+                print("✅ MapQuizCompleteカラム追加完了")
+    except Exception as e:
+        print(f"⚠️ MqComplete migration warning: {e}")
 
 def _add_score_column_to_rpg_enemy():
     """RpgEnemyテーブルにappearance_required_scoreカラムを追加するマイグレーション関数"""
@@ -14985,13 +15003,27 @@ def api_record_map_quiz_perfect():
          return jsonify({'status': 'error', 'message': 'Missing map_id'}), 400
 
     try:
+        # Calculate current problem count for this map
+        # Join MapLocation to filter problems by map_image_id, counting distinct problems
+        current_count = db.session.query(func.count(MapQuizProblem.id))\
+                        .join(MapLocation, MapQuizProblem.map_location_id == MapLocation.id)\
+                        .filter(MapLocation.map_image_id == map_id).scalar()
+
         # Check if already exists
         exists = MapQuizComplete.query.filter_by(user_id=session['user_id'], map_image_id=map_id).first()
-        if not exists:
-            new_record = MapQuizComplete(user_id=session['user_id'], map_image_id=map_id)
+        if exists:
+            # Update existing record logic: 
+            # If the user achieved "Perfect" again (which is what calls this API), update the count to current.
+            # This handles the case where they lost the crown due to new problems, but just re-perfected it.
+            exists.problem_count = current_count
+            exists.created_at = datetime.now(JST)
+            db.session.commit()
+            logger.info(f"User {session['user_id']} updated Perfect on Map {map_id} (Count: {current_count})")
+        else:
+            new_record = MapQuizComplete(user_id=session['user_id'], map_image_id=map_id, problem_count=current_count)
             db.session.add(new_record)
             db.session.commit()
-            logger.info(f"User {session['user_id']} achieved Perfect on Map {map_id}")
+            logger.info(f"User {session['user_id']} achieved Perfect on Map {map_id} (Count: {current_count})")
         
         return jsonify({'status': 'success'})
     except Exception as e:
@@ -15055,8 +15087,8 @@ def map_quiz_index():
     result = db.session.execute(strict_mastery_query, {'uid': user_id})
     real_mastered_ids = {row[0] for row in result}
 
-    # 2. Get Perfect Records (All Mode)
-    perfect_map_ids = {row[0] for row in db.session.query(MapQuizComplete.map_image_id)
+    # 2. Get Perfect Records (All Mode) with problem count
+    perfect_records = {row[0]: row[1] for row in db.session.query(MapQuizComplete.map_image_id, MapQuizComplete.problem_count)
                        .filter(MapQuizComplete.user_id == user_id).all()}
 
     # 3. Get Map -> Problem IDs Mapping
@@ -15076,7 +15108,12 @@ def map_quiz_index():
         if not pids.issubset(real_mastered_ids): return False
         
         # Condition 2: Perfect score in All mode
-        if map_obj.id not in perfect_map_ids: return False
+        if map_obj.id not in perfect_records: return False
+        
+        # Condition 3: Check if the perfect record is up-to-date (problem count matches)
+        recorded_count = perfect_records[map_obj.id]
+        current_count = len(pids)
+        if recorded_count != current_count: return False
         
         return True
 
@@ -15126,6 +15163,17 @@ def api_get_map_play_data(map_id):
     # Generally, if filtering reduces problems, pins should reduce too.
     
     related_location_ids = {p.map_location_id for p in problems}
+    
+    # Dummy Pins Logic: If filtered by difficulty, add up to 5 random dummy locations from other difficulties
+    if difficulty and difficulty > 0:
+        all_location_ids = {l.id for l in map_obj.locations}
+        candidate_dummy_ids = list(all_location_ids - related_location_ids)
+        if candidate_dummy_ids:
+            # Sample up to 5
+            dummy_count = min(len(candidate_dummy_ids), 5)
+            dummy_ids = random.sample(candidate_dummy_ids, dummy_count)
+            related_location_ids.update(dummy_ids)
+            
     locations = [l for l in map_obj.locations if l.id in related_location_ids]
     
     return jsonify({
