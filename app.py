@@ -20571,6 +20571,7 @@ def _create_map_quiz_tables():
 
 with app.app_context():
     _create_map_quiz_tables()
+    _add_mq_complete_columns_safe()
 
 
 
