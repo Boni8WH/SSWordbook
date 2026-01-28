@@ -17358,6 +17358,7 @@ def get_sample_quiz():
         # デフォルトのwords.csvから読み込み
         word_data = []
         all_answers = []  # 選択肢生成用に全回答を収集
+        answers_by_category = {} # 🆕 カテゴリ別の回答リスト
         
         try:
             with open('words.csv', 'r', encoding='utf-8-sig') as f:
@@ -17383,6 +17384,13 @@ def get_sample_quiz():
                         'incorrect': row.get('incorrect', ''),  # 手動設定の誤答
                     })
                     all_answers.append(answer)
+                    
+                    # 🆕 カテゴリ別に回答を収集
+                    category = row.get('category', '')
+                    if category:
+                        if category not in answers_by_category:
+                            answers_by_category[category] = []
+                        answers_by_category[category].append(answer)
         except FileNotFoundError:
             return jsonify({'error': 'Sample data not available'}), 404
         
@@ -17405,19 +17413,34 @@ def get_sample_quiz():
             manual_incorrect_str = problem.get('incorrect', '')
             if manual_incorrect_str and manual_incorrect_str.strip():
                 manual_candidates = [x.strip() for x in manual_incorrect_str.split(',') if x.strip()]
-                if len(manual_candidates) >= 3:
-                    distractors = random.sample(manual_candidates, 3)
+                # 手動設定がある場合は、最大3つまで使う（足りなくても補充しない）
+                if len(manual_candidates) > 3:
+                     distractors = random.sample(manual_candidates, 3)
                 else:
-                    distractors = manual_candidates
+                     distractors = manual_candidates
             
-            # 2. 足りない場合はランダムな他の回答から補充
-            if len(distractors) < 3:
-                distractor_pool = [ans for ans in all_answers if ans != correct_answer and ans not in distractors]
-                needed = 3 - len(distractors)
-                if len(distractor_pool) >= needed:
-                    distractors.extend(random.sample(distractor_pool, needed))
+            # 2. 手動設定がない場合のみ、ランダムな他の回答から補充
+            else:
+                distractor_pool = []
+                
+                # 🆕 同じカテゴリの回答を優先的に候補に入れる
+                category = problem.get('category', '')
+                if category and category in answers_by_category:
+                    # 同じカテゴリの回答のみ抽出（正解は除く）
+                    same_category_answers = [ans for ans in answers_by_category[category] if ans != correct_answer]
+                    
+                    if len(same_category_answers) >= 3:
+                        distractor_pool = same_category_answers
+                
+                # 同じカテゴリで足りない場合、またはカテゴリがない場合は全回答から候補を作成
+                if len(distractor_pool) < 3:
+                     # 念のため全回答からも候補を取得
+                     distractor_pool = [ans for ans in all_answers if ans != correct_answer]
+                
+                if len(distractor_pool) >= 3:
+                    distractors = random.sample(distractor_pool, 3)
                 else:
-                    distractors.extend(distractor_pool)
+                    distractors = distractor_pool
             
             # 正解と誤答を合わせてシャッフル
             choices = distractors[:3] + [correct_answer]  # 最大4択
