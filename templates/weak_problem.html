@@ -52,7 +52,7 @@
                         現在、特訓中の問題はありません。全て克服済みです！🎉
                     </div>
 
-                    <ul id="myMasteryList" class="list-group list-group-flush">
+                    <ul id="myMasteryList" class="list-group border-0 bg-transparent">
                         <!-- JavaScriptで挿入 -->
                     </ul>
                 </div>
@@ -78,7 +78,7 @@
                         まだ回答履歴がありません。
                     </div>
 
-                    <ul id="myWeakList" class="list-group list-group-flush">
+                    <ul id="myWeakList" class="list-group border-0 bg-transparent">
                         <!-- JavaScriptで挿入 -->
                     </ul>
                 </div>
@@ -103,7 +103,7 @@
                         集計データがありません。
                     </div>
 
-                    <ul id="everyoneWeakList" class="list-group list-group-flush">
+                    <ul id="everyoneWeakList" class="list-group border-0 bg-transparent">
                         <!-- JavaScriptで挿入 -->
                     </ul>
                 </div>
@@ -232,11 +232,7 @@
 
             // 2. 分析：正答率ワーストの描画
             allProblemsWithStats.sort((a, b) => {
-                const now = Date.now();
-                const aCool = (a.cooldownUntil > now);
-                const bCool = (b.cooldownUntil > now);
-
-                if (aCool !== bCool) return aCool ? 1 : -1;
+                // クールダウン中のものも平等に並べるため、ここではクールダウン判定をソート条件から外す
                 if (a.accuracyRate !== b.accuracyRate) return a.accuracyRate - b.accuracyRate;
                 return b.totalAttempts - a.totalAttempts;
             });
@@ -287,20 +283,26 @@
 
         items.forEach((item, index) => {
             const li = document.createElement('li');
-            li.className = 'list-group-item p-3';
+            li.className = 'list-group-item p-0 mb-3 border rounded shadow-sm overflow-hidden';
 
             const rankBadge = showRank ? `<span class="badge bg-primary me-2">${index + 1}位</span>` : '';
 
             let statusBadge = '';
-            let rowClass = '';
             let extraInfo = '';
 
             if (isPersonal && item.isCurrentlyWeak) {
                 // クールダウン判定
                 if (item.cooldownUntil > now) {
                     const diffMinutes = Math.ceil((item.cooldownUntil - now) / (60 * 1000));
-                    statusBadge = `<span class="badge bg-secondary ms-2"><i class="fas fa-hourglass-half me-1"></i>休憩中 (あと${diffMinutes}分)</span>`;
-                    rowClass = 'opacity-75 bg-light'; // 薄くする
+                    // クールダウン中でも「Progress 0/2」などを表示し、休憩中バッジも併記する
+                    if (item.streak === 0) {
+                        statusBadge = `<span class="badge bg-danger ms-2"><i class="fas fa-dot-circle me-1"></i>Progress 0/2</span>`;
+                    } else if (item.streak === 1) {
+                        statusBadge = `<span class="badge bg-warning text-dark ms-2"><i class="fas fa-star-half-alt me-1"></i>Progress 1/2</span>`;
+                    } else {
+                        statusBadge = `<span class="badge bg-success ms-2"><i class="fas fa-check me-1"></i>克服間近</span>`;
+                    }
+                    statusBadge += `<span class="badge bg-secondary ms-2"><i class="fas fa-hourglass-half me-1"></i>クールダウン中 (あと${diffMinutes}分)</span>`;
                 } else {
                     // Streaks判定 (レベル表示)
                     if (item.streak === 0) {
@@ -314,31 +316,32 @@
                 }
             }
 
-            if (rowClass) li.className += ' ' + rowClass;
-
             const accuracyColor = item.accuracyRate >= 80 ? 'text-success' : 'text-danger';
 
             li.innerHTML = `
-            <div class="d-flex justify-content-between align-items-start">
-                <div class="flex-grow-1">
-                    <div class="fw-bold mb-1">
-                        ${rankBadge}${item.question}${statusBadge}${extraInfo}
-                    </div>
-                    <div class="text-muted small mb-2">
-                        <span class="answer-blur" onclick="this.classList.toggle('revealed')">
-                            ${item.answer}
-                        </span>
-                        <span class="ms-2 text-secondary" style="font-size: 0.8em;">(クリックで答えを表示)</span>
-                    </div>
+            <div class="p-3">
+                <div class="fw-bold mb-1">
+                    ${rankBadge}${item.question}
                 </div>
-                <div class="text-end ms-3" style="min-width: 120px;">
-                    <div class="fw-bold ${accuracyColor}">
+                <div class="text-muted small mb-0">
+                    <span class="answer-blur" onclick="this.classList.toggle('revealed')">
+                        ${item.answer}
+                    </span>
+                    <span class="ms-2 text-secondary" style="font-size: 0.8em;">(クリックで答えを表示)</span>
+                </div>
+            </div>
+            <div class="bg-light p-2 px-3 border-top d-flex flex-column flex-sm-row justify-content-between align-items-sm-center">
+                <div class="d-flex align-items-center flex-wrap">
+                    ${statusBadge}${extraInfo}
+                </div>
+                <div class="text-sm-end mt-2 mt-sm-0 d-flex flex-row flex-sm-column justify-content-between align-items-center align-items-sm-end">
+                    <div class="fw-bold ${accuracyColor} me-3 me-sm-0">
                         正答率: ${item.accuracyRate.toFixed(1)}%
                     </div>
-                    <div class="text-muted small">
+                    <div class="text-muted" style="font-size: 0.75rem;">
                         ${isPersonal ?
                     `正解:${item.correctAttempts} / 不正解:${item.incorrectAttempts}` :
-                    `合計回答数: ${item.totalAttempts}回`}
+                    `回答:${item.totalAttempts}回`}
                     </div>
                 </div>
             </div>
