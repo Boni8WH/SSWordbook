@@ -378,25 +378,20 @@
     {% block footer %}
     <footer class="footer mt-5 py-4 bg-light border-top">
         <div class="container">
-            <div class="row">
-                <div class="col-md-6">
+            <div class="row align-items-center">
+                <div class="col-md-6 text-center text-md-start">
                     <div class="footer-text">
                         © 2025 {{ app_name }}. All rights reserved.
                     </div>
-                    <div class="footer-links mt-2">
+                </div>
+                <div class="col-md-6 text-center text-md-end">
+                    <div class="footer-links">
                         <a href="{{ url_for('privacy_policy') }}" class="text-muted small text-decoration-none me-3">
-                            <i class="fas fa-shield-alt me-1"></i>プライバシーポリシー
+                            プライバシーポリシー
                         </a>
                         <a href="{{ url_for('terms_of_service') }}" class="text-muted small text-decoration-none">
-                            <i class="fas fa-file-contract me-1"></i>利用規約
+                            利用規約
                         </a>
-                    </div>
-                </div>
-                <div class="col-md-6 text-md-end">
-                    <div class="app-version mt-1">
-                        <small class="text-muted">
-                            {{ app_name }}
-                        </small>
                     </div>
                 </div>
             </div>

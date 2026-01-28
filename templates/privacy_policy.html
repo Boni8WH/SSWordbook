@@ -1,6 +1,9 @@
 {% extends "base.html" %}
 
-{% block title %}プライバシーポリシー - {{ app_name }}{% endblock %}
+{% block title %}プライバシーポリシー - {{ app_name }}
+{% block footer %}{% endblock %}
+{% block info_icon %}{% endblock %}
+{% endblock %}
 
 {% block content %}
 <div class="container py-4">
@@ -137,17 +140,6 @@
                             本プライバシーポリシーは、法令の改正やサービスの変更等に伴い、
                             事前の通知なく変更することがあります。変更後のプライバシーポリシーは、
                             当サービス上に掲載した時点で効力を生じるものとします。
-                        </p>
-                    </section>
-
-                    <section class="mb-4">
-                        <h2 class="h4 border-bottom pb-2 mb-3">11. お問い合わせ</h2>
-                        <p>
-                            本プライバシーポリシーに関するお問い合わせは、サービス内のお問い合わせ機能
-                            {% if app_contact_email %}
-                            または <a href="mailto:{{ app_contact_email }}">{{ app_contact_email }}</a>
-                            {% endif %}
-                            までご連絡ください。
                         </p>
                     </section>
 
