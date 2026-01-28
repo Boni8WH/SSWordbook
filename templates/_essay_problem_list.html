@@ -31,7 +31,7 @@
         </div>
 
         <div class="problem-question-preview">
-            {{ problem.question[:150] }}{% if problem.question|length > 150 %}...{% endif %}
+            {{ problem.clean_question_preview }}
         </div>
 
         <a href="{{ url_for('essay_problem', problem_id=problem.id) }}" class="problem-link">
