@@ -712,6 +712,16 @@ class MapQuizLog(db.Model):
     location = db.relationship('MapLocation', backref=db.backref('logs', lazy=True, cascade="all, delete-orphan"))
     problem = db.relationship('MapQuizProblem', backref=db.backref('logs', lazy=True, cascade="all, delete-orphan"))
 
+class MapQuizComplete(db.Model):
+    """地図クイズの完全制覇記録（すべてモードで満点を取った記録）"""
+    __tablename__ = 'mq_complete'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False)
+    map_image_id = db.Column(db.Integer, db.ForeignKey('mq_image.id', ondelete='CASCADE'), nullable=False)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))
+
+    __table_args__ = (db.UniqueConstraint('user_id', 'map_image_id', name='unique_user_map_complete'),)
+
 
 # Helper to determine database type for migrations
 def _is_postgres():
@@ -14963,6 +14973,32 @@ def api_delete_problem(prob_id):
         db.session.rollback()
         return jsonify({'status': 'error', 'message': str(e)})
 
+@app.route('/api/map_quiz/record_perfect', methods=['POST'])
+def api_record_map_quiz_perfect():
+    if 'user_id' not in session:
+        return jsonify({'status': 'error', 'message': 'Unauthorized'}), 401
+    
+    data = request.get_json()
+    map_id = data.get('map_id')
+    
+    if not map_id:
+         return jsonify({'status': 'error', 'message': 'Missing map_id'}), 400
+
+    try:
+        # Check if already exists
+        exists = MapQuizComplete.query.filter_by(user_id=session['user_id'], map_image_id=map_id).first()
+        if not exists:
+            new_record = MapQuizComplete(user_id=session['user_id'], map_image_id=map_id)
+            db.session.add(new_record)
+            db.session.commit()
+            logger.info(f"User {session['user_id']} achieved Perfect on Map {map_id}")
+        
+        return jsonify({'status': 'success'})
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Failed to record perfect: {e}")
+        return jsonify({'status': 'error', 'message': str(e)})
+
 # ====================================================================
 # 地図クイズユーザー画面 (Map Quiz User)
 # ====================================================================
@@ -14990,6 +15026,68 @@ def map_quiz_index():
     
     # Fetch maps with no genre and are active
     others_maps = MapImage.query.filter(MapImage.genre_id == None, MapImage.is_active == True).order_by(MapImage.display_order).all()
+    
+    # Calculate Completion Status
+    user_id = session['user_id']
+    # 1. Get Set of Mastered Problem IDs (Correctly Answered)
+    mastered_ids = {row[0] for row in db.session.query(MapQuizLog.map_quiz_problem_id)
+                    .filter(MapQuizLog.user_id == user_id, MapQuizLog.is_correct == True)
+                    .distinct().all() if row[0] is not None} # This logic is flawed for "Mastery" definition (3 streak), but keeping as is per previous impl, assuming "mastery" meant "at least once correct" in the *previous* logic. 
+                    # WAIT, the requirement is "Mastery" (3 times). The previous impl just checked ONE correct.
+                    # I should fix this to match the strict definition if requested, but let's stick to the "Mastery" query logic I saw in difficulty_counts.
+
+    # Strict Mastery Query (3 streak)
+    strict_mastery_query = text("""
+        WITH last_logs AS (
+            SELECT 
+                map_quiz_problem_id, 
+                is_correct,
+                ROW_NUMBER() OVER (PARTITION BY map_quiz_problem_id ORDER BY created_at DESC) as rn
+            FROM mq_log
+            WHERE user_id = :uid
+        )
+        SELECT map_quiz_problem_id
+        FROM last_logs
+        WHERE rn <= 3
+        GROUP BY map_quiz_problem_id
+        HAVING COUNT(*) >= 3 AND MIN(CASE WHEN is_correct THEN 1 ELSE 0 END) = 1
+    """)
+    result = db.session.execute(strict_mastery_query, {'uid': user_id})
+    real_mastered_ids = {row[0] for row in result}
+
+    # 2. Get Perfect Records (All Mode)
+    perfect_map_ids = {row[0] for row in db.session.query(MapQuizComplete.map_image_id)
+                       .filter(MapQuizComplete.user_id == user_id).all()}
+
+    # 3. Get Map -> Problem IDs Mapping
+    all_problems = db.session.query(MapQuizProblem.id, MapLocation.map_image_id)\
+                   .join(MapLocation).all()
+    
+    map_problem_map = {}
+    for pid, mid in all_problems:
+        if mid not in map_problem_map: map_problem_map[mid] = set()
+        map_problem_map[mid].add(pid)
+
+    def check_completion(map_obj):
+        pids = map_problem_map.get(map_obj.id, set())
+        if not pids: return False
+        
+        # Condition 1: All problems mastered
+        if not pids.issubset(real_mastered_ids): return False
+        
+        # Condition 2: Perfect score in All mode
+        if map_obj.id not in perfect_map_ids: return False
+        
+        return True
+
+    # Attach to active_genres maps
+    for g_data in active_genres:
+        for m in g_data['maps']:
+            m.is_completed = check_completion(m)
+
+    # Attach to others_maps
+    for m in others_maps:
+        m.is_completed = check_completion(m)
     
     return render_template('map_quiz_index.html', genres=active_genres, others_maps=others_maps)
 
@@ -15020,7 +15118,15 @@ def api_get_map_play_data(map_id):
         query = query.filter(MapQuizProblem.difficulty == difficulty)
     
     problems = query.all()
-    locations = map_obj.locations
+    
+    # Filter locations to only those used by the filtered problems
+    # If no difficulty filter, use all map locations (or should we still only show ones with problems? 
+    # User request implies: "Only show pins for the set difficulty". 
+    # If no difficulty is set (all), then all pins (presumably all have problems or we show all).
+    # Generally, if filtering reduces problems, pins should reduce too.
+    
+    related_location_ids = {p.map_location_id for p in problems}
+    locations = [l for l in map_obj.locations if l.id in related_location_ids]
     
     return jsonify({
         'status': 'success',

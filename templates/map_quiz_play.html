@@ -416,6 +416,18 @@
             msgEl.className = "fw-bold text-warning";
             iconEl.className = "fas fa-crown fa-4x text-warning mb-3";
             iconEl.style.display = 'inline-block';
+
+            // Check if difficulty is All (0 or undefined) and record success
+            const urlParams = new URLSearchParams(window.location.search);
+            const diff = urlParams.get('difficulty');
+            if (!diff || diff === '0') {
+                fetch('/api/map_quiz/record_perfect', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ map_id: MAP_ID })
+                }).catch(err => console.error("Failed to record perfect:", err));
+            }
+
             // Start confetti here if implemented
         } else if (percentage >= 80) {
             msgEl.innerText = "Great Job! あと少し！";

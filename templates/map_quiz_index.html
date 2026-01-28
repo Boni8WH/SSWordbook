@@ -111,6 +111,10 @@
                         <div>
                             <h6 class="mb-1 fw-bold text-dark">
                                 <i class="fas fa-map me-2 text-secondary"></i>{{ map.name }}
+                                {% if map.is_completed %}
+                                <i class="fas fa-crown text-warning ms-2" title="コンプリート！"
+                                    style="filter: drop-shadow(0 2px 2px rgba(0,0,0,0.1));"></i>
+                                {% endif %}
                             </h6>
                             <div class="d-flex align-items-center">
                                 <div class="progress flex-grow-1 me-2" style="height: 6px; max-width: 120px;">
