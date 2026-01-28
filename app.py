@@ -4699,6 +4699,57 @@ def test_page():
 def favicon():
     return '', 204
 
+@app.route('/contact', methods=['GET', 'POST'])
+def contact_page():
+    app_info = AppInfo.get_current_info()
+    if request.method == 'POST':
+        # ハニーポットによるボット検知
+        if request.form.get('honeypot'):
+            # ボットと思われる場合は正常を装ってリダイレクト（あるいはエラー）
+            flash('お問い合わせを送信しました。', 'success')
+            return redirect(url_for('index'))
+
+        name = request.form.get('name')
+        email = request.form.get('email')
+        subject = request.form.get('subject', 'お問い合わせ')
+        message = request.form.get('message')
+
+        if not name or not email or not message:
+            flash('名前、メールアドレス、お問い合わせ内容は必須です。', 'danger')
+            return render_template('contact.html', app_name=app_info.app_name, app_info=app_info)
+
+        # 管理者への通知内容
+        email_body = f"""
+新しいお問い合わせが届きました。
+
+【送信者名】
+{name}
+
+【返信用メールアドレス】
+{email}
+
+【件名】
+{subject}
+
+【内容】
+{message}
+
+---
+このメールは {app_info.app_name} のお問い合わせフォームから送信されました。
+"""
+        try:
+            send_admin_notification_email(f"お問い合わせ: {subject}", email_body)
+            flash('お問い合わせを受け付けました。ありがとうございます。', 'success')
+        except Exception as e:
+            print(f"❌ お問い合わせメール送信エラー: {e}")
+            flash('メール送信中にエラーが発生しました。後ほど再度お試しください。', 'warning')
+
+        return redirect(url_for('index'))
+
+    return render_template('contact.html', 
+                         app_name=app_info.app_name, 
+                         app_info=app_info)
+
 @app.route('/')
 def index():
     try:
