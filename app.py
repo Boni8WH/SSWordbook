@@ -1555,6 +1555,19 @@ class EssayProblem(db.Model):
         text = text.replace('\n', '').strip()
         return len(text)
 
+    @property
+    def clean_question_preview(self):
+        """HTMLタグを除去した問題文の先頭150文字を返す"""
+        if not self.question:
+            return ""
+        # タグ除去
+        text = re.sub(r'<[^>]+>', '', self.question)
+        # 改行をスペースに置換して整形
+        text = text.replace('\n', ' ').strip()
+        if len(text) > 150:
+            return text[:150] + "..."
+        return text
+
     def to_dict(self):
         return {
             'id': self.id,
@@ -1643,7 +1656,7 @@ class EssayCorrectionRequest(db.Model):
             'user_real_name': self.user.real_name if self.user else 'Unknown',
             'problem_id': self.problem_id,
             'problem_text': self.problem.question[:30] + '...' if self.problem else '',
-            'request_text': self.request_text,
+            'request_text': strip_html_tags(self.request_text) if self.request_text else None,
             'request_image_path': self.request_image_path,
             'student_message': self.student_message,
             'status': self.status,
@@ -3662,6 +3675,16 @@ def generate_temp_password():
     characters = string.ascii_letters + string.digits
     return ''.join(secrets.choice(characters) for _ in range(8))
 
+def strip_html_tags(text):
+    """HTMLタグを除去し、改行を整理するヘルパー"""
+    if not text:
+        return ""
+    # タグ除去
+    clean = re.sub(r'<[^>]+>', '', text)
+    # 実体参照などの簡易変換（必要に応じて）
+    clean = clean.replace('&nbsp;', ' ')
+    return clean.strip()
+
 def send_password_reset_email(user, email, token):
     """パスワード再発行メールを送信（エラーハンドリング強化版）"""
     try:
@@ -3944,13 +3967,15 @@ def send_chat_notification_email(recipient_email, sender_name, problem_id, messa
             # 生徒からのメッセージ（管理者向け）
             subject = f"[{app_info.app_name}] 添削チャット: {sender_name}さんから新しいメッセージ"
             target_url = url_for('admin_correction_request_detail', request_id=problem_id, _external=True)
+            # HTMLタグを除去してからプレビュー作成
+            clean_preview = strip_html_tags(message_preview)
             body = f"""
 {app_info.app_name} 添削チャット通知
 
 {sender_name}さんから添削チャットに新しいメッセージが届きました。
 
 --- メッセージ内容 ---
-{message_preview[:200]}{'...' if len(message_preview) > 200 else ''}
+{clean_preview[:200]}{'...' if len(clean_preview) > 200 else ''}
 ---
 
 確認はこちら:
@@ -3964,13 +3989,15 @@ def send_chat_notification_email(recipient_email, sender_name, problem_id, messa
             # 先生からのメッセージ（生徒向け）
             subject = f"[{app_info.app_name}] 添削チャット: 先生から新しいメッセージ"
             target_url = url_for('my_corrections', _external=True)
+            # HTMLタグを除去してからプレビュー作成
+            clean_preview = strip_html_tags(message_preview)
             body = f"""
 {app_info.app_name} 添削チャット通知
 
 先生から添削チャットに新しいメッセージが届きました。
 
 --- メッセージ内容 ---
-{message_preview[:200]}{'...' if len(message_preview) > 200 else ''}
+{clean_preview[:200]}{'...' if len(clean_preview) > 200 else ''}
 ---
 
 確認はこちら:

@@ -237,7 +237,12 @@
                     contentHtml = message;
                 }
             } else {
-                contentHtml = escapeHtml(message);
+                // 生徒のメッセージも下線などのタグが含まれるためHTMLとして扱う
+                if (!message.includes('<') && !message.includes('>')) {
+                    contentHtml = escapeHtml(message).replace(/\n/g, '<br>');
+                } else {
+                    contentHtml = message;
+                }
             }
 
             inner.innerHTML = `
