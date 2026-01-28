@@ -464,18 +464,24 @@
                 btn.classList.toggle('active', index == value);
             });
 
-            // Uncheck weak problem if count is selected
-            if (weakCheckbox && weakCheckbox.checked) {
-                weakCheckbox.checked = false;
-            }
+            // Uncheck weak problem if count is selected -> REVERTED: Keep mode active logic
+            // if (weakCheckbox && weakCheckbox.checked) {
+            //     weakCheckbox.checked = false;
+            // }
 
-            // Show range selection area
-            if (rangeSelectionArea) {
-                rangeSelectionArea.style.display = 'block';
-            }
-            if (rangeSelectionTitleText) {
-                rangeSelectionTitleText.textContent = '出題数を選択';
-                rangeSelectionTitleText.style.color = '#34495e';
+            // Show range selection area ONLY if weak mode is OFF
+            if (weakCheckbox && weakCheckbox.checked) {
+                if (rangeSelectionArea) rangeSelectionArea.style.display = 'none';
+                if (rangeSelectionTitleText) {
+                    rangeSelectionTitleText.textContent = '苦手問題モード';
+                    rangeSelectionTitleText.style.color = '#e74c3c';
+                }
+            } else {
+                if (rangeSelectionArea) rangeSelectionArea.style.display = 'block';
+                if (rangeSelectionTitleText) {
+                    rangeSelectionTitleText.textContent = '出題数を選択';
+                    rangeSelectionTitleText.style.color = '#34495e';
+                }
             }
         }
 
@@ -507,9 +513,12 @@
         if (weakCheckbox) {
             weakCheckbox.addEventListener('change', function () {
                 if (this.checked) {
-                    incorrectOnlyRadio.checked = true;
-                    incorrectOnlyRadio.dispatchEvent(new Event('change', { bubbles: true }));
-                    countBtns.forEach(btn => btn.classList.remove('active'));
+                    // 苦手問題モードON
+                    // incorrectOnlyRadio.checked = true; // 廃止：カウント選択を維持する
+                    // incorrectOnlyRadio.dispatchEvent(new Event('change', { bubbles: true }));
+
+                    // Count buttons allow selection, so DON'T remove active class
+                    // countBtns.forEach(btn => btn.classList.remove('active'));
 
                     // Hide range selection area when weak problem is selected
                     if (rangeSelectionArea) {
@@ -522,12 +531,35 @@
 
                     // Disable other filters
                     updateFilterCheckboxState(true);
+
+                    // ★追加: 苦手モードON時はデフォルトで「全問」を選択
+                    // value 3 is "All" (mapped as qcAll in selectCount logic)
+                    // Note: using direct button click or selectCount(3)
+                    selectCount(3);
                 } else {
-                    // Default back to 10問
-                    selectCount(0);
+                    // 苦手問題モードOFF
+                    // Default back to 10問 if needed, but current selection is fine
+                    // selectCount(0); // Optional: keep current count
+
+                    // Show range selection area
+                    if (rangeSelectionArea) {
+                        rangeSelectionArea.style.display = 'block';
+                    }
+                    if (rangeSelectionTitleText) {
+                        rangeSelectionTitleText.textContent = '出題数を選択';
+                        rangeSelectionTitleText.style.color = '#34495e';
+                    }
 
                     // Re-enable other filters
                     updateFilterCheckboxState(false);
+                }
+
+                // Trigger update in script.js to handle total count and restrictions
+                if (typeof window.updateIncorrectOnlySelection === 'function') {
+                    window.updateIncorrectOnlySelection();
+                }
+                if (typeof window.updateSelectionTotalCount === 'function') {
+                    window.updateSelectionTotalCount();
                 }
             });
         }

@@ -95,15 +95,14 @@
     {% set genre_id = 'genre-' ~ genre.id %}
     <div class="accordion-item shadow-sm mb-3 border-0 rounded overflow-hidden">
         <h2 class="accordion-header" id="heading-{{ genre_id }}">
-            <button class="accordion-button {{ 'collapsed' if not loop.first }}" type="button" data-bs-toggle="collapse"
-                data-bs-target="#collapse-{{ genre_id }}" aria-expanded="{{ 'true' if loop.first else 'false' }}"
-                aria-controls="collapse-{{ genre_id }}" style="font-weight: bold; background-color: #f8f9fa;">
+            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                data-bs-target="#collapse-{{ genre_id }}" aria-expanded="false" aria-controls="collapse-{{ genre_id }}"
+                style="font-weight: bold; background-color: #f8f9fa;">
                 <i class="fas fa-tag me-2 text-primary"></i> {{ genre.name }}
                 <span class="badge bg-secondary ms-3 rounded-pill">{{ map_list|length }}</span>
             </button>
         </h2>
-        <div id="collapse-{{ genre_id }}" class="accordion-collapse collapse {{ 'show' if loop.first }}"
-            aria-labelledby="heading-{{ genre_id }}">
+        <div id="collapse-{{ genre_id }}" class="accordion-collapse collapse" aria-labelledby="heading-{{ genre_id }}">
             <div class="accordion-body p-0">
                 <div class="list-group list-group-flush">
                     {% for map in map_list %}
@@ -126,7 +125,8 @@
                                     }}地点</small>
                             </div>
                         </div>
-                        <span class="btn btn-sm btn-outline-primary rounded-pill text-nowrap"
+                        <span id="btn-challenge-{{ map.id }}"
+                            class="btn btn-sm btn-outline-primary rounded-pill text-nowrap"
                             onclick="openDifficultyModal({{ map.id }}, '{{ map.name }}')">
                             <i class="fas fa-play me-1"></i> 挑戦
                         </span>
@@ -384,6 +384,29 @@
         }
     }
 
-    document.addEventListener('DOMContentLoaded', loadMapStats);
+    document.addEventListener('DOMContentLoaded', function () {
+        loadMapStats();
+
+        // Check for open_map_id in URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const openMapId = urlParams.get('open_map_id');
+
+        if (openMapId) {
+            const btn = document.getElementById(`btn-challenge-${openMapId}`);
+            if (btn) {
+                // Determine which accordion item contains this button and open it
+                const accordionCollapse = btn.closest('.accordion-collapse');
+                if (accordionCollapse) {
+                    const bsCollapse = new bootstrap.Collapse(accordionCollapse, {
+                        toggle: false
+                    });
+                    bsCollapse.show();
+                }
+
+                // Click the button to open modal
+                btn.click();
+            }
+        }
+    });
 </script>
 {% endblock %}

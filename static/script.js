@@ -25,6 +25,31 @@ window.word_data = [];  // この行を追加
 let word_data = window.word_data;  // この行も追加
 
 // ==========================================
+// Constants for Weakness Mode (Penalty Delay)
+// ==========================================
+const COOLDOWN_DURATION = 4 * 60 * 60 * 1000; // 4 hours in milliseconds
+
+function isCoolingDown(history) {
+    if (!history || !history.cooldown_until) return false;
+    return history.cooldown_until > Date.now();
+}
+
+function getValidWeakProblemCount() {
+    if (!incorrectWords || incorrectWords.length === 0) return 0;
+
+    // Count only problems that are NOT in cooldown
+    let count = 0;
+    for (const problemId of incorrectWords) {
+        const history = problemHistory[problemId];
+        if (!isCoolingDown(history)) {
+            count++;
+        }
+    }
+    return count;
+}
+
+
+// ==========================================
 // Global Confirm Modal Logic (Replaces native confirm)
 // ==========================================
 let genericConfirmCallback = null;
@@ -717,6 +742,8 @@ function updateIncorrectOnlySelection() {
     const rangeSelectionTitleText = document.getElementById('rangeSelectionTitleText');
     const questionCountRadios = document.querySelectorAll('input[name="questionCount"]:not(#incorrectOnlyRadio)');
 
+    const weakCheckbox = document.getElementById('incorrectOnlyCheckbox2');
+
     // ★修正：有効な苦手問題数を使用
     const weakProblemCount = getValidWeakProblemCount();
     const rawWeakProblemCount = incorrectWords.length;
@@ -757,13 +784,17 @@ function updateIncorrectOnlySelection() {
 
     if (isCurrentlyRestricted) {
         // 制限発動中
-        if (incorrectOnlyRadio) {
-            incorrectOnlyRadio.checked = true;
+        // ★修正: 苦手問題チェックボックスを強制ONにして無効化
+        if (weakCheckbox) {
+            weakCheckbox.checked = true;
+            weakCheckbox.disabled = true; // 解除不可
+            weakCheckbox.closest('.filter-option-btn')?.classList.add('disabled'); // 見た目も無効化
         }
 
+        // ★修正: カウント選択は許可する（制限中でも10問ずつ解けるように）
         questionCountRadios.forEach(radio => {
-            radio.disabled = true;
-            radio.parentElement.style.opacity = '0.5';
+            radio.disabled = false;
+            radio.parentElement.style.opacity = '1';
         });
 
         if (rangeSelectionArea) {
@@ -779,21 +810,40 @@ function updateIncorrectOnlySelection() {
             showIntermediateWeakProblemWarning(weakProblemCount);
         }
 
-    } else if (incorrectOnlyRadio && incorrectOnlyRadio.checked) {
+    } else if (weakCheckbox && weakCheckbox.checked) {
         // 手動で苦手問題が選択されている場合
+        // ★修正: カウント選択は許可する
+        questionCountRadios.forEach(radio => {
+            radio.disabled = false;
+            radio.parentElement.style.opacity = '1';
+        });
+
         if (rangeSelectionArea) {
             rangeSelectionArea.style.display = 'none';
         }
         if (rangeSelectionTitleText) {
             rangeSelectionTitleText.textContent = '苦手問題モード';
-            rangeSelectionTitleText.style.color = '#95a5a6';
+            rangeSelectionTitleText.style.color = '#e74c3c'; // 赤色強調
         }
+
+        // WeakCheckbox should be enabled
+        if (weakCheckbox) {
+            weakCheckbox.disabled = false;
+            weakCheckbox.closest('.filter-option-btn')?.classList.remove('disabled');
+        }
+
     } else {
         // 制限なし（通常モード）
         questionCountRadios.forEach(radio => {
             radio.disabled = false;
             radio.parentElement.style.opacity = '1';
         });
+
+        // WeakCheckbox should be enabled
+        if (weakCheckbox) {
+            weakCheckbox.disabled = false;
+            weakCheckbox.closest('.filter-option-btn')?.classList.remove('disabled');
+        }
 
         if (rangeSelectionArea) {
             rangeSelectionArea.style.display = 'block';
@@ -1030,7 +1080,8 @@ function getSelectedQuestions() {
 function getFilteredQuestions() {
     let quizQuestions = [];
     // 常にDOMから現在の状態を取得
-    const isIncorrectOnly = document.querySelector('input[name="questionCount"][value="incorrectOnly"]')?.checked;
+    // ★修正: checkboxの状態をチェック
+    const isIncorrectOnly = document.getElementById('incorrectOnlyCheckbox2')?.checked || false;
 
     // ★重要: チェックボックスの状態を直接取得
     const unsolvedCheckbox = document.getElementById('unsolvedOnlyCheckbox');
@@ -1041,9 +1092,16 @@ function getFilteredQuestions() {
 
     if (isIncorrectOnly) {
         // 苦手問題モードの場合
+        // 苦手問題モードの場合
         quizQuestions = word_data.filter(word => {
             const wordIdentifier = generateProblemId(word);
-            return incorrectWords.includes(wordIdentifier);
+            // 苦手リストに含まれており、かつクールダウン中でないもの
+            if (!incorrectWords.includes(wordIdentifier)) return false;
+
+            const history = problemHistory[wordIdentifier];
+            if (isCoolingDown(history)) return false;
+
+            return true;
         });
     } else {
         // 通常モード：選択された範囲から出題
@@ -1191,12 +1249,16 @@ function startQuiz() {
 
         const weakProblemCount = getValidWeakProblemCount();
         const rawWeakProblemCount = incorrectWords.length; // 表示用などに元の数も保持
+        // ★修正: 'incorrectOnly' 文字列ではなく、数値を取得
         const selectedQuestionCount = getSelectedQuestionCount();
+        // ★修正: checkboxの状態をチェック
+        const isIncorrectOnly = document.getElementById('incorrectOnlyCheckbox2')?.checked || false;
+
         const isCurrentlyRestricted = hasBeenRestricted && !restrictionReleased;
         const isUnsolvedOnly = document.getElementById('unsolvedOnlyCheckbox')?.checked || false;
         const isUnmasteredOnly = document.getElementById('unmasteredOnlyCheckbox')?.checked || false;
 
-        if (isCurrentlyRestricted && selectedQuestionCount !== 'incorrectOnly') {
+        if (isCurrentlyRestricted && !isIncorrectOnly) {
             // ★追加: 制限中だが、有効な苦手問題が0問の場合（データの不整合など）
             // 自動的に制限を解除して、通常モードで開始できるようにする
             if (weakProblemCount === 0) {
@@ -1223,7 +1285,6 @@ function startQuiz() {
         }
 
         let quizQuestions = getFilteredQuestions();
-        const isIncorrectOnly = (selectedQuestionCount === 'incorrectOnly');
 
         // 苦手問題モード・未解答モード・未マスターモードの場合は範囲選択チェックをスキップ
         // ただし通常モードの場合は、単元が選択されているか確認
@@ -1275,11 +1336,11 @@ function startQuiz() {
             saveSelectionState();
         }
 
-        // 問題数の制限（苦手問題モード以外）
-        // ※「全問」かつ「全問題数 > 出題数」の場合はシャッフルして制限
-        if (selectedQuestionCount !== 'all' && selectedQuestionCount !== 'incorrectOnly') {
+        // 問題数の制限（苦手問題モード関係なく制限するようになった）
+        // ★修正: 苦手問題モードでもカウント制限を行う
+        if (selectedQuestionCount !== 'all') {
             const count = parseInt(selectedQuestionCount);
-            if (quizQuestions.length > count) {
+            if (!isNaN(count) && quizQuestions.length > count) {
                 quizQuestions = shuffleArray(quizQuestions).slice(0, count);
             }
         }
@@ -1333,15 +1394,22 @@ function restartWeakProblemsQuiz() {
         existingCelebration.remove();
     }
 
-    // 最新の苦手問題リストを取得
+    // 最新の苦手問題リストを取得 (クールダウン中を除く)
     const currentWeakProblems = word_data.filter(word => {
         const wordIdentifier = generateProblemId(word);
-        return incorrectWords.includes(wordIdentifier);
+        if (!incorrectWords.includes(wordIdentifier)) return false;
+
+        const history = problemHistory[wordIdentifier];
+        if (isCoolingDown(history)) return false;
+
+        return true;
     });
 
     if (currentWeakProblems.length === 0) {
         // 苦手問題がなくなった場合
-        showNoWeakProblemsMessage();
+        // ★修正: 本当に克服したのか、全てクールダウン中なのかを判定
+        const allCooldown = incorrectWords.length > 0;
+        showNoWeakProblemsMessage(allCooldown);
         return;
     }
 
@@ -1380,7 +1448,7 @@ function clearPreviousCelebrationMessages() {
     });
 }
 
-function showNoWeakProblemsMessage() {
+function showNoWeakProblemsMessage(isAllCooldown = false) {
     // ★重要：既存のお祝いメッセージを削除
     const existingCelebration = document.querySelector('.no-weak-problems-celebration');
     if (existingCelebration) {
@@ -1391,17 +1459,36 @@ function showNoWeakProblemsMessage() {
     // ★シンプルなデザインのメッセージを作成
     const messageDiv = document.createElement('div');
     messageDiv.className = 'no-weak-problems-celebration';
-    messageDiv.innerHTML = `
-        <div style="text-align: center; padding: 25px; background-color: #f8f9fa; border: 2px solid #28a745; border-radius: 8px; margin: 20px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-            <div style="font-size: 3em; margin-bottom: 15px;">🎉</div>
-            <h3 style="margin: 0 0 10px 0; color: #28a745; font-size: 1.4em;">おめでとうございます！</h3>
-            <p style="color: #495057; margin: 10px 0; font-size: 1.1em;">苦手問題を全て克服しました</p>
-            <p style="color: #6c757d; margin: 15px 0; font-size: 0.95em;">新しい問題に挑戦して、さらに学習を進めましょう。</p>
-            <button onclick="backToSelectionScreen()" class="btn btn-success" style="margin-top: 15px; padding: 10px 25px; font-weight: 600;">
-                <i class="fas fa-arrow-left"></i> 新しい範囲を選択する
-            </button>
-        </div>
-    `;
+
+    if (isAllCooldown) {
+        // ★全てクールダウン中の場合のメッセージ
+        messageDiv.innerHTML = `
+            <div style="text-align: center; padding: 25px; background-color: #f8f9fa; border: 2px solid #6c757d; border-radius: 8px; margin: 20px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                <div style="font-size: 3em; margin-bottom: 15px;">⏳</div>
+                <h3 style="margin: 0 0 10px 0; color: #6c757d; font-size: 1.4em;">クールダウン中</h3>
+                <p style="color: #495057; margin: 10px 0; font-size: 1.1em;">現在の苦手問題はすべてクールダウン中です。</p>
+                <p style="color: #6c757d; margin: 15px 0; font-size: 0.95em;">長期記憶ができているか、時間をおいて確認しましょう。</p>
+                <button onclick="backToSelectionScreen()" class="btn btn-secondary" style="margin-top: 15px; padding: 10px 25px; font-weight: 600;">
+                    <i class="fas fa-arrow-left"></i> トップに戻る
+                </button>
+            </div>
+        `;
+        flashMessage('⏳ 苦手問題はすべてクールダウン中です。', 'info');
+    } else {
+        // ★本当に克服した場合のメッセージ
+        messageDiv.innerHTML = `
+            <div style="text-align: center; padding: 25px; background-color: #f8f9fa; border: 2px solid #28a745; border-radius: 8px; margin: 20px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                <div style="font-size: 3em; margin-bottom: 15px;">🎉</div>
+                <h3 style="margin: 0 0 10px 0; color: #28a745; font-size: 1.4em;">おめでとうございます！</h3>
+                <p style="color: #495057; margin: 10px 0; font-size: 1.1em;">苦手問題を全て克服しました</p>
+                <p style="color: #6c757d; margin: 15px 0; font-size: 0.95em;">新しい問題に挑戦して、さらに学習を進めましょう。</p>
+                <button onclick="backToSelectionScreen()" class="btn btn-success" style="margin-top: 15px; padding: 10px 25px; font-weight: 600;">
+                    <i class="fas fa-arrow-left"></i> 新しい範囲を選択する
+                </button>
+            </div>
+        `;
+        flashMessage('🎉 すべての苦手問題を克服しました！', 'success');
+    }
 
     // ★quizResultAreaの先頭に挿入（既存コンテンツの前に）
     if (quizResultArea) {
@@ -1412,11 +1499,6 @@ function showNoWeakProblemsMessage() {
             quizResultArea.appendChild(messageDiv);
         }
     }
-
-
-
-    // ★フラッシュメッセージも表示
-    flashMessage('🎉 すべての苦手問題を克服しました！', 'success');
 }
 
 function showNextQuestion() {
@@ -1457,6 +1539,32 @@ function showNextQuestion() {
         if (questionElement) {
 
             questionElement.textContent = currentWord.question;
+
+            // ★新機能: 「あと1回で克服」インジケーターを表示
+            // 既存のインジケーターがあれば削除
+            const existingIndicator = document.getElementById('mastery-indicator');
+            if (existingIndicator) existingIndicator.remove();
+
+            const wordIdentifier = generateProblemId(currentWord);
+            if (incorrectWords.includes(wordIdentifier)) {
+                // 履歴情報を確認
+                const history = problemHistory[wordIdentifier];
+                if (history && history.correct_streak >= 1) {
+                    // あと1回で克服！
+                    const indicator = document.createElement('div');
+                    indicator.id = 'mastery-indicator';
+                    indicator.style.marginBottom = '8px'; // 下に少し余白
+                    indicator.style.textAlign = 'left';   // 左寄せ
+                    indicator.innerHTML = `
+                        <span class="badge bg-warning text-dark animate__animated animate__pulse animate__infinite">
+                            <i class="fas fa-fire"></i> ここで正解で克服！
+                        </span>
+                    `;
+                    // 質問文の上（直前）に挿入
+                    questionElement.parentNode.insertBefore(indicator, questionElement);
+                }
+            }
+
             // 強制再描画
             questionElement.style.display = 'none';
             questionElement.offsetHeight; // trigger reflow
@@ -1510,6 +1618,12 @@ function handleAnswer(isCorrect) {
         problemHistory[wordIdentifier].correct_attempts++;
         problemHistory[wordIdentifier].correct_streak++;
 
+        // 正解したらクールダウン解除
+        if (problemHistory[wordIdentifier].cooldown_until) {
+            delete problemHistory[wordIdentifier].cooldown_until;
+        }
+
+        // 2回連続正解で克服
         if (problemHistory[wordIdentifier].correct_streak >= 2) {
             const incorrectIndex = incorrectWords.indexOf(wordIdentifier);
             if (incorrectIndex > -1) {
@@ -1519,7 +1633,16 @@ function handleAnswer(isCorrect) {
     } else {
         incorrectCount++;
         problemHistory[wordIdentifier].incorrect_attempts++;
+
+        // ★修正: そもそも「上達しかけていた（Streak > 0）」問題を間違えた場合のみクールダウン
+        // （ずっと間違えている問題や、新規の問題はクールダウンしない）
+        const wasProgressing = (problemHistory[wordIdentifier].correct_streak > 0);
+
         problemHistory[wordIdentifier].correct_streak = 0;
+
+        if (wasProgressing) {
+            problemHistory[wordIdentifier].cooldown_until = Date.now() + COOLDOWN_DURATION;
+        }
 
         if (!incorrectWords.includes(wordIdentifier)) {
             incorrectWords.push(wordIdentifier);

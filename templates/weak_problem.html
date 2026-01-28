@@ -157,14 +157,22 @@
                             incorrectAttempts,
                             totalAttempts,
                             accuracyRate,
-                            isCurrentlyWeak: incorrectWords.includes(problemId)
+                            isCurrentlyWeak: incorrectWords.includes(problemId),
+                            streak: history.correct_streak || 0,
+                            cooldownUntil: history.cooldown_until || 0
                         });
                     }
                 }
             }
 
-            // ソート: 正答率低い順 -> 回答数多い順
+            // ソート: クールダウン中を後ろに、その中で正答率低い順
             allProblemsWithStats.sort((a, b) => {
+                const now = Date.now();
+                const aCool = (a.cooldownUntil > now);
+                const bCool = (b.cooldownUntil > now);
+
+                if (aCool !== bCool) return aCool ? 1 : -1; // クールダウン中は下へ
+
                 if (a.accuracyRate !== b.accuracyRate) return a.accuracyRate - b.accuracyRate;
                 return b.totalAttempts - a.totalAttempts;
             });
@@ -210,13 +218,38 @@
 
     function renderList(container, items, isPersonal) {
         container.innerHTML = '';
+        const now = Date.now();
+
         items.forEach((item, index) => {
             const li = document.createElement('li');
             li.className = 'list-group-item p-3';
 
             const rankBadge = `<span class="badge bg-primary me-2">${index + 1}位</span>`;
-            const weakBadge = (isPersonal && item.isCurrentlyWeak) ?
-                `<span class="badge bg-danger ms-2">苦手</span>` : '';
+
+            let statusBadge = '';
+            let rowClass = '';
+            let extraInfo = '';
+
+            if (isPersonal && item.isCurrentlyWeak) {
+                // クールダウン判定
+                if (item.cooldownUntil > now) {
+                    const diffMinutes = Math.ceil((item.cooldownUntil - now) / (60 * 1000));
+                    statusBadge = `<span class="badge bg-secondary ms-2"><i class="fas fa-hourglass-half me-1"></i>休憩中 (あと${diffMinutes}分)</span>`;
+                    rowClass = 'opacity-75 bg-light'; // 薄くする
+                } else {
+                    // Streaks判定 (レベル表示)
+                    if (item.streak === 0) {
+                        statusBadge = `<span class="badge bg-danger ms-2"><i class="fas fa-egg me-1"></i>Lv.0 (卵)</span>`;
+                    } else if (item.streak === 1) {
+                        statusBadge = `<span class="badge bg-warning text-dark ms-2"><i class="fas fa-crow me-1"></i>Lv.1 (ヒヨコ)</span>`;
+                        extraInfo = '<small class="text-success fw-bold ms-2">あと1回で克服！</small>';
+                    } else {
+                        statusBadge = `<span class="badge bg-success ms-2"><i class="fas fa-check me-1"></i>克服間近</span>`;
+                    }
+                }
+            }
+
+            if (rowClass) li.className += ' ' + rowClass;
 
             const accuracyColor = item.accuracyRate >= 80 ? 'text-success' : 'text-danger';
 
@@ -224,7 +257,7 @@
             <div class="d-flex justify-content-between align-items-start">
                 <div class="flex-grow-1">
                     <div class="fw-bold mb-1">
-                        ${rankBadge}${item.question}${weakBadge}
+                        ${rankBadge}${item.question}${statusBadge}${extraInfo}
                     </div>
                     <div class="text-muted small mb-2">
                         <span class="answer-blur" onclick="this.classList.toggle('revealed')">

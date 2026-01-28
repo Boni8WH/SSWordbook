@@ -3,6 +3,9 @@
 
 {% block head_extra %}
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link
+    href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@700&family=Kaisei+Tokumin:wght@400;700&display=swap"
+    rel="stylesheet">
 <style>
     /* ベーススタイル */
     .essay-container {
@@ -11,50 +14,75 @@
         padding: 15px;
     }
 
+    /* Map Abyss Style Header */
     .essay-header {
         text-align: center;
-        margin-bottom: 30px;
-        padding: 25px 20px;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        border-radius: 15px;
-        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+        margin-bottom: 2rem;
+        padding: 2rem 0;
+        background: transparent;
+        border-bottom: 1px solid #e0e0e0;
     }
 
-    .essay-header h1 {
-        margin: 0 0 15px 0;
-        font-size: clamp(1.8rem, 4vw, 2.5rem);
+    .essay-title {
+        font-family: 'Shippori Mincho', serif;
+        font-size: clamp(1.8rem, 5vw, 2.8rem);
         font-weight: 700;
-        line-height: 1.2;
-    }
-
-    .essay-description {
-        font-size: clamp(0.9rem, 2.5vw, 1.1rem);
-        margin-bottom: 20px;
-        opacity: 0.95;
-        line-height: 1.6;
-        text-align: left;
-    }
-
-    .back-to-main .btn {
-        background: rgba(255, 255, 255, 0.2);
-        border: 2px solid rgba(255, 255, 255, 0.3);
-        color: white;
-        padding: 10px 20px;
-        border-radius: 25px;
-        transition: all 0.3s ease;
-        text-decoration: none;
+        color: #1a1a2e;
+        letter-spacing: 0.12em;
         display: inline-flex;
         align-items: center;
-        gap: 8px;
-        font-size: clamp(0.85rem, 2vw, 1rem);
+        justify-content: center;
+        position: relative;
+        padding: 0 10px;
+        text-shadow: 2px 2px 0px rgba(212, 175, 55, 0.2);
+        max-width: 100%;
+        white-space: nowrap;
+        margin-bottom: 0.5rem;
     }
 
-    .back-to-main .btn:hover {
-        background: rgba(255, 255, 255, 0.3);
-        border-color: rgba(255, 255, 255, 0.5);
-        color: white;
-        transform: translateY(-2px);
+    .essay-title::before,
+    .essay-title::after {
+        content: "";
+        height: 1px;
+        background: linear-gradient(to right, transparent, #d4af37, transparent);
+        flex: 1;
+        min-width: 10px;
+        margin: 0 10px;
+    }
+
+    @media (min-width: 768px) {
+
+        .essay-title::before,
+        .essay-title::after {
+            min-width: 50px;
+            margin: 0 20px;
+        }
+    }
+
+    .essay-title i {
+        color: #d4af37;
+        margin-right: 0.4em;
+        font-size: 0.8em;
+        filter: drop-shadow(1px 1px 1px rgba(0, 0, 0, 0.2));
+    }
+
+    .essay-subtitle {
+        font-family: 'Kaisei Tokumin', serif;
+        color: #666;
+        font-size: clamp(0.7rem, 3vw, 0.9rem);
+        margin-top: 0.5rem;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        padding: 0 15px;
+        margin-bottom: 1.5rem;
+    }
+
+    /* Button area styles */
+    .back-to-main {
+        display: flex;
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 10px;
     }
 
     /* 今日の10問ボタン用 */
@@ -441,24 +469,27 @@
 {% block content %}
 <div class="essay-container">
     <div class="essay-header">
-        <h1><i class="fas fa-edit"></i> 論述問題集</h1>
+        <h1 class="essay-title"><i class="fas fa-edit"></i>論述問題集</h1>
+        <div class="essay-subtitle">Illuminate the Reason</div>
+
         <div class="back-to-main">
             {% if is_essay_room %}
             <!-- 今日の10問ボタン (論述ルーム用) -->
             {% if not is_all_unlocked %}
-            <button id="dailyQuizButton" class="btn btn-warning" style="margin-right: 10px;">
-                <i class="fas fa-stopwatch"></i> 今日の10問
+            <button id="dailyQuizButton" class="btn btn-warning rounded-pill px-4 shadow-sm">
+                <i class="fas fa-stopwatch me-2"></i> 今日の10問
             </button>
             {% endif %}
-            <a href="{{ url_for('my_corrections') }}" class="btn btn-outline-warning" style="margin-right: 10px;">
-                <i class="fas fa-history"></i> 添削履歴
+            <a href="{{ url_for('my_corrections') }}" class="btn btn-outline-warning rounded-pill px-4 shadow-sm">
+                <i class="fas fa-history me-2"></i> 添削履歴
             </a>
             {% endif %}
-            <button id="openEssaySearchButton" class="btn" style="margin-right: 10px;">
-                <i class="fas fa-search"></i> 問題検索
+            <button id="openEssaySearchButton" class="btn btn-outline-secondary rounded-pill px-4 shadow-sm">
+                <i class="fas fa-search me-2"></i> 問題検索
             </button>
-            <a href="{{ url_for('essay_university_index') }}" class="btn">
-                <i class="fas fa-search-plus"></i> カスタム検索
+            <a href="{{ url_for('essay_university_index') }}"
+                class="btn btn-outline-secondary rounded-pill px-4 shadow-sm">
+                <i class="fas fa-search-plus me-2"></i> カスタム検索
             </a>
         </div>
     </div>

@@ -708,6 +708,11 @@
 
         setTransform();
     }
+
+    function goBackToDifficultySelect() {
+        // Redirect to index with open_map_id parameter
+        window.location.href = "{{ url_for('map_quiz_index') }}?open_map_id=" + MAP_ID;
+    }
 </script>
 
 <!-- Result Overlay -->
@@ -753,9 +758,13 @@
                     onclick="location.reload()">
                     <i class="fas fa-redo me-2"></i>
                 </button>
+                <button class="btn btn-outline-primary btn-lg rounded-pill px-5 shadow-sm hover-shadow"
+                    onclick="goBackToDifficultySelect()">
+                    <i class="fas fa-layer-group me-2"></i>
+                </button>
                 <a href="{{ url_for('map_quiz_index') }}"
                     class="btn btn-outline-secondary btn-lg rounded-pill px-5 shadow-sm">
-                    <i class="fas fa-map me-2"></i> 地図選択
+                    <i class="fas fa-map me-2"></i>
                 </a>
             </div>
         </div>
