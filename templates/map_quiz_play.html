@@ -4,12 +4,12 @@
 {% block content %}
 <div class="container-fluid p-0" style="height: calc(100vh - 56px); display: flex; flex-direction: column;">
     <!-- Quiz Header / Question Area -->
-    <div class="p-3 shadow-sm"
+    <div class="py-2 px-3 shadow-sm"
         style="flex-shrink: 0; z-index: 1000; background-color: #ffffff !important; color: #212529 !important; border-bottom: 1px solid #dee2e6;">
-        <div class="container d-flex justify-content-between align-items-center">
+        <div class="container-fluid d-flex justify-content-between align-items-center">
             <div style="flex: 1;">
                 <span class="badge bg-secondary mb-1" id="progressBadge">Question 1</span>
-                <h4 id="questionText" class="mb-0 fw-bold">Loading...</h4>
+                <h5 id="questionText" class="mb-0 fw-bold">Loading...</h5>
                 <div id="explanationText" class="mt-2 text-danger fw-bold" style="display: none;"></div>
             </div>
             <div class="text-end ms-3">
