@@ -101,10 +101,35 @@
             mqQuizData = data;
 
             // Set Map Image
-            document.getElementById('gameMapImage').src = `/serve_map_image/${data.map.filename}`;
-            document.getElementById('gameMapImage').onload = () => {
+            // Set Map Image
+            const gameMapImage = document.getElementById('gameMapImage');
+
+            // Define load handler
+            const onMapLoad = () => {
+                console.log("Map image loaded. Fitting to screen.");
                 fitMapToScreen();
             };
+
+            gameMapImage.onload = onMapLoad;
+
+            // Error handling
+            gameMapImage.onerror = () => {
+                console.error("Failed to load map image");
+            };
+
+            // Set src AFTER defining handlers
+            gameMapImage.src = `/serve_map_image/${data.map.filename}`;
+
+            // Check if already complete (e.g. from cache)
+            if (gameMapImage.complete && gameMapImage.naturalWidth !== 0) {
+                onMapLoad();
+            }
+
+            // Handle Resize / Orientation Change
+            window.addEventListener('resize', () => {
+                // Debounce or just call efficiently
+                requestAnimationFrame(() => fitMapToScreen());
+            });
 
             // Render Pins
             renderPins();
