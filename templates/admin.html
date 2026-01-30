@@ -2293,10 +2293,23 @@
 
                                     <!-- 有効化チェックボックス -->
                                     <div class="essay-checkbox-group">
-                                        <input type="checkbox" id="new_essay_enabled" name="enabled" checked>
-                                        <label for="new_essay_enabled">
-                                            <i class="fas fa-check-circle"></i> 有効にする
-                                        </label>
+                                        <div class="form-check form-check-inline">
+                                            <input class="form-check-input" type="checkbox" id="new_essay_enabled"
+                                                name="enabled" checked>
+                                            <label class="form-check-label" for="new_essay_enabled">
+                                                <i class="fas fa-check-circle"></i> 有効にする
+                                            </label>
+                                        </div>
+                                        <div class="form-check form-check-inline ms-3">
+                                            <input class="form-check-input" type="checkbox"
+                                                id="new_essay_count_half_width_digits_as_half"
+                                                name="count_half_width_digits_as_half"
+                                                onchange="updateAnswerCharCount('new_essay_answer', 'newAnswerCharCount')">
+                                            <label class="form-check-label"
+                                                for="new_essay_count_half_width_digits_as_half">
+                                                <i class="fas fa-divide"></i> 半角数字2文字を1文字扱い
+                                            </label>
+                                        </div>
                                     </div>
 
                                     <!-- 送信ボタン -->
@@ -2494,6 +2507,18 @@
                                                     onclick="zoomEditorMap(1.2)"><i class="fas fa-plus"></i></button>
                                             </div>
 
+                                            <div class="btn-group btn-group-sm me-2">
+                                                <input type="radio" class="btn-check" name="createMode" id="modePoint"
+                                                    autocomplete="off" checked onchange="setCreateMode('point')">
+                                                <label class="btn btn-outline-primary" for="modePoint"
+                                                    title="ピン作成モード"><i class="fas fa-map-marker-alt"></i></label>
+
+                                                <input type="radio" class="btn-check" name="createMode" id="modeCircle"
+                                                    autocomplete="off" onchange="setCreateMode('circle')">
+                                                <label class="btn btn-outline-primary" for="modeCircle"
+                                                    title="領域(円)作成モード"><i class="far fa-circle"></i></label>
+                                            </div>
+
                                             <button id="startCropBtn" class="btn btn-sm btn-outline-warning"
                                                 onclick="toggleCropMode()">
                                                 <i class="fas fa-crop-alt"></i> トリミング
@@ -2599,6 +2624,50 @@
                                     <span class="input-group-text">Y:</span>
                                     <input type="text" id="displayPinY" class="form-control" readonly>
                                     <span class="input-group-text">%</span>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">領域設定</label>
+                                <div class="d-flex align-items-center mb-2 p-2 border rounded bg-light">
+                                    <div class="form-check me-3">
+                                        <input class="form-check-input" type="radio" name="shapeType"
+                                            id="shapeTypePoint" value="point" checked onchange="toggleShapeInputs()">
+                                        <label class="form-check-label" for="shapeTypePoint"><i
+                                                class="fas fa-map-marker-alt text-danger"></i> ピン (点)</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="shapeType"
+                                            id="shapeTypeCircle" value="circle" onchange="toggleShapeInputs()">
+                                        <label class="form-check-label" for="shapeTypeCircle"><i
+                                                class="far fa-circle text-primary"></i> 領域 (楕円)</label>
+                                    </div>
+                                </div>
+                                <div id="circleInputs" style="display: none;" class="ms-3 border-start ps-3">
+                                    <div class="row g-2 mb-2">
+                                        <div class="col-6">
+                                            <label class="form-label small text-muted">Radius X (%)</label>
+                                            <input type="number" id="pinRadiusXInput"
+                                                class="form-control form-control-sm" step="0.1" min="0" value="5.0">
+                                        </div>
+                                        <div class="col-6">
+                                            <label class="form-label small text-muted">Radius Y (%)</label>
+                                            <input type="number" id="pinRadiusYInput"
+                                                class="form-control form-control-sm" step="0.1" min="0" value="5.0">
+                                        </div>
+                                    </div>
+                                    <div class="mb-2">
+                                        <label class="form-label small text-muted">Rotation (deg)</label>
+                                        <div class="input-group input-group-sm">
+                                            <input type="number" id="pinRotationInput" class="form-control" step="1"
+                                                value="0">
+                                            <span class="input-group-text">°</span>
+                                        </div>
+                                    </div>
+                                    <div class="form-text small text-muted">
+                                        ※地図上でハンドルをドラッグして変形・回転できます
+                                    </div>
+                                    <input type="hidden" id="pinRadiusInput"> <!-- Legacy/Fallback -->
                                 </div>
                             </div>
 
@@ -5222,10 +5291,16 @@
                                 </div>
                             </div>
                             
-                            <div class="form-check">
+                            <div class="form-check mb-2">
                                 <input class="form-check-input" type="checkbox" id="edit_enabled" ${problem.enabled ? 'checked' : ''}>
                                 <label class="form-check-label" for="edit_enabled">
                                     <i class="fas fa-check-circle"></i> 有効にする
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="edit_count_half_width_digits_as_half" ${problem.count_half_width_digits_as_half ? 'checked' : ''} onchange="updateAnswerCharCount('edit_answer', 'answerLength')">
+                                <label class="form-check-label" for="edit_count_half_width_digits_as_half">
+                                    <i class="fas fa-divide"></i> 半角数字2文字を1文字扱い
                                 </label>
                             </div>
                         </form>
@@ -5290,7 +5365,8 @@
                 year: parseInt(document.getElementById('edit_year').value) || 2025,
                 question: question,
                 answer: document.getElementById('edit_answer').value.trim() || '解答なし',
-                enabled: document.getElementById('edit_enabled').checked
+                enabled: document.getElementById('edit_enabled').checked,
+                count_half_width_digits_as_half: document.getElementById('edit_count_half_width_digits_as_half').checked
             };
 
             fetch('/admin/essay/update_problem', {
@@ -6399,7 +6475,25 @@
             }
 
             const textWithoutTags = textarea.value.replace(/<[^>]*>/g, '');
-            const currentLength = textWithoutTags.length;
+            let currentLength = textWithoutTags.length;
+
+            // 半角数字2文字を1文字扱いにするフラグを確認
+            let countHalfWidthDigitsAsHalf = false;
+            if (textareaId === 'new_essay_answer') {
+                const checkbox = document.getElementById('new_essay_count_half_width_digits_as_half');
+                if (checkbox) countHalfWidthDigitsAsHalf = checkbox.checked;
+            } else if (textareaId === 'edit_answer') {
+                const checkbox = document.getElementById('edit_count_half_width_digits_as_half');
+                if (checkbox) countHalfWidthDigitsAsHalf = checkbox.checked;
+            }
+
+            if (countHalfWidthDigitsAsHalf) {
+                const digits = textWithoutTags.match(/[0-9]/g) || [];
+                const digitCount = digits.length;
+                const otherCount = textWithoutTags.length - digitCount;
+                currentLength = otherCount + Math.ceil(digitCount / 2);
+            }
+
             counter.textContent = `${currentLength}字`;
 
             // 文字数に応じてスタイル変更

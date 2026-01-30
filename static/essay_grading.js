@@ -26,10 +26,26 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Rich Text Editor - Character Count
     if (richTextEditor) {
+        const RICH_TEXT_LIMIT = 5000; // Limit to prevent freezing
         richTextEditor.addEventListener('input', function () {
             // Remove ALL whitespace (newlines, spaces, nbsp) for consistent counting
             const text = richTextEditor.innerText.replace(/\s+/g, '');
-            charCount.textContent = text.length + '文字';
+            const countHalfWidthDigitsAsHalf = problemData.getAttribute('data-count-half-width-digits-as-half') === 'true';
+
+            if (countHalfWidthDigitsAsHalf) {
+                // Count ASCII digits (0-9)
+                let digitCount = 0;
+                for (let char of text) {
+                    if (/[0-9]/.test(char)) {
+                        digitCount++;
+                    }
+                }
+                const otherCount = text.length - digitCount;
+                const finalCount = otherCount + Math.ceil(digitCount / 2);
+                charCount.textContent = finalCount + '文字';
+            } else {
+                charCount.textContent = text.length + '文字';
+            }
         });
         // Initial count
         const initialText = richTextEditor.innerText.replace(/\s+/g, '');
