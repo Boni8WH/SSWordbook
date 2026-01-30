@@ -20751,9 +20751,6 @@ def _create_map_quiz_tables():
     except Exception as e:
         print(f"⚠️ Map Quiz tables migration error: {e}")
 
-
-
-
 def _add_ellipse_columns_to_map_location():
     """MapLocationモデルにradius_x, radius_y, rotationカラムを追加"""
     try:
@@ -20810,8 +20807,6 @@ def _add_essay_problem_columns_safe():
                 print("✅ EssayProblemカラム追加完了")
     except Exception as e:
         print(f"⚠️ EssayProblem migration warning: {e}")
-
-
 
 with app.app_context():
     _create_map_quiz_tables()

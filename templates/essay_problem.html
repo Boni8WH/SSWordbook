@@ -908,7 +908,11 @@
                     placeholder="ここに答案を入力してください...">{{ problem.progress.draft_answer | safe if problem.progress and
                     problem.progress.draft_answer else '' }}</div>
                 <!-- 文字数カウント -->
-                <div class="editor-footer">
+                <div class="editor-footer d-flex justify-content-end align-items-center gap-3">
+                    <div class="form-check form-switch mb-0">
+                        <input class="form-check-input" type="checkbox" id="digitCountToggle">
+                        <label class="form-check-label small text-muted" for="digitCountToggle">半角英合体</label>
+                    </div>
                     <span id="charCount">0文字</span>
                 </div>
             </div>

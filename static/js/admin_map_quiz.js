@@ -681,13 +681,15 @@ function onGlobalMouseUp(e) {
         isDraggingPin = false;
         const delta = Math.sqrt(Math.pow(e.clientX - dragStartX, 2) + Math.pow(e.clientY - dragStartY, 2));
         if (delta < 5) {
-            // Clicked Pin -> Select it
+            // Clicked Pin -> Select it AND open edit modal
             const pin = currentPins.find(p => p.id === draggedPinId);
             if (pin) {
                 selectedPinId = pin.id;
                 renderEditorPins();
+                openPinEdit(pin); // Added call to open edit modal
             }
-        } else {
+        }
+        else {
             // Dragged -> Save
             const pin = currentPins.find(p => p.id === draggedPinId);
             if (pin) savePinCoordinates(pin);
@@ -964,7 +966,7 @@ function openPinCreate(coords) {
     document.getElementById('pinProblemsList').innerHTML = '<div class="text-muted small">保存後に問題を追加できます</div>';
 
     resetProblemForm();
-    const modal = new bootstrap.Modal(document.getElementById('pinEditModal'));
+    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('pinEditModal'));
     modal.show();
 }
 
@@ -995,7 +997,7 @@ async function openPinEdit(pin) {
     resetProblemForm();
     await loadPinProblems(pin.id);
 
-    const modal = new bootstrap.Modal(document.getElementById('pinEditModal'));
+    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('pinEditModal'));
     modal.show();
 }
 
