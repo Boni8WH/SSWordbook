@@ -1166,6 +1166,7 @@
 <script src="{{ url_for('static', filename='essay_grading.js') }}"></script>
 <!-- データ属性でJavaScriptに値を渡す -->
 <div id="problem-data" data-problem-id="{{ problem.id }}" data-university="{{ problem.university }}"
+    data-count-half-width-digits-as-half="{{ 'true' if problem.count_half_width_digits_as_half else 'false' }}"
     data-year="{{ problem.year }}" data-answer-length="{{ problem.answer_length }}"
     data-current-rating="{% if problem.progress and problem.progress.difficulty_rating %}{{ problem.progress.difficulty_rating }}{% else %}0{% endif %}"
     data-viewed-answer="{% if problem.progress and problem.progress.viewed_answer %}true{% else %}false{% endif %}"

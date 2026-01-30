@@ -25,6 +25,21 @@ let initialPinY = 0; // %
 // Edit Problem State
 let editingProblemId = null;
 
+// Drawing State
+let currentDrawMode = 'point'; // 'point' or 'circle'
+let isDrawingCircle = false;
+let drawCenterX = 0;
+let drawCenterY = 0;
+let drawRadius = 0;
+let tempCircleEl = null;
+
+let selectedPinId = null;
+// Resize/Rotate State
+let isRotating = false;
+let isResizing = false;
+let resizeAxis = null; // 'x', 'y'
+let dragStartAngle = 0;
+
 document.addEventListener('DOMContentLoaded', function () {
     // Determine if we need to load map list
     const tabLink = document.getElementById('tab-link-map-quiz');
@@ -364,18 +379,32 @@ function renderEditorPins() {
         // Store ID for retrieval
         pinEl.dataset.pinId = pin.id;
 
-        const icon = document.createElement('i');
-        icon.className = 'fas fa-map-marker-alt fa-2x text-danger';
-        icon.style.filter = 'drop-shadow(2px 2px 2px rgba(0,0,0,0.5))';
-        icon.style.position = 'absolute';
-        icon.style.left = '0';
-        icon.style.top = '0';
-        icon.style.transformOrigin = '50% 100%'; // Anchor at bottom center to prevent drift on scale
-        icon.style.transform = 'translate(-50%, -100%)';
-        icon.style.display = 'block';
-        icon.style.pointerEvents = 'auto'; // Important for handling events on icon
-
-        pinEl.appendChild(icon);
+        if (pin.shape_type !== 'circle' && pin.shape_type !== 'ellipse') {
+            const icon = document.createElement('i');
+            icon.className = 'fas fa-map-marker-alt fa-2x text-danger';
+            icon.style.filter = 'drop-shadow(2px 2px 2px rgba(0,0,0,0.5))';
+            icon.style.position = 'absolute';
+            icon.style.left = '0';
+            icon.style.top = '0';
+            icon.style.transformOrigin = '50% 100%';
+            icon.style.transform = 'translate(-50%, -100%)';
+            icon.style.display = 'block';
+            icon.style.pointerEvents = 'auto';
+            pinEl.appendChild(icon);
+        } else {
+            // For circle/ellipse, add a tiny center dot for dragging
+            const centerDot = document.createElement('div');
+            centerDot.style.width = '10px';
+            centerDot.style.height = '10px';
+            centerDot.style.borderRadius = '50%';
+            centerDot.style.backgroundColor = 'rgba(220, 53, 69, 0.8)';
+            centerDot.style.position = 'absolute';
+            centerDot.style.left = '50%';
+            centerDot.style.top = '50%';
+            centerDot.style.transform = 'translate(-50%, -50%)';
+            centerDot.style.pointerEvents = 'auto'; // Drag handle
+            pinEl.appendChild(centerDot);
+        }
 
         if (showPinNames && pin.name) {
             const label = document.createElement('span');
@@ -384,8 +413,100 @@ function renderEditorPins() {
             label.style.left = '10px';
             label.style.top = '-30px';
             label.style.whiteSpace = 'nowrap';
+            label.style.zIndex = '100';
             label.textContent = pin.name;
             pinEl.appendChild(label);
+        }
+
+        // Render Circle/Ellipse Region if applicable
+        if (pin.shape_type === 'circle' || pin.shape_type === 'ellipse' || (pin.shape_type === 'point' && pin.radius > 0)) {
+            let rx = pin.radius_x || pin.radius || 0;
+            let ry = pin.radius_y || pin.radius || 0;
+            let rot = pin.rotation || 0;
+
+            if (rx > 0 || ry > 0) {
+                if (rx === 0) rx = ry;
+                if (ry === 0) ry = rx;
+
+                const ellipse = document.createElement('div');
+                ellipse.className = 'pin-region-shape';
+                ellipse.style.position = 'absolute';
+                ellipse.style.left = '50%';
+                ellipse.style.top = '50%';
+                ellipse.style.borderRadius = '50%';
+                ellipse.style.border = '2px solid rgba(13, 110, 253, 0.7)';
+                ellipse.style.backgroundColor = 'rgba(13, 110, 253, 0.2)';
+                ellipse.style.pointerEvents = 'none';
+
+                const img = document.getElementById('editorMapImage');
+                if (img) {
+                    const w = img.clientWidth;
+                    const pxRx = (rx / 100) * w;
+                    const pxRy = (ry / 100) * w;
+                    ellipse.style.width = (pxRx * 2) + 'px';
+                    ellipse.style.height = (pxRy * 2) + 'px';
+                    ellipse.style.transform = `translate(-50%, -50%) rotate(${rot}deg)`;
+                }
+
+                pinEl.appendChild(ellipse);
+
+                if (selectedPinId === pin.id) {
+                    ellipse.style.border = '2px dashed #ffc107';
+                    ellipse.style.boxShadow = '0 0 5px rgba(255, 193, 7, 0.8)';
+
+                    const rotHandle = document.createElement('div');
+                    rotHandle.className = 'editor-handle rotate-handle';
+                    rotHandle.style.position = 'absolute';
+                    rotHandle.style.left = '50%';
+                    rotHandle.style.top = '-20px';
+                    rotHandle.style.width = '2px';
+                    rotHandle.style.height = '20px';
+                    rotHandle.style.backgroundColor = '#ffc107';
+                    rotHandle.style.cursor = 'grab';
+                    rotHandle.style.pointerEvents = 'auto';
+                    const rotKnob = document.createElement('div');
+                    rotKnob.style.position = 'absolute';
+                    rotKnob.style.top = '-5px';
+                    rotKnob.style.left = '-4px';
+                    rotKnob.style.width = '10px';
+                    rotKnob.style.height = '10px';
+                    rotKnob.style.borderRadius = '50%';
+                    rotKnob.style.backgroundColor = '#ffc107';
+                    rotHandle.appendChild(rotKnob);
+                    rotHandle.onmousedown = (e) => startRotateDrag(e, pin);
+                    ellipse.appendChild(rotHandle);
+
+                    const resR = document.createElement('div');
+                    resR.className = 'editor-handle resize-r';
+                    resR.style.position = 'absolute';
+                    resR.style.right = '-6px';
+                    resR.style.top = '50%';
+                    resR.style.marginTop = '-6px';
+                    resR.style.width = '12px';
+                    resR.style.height = '12px';
+                    resR.style.backgroundColor = '#0d6efd';
+                    resR.style.border = '1px solid white';
+                    resR.style.cursor = 'ew-resize';
+                    resR.style.pointerEvents = 'auto';
+                    resR.onmousedown = (e) => startResizeDrag(e, pin, 'x');
+                    ellipse.appendChild(resR);
+
+                    const resB = document.createElement('div');
+                    resB.className = 'editor-handle resize-b';
+                    resB.style.position = 'absolute';
+                    resB.style.bottom = '-6px';
+                    resB.style.left = '50%';
+                    resB.style.marginLeft = '-6px';
+                    resB.style.width = '12px';
+                    resB.style.height = '12px';
+                    resB.style.backgroundColor = '#0d6efd';
+                    resB.style.border = '1px solid white';
+                    resB.style.cursor = 'ns-resize';
+                    resB.style.pointerEvents = 'auto';
+                    resB.onmousedown = (e) => startResizeDrag(e, pin, 'y');
+                    ellipse.appendChild(resB);
+                }
+            }
         }
 
         // --- Drag Events ---
@@ -395,12 +516,7 @@ function renderEditorPins() {
         };
 
         // --- Click (Edit) ---
-        // Mouseup handles click if not dragged
         pinEl.onclick = (e) => {
-            // Handled by mouseup discrimination or let's verify if we dragged
-            // If moved significantly, it's a drag. If not, it's a click.
-            // Since we use onmousedown -> window.mousemove, the onclick might fire after drag end.
-            // We'll curb onclick if drag occurred.
             e.stopPropagation();
         };
 
@@ -418,6 +534,22 @@ function startPinDrag(e, pinId, startXPercent, startYPercent) {
     initialPinY = parseFloat(startYPercent);
 }
 
+function startRotateDrag(e, pin) {
+    e.stopPropagation(); // Don't drag pin
+    e.preventDefault();
+    isRotating = true;
+    selectedPinId = pin.id;
+    dragStartAngle = pin.rotation || 0;
+}
+
+function startResizeDrag(e, pin, axis) {
+    e.stopPropagation();
+    e.preventDefault();
+    isResizing = true;
+    resizeAxis = axis;
+    selectedPinId = pin.id;
+}
+
 function onMapMouseDown(e) {
     if (e.button !== 0) return;
     // Assume start panning if not on pin
@@ -425,6 +557,27 @@ function onMapMouseDown(e) {
 
     // Distinguish click from pan:
     // We'll record start Pos. If moved > threshold, it's a pan.
+    // BUT if in CIRCLE DRAW mode, start drawing circle.
+    if (currentDrawMode === 'circle') {
+        const img = document.getElementById('editorMapImage');
+        const rect = img.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+
+        drawCenterX = (x / rect.width) * 100;
+        drawCenterY = (y / rect.height) * 100;
+
+        // Start dragging
+        isDrawingCircle = true;
+        dragStartX = e.clientX;
+        dragStartY = e.clientY;
+
+        // Create Temp Visual
+        createTempCircle(x, y, rect.width);
+
+        return; // Consumption
+    }
+
     isDependingPan = true;
     startPanX = e.clientX - editorPanX;
     startPanY = e.clientY - editorPanY;
@@ -465,8 +618,56 @@ function onGlobalMouseMove(e) {
             pin.y = newY;
             updatePinPositionVisual(draggedPinId, newX, newY);
         }
-    }
-    else if (isDependingPan) {
+    } else if (isRotating && selectedPinId) {
+        e.preventDefault();
+        const pin = currentPins.find(p => p.id === selectedPinId);
+        if (pin) {
+            const pinEl = document.querySelector(`.map-pin[data-pin-id="${pin.id}"]`);
+            if (pinEl) {
+                const pinRect = pinEl.getBoundingClientRect();
+                const centerX = pinRect.left + pinRect.width / 2;
+                const centerY = pinRect.top + pinRect.height / 2;
+                const dx = e.clientX - centerX;
+                const dy = e.clientY - centerY;
+                let angle = Math.atan2(dy, dx) * (180 / Math.PI);
+                let rot = angle + 90;
+                pin.rotation = rot;
+                renderEditorPins();
+            }
+        }
+    } else if (isResizing && selectedPinId) {
+        e.preventDefault();
+        const pin = currentPins.find(p => p.id === selectedPinId);
+        if (pin) {
+            const img = document.getElementById('editorMapImage');
+            const rect = img.getBoundingClientRect();
+            const pinEl = document.querySelector(`.map-pin[data-pin-id="${pin.id}"]`);
+            if (pinEl) {
+                const pinRect = pinEl.getBoundingClientRect();
+                const centerX = pinRect.left + pinRect.width / 2;
+                const centerY = pinRect.top + pinRect.height / 2;
+                const dist = Math.sqrt(Math.pow(e.clientX - centerX, 2) + Math.pow(e.clientY - centerY, 2));
+                const radiusP = (dist / rect.width) * 100;
+                if (resizeAxis === 'x') pin.radius_x = radiusP;
+                if (resizeAxis === 'y') pin.radius_y = radiusP;
+                renderEditorPins();
+            }
+        }
+    } else if (isDrawingCircle) {
+        e.preventDefault();
+        const img = document.getElementById('editorMapImage');
+        const rect = img.getBoundingClientRect();
+
+        const deltaX = e.clientX - dragStartX;
+        const deltaY = e.clientY - dragStartY;
+        // Radius = distance in pixels / width * 100
+        const distPx = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+        const radiusPercent = (distPx / rect.width) * 100;
+
+        drawRadius = radiusPercent;
+        updateTempCircle(distPx);
+
+    } else if (isDependingPan) {
         // Panning map
         e.preventDefault();
         editorPanX = e.clientX - startPanX;
@@ -478,39 +679,52 @@ function onGlobalMouseMove(e) {
 function onGlobalMouseUp(e) {
     if (isDraggingPin) {
         isDraggingPin = false;
-
-        // If we dragged, we should update the DB or at least the modal inputs
-        // to reflect new position if we were to open "Edit".
-        // Actually, let's open edit modal explicitly if it was a small movement (Click),
-        // OR just save the new position silently? 
-        // User request: "Adjust position by drag".
-        // Better UX: Drag updates position. To edit name/problems, Click.
-
         const delta = Math.sqrt(Math.pow(e.clientX - dragStartX, 2) + Math.pow(e.clientY - dragStartY, 2));
         if (delta < 5) {
-            // It was a click
+            // Clicked Pin -> Select it
             const pin = currentPins.find(p => p.id === draggedPinId);
-            if (pin) openPinEdit(pin);
+            if (pin) {
+                selectedPinId = pin.id;
+                renderEditorPins();
+            }
         } else {
-            // It was a drag -> Confirm/Save Position?
-            // Let's autosave coord updates or ask confirmation? 
-            // For smooth workflow, maybe assume autosave or "Unsaved changes" state.
-            // Let's try autosave for now, or just update the in-memory state and let users click "Update" somewhere?
-            // The current modal-based flow requires "Save".
-            // Let's trigger a silent save of coordinates.
+            // Dragged -> Save
             const pin = currentPins.find(p => p.id === draggedPinId);
             if (pin) savePinCoordinates(pin);
         }
-
         draggedPinId = null;
+    }
+
+    if (isRotating || isResizing) {
+        // Finished transforming
+        isRotating = false;
+        isResizing = false;
+        if (selectedPinId) {
+            const pin = currentPins.find(p => p.id === selectedPinId);
+            if (pin) savePinCoordinates(pin);
+        }
+    }
+
+    if (isDrawingCircle) {
+        isDrawingCircle = false;
+        if (tempCircleEl) {
+            tempCircleEl.remove();
+            tempCircleEl = null;
+        }
+        if (drawRadius < 0.5) { }
+        openPinCreate({
+            x: drawCenterX.toFixed(2),
+            y: drawCenterY.toFixed(2),
+            radius: drawRadius.toFixed(2),
+            radius_x: drawRadius.toFixed(2),
+            radius_y: drawRadius.toFixed(2),
+            shape: 'circle'
+        });
+        return;
     }
 
     if (isDependingPan) {
         isDependingPan = false;
-        const delta = Math.sqrt(Math.pow(e.clientX - dragStartX, 2) + Math.pow(e.clientY - dragStartY, 2));
-        // If it was a tiny movement, onMapClick logic should fire (handled by onclick event on image)
-        // But since we had mousedown listeners, we need to ensure native click fires or call it manually.
-        // Native click usually fires if mousedown/up happen on same element.
     }
 }
 
@@ -525,10 +739,21 @@ function updatePinPositionVisual(id, x, y) {
 async function savePinCoordinates(pin) {
     // Only update coords
     try {
+        const payload = {
+            map_id: currentMap.id,
+            name: pin.name,
+            x: pin.x,
+            y: pin.y,
+            shape_type: pin.shape_type,
+            radius: pin.radius,
+            radius_x: pin.radius_x,
+            radius_y: pin.radius_y,
+            rotation: pin.rotation
+        };
         const response = await fetch(`${API_BASE}/location/${pin.id}/update`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
-            body: JSON.stringify({ map_id: currentMap.id, name: pin.name, x: pin.x, y: pin.y })
+            body: JSON.stringify(payload)
         });
         // Silent update
     } catch (e) {
@@ -606,12 +831,6 @@ function onMapClick(event) {
     if (dist > 5) return; // Allow small jitter, but ignore drags
 
     const img = document.getElementById('editorMapImage');
-    // Note: click event target might be image.
-    // Because of zoom/pan, event.offsetX/Y on the image element *should* be correct relative to the image itself regardless of CSS transform?
-    // Chrome: offsetX is relative to the target element's padding edge.
-    // If element is scaled, offsetX is in screen pixels (scaled).
-    // We need unscaled coords.
-
     const rect = img.getBoundingClientRect();
     const x = event.clientX - rect.left; // x in screen pixels within the image box
     const y = event.clientY - rect.top;
@@ -677,7 +896,7 @@ async function cancelCrop() {
 
 async function saveCrop() {
     if (!cropper) return;
-    if (!confirm('画像をトリミングしますか？\n既存のピンの位置は再計算されますが、範囲外のピンは削除されます。')) return;
+    if (!confirm('画像をトリミングしますか？\\n既存のピンの位置は再計算されますが、範囲外のピンは削除されます。')) return;
 
     // Get Data
     // We need data relative to the *original* image natural size.
@@ -727,6 +946,21 @@ function openPinCreate(coords) {
     document.getElementById('currentPinX').value = coords.x;
     document.getElementById('currentPinY').value = coords.y;
     document.getElementById('pinNameInput').value = '';
+
+    // Set Shape Info
+    if (coords.shape === 'circle') {
+        document.getElementById('shapeTypeCircle').checked = true;
+        document.getElementById('pinRadiusXInput').value = coords.radius_x || coords.radius || 5.0;
+        document.getElementById('pinRadiusYInput').value = coords.radius_y || coords.radius || 5.0;
+        document.getElementById('pinRotationInput').value = 0;
+    } else {
+        document.getElementById('shapeTypePoint').checked = true;
+        document.getElementById('pinRadiusXInput').value = 0;
+        document.getElementById('pinRadiusYInput').value = 0;
+        document.getElementById('pinRotationInput').value = 0;
+    }
+    toggleShapeInputs();
+
     document.getElementById('pinProblemsList').innerHTML = '<div class="text-muted small">保存後に問題を追加できます</div>';
 
     resetProblemForm();
@@ -741,6 +975,22 @@ async function openPinEdit(pin) {
     document.getElementById('currentPinX').value = pin.x;
     document.getElementById('currentPinY').value = pin.y;
     document.getElementById('pinNameInput').value = pin.name;
+
+    // Set Shape Info
+    if (pin.shape_type === 'circle' || pin.shape_type === 'ellipse') {
+        document.getElementById('shapeTypeCircle').checked = true;
+        let rx = pin.radius_x || pin.radius || 5.0;
+        let ry = pin.radius_y || pin.radius || 5.0;
+        document.getElementById('pinRadiusXInput').value = rx;
+        document.getElementById('pinRadiusYInput').value = ry;
+        document.getElementById('pinRotationInput').value = pin.rotation || 0;
+    } else {
+        document.getElementById('shapeTypePoint').checked = true;
+        document.getElementById('pinRadiusXInput').value = 0;
+        document.getElementById('pinRadiusYInput').value = 0;
+        document.getElementById('pinRotationInput').value = 0;
+    }
+    toggleShapeInputs();
 
     resetProblemForm();
     await loadPinProblems(pin.id);
@@ -760,13 +1010,46 @@ async function _doSavePin() {
     const x = document.getElementById('currentPinX').value;
     const y = document.getElementById('currentPinY').value;
 
+    // Shape Data
+    const isCircle = document.getElementById('shapeTypeCircle').checked;
+    const shapeType = isCircle ? 'ellipse' : 'point'; // Default to ellipse if circle mode selected, or detect equal radii?
+    // Actually backend supports 'circle' or 'ellipse'. 
+    // Let's use 'ellipse' if we have independent X/Y. Or 'circle' if equal.
+    // For simplicity, let's just send 'ellipse' if isCircle check matches.
+    // Or check if x != y. 
+
+    let radiusX = 0;
+    let radiusY = 0;
+    let rotation = 0;
+
+    if (isCircle) {
+        radiusX = parseFloat(document.getElementById('pinRadiusXInput').value) || 0;
+        radiusY = parseFloat(document.getElementById('pinRadiusYInput').value) || 0;
+        rotation = parseInt(document.getElementById('pinRotationInput').value) || 0;
+
+        if (radiusX <= 0 || radiusY <= 0) {
+            alert('半径は0より大きい値を設定してください');
+            return null;
+        }
+    }
+
     if (!name) {
         alert('地点名を入力してください');
         return null;
     }
 
     const url = pinId ? `${API_BASE}/location/${pinId}/update` : `${API_BASE}/location/add`;
-    const payload = { map_id: mapId, name: name, x: x, y: y };
+    const payload = {
+        map_id: mapId,
+        name: name,
+        x: x,
+        y: y,
+        shape_type: isCircle ? ((radiusX === radiusY) ? 'circle' : 'ellipse') : 'point',
+        radius: (radiusX === radiusY) ? radiusX : 0, // Legacy support
+        radius_x: radiusX,
+        radius_y: radiusY,
+        rotation: rotation
+    };
 
     try {
         const response = await fetch(url, {
@@ -1069,31 +1352,61 @@ async function deleteProblem(problemId) {
     } catch (e) { alert('Error'); }
 }
 
-async function deleteCurrentMap() {
-    if (!currentMap) return;
-    if (!confirm(`地図「${currentMap.name}」を削除しますか？\n登録された地点と問題も全て削除されます。`)) return;
-
-    try {
-        const response = await fetch(`${API_BASE}/map/${currentMap.id}/delete`, {
-            method: 'POST',
-            headers: { 'X-CSRFToken': getCsrfToken() }
-        });
-        const res = await response.json();
-        if (res.status === 'success') {
-            currentMap = null;
-            document.getElementById('mapEditorContainer').style.display = 'none';
-            document.getElementById('mapEditorPlaceholder').style.display = 'block';
-            loadSortableMapList();
-        } else {
-            alert('Error: ' + res.message);
-        }
-    } catch (e) { alert('Error: ' + e.message); }
-}
-
 function getCsrfToken() {
     const input = document.querySelector('input[name="csrf_token"]');
     if (input) return input.value;
     const meta = document.querySelector('meta[name="csrf-token"]');
     if (meta) return meta.getAttribute('content');
     return '';
+}
+
+// --- Helper Functions for Region Support ---
+
+function setCreateMode(mode) {
+    currentDrawMode = mode;
+    if (mode === 'point') {
+        const rad = document.getElementById('modePoint');
+        if (rad) rad.checked = true;
+    } else {
+        const rad = document.getElementById('modeCircle');
+        if (rad) rad.checked = true;
+    }
+}
+
+function toggleShapeInputs() {
+    const isCircle = document.getElementById('shapeTypeCircle').checked;
+    const inputs = document.getElementById('circleInputs');
+    if (inputs) {
+        inputs.style.display = isCircle ? 'block' : 'none';
+    }
+}
+
+function createTempCircle(centerX, centerY, mapWidthPx) {
+    const container = document.getElementById('editorPinsContainer');
+    tempCircleEl = document.createElement('div');
+    tempCircleEl.style.position = 'absolute';
+    tempCircleEl.style.left = drawCenterX + '%';
+    tempCircleEl.style.top = drawCenterY + '%';
+    tempCircleEl.style.width = '0px';
+    tempCircleEl.style.height = '0px';
+    tempCircleEl.style.transform = 'translate(-50%, -50%)';
+    tempCircleEl.style.borderRadius = '50%';
+    tempCircleEl.style.border = '2px dashed rgba(13, 110, 253, 0.8)';
+    tempCircleEl.style.backgroundColor = 'rgba(13, 110, 253, 0.3)';
+    tempCircleEl.style.pointerEvents = 'none';
+
+    container.appendChild(tempCircleEl);
+}
+
+function updateTempCircle(radiusPx) {
+    if (!tempCircleEl) return;
+
+    // Calculate size based on drawRadius (%) so it matches final render
+    const img = document.getElementById('editorMapImage');
+    const w = img.clientWidth;
+
+    const px = (drawRadius / 100) * w * 2;
+
+    tempCircleEl.style.width = px + 'px';
+    tempCircleEl.style.height = px + 'px';
 }

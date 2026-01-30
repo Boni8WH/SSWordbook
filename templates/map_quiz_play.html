@@ -108,6 +108,7 @@
             const onMapLoad = () => {
                 console.log("Map image loaded. Fitting to screen.");
                 fitMapToScreen();
+                renderPins(); // Re-render to correctly size regions
             };
 
             gameMapImage.onload = onMapLoad;
@@ -152,6 +153,9 @@
         const container = document.getElementById('gamePinsContainer');
         container.innerHTML = '';
 
+        const img = document.getElementById('gameMapImage');
+        const mapNaturalW = img.naturalWidth || 1000; // default to avoid zero if not loaded (though re-render handles it)
+
         mqQuizData.locations.forEach(loc => {
             const pinBtn = document.createElement('div');
             pinBtn.className = 'game-pin';
@@ -159,24 +163,57 @@
             pinBtn.style.position = 'absolute';
             pinBtn.style.left = `${loc.x}%`;
             pinBtn.style.top = `${loc.y}%`;
-            // Wrapper 0 size, no transform on wrapper
+            // Wrapper 0 size
             pinBtn.style.width = '0';
             pinBtn.style.height = '0';
             pinBtn.style.overflow = 'visible';
             pinBtn.style.cursor = 'pointer';
             pinBtn.onclick = (e) => onPinClick(e, loc.id);
 
-            // Icon: anchor bottom-center to wrapper (0,0)
-            const iconHtml = `<i class="fas fa-map-marker-alt text-danger fa-lg" style="position: absolute; left: 0; top: 0; transform: translate(-50%, -100%); filter: drop-shadow(0 2px 3px rgba(0,0,0,0.5)); transition: all 0.2s;"></i>`;
+            // Icon: anchor bottom-center (Only for points)
+            let iconHtml = '';
+            if (loc.shape_type !== 'circle') {
+                iconHtml = `<i class="fas fa-map-marker-alt text-danger fa-lg" style="position: absolute; left: 0; top: 0; transform: translate(-50%, -100%); filter: drop-shadow(0 2px 3px rgba(0,0,0,0.5)); transition: all 0.2s; z-index: 2;"></i>`;
+            }
+
+            // Circle/Ellipse Region
+            let regionHtml = '';
+            if ((loc.shape_type === 'circle' || loc.shape_type === 'ellipse') && (loc.radius > 0 || loc.radius_x > 0)) {
+                // Calculate px size based on natural width
+                const rx = loc.radius_x || loc.radius || 0;
+                const ry = loc.radius_y || loc.radius || 0;
+                const rot = loc.rotation || 0;
+
+                if (rx > 0 || ry > 0) {
+                    const finalRx = rx > 0 ? rx : ry;
+                    const finalRy = ry > 0 ? ry : rx;
+
+                    const width = (finalRx / 100) * mapNaturalW * 2;
+                    const height = (finalRy / 100) * mapNaturalW * 2;
+
+                    regionHtml = `<div style="
+                        position: absolute; 
+                        left: 50%; top: 50%; 
+                        width: ${width}px; height: ${height}px; 
+                        transform: translate(-50%, -50%) rotate(${rot}deg);
+                        border-radius: 50%; 
+                        background-color: rgba(220, 53, 69, 0.2); 
+                        border: 1px solid rgba(220, 53, 69, 0.5);
+                        z-index: 1;
+                        pointer-events: auto;
+                     "></div>`;
+                }
+            }
 
             // Label (Only if name is not empty)
             let labelHtml = '';
             if (loc.name && loc.name.trim() !== "") {
                 // Labels hidden by default
-                labelHtml = `<div class="pin-label badge bg-light text-dark border shadow-sm" id="label-${loc.id}" style="position: absolute; left: 15px; top: -35px; font-size: 14px; white-space: nowrap; display: none;">${loc.name}</div>`;
+                // z-index bumped to 10 to ensure visibility over region
+                labelHtml = `<div class="pin-label badge bg-light text-dark border shadow-sm" id="label-${loc.id}" style="position: absolute; left: 15px; top: -35px; font-size: 14px; white-space: nowrap; display: none; z-index: 10;">${loc.name}</div>`;
             }
 
-            pinBtn.innerHTML = iconHtml + labelHtml;
+            pinBtn.innerHTML = regionHtml + iconHtml + labelHtml;
             container.appendChild(pinBtn);
         });
     }
@@ -250,11 +287,44 @@
             correctLabel.style.display = 'block';
         }
 
-        const clickedPin = document.getElementById(`pin-${locId}`).querySelector('i');
-        const correctPin = document.getElementById(`pin-${correctLocId}`).querySelector('i');
+        const clickedPinEl = document.getElementById(`pin-${locId}`);
+        const correctPinEl = document.getElementById(`pin-${correctLocId}`);
+
+        // Helper function for visual feedback
+        const setPinVisual = (el, status) => {
+            if (!el) return;
+            const icon = el.querySelector('i');
+            // Region is a div that is NOT the label
+            const region = el.querySelector('div:not(.pin-label)');
+
+            if (status === 'correct') {
+                if (icon) icon.className = 'fas fa-map-marker-alt text-success fa-3x';
+                if (region) {
+                    region.style.backgroundColor = 'rgba(25, 135, 84, 0.6)'; // Success Green
+                    region.style.borderColor = '#198754';
+                    region.style.boxShadow = '0 0 10px #198754';
+                }
+            } else if (status === 'wrong') {
+                if (icon) icon.className = 'fas fa-map-marker-alt text-secondary fa-lg';
+                if (region) {
+                    region.style.backgroundColor = 'rgba(108, 117, 125, 0.4)'; // Grey
+                    region.style.borderColor = '#6c757d';
+                }
+            } else if (status === 'bounce') {
+                if (icon) icon.classList.add('fa-bounce');
+                if (region) {
+                    // Add a simple pulse effect if desired, or just highlight
+                    region.animate([
+                        { transform: 'translate(-50%, -50%) scale(1)' },
+                        { transform: 'translate(-50%, -50%) scale(1.1)' },
+                        { transform: 'translate(-50%, -50%) scale(1)' }
+                    ], { duration: 500, iterations: 3 });
+                }
+            }
+        };
 
         if (isCorrect) {
-            clickedPin.className = 'fas fa-map-marker-alt text-success fa-3x'; // Green & Bigger
+            setPinVisual(clickedPinEl, 'correct');
             playAudio('correct');
             mqCorrectCount++;
 
@@ -262,9 +332,10 @@
             ensurePinVisible(correctLocId);
         } else {
             // Incorrect Logic
-            clickedPin.className = 'fas fa-map-marker-alt text-secondary fa-lg'; // Grey
-            correctPin.className = 'fas fa-map-marker-alt text-success fa-3x'; // Show correct one
-            correctPin.classList.add('fa-bounce');
+            setPinVisual(clickedPinEl, 'wrong');
+            setPinVisual(correctPinEl, 'correct');
+            setPinVisual(correctPinEl, 'bounce');
+
             playAudio('wrong');
 
             // Find clicked location name for feedback

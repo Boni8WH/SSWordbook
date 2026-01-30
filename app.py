@@ -686,6 +686,13 @@ class MapLocation(db.Model):
     x_coordinate = db.Column(db.Float, nullable=False) # % (0.0-100.0)
     y_coordinate = db.Column(db.Float, nullable=False) # % (0.0-100.0)
     
+    # 🆕 領域指定 (円形・楕円)
+    shape_type = db.Column(db.String(20), default='point') # 'point', 'circle', 'ellipse'
+    radius = db.Column(db.Float, default=0.0) # % (Legacy: used for circle radius)
+    radius_x = db.Column(db.Float, default=0.0) # % (Horizontal radius)
+    radius_y = db.Column(db.Float, default=0.0) # % (Vertical radius)
+    rotation = db.Column(db.Float, default=0.0) # Degrees (0-360)
+    
     problems = db.relationship('MapQuizProblem', backref='location', cascade='all, delete-orphan')
 
 class MapQuizProblem(db.Model):
@@ -777,6 +784,28 @@ def _add_mq_complete_columns_safe():
                 print("✅ MapQuizCompleteカラム追加完了")
     except Exception as e:
         print(f"⚠️ MqComplete migration warning: {e}")
+
+def _add_shape_columns_to_map_location():
+    """MapLocationモデルにshape_type, radiusカラムを追加 (安全版)"""
+    try:
+        with db.engine.connect() as conn:
+            inspector = inspect(db.engine)
+            if 'mq_location' in inspector.get_table_names():
+                columns = [col['name'] for col in inspector.get_columns('mq_location')]
+                
+                if 'shape_type' not in columns:
+                    print("🔄 MapLocation: shape_typeを追加")
+                    conn.execute(text("ALTER TABLE mq_location ADD COLUMN shape_type VARCHAR(20) DEFAULT 'point'"))
+                
+                if 'radius' not in columns:
+                    print("🔄 MapLocation: radiusを追加")
+                    # SQLite/Postgres compatibility for Float/Real not strictly needed for just "ADD COLUMN FLOAT" usually works
+                    conn.execute(text("ALTER TABLE mq_location ADD COLUMN radius FLOAT DEFAULT 0.0"))
+
+                conn.commit()
+                # print("✅ MapLocation形状カラム追加完了")
+    except Exception as e:
+        print(f"⚠️ MapLocation shape migration warning: {e}")
 
 def _add_score_column_to_rpg_enemy():
     """RpgEnemyテーブルにappearance_required_scoreカラムを追加するマイグレーション関数"""
@@ -1540,19 +1569,28 @@ class EssayProblem(db.Model):
     answer = db.Column(db.Text, nullable=False)
     answer_length = db.Column(db.Integer, nullable=False)
     enabled = db.Column(db.Boolean, default=True, nullable=False)
+    # 🆕 半角数字2文字を1文字扱いにするフラグ
+    count_half_width_digits_as_half = db.Column(db.Boolean, default=False, nullable=False)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))
     image_url = db.Column(db.Text, nullable=True) 
     
     @property
     def clean_answer_length(self):
-        """HTMLタグと改行を除いた正味の文字数を返す"""
+        """HTMLタグと改行を除いた正味の文字数を返す（半角数字フラグを考慮）"""
         if not self.answer:
             return 0
         # タグ除去
         text = re.sub(r'<[^>]+>', '', self.answer)
         # 改行と空白除去
         text = text.replace('\n', '').strip()
+        
+        if self.count_half_width_digits_as_half:
+            # 半角数字（0-9）をカウント
+            ascii_digits = sum(1 for c in text if '0' <= c <= '9')
+            other_chars = len(text) - ascii_digits
+            return other_chars + (ascii_digits + 1) // 2
+        
         return len(text)
 
     @property
@@ -1579,6 +1617,7 @@ class EssayProblem(db.Model):
             'answer': self.answer,
             'answer_length': self.answer_length,
             'enabled': self.enabled,
+            'count_half_width_digits_as_half': self.count_half_width_digits_as_half,
             'image_url': self.image_url,
             'has_image': bool(self.image_url)
         }
@@ -14718,7 +14757,12 @@ def api_get_map_locations(map_id):
                 'id': l.id, 
                 'name': l.name, 
                 'x': l.x_coordinate, 
-                'y': l.y_coordinate
+                'y': l.y_coordinate,
+                'shape_type': getattr(l, 'shape_type', 'point'),
+                'radius': getattr(l, 'radius', 0),
+                'radius_x': getattr(l, 'radius_x', 0),
+                'radius_y': getattr(l, 'radius_y', 0),
+                'rotation': getattr(l, 'rotation', 0)
             } for l in locs]
         })
     except Exception as e:
@@ -14736,7 +14780,12 @@ def api_add_map_location():
             map_image_id=int(data['map_id']), # Explicitly cast to int
             name=data['name'],
             x_coordinate=float(data['x']),
-            y_coordinate=float(data['y'])
+            y_coordinate=float(data['y']),
+            shape_type=data.get('shape_type', 'point'),
+            radius=float(data.get('radius', 0.0)),
+            radius_x=float(data.get('radius_x', 0.0)),
+            radius_y=float(data.get('radius_y', 0.0)),
+            rotation=float(data.get('rotation', 0.0))
         )
         db.session.add(loc)
         db.session.commit()
@@ -14755,7 +14804,16 @@ def api_update_map_location(loc_id):
     try:
         loc.name = data.get('name', loc.name)
         if 'x' in data: loc.x_coordinate = float(data['x'])
+        if 'x' in data: loc.x_coordinate = float(data['x'])
         if 'y' in data: loc.y_coordinate = float(data['y'])
+        
+        # Update shape info
+        if 'shape_type' in data: loc.shape_type = data['shape_type']
+        if 'radius' in data: loc.radius = float(data['radius'])
+        if 'radius_x' in data: loc.radius_x = float(data['radius_x'])
+        if 'radius_y' in data: loc.radius_y = float(data['radius_y'])
+        if 'rotation' in data: loc.rotation = float(data['rotation'])
+        
         db.session.commit()
         return jsonify({'status': 'success', 'location': {'id': loc.id}})
     except Exception as e:
@@ -15257,7 +15315,7 @@ def api_get_map_play_data(map_id):
     return jsonify({
         'status': 'success',
         'map': {'id': map_obj.id, 'name': map_obj.name, 'filename': map_obj.filename},
-        'locations': [{'id': l.id, 'x': l.x_coordinate, 'y': l.y_coordinate, 'name': l.name} for l in locations],
+        'locations': [{'id': l.id, 'x': l.x_coordinate, 'y': l.y_coordinate, 'name': l.name, 'shape_type': getattr(l, 'shape_type', 'point'), 'radius': getattr(l, 'radius', 0), 'radius_x': getattr(l, 'radius_x', 0), 'radius_y': getattr(l, 'radius_y', 0), 'rotation': getattr(l, 'rotation', 0)} for l in locations],
         'problems': [{
             'id': p.id, 
             'location_id': p.map_location_id, 
@@ -15552,8 +15610,11 @@ def admin_essay_update_problem():
             return jsonify({'status': 'error', 'message': '問題が見つかりません'}), 404
         
         # 更新可能フィールド
-        updatable_fields = ['chapter', 'type', 'university', 'year', 'question', 'answer', 'enabled']
+        updatable_fields = ['chapter', 'type', 'university', 'year', 'question', 'answer', 'enabled', 'count_half_width_digits_as_half']
         
+        # フラグや解答が変更される可能性があるため、最後に再計算
+        should_recalc_length = False
+
         for field in updatable_fields:
             if field in data:
                 if field == 'year':
@@ -15561,16 +15622,26 @@ def admin_essay_update_problem():
                         setattr(problem, field, int(data[field]))
                     except (ValueError, TypeError):
                         setattr(problem, field, 2025)
-                elif field == 'enabled':
+                elif field == 'enabled' or field == 'count_half_width_digits_as_half':
                     setattr(problem, field, bool(data[field]))
+                    should_recalc_length = True
                 elif field == 'answer':
                     answer = data[field] or '解答なし'
                     setattr(problem, field, answer)
-                    # HTMLタグを除去して文字数をカウント
-                    clean_answer = re.sub(r'<[^>]+>', '', answer)
-                    problem.answer_length = len(clean_answer)
+                    should_recalc_length = True
                 else:
                     setattr(problem, field, data[field])
+        
+        # 文字数再計算
+        if should_recalc_length:
+            clean_answer = re.sub(r'<[^>]+>', '', problem.answer)
+            if problem.count_half_width_digits_as_half:
+                # 半角数字（0-9）をカウント
+                ascii_digits = sum(1 for c in clean_answer if '0' <= c <= '9')
+                other_chars = len(clean_answer) - ascii_digits
+                problem.answer_length = other_chars + (ascii_digits + 1) // 2
+            else:
+                problem.answer_length = len(clean_answer)
         
         db.session.commit()
         
@@ -15701,6 +15772,7 @@ def admin_essay_add_problem():
         question = request.form.get('question')
         answer = request.form.get('answer', '解答なし')
         enabled = request.form.get('enabled') == 'on'
+        count_half_width_digits_as_half = request.form.get('count_half_width_digits_as_half') == 'on'
         
         # 必須フィールドの確認
         if not chapter or not question:
@@ -15715,6 +15787,15 @@ def admin_essay_add_problem():
         except (ValueError, TypeError):
             year = 2025
         
+        # 文字数計算
+        clean_answer = re.sub(r'<[^>]+>', '', answer)
+        answer_length = len(clean_answer)
+        
+        if count_half_width_digits_as_half:
+            ascii_digits = sum(1 for c in clean_answer if '0' <= c <= '9')
+            other_chars = len(clean_answer) - ascii_digits
+            answer_length = other_chars + (ascii_digits + 1) // 2
+
         # まず問題を作成
         new_problem = EssayProblem(
             chapter=chapter,
@@ -15723,9 +15804,9 @@ def admin_essay_add_problem():
             year=year,
             question=question,
             answer=answer,
-            # HTMLタグを除去して文字数をカウント
-            answer_length=len(re.sub(r'<[^>]+>', '', answer)),
-            enabled=enabled
+            answer_length=answer_length,
+            enabled=enabled,
+            count_half_width_digits_as_half=count_half_width_digits_as_half
         )
         
         db.session.add(new_problem)
@@ -20670,11 +20751,74 @@ def _create_map_quiz_tables():
     except Exception as e:
         print(f"⚠️ Map Quiz tables migration error: {e}")
 
+
+
+
+def _add_ellipse_columns_to_map_location():
+    """MapLocationモデルにradius_x, radius_y, rotationカラムを追加"""
+    try:
+        with db.engine.connect() as conn:
+            inspector = inspect(db.engine)
+            if 'mq_location' in inspector.get_table_names():
+                columns = [col['name'] for col in inspector.get_columns('mq_location')]
+                
+                # Check and Add radius_x
+                if 'radius_x' not in columns:
+                    print("🔄 MapLocation: radius_xを追加")
+                    conn.execute(text("ALTER TABLE mq_location ADD COLUMN radius_x FLOAT DEFAULT 0.0"))
+                    
+                    # Migration: Copy existing radius to radius_x
+                    if 'radius' in columns:
+                         print("🔄 Migrating radius -> radius_x")
+                         conn.execute(text("UPDATE mq_location SET radius_x = radius WHERE radius IS NOT NULL"))
+
+                # Check and Add radius_y
+                if 'radius_y' not in columns:
+                    print("🔄 MapLocation: radius_yを追加")
+                    conn.execute(text("ALTER TABLE mq_location ADD COLUMN radius_y FLOAT DEFAULT 0.0"))
+                    
+                    # Migration: Copy existing radius to radius_y
+                    if 'radius' in columns:
+                         print("🔄 Migrating radius -> radius_y")
+                         conn.execute(text("UPDATE mq_location SET radius_y = radius WHERE radius IS NOT NULL"))
+
+                # Check and Add rotation
+                if 'rotation' not in columns:
+                    print("🔄 MapLocation: rotationを追加")
+                    conn.execute(text("ALTER TABLE mq_location ADD COLUMN rotation FLOAT DEFAULT 0.0"))
+
+                conn.commit()
+    except Exception as e:
+        print(f"⚠️ MapLocation ellipse migration warning: {e}")
+
+def _add_essay_problem_columns_safe():
+    """EssayProblemテーブルにcount_half_width_digits_as_halfカラムを追加（安全版）"""
+    try:
+        with db.engine.connect() as conn:
+            inspector = inspect(db.engine)
+            if 'essay_problems' in inspector.get_table_names():
+                columns = [col['name'] for col in inspector.get_columns('essay_problems')]
+                
+                if 'count_half_width_digits_as_half' not in columns:
+                    print("🔄 EssayProblem: count_half_width_digits_as_halfを追加")
+                    if _is_postgres():
+                         conn.execute(text("ALTER TABLE essay_problems ADD COLUMN count_half_width_digits_as_half BOOLEAN DEFAULT FALSE NOT NULL"))
+                    else:
+                         conn.execute(text("ALTER TABLE essay_problems ADD COLUMN count_half_width_digits_as_half BOOLEAN DEFAULT 0 NOT NULL"))
+                    
+                conn.commit()
+                print("✅ EssayProblemカラム追加完了")
+    except Exception as e:
+        print(f"⚠️ EssayProblem migration warning: {e}")
+
+
+
 with app.app_context():
     _create_map_quiz_tables()
     _add_mq_complete_columns_safe()
-
-
+    _add_shape_columns_to_map_location()
+    _add_ellipse_columns_to_map_location()
+    _add_essay_problem_columns_safe()
 
 if __name__ == '__main__':
     try:
