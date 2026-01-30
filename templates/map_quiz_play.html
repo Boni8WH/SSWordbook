@@ -191,7 +191,7 @@
                     const width = (finalRx / 100) * mapNaturalW * 2;
                     const height = (finalRy / 100) * mapNaturalW * 2;
 
-                    regionHtml = `<div style="
+                    regionHtml = `<div class="pin-region" data-rotation="${rot}" style="
                         position: absolute; 
                         left: 50%; top: 50%; 
                         width: ${width}px; height: ${height}px; 
@@ -208,14 +208,21 @@
             // Label (Only if name is not empty)
             let labelHtml = '';
             if (loc.name && loc.name.trim() !== "") {
-                // Labels hidden by default
-                // z-index bumped to 10 to ensure visibility over region
-                labelHtml = `<div class="pin-label badge bg-light text-dark border shadow-sm" id="label-${loc.id}" style="position: absolute; left: 15px; top: -35px; font-size: 14px; white-space: nowrap; display: none; z-index: 10;">${loc.name}</div>`;
+                const isRegion = (loc.shape_type === 'circle' || loc.shape_type === 'ellipse');
+                // Centered for regions, offset for points
+                const labelStyle = isRegion
+                    ? 'position: absolute; left: 0; top: 0; transform: translate(-50%, -50%);'
+                    : 'position: absolute; left: 15px; top: -35px;';
+
+                labelHtml = `<div class="pin-label badge bg-light text-dark border shadow-sm" id="label-${loc.id}" style="${labelStyle} font-size: 14px; white-space: nowrap; display: none; z-index: 10;">${loc.name}</div>`;
             }
 
-            pinBtn.innerHTML = regionHtml + iconHtml + labelHtml;
+            pinBtn.innerHTML = regionHtml + `<div class="pin-marker-wrapper" style="position: absolute; left: 0; top: 0; z-index: 10;">${iconHtml + labelHtml}</div>`;
             container.appendChild(pinBtn);
         });
+
+        // Ensure new pins are correctly scaled according to current zoom
+        setTransform();
     }
 
     function showQuestion(index) {
@@ -249,6 +256,13 @@
             if (icon) {
                 icon.className = 'fas fa-map-marker-alt text-danger fa-lg';
                 icon.classList.remove('fa-bounce');
+            }
+            // Reset region color/shadow
+            const region = pin.querySelector('.pin-region');
+            if (region) {
+                region.style.backgroundColor = 'rgba(220, 53, 69, 0.2)';
+                region.style.borderColor = 'rgba(220, 53, 69, 0.5)';
+                region.style.boxShadow = 'none';
             }
         });
 
@@ -313,11 +327,13 @@
             } else if (status === 'bounce') {
                 if (icon) icon.classList.add('fa-bounce');
                 if (region) {
+                    const rot = region.getAttribute('data-rotation') || 0;
                     // Add a simple pulse effect if desired, or just highlight
+                    // CRITICAL: Must include rotation in the animation to avoid reset
                     region.animate([
-                        { transform: 'translate(-50%, -50%) scale(1)' },
-                        { transform: 'translate(-50%, -50%) scale(1.1)' },
-                        { transform: 'translate(-50%, -50%) scale(1)' }
+                        { transform: `translate(-50%, -50%) rotate(${rot}deg) scale(1)` },
+                        { transform: `translate(-50%, -50%) rotate(${rot}deg) scale(1.1)` },
+                        { transform: `translate(-50%, -50%) rotate(${rot}deg) scale(1)` }
                     ], { duration: 500, iterations: 3 });
                 }
             }
@@ -776,10 +792,11 @@
     function setTransform() {
         mapWrapper.style.transform = "translate(" + pointX + "px, " + pointY + "px) scale(" + scale + ")";
 
-        // Counter-scale pins
+        // Counter-scale ONLY the visual markers (icons and labels)
+        // Map regions (circles/ellipses) will scale naturally with the map
         const invScale = 1 / scale;
-        document.querySelectorAll('.game-pin').forEach(pin => {
-            pin.style.transform = `scale(${invScale})`;
+        document.querySelectorAll('.pin-marker-wrapper').forEach(wrapper => {
+            wrapper.style.transform = `scale(${invScale})`;
         });
     }
 

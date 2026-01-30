@@ -25,12 +25,24 @@ document.addEventListener('DOMContentLoaded', function () {
     const modelAnswerText = document.querySelector('.answer-text').innerText;
 
     // Rich Text Editor - Character Count
+    // Rich Text Editor - Character Count
     if (richTextEditor) {
-        const RICH_TEXT_LIMIT = 5000; // Limit to prevent freezing
-        richTextEditor.addEventListener('input', function () {
+        const digitCountToggle = document.getElementById('digitCountToggle');
+
+        // Initialize toggle state from data attribute
+        if (digitCountToggle) {
+            const defaultSetting = problemData.getAttribute('data-count-half-width-digits-as-half') === 'true';
+            digitCountToggle.checked = defaultSetting;
+
+            // Allow toggle change to update count
+            digitCountToggle.addEventListener('change', updateCharCount);
+        }
+
+        function updateCharCount() {
             // Remove ALL whitespace (newlines, spaces, nbsp) for consistent counting
             const text = richTextEditor.innerText.replace(/\s+/g, '');
-            const countHalfWidthDigitsAsHalf = problemData.getAttribute('data-count-half-width-digits-as-half') === 'true';
+            // Check checkbox state if it exists, otherwise fall back to false/default
+            const countHalfWidthDigitsAsHalf = digitCountToggle ? digitCountToggle.checked : false;
 
             if (countHalfWidthDigitsAsHalf) {
                 // Count ASCII digits (0-9)
@@ -46,10 +58,13 @@ document.addEventListener('DOMContentLoaded', function () {
             } else {
                 charCount.textContent = text.length + '文字';
             }
-        });
+        }
+
+        const RICH_TEXT_LIMIT = 5000; // Limit to prevent freezing
+        richTextEditor.addEventListener('input', updateCharCount);
+
         // Initial count
-        const initialText = richTextEditor.innerText.replace(/\s+/g, '');
-        charCount.textContent = initialText.length + '文字';
+        updateCharCount();
     }
 
     // Save Draft

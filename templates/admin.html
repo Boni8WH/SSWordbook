@@ -447,6 +447,30 @@
     .tab-pane:not(.active) {
         display: none !important;
     }
+
+    /* Map Quiz Admin - Pin Edit Modal Non-blocking styles & positioning (Only when shown) */
+    #pinEditModal.show {
+        pointer-events: none;
+        display: flex !important;
+        align-items: flex-start;
+        justify-content: flex-start;
+        padding-left: calc(var(--sidebar-width) + 20px);
+        padding-top: 20px;
+        padding-bottom: 20px;
+    }
+
+    #pinEditModal.show .modal-dialog {
+        pointer-events: auto;
+        margin: 0;
+        max-width: 400px;
+        width: 100%;
+        max-height: calc(100vh - 40px);
+    }
+
+    #pinEditModal.show .modal-content {
+        max-height: 100%;
+        overflow-y: auto;
+    }
 </style>
 
 </div> <!-- Close Base Container -->
@@ -2602,7 +2626,7 @@
             </div>
 
             <!-- Pin Edit Modal (Using Bootstrap Modal instead of inline card for better UX) -->
-            <div class="modal fade" id="pinEditModal" tabindex="-1" aria-hidden="true">
+            <div class="modal fade" id="pinEditModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="false">
                 <div class="modal-dialog">
                     <div class="modal-content">
                         <div class="modal-header">
