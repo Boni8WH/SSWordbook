@@ -3564,8 +3564,19 @@ function openRpgIntro() {
     const battle = document.getElementById('rpgBattleScreen');
     const result = document.getElementById('rpgResultScreen');
 
-    if (overlay) overlay.classList.remove('hidden');
-    if (intro) intro.classList.remove('hidden');
+    if (overlay) {
+        overlay.classList.remove('hidden');
+        overlay.classList.remove('anim-active');
+        void overlay.offsetWidth;
+        overlay.classList.add('anim-active');
+    }
+    if (intro) {
+        intro.classList.remove('hidden');
+        // Trigger animations
+        intro.classList.remove('anim-active');
+        void intro.offsetWidth; // Force reflow to restart animation
+        intro.classList.add('anim-active');
+    }
     if (battle) battle.classList.add('hidden');
     if (result) result.classList.add('hidden');
 
@@ -3592,7 +3603,13 @@ if (btnRpgStart) btnRpgStart.addEventListener('click', startRpgGame);
 
 function closeRpgModal() {
     const overlay = document.getElementById('rpgOverlay');
-    if (overlay) overlay.classList.add('hidden');
+    const intro = document.getElementById('rpgIntroScreen');
+    if (overlay) {
+        overlay.classList.add('hidden');
+        overlay.classList.remove('anim-active');
+    }
+    if (intro) intro.classList.remove('anim-active');
+    if (result) result.classList.remove('anim-victory');
     clearInterval(rpgTimerInterval);
 }
 
@@ -3838,7 +3855,14 @@ function finishRpgGame(isWin) {
     const battleScreen = document.getElementById('rpgBattleScreen');
 
     if (battleScreen) battleScreen.classList.add('hidden');
-    if (resultScreen) resultScreen.classList.remove('hidden');
+    if (resultScreen) {
+        resultScreen.classList.remove('hidden');
+        resultScreen.classList.remove('anim-victory');
+        if (isWin) {
+            void resultScreen.offsetWidth;
+            resultScreen.classList.add('anim-victory');
+        }
+    }
 
     const title = document.getElementById('rpgResultTitle');
     const winContent = document.getElementById('rpgWinContent');
