@@ -900,7 +900,6 @@ function updateIncorrectOnlySelection() {
 function setupEventListeners() {
     try {
         if (startButton) startButton.addEventListener('click', startQuiz);
-        if (startButton) startButton.addEventListener('click', startQuiz);
 
         // Voice Answer Logic (PC & Mobile)
         if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
@@ -1297,7 +1296,7 @@ function startQuiz() {
         // ★修正: 'incorrectOnly' 文字列ではなく、数値を取得
         const selectedQuestionCount = getSelectedQuestionCount();
         // ★修正: checkboxの状態をチェック
-        const isIncorrectOnly = document.getElementById('incorrectOnlyCheckbox2')?.checked || false;
+        let isIncorrectOnly = document.getElementById('incorrectOnlyCheckbox2')?.checked || false;
 
         const isCurrentlyRestricted = hasBeenRestricted && !restrictionReleased;
         const isUnsolvedOnly = document.getElementById('unsolvedOnlyCheckbox')?.checked || false;
@@ -1320,12 +1319,22 @@ function startQuiz() {
 
                 // 続行許可（下の処理へ）
             } else {
+                // 制限を適用し、苦手問題モードを強制する
+                isIncorrectOnly = true;
+                if (document.getElementById('incorrectOnlyCheckbox2')) {
+                    document.getElementById('incorrectOnlyCheckbox2').checked = true;
+                }
+                updateIncorrectOnlySelection();
+
+                // 続行を許可する（下で getFilteredQuestions() が呼ばれる際に isIncorrectOnly=true として扱われる）
+                /*
                 if (weakProblemCount >= 20) {
                     flashMessage('苦手問題が20問以上あります。まず苦手問題モードで学習してください。', 'danger');
                 } else {
                     flashMessage(`苦手問題を10問以下に減らすまで、苦手問題モードで学習してください。（現在${weakProblemCount}問）`, 'warning');
                 }
                 return;
+                */
             }
         }
 
@@ -1335,9 +1344,10 @@ function startQuiz() {
         // ただし通常モードの場合は、単元が選択されているか確認
         if (!isIncorrectOnly) {
             const rawSelected = getSelectedQuestions();
-            if (rawSelected.length === 0 && !isIncorrectOnly) {
+            if (rawSelected.length === 0) {
                 // 通常モードで単元未選択の場合のチェック（UnsolvedOnlyなどがない場合）
                 if (!isUnsolvedOnly && !isUnmasteredOnly) {
+                    console.log('Range selection empty. SelectedRadio:', selectedQuestionCount, 'isIncorrectOnly:', isIncorrectOnly);
                     flashMessage('出題範囲を選択してください。', 'danger');
                     return;
                 }
@@ -1472,6 +1482,16 @@ function restartWeakProblemsQuiz() {
 
     // 新しい苦手問題セットでクイズを開始
     currentQuizData = shuffleArray(currentWeakProblems);
+
+    // ★修正: 前回と同じ問題数制限を適用する
+    const selectedQuestionCount = lastQuizSettings.questionCount;
+    if (selectedQuestionCount && selectedQuestionCount !== 'all' && selectedQuestionCount !== 'incorrectOnly') {
+        const count = parseInt(selectedQuestionCount);
+        if (!isNaN(count) && currentQuizData.length > count) {
+            currentQuizData = currentQuizData.slice(0, count);
+        }
+    }
+
     currentQuestionIndex = 0;
     correctCount = 0;
     incorrectCount = 0;
@@ -2218,6 +2238,16 @@ function restartQuiz() {
 
     // 新しい問題セットでクイズを再開始
     currentQuizData = shuffleArray(newQuizQuestions);
+
+    // ★修正: 前回と同じ問題数制限を適用する
+    const selectedQuestionCount = lastQuizSettings.questionCount;
+    if (selectedQuestionCount && selectedQuestionCount !== 'all' && selectedQuestionCount !== 'incorrectOnly') {
+        const count = parseInt(selectedQuestionCount);
+        if (!isNaN(count) && currentQuizData.length > count) {
+            currentQuizData = currentQuizData.slice(0, count);
+        }
+    }
+
     currentQuestionIndex = 0;
     correctCount = 0;
     incorrectCount = 0;

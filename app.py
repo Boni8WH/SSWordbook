@@ -18690,9 +18690,9 @@ def get_rpg_status():
     # ターゲットが存在するか確認
     is_cleared = False
     if target_boss:
-        # get_current_bossは未クリアのボスがいればそれを優先して返す仕様
-        cleared_ids = set(rpg_state.cleared_stages) if rpg_state else set()
-        is_cleared = str(target_boss.id) in cleared_ids or target_boss.id in cleared_ids
+        # 撃破済み判定を型に依存しないよう文字列に統一して行う
+        cleared_ids = {str(sid) for sid in rpg_state.cleared_stages} if rpg_state else set()
+        is_cleared = str(target_boss.id) in cleared_ids
         
     if not target_boss:
         return jsonify({'available': False, 'reason': 'no_boss_found', 'current_score': balance_score})
@@ -18724,7 +18724,7 @@ def get_current_boss(user_id, rpg_state=None):
     user_stats = UserStats.query.filter_by(user_id=user_id).first()
     current_score = user_stats.balance_score if user_stats else 0
     
-    cleared_stages = set(rpg_state.cleared_stages) if rpg_state else set()
+    cleared_stages = {str(sid) for sid in (rpg_state.cleared_stages if rpg_state else [])}
     
     # 条件1: 有効(is_active)であること
     # 条件2: 出現必要スコアを満たしていること (balance_score >= appearance_required_score)
@@ -18736,18 +18736,13 @@ def get_current_boss(user_id, rpg_state=None):
     if not candidates:
         return None
         
-    # 未クリアのボスの中で、diplay_order順に最初のボスを選択
+    # 未クリアのボスの中で、display_order順に最初のボスを選択
     for enemy in candidates:
-        if str(enemy.id) not in cleared_stages: # cleared_stages stores string IDs in JSON usually
-            # int/str mismatch check
-            if enemy.id not in cleared_stages and str(enemy.id) not in cleared_stages:
-                return enemy
+        if str(enemy.id) not in cleared_stages:
+            return enemy
             
-    # 全てクリア済みの場合は、候補の中からランダム（またはリプレイモード）
-    # ループ防止のため、一旦 None を返す (または専用のステータス)
-    # ユーザーが「勝ったのに進まない」と誤解するのを防ぐ
+    # 全てクリア済み
     return None
-    # return random.choice(candidates)
 
 @app.route('/api/rpg/start', methods=['POST'])
 def start_rpg_battle():
