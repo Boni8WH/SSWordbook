@@ -427,6 +427,20 @@
         color: #6c757d;
         /* Muted text for number */
     }
+
+    /* View Count Style */
+    #modalViewCount,
+    .view-count-badge {
+        font-size: 1.1rem;
+        color: #6c757d;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .view-count-badge {
+        font-size: 0.85em;
+    }
 </style>
 
 <div class="container py-4">
@@ -442,6 +456,7 @@
             <select class="form-select form-select-sm" id="columnSort" onchange="sortColumns()" style="width: auto;">
                 <option value="number">No.順</option>
                 <option value="likes">いいね順</option>
+                <option value="views">閲覧数順</option>
             </select>
         </div>
         <div class="form-check form-switch m-0">
@@ -500,7 +515,7 @@
                                 {% set is_read = unique_id in read_columns %}
 
                                 <div class="col" data-id="{{ unique_id }}" data-number="{{ col.numbering }}"
-                                    data-likes="{{ col.like_count }}">
+                                    data-likes="{{ col.like_count }}" data-views="{{ col.view_count }}">
                                     <!-- Data Block for Safe Retrieval -->
                                     <script id="data-{{ safe_id }}" type="application/json">
                                         {
@@ -514,12 +529,18 @@
                                         onclick="openColumnModal(this.dataset.uniqueId, this.dataset.safeId)">
                                         <div class="card-meta">
                                             <span class="column-number">No. {{ col.numbering }}</span>
-                                            <span class="like-count-badge text-muted"
-                                                id="list-like-count-{{ safe_id }}">
-                                                <i
-                                                    class="{{ 'fas' if col.is_liked else 'far' }} fa-heart text-danger"></i>
-                                                {{ col.like_count }}
-                                            </span>
+                                            <div class="d-flex align-items-center gap-2">
+                                                <span class="view-count-badge text-muted"
+                                                    id="list-view-count-{{ safe_id }}">
+                                                    <i class="fas fa-chart-line"></i> {{ col.view_count }}
+                                                </span>
+                                                <span class="like-count-badge text-muted"
+                                                    id="list-like-count-{{ safe_id }}">
+                                                    <i
+                                                        class="{{ 'fas' if col.is_liked else 'far' }} fa-heart text-danger"></i>
+                                                    {{ col.like_count }}
+                                                </span>
+                                            </div>
                                         </div>
                                         <div class="card-title">{{ col.title }}
                                             <i class="fas fa-chevron-right ms-auto text-muted"
@@ -571,10 +592,15 @@
                         <i class="fas fa-font"></i> 表示設定
                     </button>
                 </div>
-                <button type="button" class="btn" id="modalLikeButton" onclick="toggleLikeFromModal()">
-                    <i class="far fa-heart"></i>
-                    <span id="modalLikeCount"></span>
-                </button>
+                <div class="d-flex align-items-center gap-4">
+                    <span id="modalViewCount" class="text-muted">
+                        <i class="fas fa-chart-line"></i> <span></span>
+                    </span>
+                    <button type="button" class="btn" id="modalLikeButton" onclick="toggleLikeFromModal()">
+                        <i class="far fa-heart"></i>
+                        <span id="modalLikeCount"></span>
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -668,6 +694,12 @@
                         const likesB = parseInt(b.dataset.likes) || 0;
                         // Sort descending by likes, then ascending by number
                         if (likesB !== likesA) return likesB - likesA;
+                        return parseInt(a.dataset.number) - parseInt(b.dataset.number);
+                    } else if (sortType === 'views') {
+                        const viewsA = parseInt(a.dataset.views) || 0;
+                        const viewsB = parseInt(b.dataset.views) || 0;
+                        // Sort descending by views, then ascending by number
+                        if (viewsB !== viewsA) return viewsB - viewsA;
                         return parseInt(a.dataset.number) - parseInt(b.dataset.number);
                     }
                 });
@@ -917,6 +949,7 @@
     let currentModalId = null;
     let currentSafeId = null;
     let originalBodyText = ''; // Initialize globally
+    let viewCountTimer = null; // Timer for delayed view count
 
     function openColumnModal(uniqueId, safeId) {
         // Retrieve Data from Script Block using Safe ID
@@ -970,6 +1003,45 @@
 
         updateLikeButtonState();
 
+        // View Count Logic (Delayed by 20 seconds as per case 1)
+        const listViewBadge = document.getElementById('list-view-count-' + safeId);
+        const modalViewCount = document.getElementById('modalViewCount').querySelector('span');
+
+        // Initial modal view count sync (from current list state)
+        if (listViewBadge) {
+            const currentViewsMatch = listViewBadge.textContent.match(/\d+/);
+            modalViewCount.textContent = currentViewsMatch ? currentViewsMatch[0] : '0';
+        }
+
+        // Clear existing timer if any
+        if (viewCountTimer) clearTimeout(viewCountTimer);
+
+        // Set 20-second timer for incrementing view count
+        viewCountTimer = setTimeout(() => {
+            // API Call to increment view count
+            fetch('/api/increment_column_view', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ column_unique_id: uniqueId })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        // Sync with server source of truth
+                        if (listViewBadge) listViewBadge.innerHTML = `<i class="fas fa-chart-line"></i> ${data.view_count}`;
+                        modalViewCount.textContent = data.view_count;
+
+                        // Update data attribute for sorting
+                        const card = document.getElementById('card-' + safeId);
+                        const colContainer = card ? card.closest('.col') : null;
+                        if (colContainer) {
+                            colContainer.dataset.views = data.view_count;
+                        }
+                    }
+                })
+                .catch(err => console.error('View increment error:', err));
+        }, 20000); // 20 seconds
+
         {% if current_user.is_authenticated %}
         const switchEl = document.getElementById('modalReadSwitch');
 
@@ -986,12 +1058,21 @@
         // Ensure settings are applied (which sets the body text)
         applySettings();
 
-        const modal = new bootstrap.Modal(document.getElementById('columnReaderModal'));
+        const modalElement = document.getElementById('columnReaderModal');
+        const modal = new bootstrap.Modal(modalElement);
         modal.show();
 
         // Check after modal is shown to ensure rendering dimensions are correct
-        modal._element.addEventListener('shown.bs.modal', function () {
+        modalElement.addEventListener('shown.bs.modal', function () {
             checkSubtitleMultiline();
+            // Reset scroll position after modal is fully shown and layout is computed
+            const modalBodyElement = modalElement.querySelector('.modal-body');
+            if (modalBodyElement) {
+                modalBodyElement.scrollTop = 0;
+                modalBodyElement.scrollLeft = 0;
+                // Make content visible after reset
+                modalBodyElement.style.opacity = '1';
+            }
         }, { once: true });
     }
 
@@ -1327,6 +1408,34 @@
             isDragging = false;
             document.removeEventListener('mousemove', drag);
             document.removeEventListener('mouseup', dragEnd);
+        }
+    });
+
+    // Handle view count timer cleanup and scroll reset on modal events
+    const columnModal = document.getElementById('columnReaderModal');
+
+    columnModal.addEventListener('show.bs.modal', function () {
+        const modalBody = this.querySelector('.modal-body');
+        if (modalBody) {
+            // Hide content during transition to prevent flicker
+            modalBody.style.opacity = '0';
+            modalBody.style.transition = 'opacity 0.2s';
+            // Early reset
+            modalBody.scrollTop = 0;
+            modalBody.scrollLeft = 0;
+        }
+    });
+
+    columnModal.addEventListener('hide.bs.modal', function () {
+        if (viewCountTimer) {
+            clearTimeout(viewCountTimer);
+            viewCountTimer = null;
+        }
+        // Reset scroll position on close so it's fresh for next open
+        const modalBody = this.querySelector('.modal-body');
+        if (modalBody) {
+            modalBody.scrollTop = 0;
+            modalBody.scrollLeft = 0;
         }
     });
 </script>

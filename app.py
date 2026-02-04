@@ -1003,6 +1003,32 @@ def _add_read_columns_to_user():
             print("🔄 User: read_columnsカラムを追加します...")
             with db.engine.connect() as conn:
                 with conn.begin(): # トランザクション
+                    # PostgreSQL/SQLite 両対応のため TEXT 型で追加 (JSONEncodedDictはTEXTとして扱われる)
+                    conn.execute(text("ALTER TABLE \"user\" ADD COLUMN read_columns TEXT DEFAULT '[]'"))
+            print("✅ User: read_columnsカラム追加完了")
+        else:
+             print("✅ User: read_columnsカラムは既に存在します")
+             
+    except Exception as e:
+        print(f"⚠️ Userマイグレーションエラー (read_columns): {e}")
+
+def _create_column_view_table():
+    """ColumnViewテーブルを作成するマイグレーション関数"""
+    try:
+        inspector = inspect(db.engine)
+        if 'column_view' not in inspector.get_table_names():
+            print("🔄 column_viewテーブルを作成します...")
+            ColumnView.__table__.create(db.engine)
+            print("✅ column_viewテーブル作成完了")
+        else:
+            print("✅ column_viewテーブルは既に存在します")
+    except Exception as e:
+        print(f"⚠️ ColumnView作成エラー: {e}")
+        
+        if 'read_columns' not in columns:
+            print("🔄 User: read_columnsカラムを追加します...")
+            with db.engine.connect() as conn:
+                with conn.begin(): # トランザクション
                     conn.execute(text("ALTER TABLE \"user\" ADD COLUMN read_columns TEXT DEFAULT '[]' NOT NULL"))
             print("✅ User: read_columnsカラム追加完了")
         else:
@@ -1053,6 +1079,13 @@ class ColumnLike(db.Model):
         db.UniqueConstraint('user_id', 'column_unique_id', name='uq_user_column_like'),
         db.Index('idx_column_like_unique_id', 'column_unique_id'),
     )
+
+class ColumnView(db.Model):
+    __tablename__ = 'column_view'
+    id = db.Column(db.Integer, primary_key=True)
+    column_unique_id = db.Column(db.String(100), unique=True, nullable=False)
+    view_count = db.Column(db.Integer, default=0, nullable=False)
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(JST), onupdate=lambda: datetime.now(JST))
 
 def _create_column_table():
     """Columnテーブルを作成するマイグレーション関数"""
@@ -17626,7 +17659,7 @@ def columns_page():
     except Exception as e:
         print(f"Error fetching columns: {e}")
 
-    # Fetch Like Counts
+    # Fetch Like and View Counts
     try:
         # Aggregate likes: {unique_id: count}
         like_counts_res = db.session.query(
@@ -17635,9 +17668,14 @@ def columns_page():
         ).group_by(ColumnLike.column_unique_id).all()
         
         like_counts = {uid: count for uid, count in like_counts_res}
+        
+        # Fetch view counts: {unique_id: count}
+        view_counts_res = ColumnView.query.with_entities(ColumnView.column_unique_id, ColumnView.view_count).all()
+        view_counts = {vc[0]: vc[1] for vc in view_counts_res}
     except Exception as e:
-        print(f"Error fetching likes: {e}")
+        print(f"Error fetching counts: {e}")
         like_counts = {}
+        view_counts = {}
 
     
     # ユーザー処理
@@ -17657,7 +17695,7 @@ def columns_page():
             user_likes_res = ColumnLike.query.filter_by(user_id=session['user_id']).with_entities(ColumnLike.column_unique_id).all()
             user_likes = {ul[0] for ul in user_likes_res}
 
-    # Inject like data into columns_data
+    # Inject like and view data into columns_data
     # columns_data structure: {'middle': {'Subject': [col_dict, ...]}, ...}
     for school in columns_data:
         for subject in columns_data[school]:
@@ -17666,6 +17704,7 @@ def columns_page():
                 # Note: col_dict['numbering'] is int, need str
                 unique_id = f"{school}-{subject}-{col_dict['numbering']}"
                 col_dict['like_count'] = like_counts.get(unique_id, 0)
+                col_dict['view_count'] = view_counts.get(unique_id, 0)
                 col_dict['is_liked'] = unique_id in user_likes
             
             # DB上のデータに合わせてIDの整合性を保つ
@@ -17765,6 +17804,34 @@ def toggle_column_like():
             'status': 'success', 
             'liked': liked,
             'count': count
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/increment_column_view', methods=['POST'])
+def increment_column_view():
+    try:
+        data = request.get_json()
+        column_unique_id = data.get('column_unique_id')
+        
+        if not column_unique_id:
+            return jsonify({'status': 'error', 'message': 'Missing column_unique_id'}), 400
+
+        view = ColumnView.query.filter_by(column_unique_id=column_unique_id).first()
+        
+        if not view:
+            view = ColumnView(column_unique_id=column_unique_id, view_count=1)
+            db.session.add(view)
+        else:
+            view.view_count += 1
+            
+        db.session.commit()
+        
+        return jsonify({
+            'status': 'success', 
+            'view_count': view.view_count
         })
         
     except Exception as e:
@@ -20459,6 +20526,7 @@ with app.app_context():
     _add_read_columns_to_user()
     _create_column_table()
     _create_column_like_table()
+    _create_column_view_table()
 
 @app.route('/api/check_rpg_intro_eligibility', methods=['GET'])
 def check_rpg_intro_eligibility():
