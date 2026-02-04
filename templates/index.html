@@ -143,13 +143,28 @@
         </div>
     </div>
     <div class="card-buttons">
-        <button id="showAnswerButton" class="primary-button">答えを見る</button>
-        <button id="correctButton" class="correct-button hidden">正解</button>
-        <button id="incorrectButton" class="incorrect-button hidden">不正解</button>
+        <div style="display: flex; justify-content: space-between; align-items: flex-end; width: 100%;">
+            <div class="answer-buttons-container" style="flex-grow: 1; display: flex; gap: 10px; margin-right: 20px;">
+                <button id="showAnswerButton" class="primary-button">答えを見る</button>
+                <button id="correctButton" class="correct-button hidden">正解</button>
+                <button id="incorrectButton" class="incorrect-button hidden">不正解</button>
+            </div>
+            <!-- PC用マイクボタン (Mobileでは非表示) -->
+            <!-- PC用マイクボタン (Mobileでは非表示) -->
+            <button id="voiceAnswerBtn" class="voice-button voice-btn-pc"
+                style="display: none; width: 60px !important; height: 60px !important; min-width: 60px !important; min-height: 60px !important; border-radius: 50% !important; background-color: #e74c3c; border: none; color: white; font-size: 1.5em; align-items: center; justify-content: center; box-shadow: 0 4px 8px rgba(0,0,0,0.2); flex-shrink: 0 !important; flex: 0 0 60px !important; padding: 0 !important; transition: transform 0.2s;">
+                <i class="fas fa-microphone"></i>
+            </button>
+        </div>
+    </div>
+    <div id="voiceFeedback" class="voice-feedback hidden" style="margin-top: 10px; text-align: center; color: #666;">
     </div>
     <div class="back-to-selection-container"
         style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-        <button id="backToSelectionFromCardButton" class="secondary-button" style="margin: 0;">選択画面に戻る</button>
+        <div style="display: flex; align-items: center; gap: 10px; flex-grow: 1;">
+            <button id="backToSelectionFromCardButton" class="secondary-button" style="margin: 0;">選択画面に戻る</button>
+            <!-- Mobile Voice Button Removed from here -->
+        </div>
 
         <div class="font-size-controls">
             <span style="font-size: 0.8rem; color: #7f8c8d;">文字サイズ</span>
@@ -160,7 +175,15 @@
                         class="fas fa-plus"></i></button>
             </div>
         </div>
+
+        <!-- Mobile用マイクボタン (PCでは非表示) -->
+        <button id="voiceAnswerBtnMobile" class="voice-button voice-btn-mobile"
+            style="display: none; width: 50px !important; height: 50px !important; min-width: 50px !important; min-height: 50px !important; border-radius: 50%; background-color: #e74c3c; border: none; color: white; font-size: 1.2em; align-items: center; justify-content: center; box-shadow: 0 4px 8px rgba(0,0,0,0.2); flex-shrink: 0; margin-left: 10px;">
+            <i class="fas fa-microphone"></i>
+        </button>
+
     </div>
+
 </section>
 
 <section id="quizResult" class="quiz-result-area hidden">
@@ -440,8 +463,58 @@
     .quiz-time-notification {
         transition: opacity 0.3s ease, transform 0.3s ease;
     }
+
+    /* Voice Button Responsive Visibility */
+    /* Default (PC): Show PC btn, Hide Mobile btn */
+    .voice-btn-pc {
+        display: flex !important;
+    }
+
+    .voice-btn-mobile {
+        display: none !important;
+    }
+
+    @media (max-width: 768px) {
+
+        /* Mobile: Hide PC btn, Show Mobile btn */
+        .voice-btn-pc {
+            display: none !important;
+        }
+
+        .voice-btn-mobile {
+            display: flex !important;
+        }
+
+        /* Adjust alignment for mobile container */
+        .back-to-selection-container {
+            align-items: center !important;
+        }
+
+        /* Mobile: Answer buttons vertical */
+        .answer-buttons-container {
+            flex-direction: column !important;
+        }
+
+        .answer-buttons-container button {
+            width: 100% !important;
+        }
+    }
+
+    /* PC/Tablet: Answer buttons horizontal */
+    .answer-buttons-container {
+        flex-direction: row;
+        align-items: center;
+    }
+
+    .answer-buttons-container button {
+        flex: 1;
+        /* Split width equally */
+    }
 </style>
 <script>
+    // Flaskから渡された語彙データを設定
+    window.word_data = {{ vocab_data | tojson | safe if vocab_data else '[]' }};
+
     document.addEventListener('DOMContentLoaded', function () {
         const countBtns = document.querySelectorAll('.count-btn');
         const radioMap = ['qc10', 'qc20', 'qc50', 'qcAll'];
