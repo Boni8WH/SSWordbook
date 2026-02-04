@@ -4881,10 +4881,13 @@ def index():
         # フッター用のコンテキストを取得
         context = get_template_context()
         
+        # 語彙データの作成 (音声認識フィルタ用: 軽量化のため答えのみ)
+        vocab_data = [{'answer': w.get('answer', '')} for w in word_data if w.get('enabled') and w.get('answer')]
+
         # ★重要な修正：JavaScriptで使う変数名を変更
         return render_template('index.html',
-
-                                chapter_data=sorted_all_chapter_unit_status)
+                                chapter_data=sorted_all_chapter_unit_status,
+                                vocab_data=vocab_data)
     
     except Exception as e:
         print(f"Error in index route: {e}")
@@ -14177,6 +14180,30 @@ def admin_get_essay_visibility_settings(room_number):
             'status': 'error', 
             'message': f'予期しないエラーが発生しました: {str(e)}'
         }), 500
+
+@app.route('/api/get_full_vocabulary')
+def get_full_vocabulary():
+    """現在のルームの全単語リスト（解答のみ）を取得"""
+    try:
+        room_number = session.get('room_number', 'default')
+        word_data = load_word_data_for_room(room_number)
+        
+        # 解答のみを抽出
+        # フロントエンドの期待に合わせてオブジェクト形式で返す: [{ "answer": "..." }, ...]
+        # ただし、データ量を減らすために軽量化も検討できるが、既存ロジックとの互換性を重視
+        vocabulary = []
+        for word in word_data:
+            if word.get('answer'):
+                vocabulary.append({'answer': word['answer']})
+                
+        return jsonify({
+            'status': 'success',
+            'vocabulary': vocabulary,
+            'count': len(vocabulary)
+        })
+    except Exception as e:
+        logger.error(f"Error getting full vocabulary: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/admin/essay_visibility_settings/save', methods=['POST'])
 def admin_save_essay_visibility_settings():

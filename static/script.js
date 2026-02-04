@@ -21,8 +21,34 @@ let answerButtonTimeout = null;
 let hasBeenRestricted = false; // 一度でも制限されたかのフラグ
 let restrictionReleased = false; // 制限が解除されたかのフラグ
 
+
 window.word_data = [];  // この行を追加
 let word_data = window.word_data;  // この行も追加
+
+// ==========================================
+// 🆕 Load Full Vocabulary for Voice Recognition
+// ==========================================
+function fetchFullVocabulary() {
+    fetch('/api/get_full_vocabulary')
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success' && data.vocabulary) {
+                // console.log(`🎤 Full Vocabulary Loaded: ${data.count} words`);
+                window.word_data = data.vocabulary;
+                // word_dataにも反映（参照渡しだが念の為）
+                word_data = window.word_data;
+            }
+        })
+        .catch(err => {
+            console.warn('Failed to load full vocabulary:', err);
+        });
+}
+
+// Call on load
+document.addEventListener('DOMContentLoaded', () => {
+    fetchFullVocabulary();
+});
+
 
 // ==========================================
 // Constants for Weakness Mode (Penalty Delay)
@@ -101,6 +127,9 @@ const answerElement = document.getElementById('answer');
 const showAnswerButton = document.getElementById('showAnswerButton');
 const correctButton = document.getElementById('correctButton');
 const incorrectButton = document.getElementById('incorrectButton');
+const voiceAnswerBtn = document.getElementById('voiceAnswerBtn');
+const voiceAnswerBtnMobile = document.getElementById('voiceAnswerBtnMobile');
+const voiceFeedback = document.getElementById('voiceFeedback');
 const progressBar = document.getElementById('progressBar');
 const questionNumberDisplay = document.getElementById('questionNumberDisplay');
 const quizResultArea = document.getElementById('quizResult');
@@ -871,6 +900,22 @@ function updateIncorrectOnlySelection() {
 function setupEventListeners() {
     try {
         if (startButton) startButton.addEventListener('click', startQuiz);
+        if (startButton) startButton.addEventListener('click', startQuiz);
+
+        // Voice Answer Logic (PC & Mobile)
+        if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
+            if (voiceAnswerBtn) {
+                voiceAnswerBtn.style.display = 'inline-flex';
+                voiceAnswerBtn.addEventListener('click', startVoiceRecognition);
+            }
+            if (voiceAnswerBtnMobile) {
+                voiceAnswerBtnMobile.style.display = 'inline-flex';
+                voiceAnswerBtnMobile.addEventListener('click', startVoiceRecognition);
+            }
+        } else {
+            console.log("Web Speech API not supported.");
+        }
+
         if (showAnswerButton) {
             showAnswerButton.addEventListener('click', function (e) {
                 e.preventDefault();
@@ -1506,6 +1551,23 @@ function showNextQuestion() {
     if (showAnswerButton) showAnswerButton.classList.remove('hidden');
     if (correctButton) correctButton.classList.add('hidden');
     if (incorrectButton) incorrectButton.classList.add('hidden');
+    // Voice Feedback Cleanup (Fix #3)
+    if (voiceFeedback) {
+        voiceFeedback.innerHTML = '';
+        voiceFeedback.classList.add('hidden');
+    }
+
+    // Reset Voice Success Lock
+    isProcessingVoiceSuccess = false;
+
+    // Re-enable Voice Buttons
+    [voiceAnswerBtn, voiceAnswerBtnMobile].forEach(btn => {
+        if (btn) {
+            btn.disabled = false;
+            btn.style.opacity = '1';
+            btn.style.cursor = 'pointer';
+        }
+    });
 
     // 答えを見るボタンを1.5秒間無効化（最初の問題以外）
     if (currentQuestionIndex > 0) {
@@ -1590,6 +1652,15 @@ function showAnswer() {
     if (showAnswerButton) showAnswerButton.classList.add('hidden');
     if (correctButton) correctButton.classList.remove('hidden');
     if (incorrectButton) incorrectButton.classList.remove('hidden');
+
+    // Disable Voice Buttons when answer is revealed
+    [voiceAnswerBtn, voiceAnswerBtnMobile].forEach(btn => {
+        if (btn) {
+            btn.disabled = true;
+            btn.style.opacity = '0.5';
+            btn.style.cursor = 'not-allowed';
+        }
+    });
 }
 
 function handleAnswer(isCorrect) {
@@ -4244,5 +4315,427 @@ function generateProblemId(word) {
         const chapter = String(word.chapter || '0').padStart(3, '0');
         const number = String(word.number || '0').padStart(3, '0');
         return `${chapter}-${number}-error`;
+    }
+}
+
+
+// ===================================
+// Helper: Levenshtein Distance (for Fuzzy Logic)
+// ===================================
+function levenshteinDistance(a, b) {
+    const matrix = [];
+    for (let i = 0; i <= b.length; i++) {
+        matrix[i] = [i];
+    }
+    for (let j = 0; j <= a.length; j++) {
+        matrix[0][j] = j;
+    }
+    for (let i = 1; i <= b.length; i++) {
+        for (let j = 1; j <= a.length; j++) {
+            if (b.charAt(i - 1) == a.charAt(j - 1)) {
+                matrix[i][j] = matrix[i - 1][j - 1];
+            } else {
+                matrix[i][j] = Math.min(
+                    matrix[i - 1][j - 1] + 1,
+                    matrix[i][j - 1] + 1,
+                    matrix[i - 1][j] + 1
+                );
+            }
+        }
+    }
+    return matrix[b.length][a.length];
+}
+
+// ===================================
+// 音声入力機能 (Voice Recognition)
+// ===================================
+
+let isProcessingVoiceSuccess = false; // Lock flag to prevent double submission
+
+
+function startVoiceRecognition(e) {
+    if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+
+    if (isAnswerButtonDisabled) return;
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+        alert("お使いのブラウザは音声入力に対応していません。ChromeやSafariをお試しください。");
+        return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'ja-JP';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 20; // Check up to 20 candidates (Fix for Katakana/Kanji bias)
+
+    // Grammar Support: Bias towards the correct answer AND global vocabulary
+    // This helps recognition even with slight mispronunciations or difficult words
+    if (currentQuizData && currentQuizData[currentQuestionIndex]) {
+        const correctAnswer = currentQuizData[currentQuestionIndex].answer;
+        const SpeechGrammarList = window.SpeechGrammarList || window.webkitSpeechGrammarList;
+
+        if (SpeechGrammarList) {
+            const speechRecognitionList = new SpeechGrammarList();
+
+            // 1. Add ALL vocabulary from word_data (Context)
+            // This allows the engine to recognize ANY word in the database better
+            if (window.word_data && Array.isArray(window.word_data)) {
+                try {
+                    const allAnswers = new Set();
+                    window.word_data.forEach(w => {
+                        if (w.answer) {
+                            // Extract clean parts just like verification logic
+                            // Extract clean parts just like verification logic
+                            const parts = w.answer.split(/[（(）)]+/);
+                            parts.forEach(p => {
+                                // Remove symbols for grammar
+                                const clean = p.replace(/[;|<>\*\(\)\[\]]/g, '').trim();
+                                if (clean.length > 0) allAnswers.add(clean);
+                            });
+                        }
+                    });
+
+                    // Join with JSGF OR operator
+                    const globalGrammarString = Array.from(allAnswers).join(' | ');
+
+                    if (globalGrammarString) {
+                        // Weight 1 for general vocabulary
+                        const globalGrammar = '#JSGF V1.0; grammar global_vocab; public <vocab> = ' + globalGrammarString + ' ;';
+                        speechRecognitionList.addFromString(globalGrammar, 1);
+                        // console.log(`Global Grammar Added: ${allAnswers.size} words`);
+                    }
+                } catch (e) {
+                    console.warn("Failed to add global grammar:", e);
+                }
+            }
+
+            // 2. Add CURRENT answer (Prioritized)
+            // Generate variations for grammar (Same logic as verification)
+            const variations = new Set();
+            // Raw answer (cleaned of grammar-breaking chars)
+            variations.add(correctAnswer.replace(/[;]/g, ''));
+
+            // Normalized parts
+            // Normalized parts
+            const parts = correctAnswer.split(/[（(）)]+/);
+            parts.forEach(p => {
+                if (p.trim()) variations.add(p.trim());
+            });
+
+            // Clean for JSGF (remove special grammar chars)
+            const variationArray = Array.from(variations).map(v => v.replace(/[;|<>\*\(\)\[\]]/g, '')).filter(v => v.length > 0);
+            const currentGrammarString = variationArray.join(' | ');
+
+            // JSpeech Grammar Format using alternatives
+            if (currentGrammarString) {
+                const grammar = '#JSGF V1.0; grammar answer; public <answer> = ' + currentGrammarString + ' ;';
+
+                // Add with significantly high weight (10) to prioritize current answer
+                speechRecognitionList.addFromString(grammar, 10);
+                recognition.grammars = speechRecognitionList;
+                // console.log(`Target Grammar Added: ${currentGrammarString}`);
+            }
+        }
+    }
+
+    // UI Updates (Disable BOTH buttons)
+    const setListeningState = (isListening) => {
+        const btns = [voiceAnswerBtn, voiceAnswerBtnMobile].filter(b => b);
+        btns.forEach(btn => {
+            if (isListening) {
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                btn.classList.add('listening');
+                btn.disabled = true;
+            } else {
+                btn.innerHTML = '<i class="fas fa-microphone"></i>';
+                btn.classList.remove('listening');
+                btn.disabled = false;
+            }
+        });
+    };
+
+    setListeningState(true);
+
+    // Clean previous feedback
+    if (voiceFeedback) {
+        voiceFeedback.textContent = '';
+        voiceFeedback.classList.add('hidden');
+    }
+
+    recognition.start();
+
+    recognition.onresult = (event) => {
+        // Collect ALL candidates
+        const candidates = [];
+        const results = event.results[0];
+        for (let i = 0; i < results.length; i++) {
+            candidates.push(results[i].transcript);
+        }
+
+        // console.log(`Recognized Candidates:`, candidates);
+        verifyVoiceAnswer(candidates);
+    };
+
+    recognition.onspeechend = () => {
+        recognition.stop();
+    };
+
+    recognition.onerror = (event) => {
+        console.error('Speech recognition error', event.error);
+
+        let errorMsg = '聞き取れませんでした';
+        if (event.error === 'no-speech') errorMsg = '音声が検出されませんでした';
+        if (event.error === 'audio-capture') errorMsg = 'マイクが見つかりません';
+        if (event.error === 'not-allowed') {
+            errorMsg = 'マイクの使用が許可されていません。\nブラウザの設定でマイクを許可してください。(スマホの場合はHTTPS接続が必要です)';
+            alert(errorMsg);
+        }
+
+        // Restore UI
+        setListeningState(false);
+
+        if (voiceFeedback) {
+            voiceFeedback.textContent = `❌ ${errorMsg}`;
+            voiceFeedback.classList.remove('hidden');
+        }
+    };
+
+    recognition.onend = () => {
+        // Check if any button is still in listening state (safety net)
+        if ((voiceAnswerBtn && voiceAnswerBtn.classList.contains('listening')) ||
+            (voiceAnswerBtnMobile && voiceAnswerBtnMobile.classList.contains('listening'))) {
+            setListeningState(false);
+        }
+    };
+}
+
+// ===================================
+// Helper: Dictionary Pre-calculation (Lazy)
+// ===================================
+let globalVoiceDictionary = null;
+
+function getVoiceDictionary() {
+    if (globalVoiceDictionary) return globalVoiceDictionary;
+
+    globalVoiceDictionary = new Set();
+    if (window.word_data && Array.isArray(window.word_data)) {
+        window.word_data.forEach(w => {
+            if (w.answer) {
+                // Split by delimiters as well to handle "A(B)" -> A, B
+                const parts = w.answer.split(/[（(）)]+/);
+                parts.forEach(p => {
+                    // Normalize using the same logic as verify
+                    const clean = normalizeString(p);
+                    if (clean.length > 0) globalVoiceDictionary.add(clean);
+                });
+            }
+        });
+    }
+    console.log(`Voice Dictionary Initialized: ${globalVoiceDictionary.size} words`);
+    return globalVoiceDictionary;
+}
+
+// Reuse normalization logic for dictionary
+function normalizeString(str) {
+    if (!str) return '';
+    let s = str.replace(/\s+/g, '') // Remove spaces
+        .replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+        .replace(/[Ａ-Ｚ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+        .replace(/[ａ-ｚ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+        .replace(/[「」『』()（）\[\]【】＝=・、。]/g, '')
+        .replace(/ヴァ/g, 'バ').replace(/ヴィ/g, 'ビ').replace(/ヴェ/g, 'ベ').replace(/ヴォ/g, 'ボ').replace(/ヴ/g, 'ブ')
+        .toLowerCase();
+
+    // Numbers
+    const kanjiDigits = '〇一二三四五六七八九';
+    s = s.replace(/[〇一二三四五六七八九]/g, m => kanjiDigits.indexOf(m));
+    s = s.replace(/(\d)十(\d)/g, '$1$2').replace(/(\d)十/g, '$10').replace(/十(\d)/g, '1$1').replace(/十/g, '10');
+    s = s.replace(/(\d)百(\d+)/g, '$1$2').replace(/(\d)百/g, '$100').replace(/百(\d+)/g, '1$1').replace(/百/g, '100');
+    s = s.replace(/(\d)千(\d+)/g, '$1$2').replace(/(\d)千/g, '$1000').replace(/千(\d+)/g, '1$1').replace(/千/g, '1000');
+    s = s.replace(/(\d)万(\d+)/g, '$1$2').replace(/(\d)万/g, '$10000').replace(/万(\d+)/g, '1$1').replace(/万/g, '10000');
+
+    return s;
+}
+
+function verifyVoiceAnswer(candidates) {
+    if (!currentQuizData || !currentQuizData[currentQuestionIndex]) return;
+
+    // Ensure array
+    if (!Array.isArray(candidates)) candidates = [candidates];
+
+    const correctAnswer = currentQuizData[currentQuestionIndex].answer;
+
+    // Normalization wrapper (now using the dedicated function to avoid duplication if I refactored purely, 
+    // but here I just call the helper above to ensure consistency)
+    const normalize = normalizeString;
+
+    // Prepare Valid Answers
+    const validAnswers = new Set();
+    const cleanAnswer = normalize(correctAnswer);
+    if (cleanAnswer) validAnswers.add(cleanAnswer);
+    const parts = correctAnswer.split(/[（(）)]+/);
+    parts.forEach(p => {
+        const n = normalize(p);
+        if (n && n.length > 0) validAnswers.add(n);
+    });
+
+    // ==========================================
+    // Check all candidates
+    // ==========================================
+    let matchFound = false;
+    let matchType = 'none'; // 'exact', 'fuzzy'
+    let matchedCandidate = '';
+
+    // 1. Check for Correct Answer
+    for (let transcript of candidates) {
+        const cleanTranscript = normalize(transcript);
+
+        for (let targetAnswer of validAnswers) {
+            // Strict
+            if (cleanTranscript === targetAnswer) {
+                matchFound = true;
+                matchType = 'exact';
+                matchedCandidate = transcript;
+                break;
+            }
+            // Fuzzy
+            if (matchType !== 'exact') {
+                if (targetAnswer.length > 3 && cleanTranscript.includes(targetAnswer)) {
+                    matchFound = true;
+                    matchType = 'fuzzy';
+                    matchedCandidate = transcript;
+                } else {
+                    const dist = levenshteinDistance(cleanTranscript, targetAnswer);
+                    const threshold = Math.max(3, Math.floor(targetAnswer.length * 0.3));
+                    if (dist <= threshold) {
+                        matchFound = true;
+                        matchType = 'fuzzy';
+                        matchedCandidate = transcript;
+                    }
+                }
+            }
+        }
+        if (matchType === 'exact') break;
+    }
+
+    // If we have a match (correct answer), handle it.
+    if (matchFound) {
+        if (matchType === 'exact') {
+            if (isProcessingVoiceSuccess) return;
+            isProcessingVoiceSuccess = true;
+            if (voiceFeedback) {
+                voiceFeedback.innerHTML = `
+                <div style="padding: 20px; background: #e8f5e9; border: 2px solid #a5d6a7; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.01); text-align: center; animation: pulse 0.5s;">
+                    <h3 style="margin: 0 0 10px 0; color: #2e7d32; font-size: 1.4em; font-weight: bold;"><i class="fas fa-check-circle"></i> 正解！</h3>
+                    <p style="margin: 0; font-size: 1.1em; color: #388e3c; font-weight: bold;">"${correctAnswer}"</p>
+                    <div style="margin-top: 10px; font-size: 0.9em; color: #66bb6a;"><i class="fas fa-spinner fa-spin"></i> 次の問題へ進みます...</div>
+                </div>`;
+                voiceFeedback.classList.remove('hidden');
+            }
+            setTimeout(() => { handleAnswer(true); }, 1500);
+            return;
+        } else {
+            // Fuzzy match confirmation
+            if (voiceFeedback) {
+                voiceFeedback.innerHTML = `
+                <div style="padding: 15px; background: #fffde7; border: 2px solid #fff176; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+                    <p style="margin: 0 0 5px; color: #f57f17; font-weight: bold; font-size: 1.1em;">
+                        <i class="fas fa-question-circle"></i> 「${correctAnswer}」？
+                    </p>
+                    <p style="margin: 0 0 10px 0; font-size: 0.95em; color: #777;">
+                        聞き取り: "${matchedCandidate}"
+                    </p>
+                    <div style="display: flex; gap: 10px; justify-content: center;">
+                        <button id="voiceConfirmYes" class="btn btn-success btn-sm" style="flex: 1; font-weight: bold;"><i class="fas fa-check"></i> はい</button>
+                        <button id="voiceConfirmNo" class="btn btn-secondary btn-sm" style="flex: 1;"><i class="fas fa-times"></i> いいえ</button>
+                    </div>
+                </div>`;
+                voiceFeedback.classList.remove('hidden');
+                document.getElementById('voiceConfirmYes').onclick = () => {
+                    if (isProcessingVoiceSuccess) return;
+                    isProcessingVoiceSuccess = true;
+                    handleAnswer(true);
+                };
+                document.getElementById('voiceConfirmNo').onclick = () => {
+                    voiceFeedback.classList.add('hidden');
+                    voiceFeedback.innerHTML = '';
+                };
+            }
+            return;
+        }
+    }
+
+    // ==========================================
+    // No Correct Answer Found: Determine Feedback
+    // ==========================================
+
+    // Find the "Best" candidate to display.
+    // Heuristic: Prefer candidates that exist in the GLOBAL DICTIONARY (history terms).
+    // If a candidate is in the dictionary, it's likely what the user said, even if wrong.
+
+    const dictionary = getVoiceDictionary();
+    let bestDisplayCandidate = null;
+    let isDictionaryTerm = false;
+
+    // Search for dictionary match
+    for (let transcript of candidates) {
+        const clean = normalize(transcript);
+        if (dictionary.has(clean)) {
+            bestDisplayCandidate = transcript;
+            isDictionaryTerm = true;
+            break; // Found a history term, stop.
+        }
+    }
+
+    // If no dictionary term found, fall back to primary candidate ONLY IF user wants to see it?
+    // User request: "Prevent unrelated words". So if not in dictionary, we should hide it or show "Unknown".
+
+    if (!bestDisplayCandidate) {
+        // No candidates matched the dictionary.
+        // It's likely "Este Hito Mo".
+        // Use a generic message or the top candidate with a warning.
+        // To be safe and meet the user's "Prevent" request, we suppress the raw text.
+        // But debugging is hard if we suppress fully. 
+        // Let's show "???" or "Unrecognized".
+        bestDisplayCandidate = "（用語として認識できませんでした）";
+    }
+
+    // console.log(`Voice mismatch. Displaying: ${bestDisplayCandidate}`);
+
+    if (voiceFeedback) {
+        let msgHtml = '';
+        if (isDictionaryTerm) {
+            // It was a history term, but wrong.
+            msgHtml = `
+            <div style="background: #fff5f5; padding: 15px; border-radius: 12px; border: 2px solid #ffcccc; margin-bottom: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+                <p style="margin: 0 0 5px; color: #e74c3c; font-weight: bold; font-size: 1.1em;">
+                    <i class="fas fa-times-circle"></i> 不正解
+                </p>
+                <p style="margin: 0 0 5px; font-size: 0.95em; color: #555;">
+                    聞き取り: "${bestDisplayCandidate}"
+                </p>
+                 <p style="margin: 0; font-size: 0.85em; color: #e67e22;">
+                    ※辞書にある単語ですが、この問題の正解ではありません。
+                </p>
+            </div>`;
+        } else {
+            // Unrecognized/Unrelated
+            msgHtml = `
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 12px; border: 2px solid #dee2e6; margin-bottom: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+                 <p style="margin: 0 0 5px; color: #7f8c8d; font-weight: bold; font-size: 1.1em;">
+                    <i class="fas fa-microphone-slash"></i> 聞き取れませんでした
+                </p>
+                <p style="margin: 0; font-size: 0.85em; color: #7f8c8d;">
+                    歴史用語として認識されませんでした。<br>もう一度お話しください。
+                </p>
+            </div>`;
+        }
+
+        voiceFeedback.innerHTML = msgHtml;
+        voiceFeedback.classList.remove('hidden');
     }
 }
