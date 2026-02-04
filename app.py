@@ -33,6 +33,17 @@ load_dotenv()
 
 JST = pytz.timezone('Asia/Tokyo')
 
+def get_logic_date(dt):
+    """指定された日時の論理的な日付を返す (朝7時切り替え)"""
+    # tzinfoがない場合はJSTとして扱う(内部保存値がNaiveな場合があるため)
+    if dt.tzinfo is None:
+        dt = JST.localize(dt)
+        
+    if dt.hour < 7:
+        return (dt - timedelta(days=1)).date()
+    return dt.date()
+
+
 # AWS S3設定
 S3_BUCKET = os.environ.get('S3_BUCKET', 'your-default-bucket')
 S3_KEY = os.environ.get('AWS_ACCESS_KEY_ID')
@@ -17716,6 +17727,7 @@ def columns_page():
     context['active_page'] = 'columns'
     # テンプレートで current_user を使えるように渡す
     context['current_user'] = current_user_obj
+    context['is_logged_in'] = current_user_obj is not None
     return render_template('columns.html', **context)
 
 @app.route('/api/mark_column_read', methods=['POST'])
@@ -18652,56 +18664,49 @@ def get_rpg_status():
     next_challenge_time = None
 
     if rpg_state and rpg_state.last_challenge_at:
-        last_challenge_at = rpg_state.last_challenge_at
-        if last_challenge_at.tzinfo is None:
-            last_challenge_at = JST.localize(last_challenge_at)
-            
-        # 翌朝7時までクールダウン
-        base_date = last_challenge_at.date()
-        target_7am_naive = datetime.combine(base_date, datetime.min.time()) + timedelta(hours=7)
-        # Assuming JST is pytz timezone, sanitize use of localize
-        target_7am = JST.localize(target_7am_naive)
+        last_challenge = rpg_state.last_challenge_at
+        current_time = datetime.now(JST)
         
-        if last_challenge_at >= target_7am:
-            target_7am += timedelta(days=1)
+        last_logic_date = get_logic_date(last_challenge)
+        current_logic_date = get_logic_date(current_time)
             
-        cooldown_end = target_7am
-        
-        if cooldown_end > datetime.now(JST):
+        if last_logic_date == current_logic_date:
             is_cooldown = True
-            next_challenge_time = cooldown_end.strftime('%Y-%m-%d %H:%M:%S')
+            
+            # 次回挑戦可能時間 (翌朝7:00 JST)
+            base_date = current_time.date()
+            next_7am = datetime.combine(base_date, datetime.min.time()) + timedelta(hours=7)
+            next_7am = JST.localize(next_7am)
+            
+            if current_time >= next_7am:
+                next_7am += timedelta(days=1)
+                
+            next_challenge_time = next_7am.strftime('%Y-%m-%d %H:%M:%S')
             
     # 現在のボスを判定
     target_boss = get_current_boss(user_id, rpg_state)
     print(f"DEBUG_RPG: user={user_id}, score={balance_score}, target={target_boss}, cooldown={is_cooldown}")
     
-    # ターゲットが存在し、かつ未クリアのボスの場合はクールダウンを無視して挑戦可能にする（新ボス追加時の遡及対応）
+    # ターゲットが存在するか確認
+    is_cleared = False
     if target_boss:
         # get_current_bossは未クリアのボスがいればそれを優先して返す仕様
-        # 実際に未クリアかどうか確認（念のため）
         cleared_ids = set(rpg_state.cleared_stages) if rpg_state else set()
-        
-        # id is int, cleared_stages stores strings usually? Let's handle both.
         is_cleared = str(target_boss.id) in cleared_ids or target_boss.id in cleared_ids
         
-        if not is_cleared:
-            is_cooldown = False
-            next_challenge_time = None
-    
     if not target_boss:
         return jsonify({'available': False, 'reason': 'no_boss_found', 'current_score': balance_score})
     
     return jsonify({
-        'available': True, # is_cooldownがFalseになればTrue扱い（フロントエンドの仕様依存だが、available自体は1000点チェック用だった）
-        # フロントエンドは available && !is_cooldown && !is_cleared でバナーを出す
+        'available': not is_cooldown, # クールダウン中でなければバナーを出す
         'is_cooldown': is_cooldown,
         'next_challenge_time': next_challenge_time,
-        'is_cleared': is_cleared, # 🆕 実際のクリア状態を返す
+        'is_cleared': is_cleared, 
         'current_stage': target_boss.id,
         'boss_name': target_boss.name,
-        'boss_icon': url_for('serve_rpg_image', enemy_id=target_boss.id, image_type='icon'), # 🆕 DB経由のURLに変更
-        'difficulty': target_boss.difficulty, # 🆕 難易度を追加
-        'intro_dialogue': target_boss.intro_dialogue, # 🆕 登場セリフ
+        'boss_icon': url_for('serve_rpg_image', enemy_id=target_boss.id, image_type='icon'),
+        'difficulty': target_boss.difficulty,
+        'intro_dialogue': target_boss.intro_dialogue,
         'time_limit': target_boss.time_limit,
         'clear_correct_count': target_boss.clear_correct_count,
         'clear_max_mistakes': target_boss.clear_max_mistakes,
@@ -18836,10 +18841,7 @@ def start_rpg_battle():
 
     # 日付判定ロジック（朝7時切り替え）
     current_time = datetime.now(JST)
-    if current_time.hour < 7:
-         logic_date = (current_time - timedelta(days=1)).date()
-    else:
-         logic_date = current_time.date()
+    logic_date = get_logic_date(current_time)
 
     if rematch_enemy_id:
         # === 再戦ロジック ===
@@ -18872,14 +18874,7 @@ def start_rpg_battle():
         # 1. 今日の挑戦権があるかチェック
         if rpg_state.last_challenge_at:
             last_challenge = rpg_state.last_challenge_at
-            if last_challenge.tzinfo is None:
-                last_challenge = JST.localize(last_challenge)
-            
-            # last_challengeのロジック日付を計算
-            if last_challenge.hour < 7:
-                last_logic_date = (last_challenge - timedelta(days=1)).date()
-            else:
-                last_logic_date = last_challenge.date()
+            last_logic_date = get_logic_date(last_challenge)
                 
             if last_logic_date == logic_date:
                  return jsonify({'status': 'error', 'message': 'ストーリーボスの挑戦は1日1回までです（毎日7:00更新）。また明日来てください！'}), 403
@@ -18941,10 +18936,7 @@ def submit_rpg_result():
         if is_rematch:
              # 再戦の場合：履歴のみ記録、スコアや進捗は更新しない
              current_time = datetime.now(JST)
-             if current_time.hour < 7:
-                 rematch_date = (current_time - timedelta(days=1)).date()
-             else:
-                 rematch_date = current_time.date()
+             rematch_date = get_logic_date(current_time)
              
              if not RpgRematchHistory.query.filter_by(user_id=user_id, enemy_id=stage_id, rematch_date=rematch_date).first():
                  hist = RpgRematchHistory(user_id=user_id, enemy_id=stage_id, rematch_date=rematch_date)

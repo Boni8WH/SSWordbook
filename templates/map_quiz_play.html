@@ -343,9 +343,6 @@
             setPinVisual(clickedPinEl, 'correct');
             playAudio('correct');
             mqCorrectCount++;
-
-            // Auto-focus Correct Pin if off-screen (keep existing logic for correct)
-            ensurePinVisible(correctLocId);
         } else {
             // Incorrect Logic
             setPinVisual(clickedPinEl, 'wrong');
@@ -364,22 +361,24 @@
                 correctName: correctLoc.name || "",
                 explanation: mqCurrentQuestion.explanation || ""
             });
-
-            // NEW: Filter Pins (Hide all except clicked and correct)
-            document.querySelectorAll('.game-pin').forEach(pin => {
-                const pid = pin.id;
-                if (pid !== `pin-${locId}` && pid !== `pin-${correctLocId}`) {
-                    pin.style.display = 'none';
-                }
-            });
-
-            // NEW: Reset View to Full Map (Smoothly)
-            mapWrapper.style.transition = "transform 1.0s ease-in-out";
-            fitMapToScreen();
-            setTimeout(() => {
-                mapWrapper.style.transition = "";
-            }, 1000);
         }
+
+        // --- Unified Feedback (Hide other pins and show full map) ---
+
+        // Filter Pins: Hide all except clicked and correct
+        document.querySelectorAll('.game-pin').forEach(pin => {
+            const pid = pin.id;
+            if (pid !== `pin-${locId}` && pid !== `pin-${correctLocId}`) {
+                pin.style.display = 'none';
+            }
+        });
+
+        // Reset View to Full Map (Smoothly but quickly to keep tempo)
+        mapWrapper.style.transition = "transform 0.6s ease-in-out";
+        fitMapToScreen();
+        setTimeout(() => {
+            mapWrapper.style.transition = "";
+        }, 600);
 
         // Show Explanation
         const explain = document.getElementById('explanationText');
@@ -421,85 +420,6 @@
         }).catch(err => console.error("Failed to record result:", err));
     }
 
-    function ensurePinVisible(locId) {
-        const loc = mqQuizData.locations.find(l => l.id === locId);
-        if (!loc) return;
-
-        const container = document.getElementById('gameArea');
-        const img = document.getElementById('gameMapImage');
-
-        const containerW = container.clientWidth;
-        const containerH = container.clientHeight;
-        const imgW = img.naturalWidth;
-        const imgH = img.naturalHeight;
-
-        // Current Pin Screen Coordinates
-        // loc.x/y are percentages (0-100)
-        const pinImgX = (loc.x / 100) * imgW;
-        const pinImgY = (loc.y / 100) * imgH;
-
-        const screenX = pointX + (pinImgX * scale);
-        const screenY = pointY + (pinImgY * scale);
-
-        const padding = 60; // Margin from edge
-
-        // Check if visible
-        const isVisible = (
-            screenX >= padding &&
-            screenX <= (containerW - padding) &&
-            screenY >= padding &&
-            screenY <= (containerH - padding)
-        );
-
-        if (!isVisible) {
-            // Auto Focus Logic
-            // If scale is too high, zoom out for context
-            if (scale > 0.5) {
-                scale = 0.5;
-            } else if (scale < 0.5) {
-                // If too zoomed out (unlikely to be invisible but possible), zoom in a bit
-                scale = Math.max(scale, 1.0);
-            }
-
-            // Target: Center of container
-            const targetX = containerW / 2;
-            const targetY = containerH / 2;
-
-            // Calculate new pointX/Y
-            // targetX = newPointX + (pinImgX * scale)
-            pointX = targetX - (pinImgX * scale);
-            pointY = targetY - (pinImgY * scale);
-
-            // Add transition for smooth slide
-            mapWrapper.style.transition = "transform 0.5s ease-out";
-            setTransform();
-
-            // Step 2: After a pause, zoom out to show full map (if we zoomed/panned)
-            setTimeout(() => {
-                const targetState = calculateFitState();
-                if (!targetState) {
-                    // Cleanup if calc failed
-                    mapWrapper.style.transition = "";
-                    return;
-                }
-
-                // Slow transition for zoom out
-                mapWrapper.style.transition = "transform 3.0s ease-in-out";
-
-                scale = targetState.scale;
-                pointX = targetState.pointX;
-                pointY = targetState.pointY;
-
-                setTransform();
-
-                // Cleanup transition
-                setTimeout(() => {
-                    mapWrapper.style.transition = "";
-                }, 3000);
-
-            }, 800); // Wait 800ms before starting zoom out
-        }
-    }
 
     function nextQuestion() {
         if (mqCurrentIndex < mqQuestions.length - 1) {
