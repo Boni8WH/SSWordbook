@@ -18,3 +18,4 @@ pywebpush==2.1.2
 google-genai
 python-dotenv
 numpy
+pykakasi

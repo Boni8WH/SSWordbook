@@ -17,6 +17,7 @@ from io import StringIO, BytesIO
 from datetime import datetime, timedelta
 from html.parser import HTMLParser
 import html
+import pykakasi
 from sqlalchemy import inspect, text, func, case, cast, Integer
 from sqlalchemy.orm import joinedload, deferred
 from datetime import date, datetime, timedelta
@@ -774,7 +775,7 @@ def _add_rpg_image_columns_safe():
                 conn.execute(text("ALTER TABLE rpg_enemy ADD COLUMN badge_image_mimetype VARCHAR(50)"))
                 
             conn.commit()
-            print("✅ RpgEnemyカラム追加完了")
+            # print("✅ RpgEnemyカラム追加完了")
             
     except Exception as e:
         print(f"⚠️ RpgEnemy migration warning: {e}")
@@ -792,7 +793,7 @@ def _add_mq_complete_columns_safe():
                     conn.execute(text("ALTER TABLE mq_complete ADD COLUMN problem_count INTEGER DEFAULT 0"))
                     
                 conn.commit()
-                print("✅ MapQuizCompleteカラム追加完了")
+                # print("✅ MapQuizCompleteカラム追加完了")
     except Exception as e:
         print(f"⚠️ MqComplete migration warning: {e}")
 
@@ -830,7 +831,7 @@ def _add_score_column_to_rpg_enemy():
                 conn.execute(text("ALTER TABLE rpg_enemy ADD COLUMN appearance_required_score INTEGER DEFAULT 0 NOT NULL"))
                 conn.commit()
                 # 既存のアレクサンドロスも0でOK
-                print("✅ RpgEnemyカラム追加完了")
+                # print("✅ RpgEnemyカラム追加完了")
     except Exception as e:
         print(f"⚠️ RpgEnemyマイグレーションエラー (無視可能): {e}")
 
@@ -889,7 +890,7 @@ def _add_logo_columns_to_app_info():
                 conn.execute(text("ALTER TABLE app_info ADD COLUMN logo_image_mimetype VARCHAR(50)"))
                 conn.commit()
                 
-            print("✅ AppInfoテーブルのマイグレーション完了")
+            # print("✅ AppInfoテーブルのマイグレーション完了")
     except Exception as e:
         print(f"⚠️ マイグレーションエラー (無視可能): {e}")
 
@@ -919,7 +920,7 @@ def _add_notification_columns_to_user():
                     conn.execute(text("ALTER TABLE \"user\" ADD COLUMN push_subscription TEXT"))
                 
                 trans.commit()
-                print("✅ Userテーブルの通知マイグレーション完了")
+                # print("✅ Userテーブルの通知マイグレーション完了")
             except Exception as e:
                 trans.rollback()
                 print(f"⚠️ Userマイグレーションエラー (ロールバック): {e}")
@@ -946,7 +947,7 @@ def _add_email_notification_columns_to_user():
                     print("🔄 notification_emailカラムを追加します...")
                     conn.execute(text("ALTER TABLE \"user\" ADD COLUMN notification_email VARCHAR(120)"))
                 
-                print("✅ Userテーブルのメール通知マイグレーション完了")
+                # print("✅ Userテーブルのメール通知マイグレーション完了")
     except Exception as e:
         print(f"⚠️ Userメール通知マイグレーションエラー: {e}")
 
@@ -963,7 +964,7 @@ def _add_equipped_title_column_to_user():
                     conn.execute(text("ALTER TABLE \"user\" ADD COLUMN equipped_rpg_enemy_id INTEGER REFERENCES rpg_enemy(id)"))
             print("✅ User: equipped_rpg_enemy_idカラム追加完了")
         else:
-            print("✅ User: equipped_rpg_enemy_idカラムは既に存在します")
+            pass # print("✅ User: equipped_rpg_enemy_idカラムは既に存在します")
             
     except Exception as e:
         print(f"⚠️ Userマイグレーションエラー (equipped_rpg_enemy_id): {e}")
@@ -981,7 +982,7 @@ def _add_rpg_intro_seen_column_to_user():
                     conn.execute(text("ALTER TABLE \"user\" ADD COLUMN rpg_intro_seen BOOLEAN DEFAULT FALSE NOT NULL"))
             print("✅ User: rpg_intro_seenカラム追加完了")
         else:
-            print("✅ User: rpg_intro_seenカラムは既に存在します")
+            pass # print("✅ User: rpg_intro_seenカラムは既に存在します")
             
     except Exception as e:
         print(f"⚠️ Userマイグレーションエラー (rpg_intro_seen): {e}")
@@ -999,7 +1000,7 @@ def _add_announcement_viewed_column_to_user():
                     conn.execute(text("ALTER TABLE \"user\" ADD COLUMN last_announcement_viewed_at TIMESTAMP"))
             print("✅ User: last_announcement_viewed_atカラム追加完了")
         else:
-            print("✅ User: last_announcement_viewed_atカラムは既に存在します")
+            pass # print("✅ User: last_announcement_viewed_atカラムは既に存在します")
             
     except Exception as e:
         print(f"⚠️ Userマイグレーションエラー (last_announcement_viewed_at): {e}")
@@ -1018,7 +1019,7 @@ def _add_read_columns_to_user():
                     conn.execute(text("ALTER TABLE \"user\" ADD COLUMN read_columns TEXT DEFAULT '[]'"))
             print("✅ User: read_columnsカラム追加完了")
         else:
-             print("✅ User: read_columnsカラムは既に存在します")
+             pass # print("✅ User: read_columnsカラムは既に存在します")
              
     except Exception as e:
         print(f"⚠️ Userマイグレーションエラー (read_columns): {e}")
@@ -1032,7 +1033,7 @@ def _create_column_view_table():
             ColumnView.__table__.create(db.engine)
             print("✅ column_viewテーブル作成完了")
         else:
-            print("✅ column_viewテーブルは既に存在します")
+            pass # print("✅ column_viewテーブルは既に存在します")
     except Exception as e:
         print(f"⚠️ ColumnView作成エラー: {e}")
         
@@ -1043,7 +1044,7 @@ def _create_column_view_table():
                     conn.execute(text("ALTER TABLE \"user\" ADD COLUMN read_columns TEXT DEFAULT '[]' NOT NULL"))
             print("✅ User: read_columnsカラム追加完了")
         else:
-            print("✅ User: read_columnsカラムは既に存在します")
+            pass # print("✅ User: read_columnsカラムは既に存在します")
             
     except Exception as e:
         print(f"⚠️ Userマイグレーションエラー (read_columns): {e}")
@@ -1062,7 +1063,7 @@ def _add_all_unlocked_column_to_room_setting():
                     conn.execute(text("ALTER TABLE room_setting ADD COLUMN is_all_unlocked BOOLEAN DEFAULT FALSE NOT NULL"))
             print("✅ RoomSetting: is_all_unlockedカラム追加完了")
         else:
-            print("✅ RoomSetting: is_all_unlockedカラムは既に存在します")
+            pass # print("✅ RoomSetting: is_all_unlockedカラムは既に存在します")
             
     except Exception as e:
         print(f"⚠️ RoomSettingマイグレーションエラー (is_all_unlocked): {e}")
@@ -1108,7 +1109,7 @@ def _create_column_table():
             print("✅ Columnテーブル作成完了")
         else:
             # 念のためカラム構成の変更があればここでAlterなどを行うが、今回は新規作成のみ
-            print("✅ Columnテーブルは既に存在します")
+            pass # print("✅ Columnテーブルは既に存在します")
     except Exception as e:
         print(f"⚠️ Columnテーブル作成エラー: {e}")
 
@@ -1121,7 +1122,7 @@ def _create_column_like_table():
             ColumnLike.__table__.create(db.engine)
             print("✅ ColumnLikeテーブル作成完了")
         else:
-            print("✅ ColumnLikeテーブルは既に存在します")
+            pass # print("✅ ColumnLikeテーブルは既に存在します")
     except Exception as e:
         print(f"⚠️ ColumnLikeテーブル作成エラー: {e}")
             
@@ -1275,11 +1276,11 @@ def check_daily_quiz_reminders():
     with app.app_context():
         now = datetime.now(JST)
         current_time_str = now.strftime("%H:%M")
-        print(f"DEBUG: Reminder check running at {current_time_str} (JST)")
+        # print(f"DEBUG: Reminder check running at {current_time_str} (JST)")
         
         # 通知有効かつ現在時刻設定のユーザーを取得
         users = User.query.filter_by(notification_enabled=True, notification_time=current_time_str).all()
-        print(f"DEBUG: Found {len(users)} users for time {current_time_str}")
+        # print(f"DEBUG: Found {len(users)} users for time {current_time_str}")
         
         for user in users:
             # 今日のクイズ完了チェック
@@ -1291,7 +1292,7 @@ def check_daily_quiz_reminders():
             if daily_quiz:
                 result = DailyQuizResult.query.filter_by(user_id=user.id, quiz_id=daily_quiz.id).first()
                 if not result:
-                    print(f"DEBUG: Sending reminder to {user.username} (Quiz exists but not done)")
+                    # print(f"DEBUG: Sending reminder to {user.username} (Quiz exists but not done)")
                     # 未完了なら通知
                     send_push_notification(
                         user,
@@ -1301,7 +1302,7 @@ def check_daily_quiz_reminders():
                     )
             else:
                 # クイズ自体がまだ生成されていない場合も、当然「未完了」なので通知する
-                print(f"DEBUG: Sending reminder to {user.username} (Quiz not generated yet)")
+                # print(f"DEBUG: Sending reminder to {user.username} (Quiz not generated yet)")
                 send_push_notification(
                     user,
                     "今日の10問が未完です！",
@@ -1931,7 +1932,7 @@ def _create_user_announcement_reads_table():
             UserAnnouncementRead.__table__.create(db.engine)
             print("✅ user_announcement_reads table created.")
         else:
-            print("ℹ️ user_announcement_reads table already exists.")
+            pass # print("ℹ️ user_announcement_reads table already exists.")
     except Exception as e:
         print(f"⚠️ Error check/create user_announcement_reads table: {e}")
 
@@ -2006,7 +2007,7 @@ with app.app_context():
         _add_logo_columns_to_app_info()
         _add_rpg_image_columns_safe()
         
-        logger.info("✅ Startup migrations completed successfully.")
+        # logger.info("✅ Startup migrations completed successfully.")
     except Exception as e:
         logger.warning(f"⚠️ Startup migration warning: {e}")
 
@@ -2263,11 +2264,11 @@ def load_word_data_for_room(room_number):
         filtered_word_data = filter_special_problems(word_data, room_number)
         
         # ★デバッグログ: 最初の数件を表示
-        if filtered_word_data:
-            print(f"🔍 load_word_data_for_room: {len(filtered_word_data)} words loaded.")
-            print(f"   First word: {filtered_word_data[0]}")
-        else:
-            print("⚠️ load_word_data_for_room: No words loaded.")
+        # if filtered_word_data:
+        #     print(f"🔍 load_word_data_for_room: {len(filtered_word_data)} words loaded.")
+        #     print(f"   First word: {filtered_word_data[0]}")
+        # else:
+        #     print("⚠️ load_word_data_for_room: No words loaded.")
         
         return filtered_word_data
         
@@ -2326,14 +2327,14 @@ def process_daily_quiz_results_for_scoring(quiz_id):
             print(f"集計スキップ: クイズID {quiz_id} は存在しないか、処理済みです。")
             return
 
-        print(f"月間スコア集計開始: クイズID {quiz_id} (日付: {quiz.date})")
+        # print(f"月間スコア集計開始: クイズID {quiz_id} (日付: {quiz.date})")
         
         results = DailyQuizResult.query.filter_by(quiz_id=quiz_id)\
             .options(joinedload(DailyQuizResult.user))\
             .order_by(DailyQuizResult.score.desc(), DailyQuizResult.time_taken_ms.asc()).all()
 
         if not results:
-            print("参加者がいないため集計を終了します。")
+            # print("参加者がいないため集計を終了します。")
             quiz.monthly_score_processed = True
             db.session.commit()
             return
@@ -2370,12 +2371,12 @@ def process_daily_quiz_results_for_scoring(quiz_id):
 
             # スコアを加算
             monthly_score.total_score += points
-            print(f"  -> {user.username}: {points}点 加算 (合計: {monthly_score.total_score})")
+            # print(f"  -> {user.username}: {points}点 加算 (合計: {monthly_score.total_score})")
 
         # クイズを「処理済み」にマーク
         quiz.monthly_score_processed = True
         db.session.commit()
-        print(f"月間スコア集計完了: クイズID {quiz_id}")
+        # print(f"月間スコア集計完了: クイズID {quiz_id}")
 
     except Exception as e:
         db.session.rollback()
@@ -2838,7 +2839,7 @@ def change_username_page():
 def migrate_database():
     """データベーススキーマの変更を処理する"""
     with app.app_context():
-        print("🔄 データベースマイグレーション開始...")
+        # print("🔄 データベースマイグレーション開始...")
         
         try:
             inspector = inspect(db.engine)
@@ -2846,7 +2847,7 @@ def migrate_database():
             # 1. Userテーブルの確認
             if inspector.has_table('user'):
                 columns = [col['name'] for col in inspector.get_columns('user')]
-                print(f"📋 既存のUserテーブルカラム: {columns}")
+                # print(f"📋 既存のUserテーブルカラム: {columns}")
                 
                 # 🆕 制限状態管理用カラムを追加
                 if 'restriction_triggered' not in columns:
@@ -2899,13 +2900,13 @@ def migrate_database():
                     print("✅ username_changed_atカラムを追加しました。")
                 
                 # パスワードハッシュフィールドの文字数制限を拡張
-                print("🔧 パスワードハッシュフィールドの文字数制限を拡張します...")
+                # print("🔧 パスワードハッシュフィールドの文字数制限を拡張します...")
                 with db.engine.connect() as conn:
                     try:
                         conn.execute(text('ALTER TABLE "user" ALTER COLUMN _room_password_hash TYPE VARCHAR(255)'))
                         conn.execute(text('ALTER TABLE "user" ALTER COLUMN _individual_password_hash TYPE VARCHAR(255)'))
                         conn.commit()
-                        print("✅ パスワードハッシュフィールドを255文字に拡張しました。")
+                        # print("✅ パスワードハッシュフィールドを255文字に拡張しました。")
                     except Exception as alter_error:
                         print(f"⚠️ カラム変更エラー: {alter_error}")
                 
@@ -2963,7 +2964,7 @@ def migrate_database():
             # 3. App_infoテーブルの確認（★重要な修正箇所）
             if inspector.has_table('app_info'):
                 columns = [col['name'] for col in inspector.get_columns('app_info')]
-                print(f"📋 既存のAppInfoテーブルカラム: {columns}")
+                # print(f"📋 既存のAppInfoテーブルカラム: {columns}")
                 
                 # school_nameカラムの追加
                 if 'school_name' not in columns:
@@ -3039,18 +3040,18 @@ def migrate_database():
                 db.create_all()
                 print("✅ csv_file_contentテーブルを作成しました。")
             else:
-                print("✅ csv_file_contentテーブルは既に存在します。")
+                pass # print("✅ csv_file_contentテーブルは既に存在します。")
             
             fix_foreign_key_constraints()
             
-            print("✅ データベースマイグレーションが完了しました。")
+            # print("✅ データベースマイグレーションが完了しました。")
             
             if not inspector.has_table('user_stats'):
                     print("🔧 user_statsテーブルを作成します...")
                     db.create_all()
                     print("✅ user_statsテーブルを作成しました。")
             else:
-                print("✅ user_statsテーブルは既に存在します。")
+                pass # print("✅ user_statsテーブルは既に存在します。")
                     
                 # 既存テーブルのカラム確認
                 columns = [col['name'] for col in inspector.get_columns('user_stats')]
@@ -3091,16 +3092,16 @@ def migrate_database():
                     except Exception as e:
                         print(f"⚠️ カラム追加エラー: {e}")
                 else:
-                    print("✅ incorrect_countカラムは既に存在します")
+                    pass # print("✅ incorrect_countカラムは既に存在します")
             
             fix_foreign_key_constraints()
                 
-            print("✅ UserStats関連のマイグレーション完了")
+            # print("✅ UserStats関連のマイグレーション完了")
 
             # 6. RoomSettingテーブルの一時停止機能用カラム追加 👈 ここから追加
             if inspector.has_table('room_setting'):
                 columns = [col['name'] for col in inspector.get_columns('room_setting')]
-                print(f"📋 既存のRoomSettingテーブルカラム: {columns}")
+                pass # print(f"📋 既存のRoomSettingテーブルカラム: {columns}")
                 
                 # is_suspendedカラムの追加
                 if 'is_suspended' not in columns:
@@ -3113,7 +3114,7 @@ def migrate_database():
                     except Exception as e:
                         print(f"⚠️ is_suspendedカラム追加エラー: {e}")
                 else:
-                    print("✅ is_suspendedカラムは既に存在します")
+                    pass # print("✅ is_suspendedカラムは既に存在します")
                 
                 # suspended_atカラムの追加
                 if 'suspended_at' not in columns:
@@ -3126,14 +3127,14 @@ def migrate_database():
                     except Exception as e:
                         print(f"⚠️ suspended_atカラム追加エラー: {e}")
                 else:
-                    print("✅ suspended_atカラムは既に存在します")
+                    pass # print("✅ suspended_atカラムは既に存在します")
             
-            print("✅ RoomSetting一時停止機能のマイグレーション完了")
+            # print("✅ RoomSetting一時停止機能のマイグレーション完了")
 
             # 7. EssayProblemテーブルのimage_urlカラム追加
             if inspector.has_table('essay_problems'):
                 columns = [col['name'] for col in inspector.get_columns('essay_problems')]
-                print(f"📋 既存のEssayProblemsテーブルカラム: {columns}")
+                # print(f"📋 既存のEssayProblemsテーブルカラム: {columns}")
                 
                 # image_urlカラムの追加
                 if 'image_url' not in columns:
@@ -3146,11 +3147,11 @@ def migrate_database():
                     except Exception as e:
                         print(f"⚠️ image_urlカラム追加エラー: {e}")
                 else:
-                    print("✅ image_urlカラムは既に存在します")
+                    pass # print("✅ image_urlカラムは既に存在します")
             else:
                 print("📋 essay_problemsテーブルが存在しません（論述機能未使用）")
 
-            print("✅ EssayProblems関連のマイグレーション完了")
+            # print("✅ EssayProblems関連のマイグレーション完了")
 
             # 8. Announcementテーブルの作成
             if not inspector.has_table('announcements'):
@@ -3158,7 +3159,7 @@ def migrate_database():
                 db.create_all()
                 print("✅ announcementsテーブルを作成しました。")
             else:
-                print("✅ announcementsテーブルは既に存在します。")
+                pass # print("✅ announcementsテーブルは既に存在します。")
 
 
             # 8. EssayImageテーブルの作成
@@ -3181,9 +3182,9 @@ def migrate_database():
                 except Exception as e:
                     print(f"⚠️ essay_imagesテーブル作成エラー: {e}")
             else:
-                print("✅ essay_imagesテーブルは既に存在します")
+                pass # print("✅ essay_imagesテーブルは既に存在します")
 
-            print("✅ EssayImage関連のマイグレーション完了")
+            # print("✅ EssayImage関連のマイグレーション完了")
                 
         except Exception as e:
             print(f"⚠️ マイグレーション中にエラーが発生しました: {e}")
@@ -3285,54 +3286,11 @@ def diagnose_database_environment():
 def create_user_stats_table_simple():
     """シンプルなuser_statsテーブル作成"""
     try:
-        print("🔧 user_statsテーブル作成開始...")
+        # print("🔧 user_statsテーブル作成開始...")
         
         # SQLAlchemyを使用してテーブル作成
         db.create_all()
-        
-        # 手動でテーブル作成も試行
-        with db.engine.connect() as conn:
-            # テーブル存在確認
-            result = conn.execute(text("""
-                SELECT EXISTS (
-                    SELECT FROM information_schema.tables 
-                    WHERE table_name = 'user_stats'
-                )
-            """))
-            table_exists = result.fetchone()[0]
-            
-            if not table_exists:
-                print("🔧 SQLで直接テーブル作成...")
-                conn.execute(text("""
-                    CREATE TABLE user_stats (
-                        id SERIAL PRIMARY KEY,
-                        user_id INTEGER NOT NULL UNIQUE,
-                        room_number VARCHAR(50) NOT NULL,
-                        total_attempts INTEGER DEFAULT 0,
-                        total_correct INTEGER DEFAULT 0,
-                        mastered_count INTEGER DEFAULT 0,
-                        accuracy_rate FLOAT DEFAULT 0.0,
-                        coverage_rate FLOAT DEFAULT 0.0,
-                        balance_score FLOAT DEFAULT 0.0,
-                        mastery_score FLOAT DEFAULT 0.0,
-                        reliability_score FLOAT DEFAULT 0.0,
-                        activity_score FLOAT DEFAULT 0.0,
-                        last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        total_questions_in_room INTEGER DEFAULT 0,
-                        FOREIGN KEY (user_id) REFERENCES "user"(id) ON DELETE CASCADE
-                    )
-                """))
-                
-                conn.execute(text("""
-                    CREATE INDEX idx_user_stats_room_number ON user_stats(room_number)
-                """))
-                
-                conn.commit()
-                print("✅ user_statsテーブル作成完了")
-                return True
-            else:
-                print("✅ user_statsテーブルは既に存在します")
-                return True
+        return True
                 
     except Exception as e:
         print(f"❌ テーブル作成エラー: {e}")
@@ -3458,7 +3416,7 @@ def serve_rpg_image(enemy_id, image_type):
     try:
         enemy = RpgEnemy.query.get(enemy_id)
         if not enemy:
-            print(f"DEBUG: RPG Image - Enemy {enemy_id} not found")
+            # print(f"DEBUG: RPG Image - Enemy {enemy_id} not found")
             return "", 404
             
         content = None
@@ -3480,10 +3438,10 @@ def serve_rpg_image(enemy_id, image_type):
         else:
             return "", 400
 
-        print(f"DEBUG: RPG Image Request - ID: {enemy_id}, Type: {image_type}")
-        print(f"DEBUG: Content Size: {len(content) if content else 'None'}")
-        print(f"DEBUG: MimeType: {mimetype}")
-        print(f"DEBUG: Filename: {filename}")
+        # print(f"DEBUG: RPG Image Request - ID: {enemy_id}, Type: {image_type}")
+        # print(f"DEBUG: Content Size: {len(content) if content else 'None'}")
+        # print(f"DEBUG: MimeType: {mimetype}")
+        # print(f"DEBUG: Filename: {filename}")
             
         # 1. DBにバイナリがあればそれを返す
         if content:
@@ -3501,17 +3459,17 @@ def serve_rpg_image(enemy_id, image_type):
         # 2. DBになければ、従来のファイルパス/URLを確認
         # filenameがURL(http...)ならリダイレクト
         if filename and (filename.startswith('http://') or filename.startswith('https://')):
-            print("DEBUG: Redirecting to External URL")
+            # print("DEBUG: Redirecting to External URL")
             return redirect(filename)
             
         # 3. ローカルファイルの場合 (static/images/rpg/)
         if filename:
             # セキュリティのためファイル名のみ抽出
             secure_name = secure_filename(os.path.basename(filename))
-            print(f"DEBUG: Redirecting to Local Static: {secure_name}")
+            # print(f"DEBUG: Redirecting to Local Static: {secure_name}")
             return redirect(url_for('static', filename=f'images/rpg/{secure_name}'))
             
-        print("DEBUG: No content or filename found.")
+        # print("DEBUG: No content or filename found.")
         return "", 404
         
     except Exception as e:
@@ -3523,13 +3481,13 @@ def serve_rpg_image(enemy_id, image_type):
 def create_essay_visibility_table_auto():
     """essay_visibility_settingテーブルを自動作成"""
     try:
-        print("🔧 essay_visibility_settingテーブル確認中...")
+        # print("🔧 essay_visibility_settingテーブル確認中...")
         
         from sqlalchemy import inspect
         inspector = inspect(db.engine)
         
         if not inspector.has_table('essay_visibility_setting'):
-            print("🔧 essay_visibility_settingテーブルを作成中...")
+            # print("🔧 essay_visibility_settingテーブルを作成中...")
             
             # 直接SQLでテーブル作成
             with db.engine.connect() as conn:
@@ -3564,7 +3522,7 @@ def create_essay_visibility_table_auto():
                 
                 conn.commit()
             
-            print("✅ essay_visibility_settingテーブル作成完了")
+            # print("✅ essay_visibility_settingテーブル作成完了")
             
             # デフォルト設定の作成を試行
             try:
@@ -3573,7 +3531,7 @@ def create_essay_visibility_table_auto():
                 print(f"⚠️ デフォルト設定作成エラー（スキップ）: {default_error}")
                 
         else:
-            print("ℹ️ essay_visibility_settingテーブルは既に存在します")
+            pass # print("ℹ️ essay_visibility_settingテーブルは既に存在します")
             
     except Exception as e:
         print(f"❌ essay_visibility_settingテーブル作成エラー: {e}")
@@ -4161,7 +4119,7 @@ def admin_add_first_login_columns():
                 added_columns.append('is_first_login')
                 print("✅ is_first_loginカラムを追加しました")
             else:
-                print("✅ is_first_loginカラムは既に存在します")
+                pass # print("✅ is_first_loginカラムは既に存在します")
             
             # password_changed_atカラムを追加
             if 'password_changed_at' not in existing_columns:
@@ -4170,7 +4128,7 @@ def admin_add_first_login_columns():
                 added_columns.append('password_changed_at')
                 print("✅ password_changed_atカラムを追加しました")
             else:
-                print("✅ password_changed_atカラムは既に存在します")
+                pass # print("✅ password_changed_atカラムは既に存在します")
             
             conn.commit()
             
@@ -4386,7 +4344,7 @@ def admin_fix_progress_issue():
                     conn.commit()
                     print("✅ ranking_display_count カラムを追加しました")
                 else:
-                    print("✅ ranking_display_count カラムは既に存在します")
+                    pass # print("✅ ranking_display_count カラムは既に存在します")
                     
             except Exception as e:
                 print(f"⚠️ カラム追加エラー: {e}")
@@ -5772,7 +5730,7 @@ def fix_foreign_key_constraints():
     """外部キー制約を修正してCASCADEを追加"""
     try:
         with app.app_context():
-            print("🔧 外部キー制約の修正を開始...")
+            pass # print("🔧 外部キー制約の修正を開始...")
             
             # PostgreSQLの場合の制約確認・修正
             if is_postgres:
@@ -5810,7 +5768,7 @@ def fix_foreign_key_constraints():
                     
                     conn.commit()
             
-            print("✅ 外部キー制約修正完了")
+            # print("✅ 外部キー制約修正完了")
             
     except Exception as e:
         print(f"❌ 外部キー制約修正エラー: {e}")
@@ -7185,20 +7143,20 @@ def admin_add_announcement():
         # プッシュ通知送信（チェックボックスがオンの場合のみ）
         if send_notification:
             try:
-                print(f"DEBUG: Announcement created. Target rooms: {target_rooms}")
+                # print(f"DEBUG: Announcement created. Target rooms: {target_rooms}")
                 # 全員または特定の部屋
                 website_url = url_for('index', _external=True)
                 
                 if target_rooms == "all":
                     users = User.query.filter(User.push_subscription.isnot(None)).all()
-                    print(f"DEBUG: Target 'all'. Found {len(users)} users with subscription.")
+                    # print(f"DEBUG: Target 'all'. Found {len(users)} users with subscription.")
                 else:
                     target_room_list = [r.strip() for r in target_rooms.split(',')]
                     users = User.query.filter(
                         User.room_number.in_(target_room_list),
                         User.push_subscription.isnot(None)
                     ).all()
-                    print(f"DEBUG: Target rooms {target_room_list}. Found {len(users)} users with subscription.")
+                    # print(f"DEBUG: Target rooms {target_room_list}. Found {len(users)} users with subscription.")
 
                 count = 0
                 for user in users:
@@ -7213,8 +7171,8 @@ def admin_add_announcement():
                         )
                         count += 1
                     else:
-                        print(f"DEBUG: User {user.username} has notifications disabled.")
-                print(f"DEBUG: Sent notification to {count} users.")
+                        pass # print(f"DEBUG: User {user.username} has notifications disabled.")
+                # print(f"DEBUG: Sent notification to {count} users.")
                 
             except Exception as e:
                 print(f"Error sending announcement push: {e}")
@@ -7308,7 +7266,7 @@ def admin_edit_announcement(announcement_id):
                         url=website_url
                     )
                     count += 1
-            print(f"DEBUG: Sent update notification to {count} users.")
+            # print(f"DEBUG: Sent update notification to {count} users.")
          except Exception as e:
             print(f"Error sending update push: {e}")
 
@@ -13574,7 +13532,7 @@ def essay_grade():
             # 詳細なデバッグ情報を出力
             import traceback
             traceback.print_exc()
-            print(f"DEBUG: content_parts: {content_parts}")
+            # print(f"DEBUG: content_parts: {content_parts}")
             raise te
             
         except Exception as e_primary:
@@ -13600,8 +13558,8 @@ def essay_grade():
         try:
             if response.candidates:
                 candidate = response.candidates[0]
-                print(f"DEBUG: Gen Finish Reason: {candidate.finish_reason}")
-                print(f"DEBUG: Gen Safety Ratings: {candidate.safety_ratings}")
+                # print(f"DEBUG: Gen Finish Reason: {candidate.finish_reason}")
+                # print(f"DEBUG: Gen Safety Ratings: {candidate.safety_ratings}")
                 if candidate.finish_reason != 1: # 1 = STOP (Normal)
                      print(f"WARNING: Generation stopped abnormally! Reason: {candidate.finish_reason}")
             else:
@@ -13635,7 +13593,7 @@ def essay_grade():
                 
                 current_rewrite_len = len(original_rewrite_text_norm)
                 
-                print(f"DEBUG: Rewrite Length Check: Current={current_rewrite_len}, Target={target_len}")
+                # print(f"DEBUG: Rewrite Length Check: Current={current_rewrite_len}, Target={target_len}")
                 
                 if current_rewrite_len > target_len:
                     print(f"WARNING: Rewrite exceeded limit ({current_rewrite_len} > {target_len}). Triggering AI Repair...")
@@ -14238,7 +14196,10 @@ def get_full_vocabulary():
         vocabulary = []
         for word in word_data:
             if word.get('answer'):
-                vocabulary.append({'answer': word['answer']})
+                vocabulary.append({
+                    'answer': word['answer'],
+                    'reading': word.get('reading', '')
+                })
                 
         return jsonify({
             'status': 'success',
@@ -14247,6 +14208,29 @@ def get_full_vocabulary():
         })
     except Exception as e:
         logger.error(f"Error getting full vocabulary: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+# Initialize pykakasi
+kks = pykakasi.kakasi()
+
+@app.route('/api/to_katakana', methods=['POST'])
+def to_katakana():
+    try:
+        data = request.get_json()
+        if not data or 'text' not in data:
+            return jsonify({'status': 'error', 'message': 'No text provided'}), 400
+            
+        text = data['text']
+        result = kks.convert(text)
+        katakana = "".join([item['kana'] for item in result])
+        
+        return jsonify({
+            'status': 'success',
+            'katakana': katakana,
+            'original': text
+        })
+    except Exception as e:
+        print(f"Error converting to katakana: {e}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/admin/essay_visibility_settings/save', methods=['POST'])
@@ -18685,7 +18669,7 @@ def get_rpg_status():
             
     # 現在のボスを判定
     target_boss = get_current_boss(user_id, rpg_state)
-    print(f"DEBUG_RPG: user={user_id}, score={balance_score}, target={target_boss}, cooldown={is_cooldown}")
+    # print(f"DEBUG_RPG: user={user_id}, score={balance_score}, target={target_boss}, cooldown={is_cooldown}")
     
     # ターゲットが存在するか確認
     is_cleared = False
@@ -20327,13 +20311,13 @@ def admin_edit_rpg_enemy(enemy_id):
         enemy.is_manual_order = is_manual
         
         # 画像更新処理
-        print(f"DEBUG_UPLOAD: Processing Edit for Enemy ID {enemy_id}")
+        # print(f"DEBUG_UPLOAD: Processing Edit for Enemy ID {enemy_id}")
         icon_file = request.files.get('icon_image')
         
         if icon_file:
-            print(f"DEBUG_UPLOAD: Icon File Present. Filename: {icon_file.filename}")
+            pass # print(f"DEBUG_UPLOAD: Icon File Present. Filename: {icon_file.filename}")
         else:
-            print("DEBUG_UPLOAD: No Icon File in request.files")
+            pass # print("DEBUG_UPLOAD: No Icon File in request.files")
 
         if icon_file and icon_file.filename:
             filename = secure_filename(icon_file.filename)
@@ -20342,7 +20326,7 @@ def admin_edit_rpg_enemy(enemy_id):
             # DB保存用にデータを読み込む
             icon_file.seek(0)
             content = icon_file.read()
-            print(f"DEBUG_UPLOAD: Read content. Size: {len(content)} bytes")
+            # print(f"DEBUG_UPLOAD: Read content. Size: {len(content)} bytes")
             
             enemy.icon_image_content = content
             enemy.icon_image_mimetype = icon_file.mimetype
@@ -20352,14 +20336,14 @@ def admin_edit_rpg_enemy(enemy_id):
             s3_url = upload_image_to_s3(icon_file, unique_filename, folder='rpg_images')
             if s3_url:
                 enemy.icon_image = s3_url
-                print(f"DEBUG_UPLOAD: Uploaded to S3: {s3_url}")
+                # print(f"DEBUG_UPLOAD: Uploaded to S3: {s3_url}")
             else:
                 upload_dir = os.path.join(app.root_path, 'static', 'images', 'rpg')
                 os.makedirs(upload_dir, exist_ok=True)
                 icon_file.seek(0)
                 icon_file.save(os.path.join(upload_dir, unique_filename))
                 enemy.icon_image = unique_filename
-                print(f"DEBUG_UPLOAD: Saved to Local: {unique_filename}")
+                # print(f"DEBUG_UPLOAD: Saved to Local: {unique_filename}")
 
         badge_file = request.files.get('badge_image')
         badge_icon_class = request.form.get('badge_icon_class')
@@ -20478,7 +20462,7 @@ def check_and_migrate_rpg_columns():
                         conn.execute(text("ALTER TABLE rpg_enemy ADD COLUMN is_manual_order BOOLEAN DEFAULT 0"))
                 
                 conn.commit()
-                print("Migration check completed.")
+                # print("Migration check completed.")
         except Exception as e:
             print(f"Migration check failed: {e}")
 
@@ -20504,7 +20488,7 @@ def check_and_migrate_room_setting():
                     else:
                         conn.execute(text("ALTER TABLE room_setting ADD COLUMN is_essay_room BOOLEAN DEFAULT 0"))
                 conn.commit()
-                print("RoomSetting migration check completed.")
+                # print("RoomSetting migration check completed.")
         except Exception as e:
             print(f"RoomSetting migration check failed: {e}")
 
@@ -20685,7 +20669,7 @@ def check_and_create_correction_tables():
         try:
             # create_all checks for table existence and creates missing ones
             db.create_all() 
-            print("✅ Checked/Created all tables (including EssayCorrectionRequest/Notification).")
+            # print("✅ Checked/Created all tables (including EssayCorrectionRequest/Notification).")
             
             # カラム追加のマイグレーション
             inspector = inspect(db.engine)
@@ -20886,7 +20870,7 @@ def _add_essay_problem_columns_safe():
                          conn.execute(text("ALTER TABLE essay_problems ADD COLUMN count_half_width_digits_as_half BOOLEAN DEFAULT 0 NOT NULL"))
                     
                 conn.commit()
-                print("✅ EssayProblemカラム追加完了")
+                # print("✅ EssayProblemカラム追加完了")
     except Exception as e:
         print(f"⚠️ EssayProblem migration warning: {e}")
 
