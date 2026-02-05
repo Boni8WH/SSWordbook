@@ -1347,7 +1347,7 @@ function startQuiz() {
             if (rawSelected.length === 0) {
                 // 通常モードで単元未選択の場合のチェック（UnsolvedOnlyなどがない場合）
                 if (!isUnsolvedOnly && !isUnmasteredOnly) {
-                    console.log('Range selection empty. SelectedRadio:', selectedQuestionCount, 'isIncorrectOnly:', isIncorrectOnly);
+                    // console.log('Range selection empty. SelectedRadio:', selectedQuestionCount, 'isIncorrectOnly:', isIncorrectOnly);
                     flashMessage('出題範囲を選択してください。', 'danger');
                     return;
                 }
@@ -4413,7 +4413,7 @@ function startVoiceRecognition(e) {
         e.stopPropagation();
     }
 
-    if (isAnswerButtonDisabled) return;
+
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
@@ -4429,7 +4429,11 @@ function startVoiceRecognition(e) {
     // Grammar Support: Bias towards the correct answer AND global vocabulary
     // This helps recognition even with slight mispronunciations or difficult words
     if (currentQuizData && currentQuizData[currentQuestionIndex]) {
-        const correctAnswer = currentQuizData[currentQuestionIndex].answer;
+        // Correct Answer Data
+        const currentData = currentQuizData[currentQuestionIndex];
+        const correctAnswer = currentData.answer;
+        const correctReading = currentData.reading || ""; // 🆕 Reading from CSV
+
         const SpeechGrammarList = window.SpeechGrammarList || window.webkitSpeechGrammarList;
 
         if (SpeechGrammarList) {
@@ -4441,13 +4445,20 @@ function startVoiceRecognition(e) {
                 try {
                     const allAnswers = new Set();
                     window.word_data.forEach(w => {
+                        // Add Answer
                         if (w.answer) {
-                            // Extract clean parts just like verification logic
-                            // Extract clean parts just like verification logic
                             const parts = w.answer.split(/[（(）)]+/);
                             parts.forEach(p => {
-                                // Remove symbols for grammar
-                                const clean = p.replace(/[;|<>\*\(\)\[\]]/g, '').trim();
+                                const clean = p.replace(/[;|<>\*\(\)\[\]\/,]/g, '').trim(); // Remove symbols including slash/comma
+                                if (clean.length > 0) allAnswers.add(clean);
+                            });
+                        }
+                        // 🆕 Add Reading
+                        if (w.reading) {
+                            // Handle comma in reading
+                            const parts = w.reading.split(/[,]+/);
+                            parts.forEach(p => {
+                                const clean = p.trim();
                                 if (clean.length > 0) allAnswers.add(clean);
                             });
                         }
@@ -4470,18 +4481,25 @@ function startVoiceRecognition(e) {
             // 2. Add CURRENT answer (Prioritized)
             // Generate variations for grammar (Same logic as verification)
             const variations = new Set();
-            // Raw answer (cleaned of grammar-breaking chars)
+
+            // Raw answer (cleaned)
             variations.add(correctAnswer.replace(/[;]/g, ''));
 
+            // 🆕 Reading (Highest Priority)
+            if (correctReading) {
+                // Split by comma OR slash to ensure individual words are added
+                const readingParts = correctReading.split(/[\/,]+/);
+                readingParts.forEach(r => variations.add(r.trim()));
+            }
+
             // Normalized parts
-            // Normalized parts
-            const parts = correctAnswer.split(/[（(）)]+/);
+            const parts = correctAnswer.split(/[（(）)\/,]+/); // Split by slash/comma too for grammar injection
             parts.forEach(p => {
                 if (p.trim()) variations.add(p.trim());
             });
 
             // Clean for JSGF (remove special grammar chars)
-            const variationArray = Array.from(variations).map(v => v.replace(/[;|<>\*\(\)\[\]]/g, '')).filter(v => v.length > 0);
+            const variationArray = Array.from(variations).map(v => v.replace(/[;|<>\*\(\)\[\]\/,]/g, '')).filter(v => v.length > 0);
             const currentGrammarString = variationArray.join(' | ');
 
             // JSpeech Grammar Format using alternatives
@@ -4523,6 +4541,9 @@ function startVoiceRecognition(e) {
     recognition.start();
 
     recognition.onresult = (event) => {
+        // Only process finalized results to prevent flickering
+        if (!event.results[0].isFinal) return;
+
         // Collect ALL candidates
         const candidates = [];
         const results = event.results[0];
@@ -4530,7 +4551,7 @@ function startVoiceRecognition(e) {
             candidates.push(results[i].transcript);
         }
 
-        // console.log(`Recognized Candidates:`, candidates);
+        console.log(`Recognized Candidates:`, candidates);
         verifyVoiceAnswer(candidates);
     };
 
@@ -4578,8 +4599,9 @@ function getVoiceDictionary() {
     globalVoiceDictionary = new Set();
     if (window.word_data && Array.isArray(window.word_data)) {
         window.word_data.forEach(w => {
+            // Answer
             if (w.answer) {
-                // Split by delimiters as well to handle "A(B)" -> A, B
+                // Split by delimiters to handle "A(B)" -> A, B
                 const parts = w.answer.split(/[（(）)]+/);
                 parts.forEach(p => {
                     // Normalize using the same logic as verify
@@ -4587,9 +4609,17 @@ function getVoiceDictionary() {
                     if (clean.length > 0) globalVoiceDictionary.add(clean);
                 });
             }
+            // 🆕 Reading
+            if (w.reading) {
+                const parts = w.reading.split(/[\/,]+/);
+                parts.forEach(p => {
+                    const clean = normalizeString(p);
+                    if (clean.length > 0) globalVoiceDictionary.add(clean);
+                });
+            }
         });
     }
-    console.log(`Voice Dictionary Initialized: ${globalVoiceDictionary.size} words`);
+    // console.log(`Voice Dictionary Initialized: ${globalVoiceDictionary.size} words`);
     return globalVoiceDictionary;
 }
 
@@ -4621,64 +4651,79 @@ function verifyVoiceAnswer(candidates) {
     // Ensure array
     if (!Array.isArray(candidates)) candidates = [candidates];
 
-    const correctAnswer = currentQuizData[currentQuestionIndex].answer;
+    const currentData = currentQuizData[currentQuestionIndex];
+    const correctAnswer = currentData.answer;
+    const correctReading = currentData.reading || ""; // 🆕
 
-    // Normalization wrapper (now using the dedicated function to avoid duplication if I refactored purely, 
-    // but here I just call the helper above to ensure consistency)
+    // Normalization wrapper
     const normalize = normalizeString;
 
-    // Prepare Valid Answers
-    const validAnswers = new Set();
-    const cleanAnswer = normalize(correctAnswer);
-    if (cleanAnswer) validAnswers.add(cleanAnswer);
-    const parts = correctAnswer.split(/[（(）)]+/);
-    parts.forEach(p => {
-        const n = normalize(p);
-        if (n && n.length > 0) validAnswers.add(n);
-    });
+    // Determine Answer Mode: "Slash (AND)" if either Answer OR Reading contains '/'
+    const isSlashMode = correctAnswer.includes('/') || (correctReading && correctReading.includes('/'));
 
-    // ==========================================
-    // Check all candidates
-    // ==========================================
+    // ---------------------------------------------------------
+    // Function to check Single/Comma (OR) match
+    // ---------------------------------------------------------
+    const checkSingleOrMatch = (transcript, targetAnswer, targetReading) => {
+        const cleanTranscript = normalize(transcript);
+
+        // 1. Prepare Valid Answers Set (OR logic)
+        const validSet = new Set();
+
+        // Add Answer variations
+        if (targetAnswer) {
+            validSet.add(normalize(targetAnswer));
+            // Parantheses A(B) -> A, B
+            const parts = targetAnswer.split(/[（(）)]+/);
+            parts.forEach(p => {
+                const n = normalize(p);
+                if (n) validSet.add(n);
+            });
+        }
+
+        // 🆕 Add Reading variations (Comma separated)
+        if (targetReading) {
+            const rParts = targetReading.split(/[,]+/);
+            rParts.forEach(r => {
+                const n = normalize(r);
+                if (n) validSet.add(n);
+            });
+        }
+
+        // 2. Check against All Valid Options
+        let result = { match: false, type: 'none' };
+
+        for (let target of validSet) {
+            // Strict
+            if (cleanTranscript === target) {
+                return { match: true, type: 'exact' };
+            }
+            // Fuzzy
+            if (target.length > 3 && cleanTranscript.includes(target)) {
+                result = { match: true, type: 'fuzzy' }; // Keep looking for exact
+            } else {
+                const dist = levenshteinDistance(cleanTranscript, target);
+                const threshold = Math.max(3, Math.floor(target.length * 0.3));
+                if (dist <= threshold) {
+                    result = { match: true, type: 'fuzzy' };
+                }
+            }
+        }
+        return result;
+    };
+
+
     let matchFound = false;
     let matchType = 'none'; // 'exact', 'fuzzy'
     let matchedCandidate = '';
 
-    // 1. Check for Correct Answer
-    for (let transcript of candidates) {
-        const cleanTranscript = normalize(transcript);
+    // ==========================================
+    // Helpers
+    // ==========================================
 
-        for (let targetAnswer of validAnswers) {
-            // Strict
-            if (cleanTranscript === targetAnswer) {
-                matchFound = true;
-                matchType = 'exact';
-                matchedCandidate = transcript;
-                break;
-            }
-            // Fuzzy
-            if (matchType !== 'exact') {
-                if (targetAnswer.length > 3 && cleanTranscript.includes(targetAnswer)) {
-                    matchFound = true;
-                    matchType = 'fuzzy';
-                    matchedCandidate = transcript;
-                } else {
-                    const dist = levenshteinDistance(cleanTranscript, targetAnswer);
-                    const threshold = Math.max(3, Math.floor(targetAnswer.length * 0.3));
-                    if (dist <= threshold) {
-                        matchFound = true;
-                        matchType = 'fuzzy';
-                        matchedCandidate = transcript;
-                    }
-                }
-            }
-        }
-        if (matchType === 'exact') break;
-    }
-
-    // If we have a match (correct answer), handle it.
-    if (matchFound) {
-        if (matchType === 'exact') {
+    // Helper: Execute Success Logic
+    const executeSuccess = (text, type) => {
+        if (type === 'exact') {
             if (isProcessingVoiceSuccess) return;
             isProcessingVoiceSuccess = true;
             if (voiceFeedback) {
@@ -4691,7 +4736,6 @@ function verifyVoiceAnswer(candidates) {
                 voiceFeedback.classList.remove('hidden');
             }
             setTimeout(() => { handleAnswer(true); }, 1500);
-            return;
         } else {
             // Fuzzy match confirmation
             if (voiceFeedback) {
@@ -4701,7 +4745,7 @@ function verifyVoiceAnswer(candidates) {
                         <i class="fas fa-question-circle"></i> 「${correctAnswer}」？
                     </p>
                     <p style="margin: 0 0 10px 0; font-size: 0.95em; color: #777;">
-                        聞き取り: "${matchedCandidate}"
+                        聞き取り: "${text}"
                     </p>
                     <div style="display: flex; gap: 10px; justify-content: center;">
                         <button id="voiceConfirmYes" class="btn btn-success btn-sm" style="flex: 1; font-weight: bold;"><i class="fas fa-check"></i> はい</button>
@@ -4719,77 +4763,207 @@ function verifyVoiceAnswer(candidates) {
                     voiceFeedback.innerHTML = '';
                 };
             }
-            return;
         }
-    }
+    };
 
-    // ==========================================
-    // No Correct Answer Found: Determine Feedback
-    // ==========================================
+    // Helper: Execute Failure Logic
+    const executeFailure = () => {
+        const dictionary = getVoiceDictionary();
+        let bestDisplayCandidate = null;
+        let isDictionaryTerm = false;
 
-    // Find the "Best" candidate to display.
-    // Heuristic: Prefer candidates that exist in the GLOBAL DICTIONARY (history terms).
-    // If a candidate is in the dictionary, it's likely what the user said, even if wrong.
-
-    const dictionary = getVoiceDictionary();
-    let bestDisplayCandidate = null;
-    let isDictionaryTerm = false;
-
-    // Search for dictionary match
-    for (let transcript of candidates) {
-        const clean = normalize(transcript);
-        if (dictionary.has(clean)) {
-            bestDisplayCandidate = transcript;
-            isDictionaryTerm = true;
-            break; // Found a history term, stop.
+        for (let transcript of candidates) {
+            const clean = normalize(transcript);
+            if (dictionary.has(clean)) {
+                bestDisplayCandidate = transcript;
+                isDictionaryTerm = true;
+                break;
+            }
         }
-    }
 
-    // If no dictionary term found, fall back to primary candidate ONLY IF user wants to see it?
-    // User request: "Prevent unrelated words". So if not in dictionary, we should hide it or show "Unknown".
+        if (!bestDisplayCandidate) {
+            bestDisplayCandidate = "（用語として認識できませんでした）";
+        }
 
-    if (!bestDisplayCandidate) {
-        // No candidates matched the dictionary.
-        // It's likely "Este Hito Mo".
-        // Use a generic message or the top candidate with a warning.
-        // To be safe and meet the user's "Prevent" request, we suppress the raw text.
-        // But debugging is hard if we suppress fully. 
-        // Let's show "???" or "Unrecognized".
-        bestDisplayCandidate = "（用語として認識できませんでした）";
-    }
+        console.log(`Voice mismatch. Displaying: ${bestDisplayCandidate}`);
 
-    // console.log(`Voice mismatch. Displaying: ${bestDisplayCandidate}`);
+        if (voiceFeedback) {
+            let msgHtml = '';
+            if (isDictionaryTerm) {
+                msgHtml = `
+                <div style="background: #fff5f5; padding: 15px; border-radius: 12px; border: 2px solid #ffcccc; margin-bottom: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+                    <p style="margin: 0 0 5px; color: #e74c3c; font-weight: bold; font-size: 1.1em;">
+                        <i class="fas fa-times-circle"></i> 不正解
+                    </p>
+                    <p style="margin: 0 0 5px; font-size: 0.95em; color: #555;">
+                        聞き取り: "${bestDisplayCandidate}"
+                    </p>
+                     <p style="margin: 0; font-size: 0.85em; color: #e67e22;">
+                        ※辞書にある単語ですが、この問題の正解ではありません。
+                    </p>
+                </div>`;
+            } else {
+                msgHtml = `
+                <div style="background: #f8f9fa; padding: 15px; border-radius: 12px; border: 2px solid #dee2e6; margin-bottom: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+                     <p style="margin: 0 0 5px; color: #7f8c8d; font-weight: bold; font-size: 1.1em;">
+                        <i class="fas fa-microphone-slash"></i> 聞き取れませんでした
+                    </p>
+                    <p style="margin: 0; font-size: 0.85em; color: #7f8c8d;">
+                        歴史用語として認識されませんでした。<br>もう一度お話しください。
+                    </p>
+                </div>`;
+            }
 
-    if (voiceFeedback) {
-        let msgHtml = '';
-        if (isDictionaryTerm) {
-            // It was a history term, but wrong.
-            msgHtml = `
-            <div style="background: #fff5f5; padding: 15px; border-radius: 12px; border: 2px solid #ffcccc; margin-bottom: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
-                <p style="margin: 0 0 5px; color: #e74c3c; font-weight: bold; font-size: 1.1em;">
-                    <i class="fas fa-times-circle"></i> 不正解
-                </p>
-                <p style="margin: 0 0 5px; font-size: 0.95em; color: #555;">
-                    聞き取り: "${bestDisplayCandidate}"
-                </p>
-                 <p style="margin: 0; font-size: 0.85em; color: #e67e22;">
-                    ※辞書にある単語ですが、この問題の正解ではありません。
-                </p>
-            </div>`;
+            voiceFeedback.innerHTML = msgHtml;
+            voiceFeedback.classList.remove('hidden');
+        }
+    };
+
+    // Helper: Check a single transcript against logic
+    const checkTranscriptMatch = (text) => {
+        const clean = normalize(text);
+
+        // Helper: Check if string contains target (Exact or Fuzzy)
+        const containsFuzzy = (haystack, needle) => {
+            if (haystack.includes(needle)) return true;
+
+            // Fuzzy check
+            // We scan the haystack with a window of needle.length size.
+            // If any window has small edit distance, return true.
+            if (needle.length < 2) return false; // Too short for fuzzy
+
+            const threshold = Math.max(1, Math.floor(needle.length * 0.3));
+
+            // Optimization: If difference in length is too big, it can't match? 
+            // But we are looking for a SUBSTRING match, so haystack is usually longer.
+
+            // Sliding window approach
+            for (let i = 0; i <= haystack.length - needle.length; i++) {
+                const sub = haystack.substr(i, needle.length);
+                const dist = levenshteinDistance(sub, needle);
+                if (dist <= threshold) return true;
+            }
+            // Check slightly larger/smaller windows too? (e.g. +/- 1 char)
+            // For simplicity, just checking exact length window often works for minor typos.
+            // Let's add +/- 1 length for robustness if haystack allows.
+            for (let lenOffset = -1; lenOffset <= 1; lenOffset++) {
+                if (lenOffset === 0) continue; // Already did
+                const wLen = needle.length + lenOffset;
+                if (wLen < 1) continue;
+                for (let i = 0; i <= haystack.length - wLen; i++) {
+                    const sub = haystack.substr(i, wLen);
+                    const dist = levenshteinDistance(sub, needle);
+                    if (dist <= threshold) return true;
+                }
+            }
+
+            return false;
+        };
+
+        if (isSlashMode) {
+            const answerParts = correctAnswer.split('/').map(s => normalize(s)).filter(s => s && s.trim().length > 0);
+            const readingParts = correctReading ? correctReading.split(/[\/,]+/).map(s => normalize(s)).filter(s => s && s.trim().length > 0) : [];
+
+            // Check 1: All Answer Parts
+            let allAns = true;
+            let ansFuzzy = false;
+            for (const p of answerParts) {
+                if (!containsFuzzy(clean, p)) { allAns = false; break; }
+                if (!clean.includes(p)) ansFuzzy = true; // Found via fuzzy
+            }
+            if (allAns) return { match: true, type: ansFuzzy ? 'fuzzy' : 'exact' };
+
+            // Check 2: All Reading Parts
+            if (readingParts.length > 0) {
+                let allRead = true;
+                let readFuzzy = false;
+                for (const p of readingParts) {
+                    if (!containsFuzzy(clean, p)) { allRead = false; break; }
+                    if (!clean.includes(p)) readFuzzy = true;
+                }
+                if (allRead) return { match: true, type: readFuzzy ? 'fuzzy' : 'exact' };
+            }
+
+            // Check 3: Hybrid
+            if (answerParts.length === readingParts.length && answerParts.length > 0) {
+                let allSlots = true;
+                let slotFuzzy = false;
+                for (let i = 0; i < answerParts.length; i++) {
+                    const hasAns = containsFuzzy(clean, answerParts[i]);
+                    const hasRead = containsFuzzy(clean, readingParts[i]);
+                    if (!hasAns && !hasRead) { allSlots = false; break; }
+
+                    if (hasAns && !clean.includes(answerParts[i])) slotFuzzy = true;
+                    if (!hasAns && hasRead && !clean.includes(readingParts[i])) slotFuzzy = true;
+                }
+                if (allSlots) return { match: true, type: slotFuzzy ? 'fuzzy' : 'exact' };
+            }
+            return { match: false, type: 'none' };
         } else {
-            // Unrecognized/Unrelated
-            msgHtml = `
-            <div style="background: #f8f9fa; padding: 15px; border-radius: 12px; border: 2px solid #dee2e6; margin-bottom: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
-                 <p style="margin: 0 0 5px; color: #7f8c8d; font-weight: bold; font-size: 1.1em;">
-                    <i class="fas fa-microphone-slash"></i> 聞き取れませんでした
-                </p>
-                <p style="margin: 0; font-size: 0.85em; color: #7f8c8d;">
-                    歴史用語として認識されませんでした。<br>もう一度お話しください。
-                </p>
-            </div>`;
+            return checkSingleOrMatch(text, correctAnswer, correctReading);
         }
+    };
 
-        voiceFeedback.innerHTML = msgHtml;
-        voiceFeedback.classList.remove('hidden');
+    // ==========================================
+    // Check all candidates
+    // ==========================================
+
+    for (let transcript of candidates) {
+        const res = checkTranscriptMatch(transcript);
+        if (res.match) {
+            matchFound = true;
+            matchType = res.type;
+            matchedCandidate = transcript;
+            if (matchType === 'exact') break;
+        }
+    }
+
+
+    // If we have a match (correct answer), handle it.
+    if (matchFound) {
+        executeSuccess(matchedCandidate, matchType);
+    } else {
+        // 🆕 Fallback: Server-side Katakana Conversion
+        if (candidates.length > 0) {
+            const bestCandidate = candidates[0]; // Try the top candidate
+
+            // Show Loading Feedback
+            if (voiceFeedback) {
+                voiceFeedback.innerHTML = `
+                 <div style="padding: 15px; background: #e3f2fd; border: 2px solid #90caf9; border-radius: 12px; color: #1565c0; animation: pulse 1s infinite; text-align: center;">
+                    <i class="fas fa-sync fa-spin"></i> 読み仮名変換で再確認中...
+                 </div>`;
+                voiceFeedback.classList.remove('hidden');
+            }
+
+            fetch('/api/to_katakana', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: bestCandidate })
+            })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        const katakana = data.katakana;
+                        console.log(`Server conversion: ${bestCandidate} -> ${katakana}`);
+
+                        // Re-check with the converted katakana
+                        const res = checkTranscriptMatch(katakana);
+                        if (res.match) {
+                            executeSuccess(katakana, res.type);
+                        } else {
+                            executeFailure();
+                        }
+                    } else {
+                        executeFailure();
+                    }
+                })
+                .catch(err => {
+                    console.warn("Server conversion failed:", err);
+                    executeFailure();
+                });
+        } else {
+            executeFailure();
+        }
     }
 }
