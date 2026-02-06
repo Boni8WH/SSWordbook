@@ -13,6 +13,11 @@ import io
 import pickle 
 import numpy as np
 
+# In-memory Caches
+ROOM_SETTING_CACHE = {} # {room_number: {'data': dict, 'timestamp': float}}
+WORD_DATA_CACHE = {}    # {filename: {'data': list, 'timestamp': float}}
+CACHE_TTL = 300         # 5 minutes
+
 from io import StringIO, BytesIO
 from datetime import datetime, timedelta
 from html.parser import HTMLParser
@@ -2208,60 +2213,109 @@ def get_monthly_ranking(room_number, user_id, year, month):
             
     return monthly_top_5, monthly_user_rank_info, total_participants
 
-# 部屋ごとの単語データを読み込む関数
-def load_word_data_for_room(room_number):
-    try:
-        room_setting = RoomSetting.query.filter_by(room_number=room_number).first()
-        
-        if room_setting and room_setting.csv_filename:
-            csv_filename = room_setting.csv_filename
-        else:
-            csv_filename = "words.csv"
-        
-        if csv_filename == "words.csv":
-            word_data = []
-            try:
-                # ★修正: BOM付きUTF-8に対応 ('utf-8-sig')
-                with open('words.csv', 'r', encoding='utf-8-sig') as f:
-                    reader = csv.DictReader(f)
-                    for row in reader:
-                        # 必須フィールドのチェック（空白のみも除外）
-                        if not row.get('question') or not row.get('answer') or not row.get('question').strip() or not row.get('answer').strip():
-                            continue
+# Helper: RoomSettingを取得 (キャッシュ対応)
+def get_room_settings_cached(room_number):
+    current_time = time.time()
+    cached_setting = ROOM_SETTING_CACHE.get(room_number)
 
-                        row['enabled'] = row.get('enabled', '1') == '1'
-                        row['chapter'] = str(row['chapter'])
-                        row['number'] = str(row['number'])
-                        word_data.append(row)
-            except FileNotFoundError:
-                print(f"❌ デフォルトファイルが見つかりません: words.csv")
+    if cached_setting and (current_time - cached_setting['timestamp'] < CACHE_TTL):
+        return cached_setting['data']
+    
+    room_setting_obj = RoomSetting.query.filter_by(room_number=room_number).first()
+    if room_setting_obj:
+        setting_data = {
+            'is_essay_room': room_setting_obj.is_essay_room,
+            'is_all_unlocked': room_setting_obj.is_all_unlocked,
+            'csv_filename': room_setting_obj.csv_filename,
+            'ranking_display_count': room_setting_obj.ranking_display_count,
+            'max_enabled_unit_number': room_setting_obj.max_enabled_unit_number, # Additional fields needed for word data logic
+            'enabled_units': room_setting_obj.enabled_units
+        }
+    else:
+        setting_data = None
+        
+    ROOM_SETTING_CACHE[room_number] = {
+        'data': setting_data,
+        'timestamp': current_time
+    }
+    return setting_data
+
+# Helper: CSVデータを読み込む (キャッシュ対応)
+def load_word_data_from_source(csv_filename):
+    current_time = time.time()
+    cached_data = WORD_DATA_CACHE.get(csv_filename)
+    
+    if cached_data and (current_time - cached_data['timestamp'] < CACHE_TTL):
+        # print(f"DEBUG: Word Data Cache Hit ({csv_filename})")
+        return cached_data['data']
+
+    # print(f"DEBUG: Word Data Cache Miss ({csv_filename})")
+    word_data = []
+    
+    if csv_filename == "words.csv":
+        try:
+            with open('words.csv', 'r', encoding='utf-8-sig') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    if not row.get('question') or not row.get('answer') or not row.get('question').strip() or not row.get('answer').strip():
+                        continue
+                    row['enabled'] = row.get('enabled', '1') == '1'
+                    row['chapter'] = str(row['chapter'])
+                    row['number'] = str(row['number'])
+                    word_data.append(row)
+        except FileNotFoundError:
+            print(f"❌ デフォルトファイルが見つかりません: words.csv")
+            return []
+    else:
+        csv_file = CsvFileContent.query.filter_by(filename=csv_filename).first()
+        if csv_file:
+            try:
+                content = csv_file.content
+                reader = csv.DictReader(StringIO(content))
+                for row in reader:
+                    if not row.get('question') or not row.get('answer') or not row.get('question').strip() or not row.get('answer').strip():
+                        continue
+                    row['enabled'] = row.get('enabled', '1') == '1'
+                    row['chapter'] = str(row['chapter'])
+                    row['number'] = str(row['number'])
+                    word_data.append(row)
+            except Exception as parse_error:
+                print(f"❌ CSVパースエラー: {parse_error}")
                 return []
         else:
-            # ★重要：データベースからカスタムCSVの内容を取得
-            csv_file = CsvFileContent.query.filter_by(filename=csv_filename).first()
-            if csv_file:
-                try:
-                    content = csv_file.content
-                    # StringIOはエンコーディング指定できないが、contentは既にデコード済み文字列
-                    reader = csv.DictReader(StringIO(content))
-                    word_data = []
-                    for row in reader:
-                        # 必須フィールドのチェック（空白のみも除外）
-                        if not row.get('question') or not row.get('answer') or not row.get('question').strip() or not row.get('answer').strip():
-                            continue
+            print(f"❌ カスタムCSVが見つかりません: {csv_filename}")
+            # Fallback to default
+            return load_word_data_from_source("words.csv")
 
-                        row['enabled'] = row.get('enabled', '1') == '1'
-                        row['chapter'] = str(row['chapter'])
-                        row['number'] = str(row['number'])
-                        word_data.append(row)
-                except Exception as parse_error:
-                    print(f"❌ CSVパースエラー: {parse_error}")
-                    return []
-            else:
-                print(f"❌ データベースにCSVが見つかりません: {csv_filename}")
-                return load_word_data_for_room("default")
+    WORD_DATA_CACHE[csv_filename] = {
+        'data': word_data,
+        'timestamp': current_time
+    }
+    return word_data
+
+# 部屋ごとの単語データを読み込む関数 (リファクタリング済み)
+def load_word_data_for_room(room_number):
+    try:
+        room_setting = get_room_settings_cached(room_number)
         
-        filtered_word_data = filter_special_problems(word_data, room_number)
+        if room_setting and room_setting.get('csv_filename'):
+            csv_filename = room_setting['csv_filename']
+        else:
+            csv_filename = "words.csv"
+            
+        word_data = load_word_data_from_source(csv_filename)
+        
+        # Room-specific filtering (if logic exists in original function, we need to keep it or adapt it)
+        # Original function had filter_special_problems at the end.
+        if word_data:
+             filtered_word_data = filter_special_problems(word_data, room_number)
+             return filtered_word_data
+        
+        return []
+
+    except Exception as e:
+        print(f"Error loading word data for room {room_number}: {e}")
+        return []
         
         # ★デバッグログ: 最初の数件を表示
         # if filtered_word_data:
@@ -6807,6 +6861,10 @@ def api_admin_update_ranking_display_count():
         
         db.session.commit()
         
+        # Cache Invalidation
+        ROOM_SETTING_CACHE.pop(str(room_number), None)
+        print(f"DEBUG: Cache invalidated for room {room_number}")
+        
         print(f"✅ ランキング表示人数更新完了: 部屋{room_number} = {display_count}人")
         
         return jsonify({
@@ -10616,6 +10674,10 @@ def admin_upload_room_csv():
                 db.session.add(csv_file_record)
             
             db.session.commit()
+            
+            # Cache Invalidation
+            WORD_DATA_CACHE.pop(filename, None)
+            print(f"DEBUG: Word Data Cache invalidated for {filename}")
             
             file_size_kb = round(file_size / 1024, 1)
             flash(f'✅ CSVファイル "{filename}" をデータベースに保存しました', 'success')
@@ -20586,6 +20648,11 @@ def admin_update_room_essay_setting():
              
         db.session.commit()
         
+        # Cache Invalidation
+        if room_number:
+            ROOM_SETTING_CACHE.pop(str(room_number), None)
+            print(f"DEBUG: Cache invalidated for room {room_number}")
+        
         return jsonify({
             'status': 'success', 
             'message': f'部屋 {room_number} の論述特化設定を更新しました',
@@ -20616,12 +20683,40 @@ def check_room_restrictions():
         return
 
     # 部屋設定を確認
-    room_setting = RoomSetting.query.filter_by(room_number=user.room_number).first()
-    if not room_setting or not room_setting.is_essay_room:
+    # 部屋設定を確認 (キャッシュ使用)
+    current_time = time.time()
+    room_number = user.room_number
+    cached_setting = ROOM_SETTING_CACHE.get(room_number)
+
+    if cached_setting and (current_time - cached_setting['timestamp'] < CACHE_TTL):
+        # Cache Hit
+        setting_data = cached_setting['data']
+        # print("DEBUG: Room Setting Cache Hit")
+    else:
+        # Cache Miss
+        # print("DEBUG: Room Setting Cache Miss")
+        room_setting_obj = RoomSetting.query.filter_by(room_number=room_number).first()
+        
+        if room_setting_obj:
+            setting_data = {
+                'is_essay_room': room_setting_obj.is_essay_room,
+                'is_all_unlocked': room_setting_obj.is_all_unlocked,
+                'csv_filename': room_setting_obj.csv_filename,
+                'ranking_display_count': room_setting_obj.ranking_display_count,
+            }
+        else:
+            setting_data = None
+            
+        ROOM_SETTING_CACHE[room_number] = {
+            'data': setting_data,
+            'timestamp': current_time
+        }
+
+    if not setting_data or not setting_data.get('is_essay_room'):
         return
 
     # 🆕 すべて解放ルームなら制限しない
-    if room_setting.is_all_unlocked:
+    if setting_data.get('is_all_unlocked'):
         return
 
     # 許可されたエンドポイントのプレフィックス
