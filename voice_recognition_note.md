@@ -6,8 +6,7 @@
 これね、実際に使ってみると完全に**「詠唱」**なんですよ。
 画面に向かって「ナポレオン！」とか「ワシントン会議！」とか叫ぶの。周りから見たらヤバい人ですが、学習効果は爆上がり（な気がする）。
 
-今回は、この機能をどうやって実装したのか、技術的な裏側をちょっとだけ公開しちゃいます。
-プログラミング初心者の方でも「へぇ〜」ってなるように書いたつもりなので、ぜひ読んでいってくださいな⭐︎
+今回は、この機能をどうやって実装したのか、実際のコードを交えながら技術的な裏側をガッツリ公開しちゃいます。
 
 ---
 
@@ -21,7 +20,7 @@
 
 かといって、スマホで毎回「マルクス＝アウレリウス＝アントニヌス」とか「王侯将相いずくんぞ種あらんや」とかフリック入力するのは拷問に近い。
 
-そこで**「声」**ですよ。
+そこで**「声」**ですよ。Web Speech API を叩いて、ブラウザに耳を持たせるのです。
 
 ## Step 1: ブラウザに「答え」を耳打ちする（Grammar Injection）
 
@@ -31,15 +30,52 @@ Webブラウザには標準で「Web Speech API」という音声認識機能が
 例えば「墾田永年私財法」なんて、普通の会話で言いませんよね？
 普通に認識させると「今電王ねん取材法」とか謎の変換をしてきやがります。使えねぇ…。
 
-そこで登場するのが、**「Grammar Injection（文法インジェクション）」**という魔法。
-ブラウザに対して、「これからこの単語が来る確率が高いぞ！」と事前に教えてあげる技術です。
+そこで登場するのが、**「Grammar Injection（文法インジェクション）」**という技術。
+JSGF (JSpeech Grammar Format) を使って、ブラウザに対して「これからこの単語が来る確率が高いぞ！」と事前に教えてあげるのです。
+
+実際のコード (`static/script.js`) はこんな感じです：
 
 ```javascript
-// 答えが「ナポレオン」の場合
-const grammar = '#JSGF V1.0; grammar answer; public <answer> = ナポレオン | napoleon ;';
+// Grammar Support: Bias towards the correct answer AND global vocabulary
+// This helps recognition even with slight mispronunciations or difficult words
+if (currentQuizData && currentQuizData[currentQuestionIndex]) {
+    // 正解データの取得
+    const currentData = currentQuizData[currentQuestionIndex];
+    const correctAnswer = currentData.answer;
+    const correctReading = currentData.reading || ""; // 読み仮名も取得
 
-// 重み付けを「10倍」にして耳打ちする
-speechRecognitionList.addFromString(grammar, 10);
+    const SpeechGrammarList = window.SpeechGrammarList || window.webkitSpeechGrammarList;
+
+    if (SpeechGrammarList) {
+        const speechRecognitionList = new SpeechGrammarList();
+
+        // 1. バリエーションの生成（正規化や分割）
+        const variations = new Set();
+        variations.add(correctAnswer.replace(/[;]/g, '')); // 生の正解
+        
+        if (correctReading) {
+            // 読み仮名があればそれを最優先に追加
+            const readingParts = correctReading.split(/[\/,]+/);
+            readingParts.forEach(r => variations.add(r.trim()));
+        }
+
+        // JSGF用に整形
+        const variationArray = Array.from(variations)
+            .map(v => v.replace(/[;|<>\*\(\)\[\]\/,]/g, '')) // 文法記号を除去
+            .filter(v => v.length > 0);
+        
+        const currentGrammarString = variationArray.join(' | ');
+
+        // JSpeech Grammar Format using alternatives
+        if (currentGrammarString) {
+            const grammar = '#JSGF V1.0; grammar answer; public <answer> = ' + currentGrammarString + ' ;';
+
+            // 重み「10」で強力にバイアスをかける
+            speechRecognitionList.addFromString(grammar, 10);
+            recognition.grammars = speechRecognitionList;
+        }
+    }
+}
 ```
 
 こうすることで、多少滑舌が悪くても、ブラウザくんが「あ、はいはいナポレオンですね！」と空気を読んでくれるようになります。
@@ -48,98 +84,163 @@ speechRecognitionList.addFromString(grammar, 10);
 
 ## Step 2: 漢字変換の壁をハックする（Katakana Fallback）
 
-しかし、これで万事解決とはいきませんでした。
+しかし、Grammar Injection だけでは万事解決とはいきませんでした。
 最大の敵、**「漢字変換」**です。
 
-例えば正解が「**始皇帝**」だとします。
-ユーザーが完璧な発音で「しこうてい」と言いました。
-でもブラウザくんが気を利かせて「**施工程**」と漢字変換して返してくることがあるんです。
+正解が「**始皇帝**」のとき、いくら耳打ちしても「**施工程**」と漢字変換して返してくることがあるんです。APIの気分次第で。
+これではユーザーが「合ってるのに！！」とブチ切れてしまいます。
 
-アプリ側：「正解は『始皇帝』です。『施工程』？ 不正解！」
-ユーザー：「はぁ！？ 合ってるし！！」
+そこで実装したのが、**「サーバーサイド・カタカナ・フォールバック」**。
+フロントエンド（JS）で正解できなかった場合、諦めずにサーバー（Python）にテキストを送り、「カタカナ」に変換し直してから再判定を行うロジックです。
 
-これではストレスで端末が壁に投げつけられてしまいます。
-そこで実装したのが、**「サーバーサイド・カタカナ・フォールバック」**。必殺技みたいでしょ。
-
-1. アプリ側で正解（漢字）と一致しない場合、諦めずにサーバーにそのテキストを送る。
-2. サーバー側では Pythonライブラリ `pykakasi` を使って、そのテキストを無理やりカタカナに戻す。
-   - 「施工程」→「シコウテイ」
-3. そのカタカナと、正解データの「読み仮名」を比較する。
-   - 正解の読み：「シコウテイ」
-   - **一致！ 正解！**
+### サーバー側 (`app.py`)
+Pythonの神ライブラリ `pykakasi` を使って、送られてきた謎の漢字をカタカナに戻します。
 
 ```python
-# サーバー側の Python コード（イメージ）
-import pykakasi
+@app.route('/api/to_katakana', methods=['POST'])
+def to_katakana():
+    try:
+        data = request.get_json()
+        text = data.get('text', '')
+        
+        if not text:
+            return jsonify({'status': 'error', 'message': 'No text provided'})
 
-kks = pykakasi.kakasi()
-
-def to_katakana(text):
-    result = kks.convert(text)
-    # 全てをカタカナに変換して結合
-    return "".join([item['kana'] for item in result])
+        # pykakasiで変換
+        kks = pykakasi.kakasi()
+        result = kks.convert(text)
+        
+        # 全てをカタカナ成分だけ結合して返す
+        katakana_text = "".join([item['kana'] for item in result])
+        
+        return jsonify({
+            'status': 'success', 
+            'original': text,
+            'katakana': katakana_text
+        })
+        
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)})
 ```
 
-この「二段構え」の判定ロジックにより、**「漢字は間違ってるけど、読み方は合ってるからヨシ！」**という、人間の採点官のような柔軟さを手に入れました。
+### クライアント側 (`static/script.js`)
+JS側では、一度不正解になっても諦めず、このAPIを叩きに行きます。
+
+```javascript
+// Default: No match found
+// 🆕 Fallback: Server-side Katakana Conversion
+if (candidates.length > 0) {
+    const bestCandidate = candidates[0]; // 最有力候補
+
+    // ユーザーに「確認中だよ」と伝える
+    if (voiceFeedback) {
+        voiceFeedback.innerHTML = `
+            <div style="...">
+            <i class="fas fa-sync fa-spin"></i> 読み仮名変換で再確認中...
+            </div>`;
+    }
+
+    // APIへGO
+    fetch('/api/to_katakana', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: bestCandidate })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.status === 'success') {
+            const katakana = data.katakana;
+            console.log(`Server conversion: ${bestCandidate} -> ${katakana}`);
+
+            // 変換されたカタカナでもう一度判定！
+            const res = checkTranscriptMatch(katakana);
+            if (res.match) {
+                executeSuccess(katakana, res.type); // 起死回生の正解！！
+            } else {
+                executeFailure();
+            }
+        } else {
+            executeFailure();
+        }
+    });
+}
+```
+
+この「二段構え」により、**「漢字は間違ってるけど、読み方は合ってるからヨシ！」**という、人間の採点官のような柔軟さを実現しました。
 
 ## Step 3: 少しのミスは許してあげる（Fuzzy Matching）
 
 人間だもの、噛むことだってあります。
-「コンスタンティノープル」とか、一息で言う自信あります？
+「コンスタンティノープル」を一息で言う自信あります？ 僕は無いです。
 
-そこで、厳密な一致だけでなく、**「レーベンシュタイン距離」**というアルゴリズムを使って、「おしい！」判定も入れています。
-文字数の30%くらいまでの違いなら、「もしかして：コンスタンティノープル？」と優しく聞き返してくれます。
+そこで、厳密な一致だけでなく、**「レーベンシュタイン距離（編集距離）」**というアルゴリズムを使って、「おしい！」判定も入れています。
 
----
+```javascript
+// レーベンシュタイン距離の計算（動的計画法）
+function levenshteinDistance(a, b) {
+    const matrix = [];
+    // 行列の初期化
+    for (let i = 0; i <= b.length; i++) matrix[i] = [i];
+    for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
 
-## Step 4: 「複数回答」の罠を攻略する（AND/OR Logic）
+    // 距離計算
+    for (let i = 1; i <= b.length; i++) {
+        for (let j = 1; j <= a.length; j++) {
+            if (b.charAt(i - 1) == a.charAt(j - 1)) {
+                matrix[i][j] = matrix[i - 1][j - 1];
+            } else {
+                matrix[i][j] = Math.min(
+                    matrix[i - 1][j - 1] + 1, // 置換
+                    matrix[i][j - 1] + 1,     // 挿入
+                    matrix[i - 1][j] + 1      // 削除
+                );
+            }
+        }
+    }
+    return matrix[b.length][a.length];
+}
 
-世界史には「別名」や「セットで覚える用語」が無限にあります。
-これをAI（プログラム）に判定させるのが地味に大変でした。
+// 判定ロジックでの使用
+const dist = levenshteinDistance(cleanTranscript, target);
+// 文字数の30%までのミスなら許容する（Max 3文字）
+const threshold = Math.max(3, Math.floor(target.length * 0.3));
 
-### パターンA：どっちでもいいよ（OR条件）
-例えば、「**オクタヴィアヌス**」と言っても「**アウグストゥス**」と言っても正解にしたい場合。
-CSVデータにはカンマ区切りで `オクタヴィアヌス,アウグストゥス` と登録しています。
+if (dist <= threshold) {
+    result = { match: true, type: 'fuzzy' }; // "もしかして"扱い
+}
+```
 
-プログラムはこれを「カンマだ！どれか一つ合ってればOKね！」と解釈し、どちらを叫んでも「正解！」ポーズをしてくれます。
+このロジックのおかげで、例えば「コンスタンティ**ヌ**ープル」と微妙に噛んでも、アプリは優しく「もしかして：コンスタンティノープル？」と聞き返してくれます。バファリンより優しい。
 
-### パターンB：全部言わなきゃダメ、でも順番は自由（AND条件）
-厄介なのがこっち。
-「**ヤルタ・ポツダム**」のように、会議名を2つ答える問題。
-データはスラッシュ区切りで `ヤルタ会談/ポツダム会談` となっています。
+## Step 4: 「複数回答」の罠を攻略する（AND Logic）
 
-これを「ヤルタ会談…あとなんだっけ…ポツダム会談！」と叫んだ場合、一つの文章として認識されます。
-単純な一致判定だと、「ヤルタ会談ポツダム会談」という長い単語と一致するか調べることになり、間に「えーと」とかが入ると即死します。
+最後に一番厄介だったのが、「**ヤルタ・ポツダム**」のように、2つの用語をセットで答える問題です。
+これを一息で言おうとすると、間に「えーと」が入ったり、順番が逆になったりで、単純な文字列比較では死にます。
 
-そこで実装したのが、**「必殺・順不同の部分一致判定」**。
+そこで、**「順不同の部分一致判定（ANDロジック）」**を実装しました。
 
-1. 正解データを `/` で分割する（[ヤルタ会談, ポツダム会談]）。
-2. ユーザーの音声の中に「ヤルタ会談」が含まれているか？ → OK
-3. ユーザーの音声の中に「ポツダム会談」も含まれているか？ → OK
-4. **全パーツ揃った！ 正解！**
+```javascript
+if (isSlashMode) {
+    // 正解をスラッシュで分割（例：[ヤルタ会談, ポツダム会談]）
+    const answerParts = correctAnswer.split('/').map(s => normalize(s));
+    
+    // Check 1: 全てのパーツが含まれているか確認
+    let allAns = true;
+    for (const p of answerParts) {
+        // containsFuzzy は部分一致＋Levenshtein距離チェックを行う自作ヘルパー
+        if (!containsFuzzy(clean, p)) { 
+            allAns = false; 
+            break; 
+        }
+    }
+    
+    if (allAns) return { match: true, type: 'exact' };
+}
+```
 
-これにより、「ポツダムと…ヤルタ！」みたいに逆順で言っても正解になります。
+音声認識された長い文字列（`clean`）の中に、分割したパーツ（`answerParts`）が**全て**含まれていれば正解とみなします。
+これなら、「ポツダムと…あとヤルタ！」みたいに逆順で答えても、間に余計な言葉が入ってもOK。
 柔軟性がすごい。もはや人間の耳より賢いのでは？
-
----
-
-## 今後の課題：漢字が書けなくなる問題
-
-超便利な音声入力。
-
-しかーーーし！
-
-**「あれ、この単語、漢字でどう書くんだっけ？」**
-
-音声入力は楽ですが、「書く」というプロセスが抜ける分、漢字の定着率が怪しくなるリスクがあります。
-「王羲之」とか「羈縻政策」とか、面倒な漢字が多いですからね。
-
-なので、次に実装したいのは**「書き取り確認モード」**。
-音声でサクサク進めつつ、間違えやすい漢字の単語だけは「じゃあこれ、書いてみて？」と不意打ちで手書きを要求してくる機能。
-急にスパルタかよ。
-
-「声で即答」＋「手で定着」。
-このハイブリッドこそが最強の学習法だと信じています。
 
 ## 結論：爆速でアウトプットできる快感
 
@@ -151,7 +252,7 @@ CSVデータにはカンマ区切りで `オクタヴィアヌス,アウグス�
 「神の見えざる手！」
 「サンバルテルミの虐殺！」
 
-深夜に部屋で一人、世界史用語を連呼している姿は完全に不審者ですが、記憶定着、教養のためなら安いものです。
+深夜に部屋で一人、世界史用語を連呼している姿は完全に不審者ですが、記憶定着のためなら安いものです。
 
-これからも「甘やかさないけど、使いやすい」教材アプリを目指して改良を続けていきます。
+これからも「甘やかさないけど、使いやすい」教材アプリを目指して、ゴリゴリコードを書いていきます。
 現場からは以上です。
