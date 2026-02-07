@@ -22,8 +22,9 @@ let hasBeenRestricted = false; // 一度でも制限されたかのフラグ
 let restrictionReleased = false; // 制限が解除されたかのフラグ
 
 
-window.word_data = [];  // この行を追加
-let word_data = window.word_data;  // この行も追加
+window.word_data = [];
+let word_data = window.word_data;
+let voice_vocab_data = []; // 🆕 音声認識用の軽量データ用変数を分離
 
 // ==========================================
 // 🆕 Load Full Vocabulary for Voice Recognition
@@ -34,9 +35,7 @@ function fetchFullVocabulary() {
         .then(data => {
             if (data.status === 'success' && data.vocabulary) {
                 // console.log(`🎤 Full Vocabulary Loaded: ${data.count} words`);
-                window.word_data = data.vocabulary;
-                // word_dataにも反映（参照渡しだが念の為）
-                word_data = window.word_data;
+                voice_vocab_data = data.vocabulary;
             }
         })
         .catch(err => {
@@ -490,14 +489,25 @@ function loadWordDataFromServer() {
     fetch('/api/word_data')
         .then(response => response.json())
         .then(data => {
-            if (data.status === 'success' && data.word_data) {
-                // 必須フィールドのチェック（クライアント側でもフィルタリング）
-                // ★修正: 空白のみのデータも除外
-                word_data = data.word_data.filter(w => w.question && w.answer && w.question.trim() !== '' && w.answer.trim() !== '');
+            let loadedData = null;
+
+            // 修正: APIは配列を直接返す場合がある
+            if (Array.isArray(data)) {
+                loadedData = data;
+            } else if (data.status === 'success' && data.word_data) {
+                loadedData = data.word_data;
 
                 if (data.star_availability) {
                     starProblemStatus = data.star_availability;
                 }
+            }
+
+            if (loadedData) {
+                // 必須フィールドのチェック（クライアント側でもフィルタリング）
+                // ★修正: 空白のみのデータも除外
+                word_data = loadedData.filter(w => w.question && w.answer && w.question.trim() !== '' && w.answer.trim() !== '');
+
+                console.log(`✅ User Word Data Loaded: ${word_data.length} words`); // Debug Log
                 if (data.star_requirements) {
                     starRequirements = data.star_requirements;
                 }
@@ -4434,6 +4444,8 @@ function startVoiceRecognition(e) {
         const correctAnswer = currentData.answer;
         const correctReading = currentData.reading || ""; // 🆕 Reading from CSV
 
+        console.log(`🎤 Voice Target: Answer="${correctAnswer}", Reading="${correctReading}"`); // Debug Log
+
         const SpeechGrammarList = window.SpeechGrammarList || window.webkitSpeechGrammarList;
 
         if (SpeechGrammarList) {
@@ -4441,10 +4453,10 @@ function startVoiceRecognition(e) {
 
             // 1. Add ALL vocabulary from word_data (Context)
             // This allows the engine to recognize ANY word in the database better
-            if (window.word_data && Array.isArray(window.word_data)) {
+            if (voice_vocab_data && Array.isArray(voice_vocab_data)) {
                 try {
                     const allAnswers = new Set();
-                    window.word_data.forEach(w => {
+                    voice_vocab_data.forEach(w => {
                         // Add Answer
                         if (w.answer) {
                             const parts = w.answer.split(/[（(）)]+/);
@@ -4489,7 +4501,18 @@ function startVoiceRecognition(e) {
             if (correctReading) {
                 // Split by comma OR slash to ensure individual words are added
                 const readingParts = correctReading.split(/[\/,]+/);
-                readingParts.forEach(r => variations.add(r.trim()));
+                readingParts.forEach(r => {
+                    const val = r.trim();
+                    if (!val) return;
+                    variations.add(val);
+
+                    // Explicitly add Hiragana/Katakana counterparts for robustness
+                    // Simple conversion assuming standard range
+                    const toHira = val.replace(/[\u30A1-\u30F6]/g, c => String.fromCharCode(c.charCodeAt(0) - 0x60));
+                    const toKata = val.replace(/[\u3041-\u3096]/g, c => String.fromCharCode(c.charCodeAt(0) + 0x60));
+                    if (toHira !== val) variations.add(toHira);
+                    if (toKata !== val) variations.add(toKata);
+                });
             }
 
             // Normalized parts
@@ -4506,8 +4529,8 @@ function startVoiceRecognition(e) {
             if (currentGrammarString) {
                 const grammar = '#JSGF V1.0; grammar answer; public <answer> = ' + currentGrammarString + ' ;';
 
-                // Add with significantly high weight (10) to prioritize current answer
-                speechRecognitionList.addFromString(grammar, 10);
+                // Add with significantly high weight (50) to prioritize current answer
+                speechRecognitionList.addFromString(grammar, 50);
                 recognition.grammars = speechRecognitionList;
                 // console.log(`Target Grammar Added: ${currentGrammarString}`);
             }
@@ -4597,8 +4620,8 @@ function getVoiceDictionary() {
     if (globalVoiceDictionary) return globalVoiceDictionary;
 
     globalVoiceDictionary = new Set();
-    if (window.word_data && Array.isArray(window.word_data)) {
-        window.word_data.forEach(w => {
+    if (voice_vocab_data && Array.isArray(voice_vocab_data)) {
+        voice_vocab_data.forEach(w => {
             // Answer
             if (w.answer) {
                 // Split by delimiters to handle "A(B)" -> A, B
@@ -4641,6 +4664,11 @@ function normalizeString(str) {
     s = s.replace(/(\d)百(\d+)/g, '$1$2').replace(/(\d)百/g, '$100').replace(/百(\d+)/g, '1$1').replace(/百/g, '100');
     s = s.replace(/(\d)千(\d+)/g, '$1$2').replace(/(\d)千/g, '$1000').replace(/千(\d+)/g, '1$1').replace(/千/g, '1000');
     s = s.replace(/(\d)万(\d+)/g, '$1$2').replace(/(\d)万/g, '$10000').replace(/万(\d+)/g, '1$1').replace(/万/g, '10000');
+
+    // 🆕 Unify Kana (Hiragana -> Katakana) for consistent matching
+    s = s.replace(/[\u3041-\u3096]/g, function (ch) {
+        return String.fromCharCode(ch.charCodeAt(0) + 0x60);
+    });
 
     return s;
 }
@@ -4685,10 +4713,13 @@ function verifyVoiceAnswer(candidates) {
         if (targetReading) {
             const rParts = targetReading.split(/[,]+/);
             rParts.forEach(r => {
-                const n = normalize(r);
+                const n = normalize(r); // 修正: n を定義
                 if (n) validSet.add(n);
             });
         }
+
+        // 🆕 Calculate Skeleton for Input
+        const inputSkeleton = getConsonantSkeleton(cleanTranscript);
 
         // 2. Check against All Valid Options
         let result = { match: false, type: 'none' };
@@ -4698,13 +4729,38 @@ function verifyVoiceAnswer(candidates) {
             if (cleanTranscript === target) {
                 return { match: true, type: 'exact' };
             }
+
+            // 🆕 Consonant Skeleton Match (Ignoring Vowels)
+            // Only apply for longer words (length >= 5) to avoid short word collisions (e.g. Kita vs Kata)
+            if (target.length >= 5) {
+                const targetSkeleton = getConsonantSkeleton(target);
+                if (targetSkeleton && inputSkeleton === targetSkeleton) {
+                    console.log(`💀 Skeleton Match! ${cleanTranscript} (${inputSkeleton}) == ${target} (${targetSkeleton})`);
+                    return { match: true, type: 'exact' }; // Treat as exact match (GREEN)
+                }
+            }
+
             // Fuzzy
             if (target.length > 3 && cleanTranscript.includes(target)) {
                 result = { match: true, type: 'fuzzy' }; // Keep looking for exact
             } else {
                 const dist = levenshteinDistance(cleanTranscript, target);
-                const threshold = Math.max(3, Math.floor(target.length * 0.3));
+
+                // 🆕 Adjusted Threshold based on User Feedback
+                // "Strictness" caused issues, so we relax it for longer words (0.2 -> 0.4)
+                // But keep it "not abnormally wide" for short words (length 4 allows 1 error, not 3).
+                let threshold;
+                if (target.length <= 4) {
+                    threshold = 1; // Strict for short words (Prevent 3 errors for 4 chars)
+                } else {
+                    threshold = Math.floor(target.length * 0.4); // Relaxed to 40% (e.g., 5 chars -> 2 errors)
+                }
+
                 if (dist <= threshold) {
+                    // 🆕 User Request: 1 char mistake -> Exact match (for length >= 3)
+                    if (dist <= 1 && target.length >= 3) {
+                        return { match: true, type: 'exact' };
+                    }
                     result = { match: true, type: 'fuzzy' };
                 }
             }
@@ -4819,12 +4875,69 @@ function verifyVoiceAnswer(candidates) {
         }
     };
 
+    // ==========================================
+    // Helper: Consonant Skeleton Extraction
+    // ==========================================
+    const getConsonantSkeleton = (str) => {
+        if (!str) return "";
+        let s = normalize(str); // Base normalization first
+
+        // Remove Vowels and special ignoring chars
+        // A I U E O, small ya/yu/yo, long vowel, small tsu (maybe?)
+        // Let's map Kana to approximate consonant
+        // This is a simplified mapping.
+
+        let res = "";
+        for (let i = 0; i < s.length; i++) {
+            const c = s.charAt(i);
+
+            // Skip Long Vowels / Small Tsu / Symbols
+            if (/[ーっッ]/.test(c)) continue;
+
+            // Map standard Gojuon (Basic Consonant Groups)
+            if (/[あいうえおアイウエオ]/.test(c)) { /* Vowel -> Skip (or placeholder?) Skip for skeleton */ continue; }
+
+            if (/[かきくけこカキクケコ]/.test(c)) { res += "K"; continue; }
+            if (/[さしすせそサシスセソ]/.test(c)) { res += "S"; continue; }
+            if (/[たちつてとタチツテト]/.test(c)) { res += "T"; continue; }
+            if (/[なにぬねのナニヌネノ]/.test(c)) { res += "N"; continue; }
+            if (/[はひふへほハヒフヘホ]/.test(c)) { res += "H"; continue; }
+            if (/[まみむめもマミムメモ]/.test(c)) { res += "M"; continue; }
+            if (/[やゆよヤユヨ]/.test(c)) { res += "Y"; continue; }
+            if (/[らりるれろラリルレロ]/.test(c)) { res += "R"; continue; }
+            if (/[わをワヲ]/.test(c)) { res += "W"; continue; }
+            if (/[んン]/.test(c)) { res += "N"; continue; } // N is important
+
+            if (/[がぎぐげごガギグゲゴ]/.test(c)) { res += "G"; continue; }
+            if (/[ざじずぜぞザジズゼゾ]/.test(c)) { res += "Z"; continue; }
+            if (/[だぢづでどダヂヅデド]/.test(c)) { res += "D"; continue; }
+            if (/[ばびぶべぼバビブベボ]/.test(c)) { res += "B"; continue; }
+            if (/[ぱぴぷぺぽパピプペポ]/.test(c)) { res += "P"; continue; }
+
+            // Small Ya/Yu/Yo often modify consonant (Kya -> K), so they are skippable if we took the consonant from the main char beforehand.
+            // e.g. キャ (Ki-ya) -> Ki (K) + ya (Y or skip). 
+            // In strict Hepburn, Kya -> KY. But for skeleton "K" is enough core.
+            if (/[ゃゅょャュョ]/.test(c)) continue;
+
+            // If unknown (Kanji or other), keep it? Or skip?
+            // Since we normalize to Kana usually via server, this might not be hit often.
+            // But if mixed, let's keep it to differentiate.
+            res += c;
+        }
+        return res;
+    };
+
+
     // Helper: Check a single transcript against logic
     const checkTranscriptMatch = (text) => {
         const clean = normalize(text);
 
+        // 🆕 Calculate Skeleton for Input
+        const inputSkeleton = getConsonantSkeleton(clean);
+
         // Helper: Check if string contains target (Exact or Fuzzy)
         const containsFuzzy = (haystack, needle) => {
+
             if (haystack.includes(needle)) return true;
 
             // Fuzzy check
@@ -4832,7 +4945,13 @@ function verifyVoiceAnswer(candidates) {
             // If any window has small edit distance, return true.
             if (needle.length < 2) return false; // Too short for fuzzy
 
-            const threshold = Math.max(1, Math.floor(needle.length * 0.3));
+            // 🆕 Adjusted Threshold for Substring
+            let threshold;
+            if (needle.length <= 4) {
+                threshold = 1;
+            } else {
+                threshold = Math.floor(needle.length * 0.4);
+            }
 
             // Optimization: If difference in length is too big, it can't match? 
             // But we are looking for a SUBSTRING match, so haystack is usually longer.
