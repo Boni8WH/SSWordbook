@@ -17,6 +17,8 @@ import numpy as np
 ROOM_SETTING_CACHE = {} # {room_number: {'data': dict, 'timestamp': float}}
 WORD_DATA_CACHE = {}    # {filename: {'data': list, 'timestamp': float}}
 CACHE_TTL = 300         # 5 minutes
+MAX_WORD_DATA_CACHE_SIZE = 5      # Limit number of large CSVs in memory
+MAX_ROOM_SETTING_CACHE_SIZE = 100 # Limit number of room settings in memory
 
 from io import StringIO, BytesIO
 from datetime import datetime, timedelta
@@ -2219,6 +2221,9 @@ def get_room_settings_cached(room_number):
     cached_setting = ROOM_SETTING_CACHE.get(room_number)
 
     if cached_setting and (current_time - cached_setting['timestamp'] < CACHE_TTL):
+        # LRU: Move to end (re-insert)
+        ROOM_SETTING_CACHE.pop(room_number)
+        ROOM_SETTING_CACHE[room_number] = cached_setting
         return cached_setting['data']
     
     room_setting_obj = RoomSetting.query.filter_by(room_number=room_number).first()
@@ -2234,6 +2239,16 @@ def get_room_settings_cached(room_number):
     else:
         setting_data = None
         
+    # Eviction: If cache is full, remove oldest item (first item in dict 3.7+)
+    if len(ROOM_SETTING_CACHE) >= MAX_ROOM_SETTING_CACHE_SIZE:
+        # Avoid popping the item we are about to insert if it existed (though we checked .get above, so strictly new or expired)
+        # But if we just popped it (re-insert scenario), size is len-1.
+        # If it's a new item, check size.
+        if room_number not in ROOM_SETTING_CACHE:
+             # pop first key
+             first_key = next(iter(ROOM_SETTING_CACHE))
+             ROOM_SETTING_CACHE.pop(first_key)
+
     ROOM_SETTING_CACHE[room_number] = {
         'data': setting_data,
         'timestamp': current_time
@@ -2286,6 +2301,12 @@ def load_word_data_from_source(csv_filename):
             print(f"❌ カスタムCSVが見つかりません: {csv_filename}")
             # Fallback to default
             return load_word_data_from_source("words.csv")
+
+    # Eviction for Word Data
+    if len(WORD_DATA_CACHE) >= MAX_WORD_DATA_CACHE_SIZE:
+        if csv_filename not in WORD_DATA_CACHE:
+            first_key = next(iter(WORD_DATA_CACHE))
+            WORD_DATA_CACHE.pop(first_key)
 
     WORD_DATA_CACHE[csv_filename] = {
         'data': word_data,
@@ -2505,8 +2526,10 @@ def filter_special_problems(word_data, room_number):
             
             if special_unlocked:
                 for special_word in problems['special']:
-                    special_word['enabled'] = True
-                    filtered_data.append(special_word)
+                    # Prevent side-effect on cached data by copying
+                    word_copy = special_word.copy()
+                    word_copy['enabled'] = True
+                    filtered_data.append(word_copy)
     return filtered_data
 
 def check_special_unlock_status(chapter, regular_problems, users):
@@ -14260,7 +14283,9 @@ def get_full_vocabulary():
             if word.get('answer'):
                 vocabulary.append({
                     'answer': word['answer'],
-                    'reading': word.get('reading', '')
+                    'reading': word.get('reading', ''),
+                    'chapter': word.get('chapter', ''),
+                    'number': word.get('number', '')
                 })
                 
         return jsonify({
@@ -14286,6 +14311,8 @@ def to_katakana():
         result = kks.convert(text)
         katakana = "".join([item['kana'] for item in result])
         
+        print(f"🔤 Kana Conversion: '{text}' -> '{katakana}'") # Debug Log
+
         return jsonify({
             'status': 'success',
             'katakana': katakana,
