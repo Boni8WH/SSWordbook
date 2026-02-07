@@ -111,7 +111,7 @@ def get_genai_client():
 
 # AI採点の同時実行制限（メモリクラッシュ防止）
 # 同時に3件までのAI採点を許可。それを超える場合は一時的に拒否。
-ai_grading_semaphore = threading.Semaphore(3)
+ai_grading_semaphore = threading.Semaphore(1)
 
 # 定数定義
 UPLOAD_FOLDER = 'uploads'
@@ -12936,9 +12936,6 @@ def admin_delete_correction_request(request_id):
 # ====================================================================
 # Gemini API連携機能 (論述問題添削 & OCR)
 # ====================================================================
-
-
-
 @app.route('/api/essay/ocr', methods=['POST'])
 def essay_ocr():
     """アップロードされた画像から手書き文字を読み取り、HTML形式で返す"""
@@ -12953,11 +12950,16 @@ def essay_ocr():
     if file.filename == '':
         return jsonify({'status': 'error', 'message': 'No image selected'}), 400
 
+    # === 同時実行制限 (メモリ節約) ===
+    # 採点機能とリソースを共有
+    if not ai_grading_semaphore.acquire(blocking=False):
+        return jsonify({'status': 'busy', 'message': '現在AI機能が混雑しています。少し待ってから再試行してください。'}), 503
+
     try:
         image = PIL.Image.open(file)
         
-        # 画像のリサイズ（長辺最大1600px）- 高速化とタイムアウト防止
-        max_size = 1600
+        # 画像のリサイズ（長辺最大1280px）- メモリ節約
+        max_size = 1280
         if max(image.size) > max_size:
             ratio = max_size / max(image.size)
             new_size = (int(image.size[0] * ratio), int(image.size[1] * ratio))
@@ -13048,6 +13050,11 @@ def essay_ocr():
         except:
             pass
         return jsonify({'status': 'error', 'message': str(e)}), 500
+    
+    finally:
+        # リソース解放
+        ai_grading_semaphore.release()
+        gc.collect()
 
 # ====================================================================
 # Textbook Manager (Dynamic Context Selection)
