@@ -12,6 +12,8 @@ import uuid
 import io
 import pickle 
 import numpy as np
+import gc
+
 
 # In-memory Caches
 ROOM_SETTING_CACHE = {} # {room_number: {'data': dict, 'timestamp': float}}
@@ -13129,9 +13131,17 @@ class TextbookManager:
         
         # Log results for verification
         print(f"🔍 Vector Search Results for: {query[:20]}...")
-        for s, item in top_items:
-            print(f"   - [{s:.4f}] {item['title']}")
+        # for s, item in top_items:
+        #     print(f"   - [{s:.4f}] {item['title']}")
             
+        # Clean up large objects explicitly
+        del client
+        del result
+        del query_vector
+        del scores
+        del top_items
+        gc.collect()
+
         return selected_titles
 
     def _load_textbook(self):
@@ -13187,6 +13197,10 @@ class TextbookManager:
         used_titles = []
         for title in selected_titles:
             # Flexible matching: exact or partial
+            if isinstance(title, list):
+                if not title: continue
+                title = title[0] # Unwrap list if needed
+            
             if title in self.sections:
                 content += f"\n\n--- {title} ---\n" + self.sections[title]
                 used_titles.append(title)
@@ -13568,6 +13582,10 @@ def essay_grade():
                 # バイナリデータからPIL Imageを作成して bytes に変換
                 img_input = io.BytesIO(essay_image.image_data)
                 image = PIL.Image.open(img_input)
+
+                # Resize image to reduce token usage and memory (Max 1024x1024)
+                image.thumbnail((1024, 1024))
+                
                 img_byte_arr = io.BytesIO()
                 image.save(img_byte_arr, format='PNG')
                 img_data = img_byte_arr.getvalue()
@@ -13579,7 +13597,7 @@ def essay_grade():
                 # Use types.Part for safer handling
                 if len(img_data) > 0:
                     content_parts.append(types.Part.from_bytes(data=img_data, mime_type='image/png'))
-                    print(f"Adding problem image to Gemini prompt: {essay_image.image_format}")
+                    print(f"Adding problem image to Gemini prompt: {essay_image.image_format} (Resized)")
                 else:
                     print("⚠️ Image data is empty, skipping.")
                     
@@ -13793,7 +13811,19 @@ def essay_grade():
     finally:
         # 必ずSemaphoreを解放（次のリクエストが処理できるように）
         ai_grading_semaphore.release()
-        print("✅ AI採点スロット解放")
+        
+        # Explicit Garbage Collection
+        try:
+             # Check if variables exist before deleting
+             if 'content_parts' in locals(): del content_parts
+             if 'response' in locals(): del response
+             if 'final_output' in locals(): del final_output
+             if 'img_data' in locals(): del img_data
+        except:
+             pass
+        
+        gc.collect()
+        print("✅ AI採点スロット解放 (GC executed)")
 
 def is_essay_problem_visible_sql(room_number, chapter, problem_type):
     """SQLベースの公開設定チェック（モデル問題回避版）"""
