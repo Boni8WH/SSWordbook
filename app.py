@@ -13109,7 +13109,7 @@ class TextbookManager:
         try:
             # model must match the one used in build logic
             result = client.models.embed_content(
-                model="text-embedding-004",
+                model="models/gemini-embedding-001",
                 contents=query
             )
             query_vector = np.array(result.embeddings[0].values)
@@ -13677,7 +13677,8 @@ def essay_grade():
                 candidate = response.candidates[0]
                 # print(f"DEBUG: Gen Finish Reason: {candidate.finish_reason}")
                 # print(f"DEBUG: Gen Safety Ratings: {candidate.safety_ratings}")
-                if candidate.finish_reason != 1: # 1 = STOP (Normal)
+                # Use .name for safety as it's an Enum-like object in the new SDK
+                if candidate.finish_reason and candidate.finish_reason.name != 'STOP':
                      print(f"WARNING: Generation stopped abnormally! Reason: {candidate.finish_reason}")
             else:
                  print("WARNING: No candidates returned in response.")
