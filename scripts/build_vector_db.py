@@ -69,9 +69,9 @@ class TextbookManagerLogic:
 def get_embedding(text):
     """Gemini APIを使ってテキストをベクトル化（新API）"""
     try:
-        # text-embedding-004 モデルを使用（新API）
+        # gemini-embedding-001 モデルを使用（app.pyと合わせる）
         result = client.models.embed_content(
-            model="text-embedding-004",
+            model="models/gemini-embedding-001",
             contents=text
         )
         return result.embeddings[0].values
