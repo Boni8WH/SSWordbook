@@ -12956,25 +12956,24 @@ def essay_ocr():
         return jsonify({'status': 'busy', 'message': '現在AI機能が混雑しています。少し待ってから再試行してください。'}), 503
 
     try:
-        image = PIL.Image.open(file)
-        
-        # 画像のリサイズ（長辺最大1280px）- メモリ節約
-        max_size = 1280
-        if max(image.size) > max_size:
-            ratio = max_size / max(image.size)
-            new_size = (int(image.size[0] * ratio), int(image.size[1] * ratio))
-            image = image.resize(new_size, PIL.Image.Resampling.LANCZOS)
-            logger.info(f"Image resized to {new_size}")
+        with PIL.Image.open(file) as image:
+            # 画像のリサイズ（長辺最大1280px）- メモリ節約
+            max_size = 1280
+            if max(image.size) > max_size:
+                ratio = max_size / max(image.size)
+                new_size = (int(image.size[0] * ratio), int(image.size[1] * ratio))
+                image = image.resize(new_size, PIL.Image.Resampling.LANCZOS)
+                logger.info(f"Image resized to {new_size}")
 
-        # Gemini 2.0 Flash を使用 (高速・高性能OCR)
-        client = get_genai_client()
-        if not client:
-             raise Exception("Gemini client could not be loaded")
-        
-        # PIL Image を bytes に変換 (新APIで必要)
-        img_byte_arr = io.BytesIO()
-        image.save(img_byte_arr, format='PNG')
-        img_byte_arr = img_byte_arr.getvalue()
+            # Gemini 2.0 Flash を使用 (高速・高性能OCR)
+            client = get_genai_client()
+            if not client:
+                 raise Exception("Gemini client could not be loaded")
+            
+            # PIL Image を bytes に変換 (新APIで必要)
+            img_byte_arr = io.BytesIO()
+            image.save(img_byte_arr, format='PNG')
+            img_byte_arr = img_byte_arr.getvalue()
         
         prompt = """
         この画像の論述答案にある手書き文字を読み取ってください。
@@ -13068,7 +13067,9 @@ class TextbookManager:
         self.toc = []      # [ "Title1", "Title2", ... ]
         self.vectors = []  # List of {title, content, vector}
         self._load_textbook()
-        self._load_vectors() # New: Load vectors
+        self.vectors = []  # List of {title, content, vector}
+        self._load_textbook()
+        # self._load_vectors() # REMOVED: Load on demand to save memory
 
     @classmethod
     def get_instance(cls):
@@ -13093,11 +13094,14 @@ class TextbookManager:
 
     def search_relevant_sections(self, query, top_k=3):
         """Vector Search for retrieval"""
+        # 1. Load vectors on demand
+        self._load_vectors()
+
         if not self.vectors:
             print("⚠️ No vectors loaded, falling back to empty.")
             return [], []
 
-        # 1. Embed query (using same model as build script)
+        # 2. Embed query (using same model as build script)
         client = get_genai_client()
         if not client:
              return [], []
@@ -13111,9 +13115,12 @@ class TextbookManager:
             query_vector = np.array(result.embeddings[0].values)
         except Exception as e:
             print(f"⚠️ Query embedding failed: {e}")
+            # Unload vectors even on fail
+            self.vectors = None
+            gc.collect()
             return [], []
 
-        # 2. Cosine Similarity Calculation
+        # 3. Cosine Similarity Calculation
         # (Since vectors are normalized, dot product is sufficient, but let's be safe)
         scores = []
         for item in self.vectors:
@@ -13129,7 +13136,7 @@ class TextbookManager:
             
             scores.append((score, item))
 
-        # 3. Sort & Select
+        # 4. Sort & Select
         scores.sort(key=lambda x: x[0], reverse=True)
         
         top_items = scores[:top_k]
@@ -13142,6 +13149,7 @@ class TextbookManager:
         #     print(f"   - [{s:.4f}] {item['title']}")
             
         # Clean up large objects explicitly
+        self.vectors = None # Important: Unload vectors to free memory
         del client
         del result
         del query_vector
@@ -13588,14 +13596,13 @@ def essay_grade():
             try:
                 # バイナリデータからPIL Imageを作成して bytes に変換
                 img_input = io.BytesIO(essay_image.image_data)
-                image = PIL.Image.open(img_input)
-
-                # Resize image to reduce token usage and memory (Max 1024x1024)
-                image.thumbnail((1024, 1024))
-                
-                img_byte_arr = io.BytesIO()
-                image.save(img_byte_arr, format='PNG')
-                img_data = img_byte_arr.getvalue()
+                with PIL.Image.open(img_input) as image:
+                    # Resize image to reduce token usage and memory (Max 1024x1024)
+                    image.thumbnail((1024, 1024))
+                    
+                    img_byte_arr = io.BytesIO()
+                    image.save(img_byte_arr, format='PNG')
+                    img_data = img_byte_arr.getvalue()
                 
                 # メモリ解放（重要）
                 img_byte_arr.close()
