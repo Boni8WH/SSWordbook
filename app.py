@@ -14,8 +14,10 @@ import pickle
 import gc
 import psutil
 
+import ctypes  # For malloc_trim
+
 # Check if memory usage exceeds this threshold (MB)
-MEMORY_THRESHOLD_MB = 400
+MEMORY_THRESHOLD_MB = 350
 
 
 # In-memory Caches
@@ -1861,7 +1863,45 @@ def cleanup_caches():
         
     # 4. Force Garbage Collection
     gc.collect()
+    
+    # 5. Linux-specific: Force release memory to OS
+    try:
+        libc = ctypes.CDLL("libc.so.6")
+        libc.malloc_trim(0)
+        print("🧹 malloc_trim(0) executed.")
+    except Exception:
+        pass  # Not on Linux or libc not found
+        
     print("✅ Memory cleanup completed.")
+
+@app.route('/api/debug/cleanup')
+def manual_cleanup():
+    """Manual memory cleanup endpoint for testing"""
+    # Security: Only allow for admins or authenticated users (basic check)
+    if 'user_id' not in session:
+        return jsonify({'status': 'error', 'message': 'Unauthorized'}), 401
+        
+    # Optional: restrict to specific user IDs for safety
+    # user = User.query.get(session['user_id'])
+    # if user.username != 'admin': ...
+
+    try:
+        process = psutil.Process()
+        before_mb = process.memory_info().rss / 1024 / 1024
+        
+        cleanup_caches()
+        
+        after_mb = process.memory_info().rss / 1024 / 1024
+        
+        return jsonify({
+            'status': 'success',
+            'message': 'Manual cleanup executed',
+            'memory_before_mb': round(before_mb, 2),
+            'memory_after_mb': round(after_mb, 2),
+            'freed_mb': round(before_mb - after_mb, 2)
+        })
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.before_request
 def check_memory_and_cleanup():
