@@ -58,3 +58,13 @@ wheels/
 venv/
 env/
 ENV/
+.venv/
+
+# Mac System Files
+.DS_Store
+
+# Sensitive Keys
+*.pem
+
+# Output Logs
+app_output.txt

@@ -11,7 +11,6 @@ import string
 import uuid
 import io
 import pickle 
-import numpy as np
 import gc
 
 
@@ -14342,8 +14341,16 @@ def get_full_vocabulary():
         logger.error(f"Error getting full vocabulary: {e}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
-# Initialize pykakasi
-kks = pykakasi.kakasi()
+
+# Lazy loading for pykakasi
+_kks_instance = None
+
+def get_kks():
+    global _kks_instance
+    if _kks_instance is None:
+        _kks_instance = pykakasi.kakasi()
+        # print("✅ pykakasi initialized (lazy loaded)")
+    return _kks_instance
 
 @app.route('/api/to_katakana', methods=['POST'])
 def to_katakana():
@@ -14353,6 +14360,7 @@ def to_katakana():
             return jsonify({'status': 'error', 'message': 'No text provided'}), 400
             
         text = data['text']
+        kks = get_kks()
         result = kks.convert(text)
         katakana = "".join([item['kana'] for item in result])
         
