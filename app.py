@@ -4849,20 +4849,49 @@ def favicon():
 def contact_page():
     app_info = AppInfo.get_current_info()
     if request.method == 'POST':
-        # ハニーポットによるボット検知
-        if request.form.get('honeypot'):
-            # ボットと思われる場合は正常を装ってリダイレクト（あるいはエラー）
+        # 1. 潜伏型ハニーポットによるボット検知
+        # フィールド名を 'honeypot' から 'fax_number' 等に変更（ボットをより騙しやすくするため）
+        if request.form.get('fax_number') or request.form.get('website_url'):
+            app.logger.info(f"Bot detected: Honeypot field filled (fax: {request.form.get('fax_number')}, url: {request.form.get('website_url')})")
             flash('お問い合わせを送信しました。', 'success')
             return redirect(url_for('index'))
 
-        name = request.form.get('name')
-        email = request.form.get('email')
-        subject = request.form.get('subject', 'お問い合わせ')
-        message = request.form.get('message')
+        # 2. 送信時間によるボット検知
+        # フォーム表示時に記録した時間と比較し、3秒未満の送信はボットとみなす
+        load_time = session.get('contact_form_load_time')
+        if load_time:
+            elapsed_time = time.time() - load_time
+            if elapsed_time < 3:
+                app.logger.info(f"Bot detected: Rapid submission ({elapsed_time:.2f}s).")
+                flash('お問い合わせを送信しました。', 'success')
+                return redirect(url_for('index'))
+
+        name = request.form.get('name', '').strip()
+        email = request.form.get('email', '').strip()
+        subject = request.form.get('subject', 'お問い合わせ').strip()
+        message = request.form.get('message', '').strip()
 
         if not name or not email or not message:
             flash('名前、メールアドレス、お問い合わせ内容は必須です。', 'danger')
             return render_template('contact.html', app_name=app_info.app_name, app_info=app_info)
+
+        # 3. ランダム文字列（デタラメ）の簡易検知
+        # 送信者名や件名が極端に不自然な（スペースや母音がない長い英数字の）場合はボットとみなす
+        def is_gibberish(text):
+            if not text: return False
+            # スペースがなく、長さが15文字以上の英数字のみの文字列をチェック
+            if len(text) > 15 and ' ' not in text and text.isalnum():
+                # 母音が極端に少ない（入っていない）場合は怪しい
+                vowels = 'aeiouAEIOU'
+                vowel_count = sum(1 for char in text if char in vowels)
+                if vowel_count == 0:
+                    return True
+            return False
+
+        if is_gibberish(name) or is_gibberish(subject):
+            app.logger.info(f"Bot detected: Gibberish detected in name ({name}) or subject ({subject}).")
+            flash('お問い合わせを送信しました。', 'success')
+            return redirect(url_for('index'))
 
         # 管理者への通知内容
         email_body = f"""
@@ -4892,6 +4921,8 @@ def contact_page():
 
         return redirect(url_for('index'))
 
+    # GETリクエスト時に送信フォームを表示した時間を記録
+    session['contact_form_load_time'] = time.time()
     return render_template('contact.html', 
                          app_name=app_info.app_name, 
                          app_info=app_info)
