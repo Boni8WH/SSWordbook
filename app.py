@@ -12,6 +12,10 @@ import uuid
 import io
 import pickle 
 import gc
+import psutil
+
+# Check if memory usage exceeds this threshold (MB)
+MEMORY_THRESHOLD_MB = 400
 
 
 # In-memory Caches
@@ -139,6 +143,12 @@ def upload_image_to_s3(file, filename, folder='essay_images', content_type='imag
         return None
         print(f"S3アップロードエラー: {e}")
         return None
+
+# ====================================================================
+# Memory Management
+# ====================================================================
+
+
 
 # ====================================================================
 # Helper: MLStripper (Robust HTML Tag Stripper)
@@ -1824,6 +1834,46 @@ logger.info(f"ログレベル設定: {logging.getLevelName(log_level)} ({'本番
 app = Flask(__name__)
 # カスタムフィルタ登録
 app.jinja_env.filters['linkify_html'] = linkify_html
+
+# ====================================================================
+# Memory Management (Auto Cleanup)
+# ====================================================================
+
+def cleanup_caches():
+    """Clear all application caches to free memory"""
+    global ROOM_SETTING_CACHE, WORD_DATA_CACHE
+    print("🧹 Memory cleanup triggered: Clearing caches...")
+    
+    # 1. Clear Global Dict Caches
+    ROOM_SETTING_CACHE.clear()
+    WORD_DATA_CACHE.clear()
+    
+    # 2. Clear Textbook Manager Memory
+    try:
+        TextbookManager.get_instance().clear_memory()
+    except Exception as e:
+        print(f"⚠️ TextbookManager cleanup failed: {e}")
+        
+    # 3. Force Garbage Collection
+    gc.collect()
+    print("✅ Memory cleanup completed.")
+
+@app.before_request
+def check_memory_and_cleanup():
+    """Check memory usage before every request and cleanup if needed"""
+    # Skip for static files to save overhead
+    if request.path.startswith('/static'):
+        return
+
+    try:
+        process = psutil.Process()
+        memory_usage_mb = process.memory_info().rss / 1024 / 1024
+        
+        if memory_usage_mb > MEMORY_THRESHOLD_MB:
+            print(f"⚠️ High Memory Detected: {memory_usage_mb:.2f} MB > {MEMORY_THRESHOLD_MB} MB")
+            cleanup_caches()
+    except Exception as e:
+        print(f"⚠️ Memory check failed: {e}")
 
 app.config['SECRET_KEY'] = 'your_secret_key_here_please_change_this_in_production'
 basedir = os.path.abspath(os.path.dirname(__file__))
@@ -4615,7 +4665,16 @@ def api_search_essays_ai():
              return jsonify({'status': 'success', 'results': []})
 
         # 1. DBフィルタリング
-        query = EssayProblem.query.filter(EssayProblem.enabled == True)
+        # メモリ最適化: 必要なカラムのみ取得し、軽量なタプルとして扱う
+        query = db.session.query(
+            EssayProblem.id, 
+            EssayProblem.university, 
+            EssayProblem.year, 
+            EssayProblem.question, 
+            EssayProblem.answer, 
+            EssayProblem.chapter, 
+            EssayProblem.type
+        ).filter(EssayProblem.enabled == True)
         
         # 年度フィルタ
         if year_start:
@@ -4648,6 +4707,7 @@ def api_search_essays_ai():
                 query = query.filter(db.or_(*university_filters))
         
         # 候補を取得（広めに取得してPython側でスコアリング）
+        # タプルのリストとして返される [(id, uni, year, q, a, chap, type), ...]
         raw_candidates = query.limit(200).all()
         
         if not raw_candidates:
@@ -4660,6 +4720,7 @@ def api_search_essays_ai():
         # Python側でスコアリング（キーワード一致数）
         scored_candidates = []
         for c in raw_candidates:
+            # c is tuple: 0:id, 1:uni, 2:year, 3:q, 4:a, 5:chap, 6:type
             # 全テキストを結合して検索
             full_text = f"{c.university} {c.question} {c.answer}"
             match_count = 0
@@ -4672,7 +4733,11 @@ def api_search_essays_ai():
         scored_candidates.sort(key=lambda x: x['score'], reverse=True)
         
         # 上位15件を取得
-        candidates = [item['candidate'] for item in scored_candidates[:15]]
+        top_candidates = [item['candidate'] for item in scored_candidates[:15]]
+        
+        # 不要なリストを削除してメモリ解放
+        del raw_candidates
+        del scored_candidates
         
         # 2. AI選定 (Gemini API)
         client = get_genai_client()
@@ -4681,7 +4746,7 @@ def api_search_essays_ai():
 
         # 候補リストの作成（JSON化）
         candidate_list_for_ai = []
-        for c in candidates:
+        for c in top_candidates:
             # トークン節約のため、問題文と解答を短縮して渡す
             # ユーザー同意済み: 問題文150文字 + 解答150文字
             clean_q = re.sub(r'<[^>]+>', '', c.question)
@@ -4690,7 +4755,7 @@ def api_search_essays_ai():
             a_text = clean_a[:150]
             candidate_list_for_ai.append({
                 "id": c.id,
-                "text": f"大学: {c.university}, 年度: {c.year}\n問題: {q_text}...\n解答要素: {a_text}..."
+                "text": f"大学: {c.university}, 年度: {c.year}\\n問題: {q_text}...\\n解答要素: {a_text}..."
             })
             
         prompt = f"""
@@ -13093,12 +13158,10 @@ class TextbookManager:
     _lock = threading.Lock()
     
     def __init__(self):
-        self.sections = {} # { "Title": "Content" }
-        self.toc = []      # [ "Title1", "Title2", ... ]
-        self.vectors = []  # List of {title, content, vector}
-        self._load_textbook()
-        self.vectors = []  # List of {title, content, vector}
-        self._load_textbook()
+        self.sections = None # Lazy load: { "Title": "Content" }
+        self.toc = None      # Lazy load: [ "Title1", "Title2", ... ]
+        self.vectors = None  # List of {title, content, vector}
+        # self._load_textbook() # Removed: Lazy load
         # self._load_vectors() # REMOVED: Load on demand to save memory
 
     @classmethod
@@ -13108,6 +13171,23 @@ class TextbookManager:
                 if not cls._instance:
                     cls._instance = cls()
         return cls._instance
+
+    def _ensure_textbook_loaded(self):
+        """Load textbook data if not already loaded"""
+        if self.sections is None or self.toc is None:
+             print("📚 Loading textbook data into memory...")
+             self.sections = {}
+             self.toc = []
+             self._load_textbook()
+
+    def clear_memory(self):
+        """Explicitly clear memory"""
+        self.sections = None
+        self.toc = None
+        self.vectors = None
+        gc.collect()
+        print("🧹 TextbookManager memory cleared.")
+
 
     def _load_vectors(self):
         """Load vector DB if exists"""
@@ -13124,17 +13204,20 @@ class TextbookManager:
 
     def search_relevant_sections(self, query, top_k=3):
         """Vector Search for retrieval"""
+        # 0. Ensure text loaded (for logic consistency if needed later)
+        self._ensure_textbook_loaded()
+
         # 1. Load vectors on demand
         self._load_vectors()
 
         if not self.vectors:
             print("⚠️ No vectors loaded, falling back to empty.")
-            return [], []
+            return []
 
         # 2. Embed query (using same model as build script)
         client = get_genai_client()
         if not client:
-             return [], []
+             return []
 
         try:
             # model must match the one used in build logic
@@ -13148,7 +13231,7 @@ class TextbookManager:
             # Unload vectors even on fail
             self.vectors = None
             gc.collect()
-            return [], []
+            return []
 
         # 3. Cosine Similarity Calculation
         # (Since vectors are normalized, dot product is sufficient, but let's be safe)
@@ -13215,7 +13298,7 @@ class TextbookManager:
                 if header_pattern.match(line):
                     # Save previous section
                     if current_content:
-                        self.sections[current_header] = "\n".join(current_content)
+                        self.sections[current_header] = "\\n".join(current_content)
                         self.toc.append(current_header)
                     
                     # Start new section
@@ -13226,7 +13309,7 @@ class TextbookManager:
             
             # Save last section
             if current_content:
-                self.sections[current_header] = "\n".join(current_content)
+                self.sections[current_header] = "\\n".join(current_content)
                 self.toc.append(current_header)
                 
             print(f"✅ Textbook loaded: {len(self.toc)} sections parsed.")
@@ -13235,10 +13318,13 @@ class TextbookManager:
             print(f"❌ Failed to parse textbook: {e}")
 
     def get_toc_text(self):
-        return "\n".join(self.toc)
+        self._ensure_textbook_loaded()
+        return "\\n".join(self.toc)
 
     def get_relevant_content(self, selected_titles):
+        self._ensure_textbook_loaded()
         content = ""
+
         used_titles = []
         for title in selected_titles:
             # Flexible matching: exact or partial
