@@ -3451,11 +3451,26 @@ async function registerServiceWorker() {
     try {
         const registration = await navigator.serviceWorker.register('/static/sw.js');
 
-
         // VAPIDキー取得
         const keyRes = await fetch('/api/vapid_public_key');
         const keyData = await keyRes.json();
         const applicationServerKey = urlBase64ToUint8Array(keyData.publicKey);
+
+        // 既存の購読を確認
+        const existingSubscription = await registration.pushManager.getSubscription();
+        if (existingSubscription) {
+            // キーが一致するか確認（一致しない場合は解除）
+            const existingKey = existingSubscription.options.applicationServerKey;
+            if (existingKey) {
+                const existingKeyUint8 = new Uint8Array(existingKey);
+                const isKeyMatch = applicationServerKey.every((val, i) => val === existingKeyUint8[i]);
+
+                if (!isKeyMatch) {
+                    console.log('VAPID key mismatch detected. Unsubscribing...');
+                    await existingSubscription.unsubscribe();
+                }
+            }
+        }
 
         const subscription = await registration.pushManager.subscribe({
             userVisibleOnly: true,
