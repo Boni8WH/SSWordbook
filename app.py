@@ -1841,7 +1841,7 @@ app.jinja_env.filters['linkify_html'] = linkify_html
 
 def cleanup_caches():
     """Clear all application caches to free memory"""
-    global ROOM_SETTING_CACHE, WORD_DATA_CACHE
+    global ROOM_SETTING_CACHE, WORD_DATA_CACHE, _kks_instance
     print("🧹 Memory cleanup triggered: Clearing caches...")
     
     # 1. Clear Global Dict Caches
@@ -1853,8 +1853,13 @@ def cleanup_caches():
         TextbookManager.get_instance().clear_memory()
     except Exception as e:
         print(f"⚠️ TextbookManager cleanup failed: {e}")
+
+    # 3. Clear pykakasi instance (for Voice Recognition memory leak)
+    if _kks_instance is not None:
+        _kks_instance = None
+        print("🧹 pykakasi instance cleared.")
         
-    # 3. Force Garbage Collection
+    # 4. Force Garbage Collection
     gc.collect()
     print("✅ Memory cleanup completed.")
 
