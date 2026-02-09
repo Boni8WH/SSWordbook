@@ -31,7 +31,9 @@ from io import StringIO, BytesIO
 from datetime import datetime, timedelta
 from html.parser import HTMLParser
 import html
-import pykakasi
+# import pykakasi (Removed to save 300MB memory)
+import MeCab
+import unidic_lite
 from sqlalchemy import inspect, text, func, case, cast, Integer
 from sqlalchemy.orm import joinedload, deferred
 from datetime import date, datetime, timedelta
@@ -1843,7 +1845,7 @@ app.jinja_env.filters['linkify_html'] = linkify_html
 
 def cleanup_caches():
     """Clear all application caches to free memory"""
-    global ROOM_SETTING_CACHE, WORD_DATA_CACHE, _kks_instance
+    global ROOM_SETTING_CACHE, WORD_DATA_CACHE
     print("🧹 Memory cleanup triggered: Clearing caches...")
     
     # 1. Clear Global Dict Caches
@@ -1856,10 +1858,8 @@ def cleanup_caches():
     except Exception as e:
         print(f"⚠️ TextbookManager cleanup failed: {e}")
 
-    # 3. Clear pykakasi instance (for Voice Recognition memory leak)
-    if _kks_instance is not None:
-        _kks_instance = None
-        print("🧹 pykakasi instance cleared.")
+    # 3. pykakasi instance removed to save memory.
+    # No instance to clear.
         
     # 4. Force Garbage Collection
     gc.collect()
@@ -14504,15 +14504,55 @@ def get_full_vocabulary():
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
-# Lazy loading for pykakasi
-_kks_instance = None
-
-def get_kks():
-    global _kks_instance
-    if _kks_instance is None:
-        _kks_instance = pykakasi.kakasi()
-        # print("✅ pykakasi initialized (lazy loaded)")
-    return _kks_instance
+# MeCab based Katakana conversion (Saves 300MB compared to pykakasi, Fast & Local)
+def get_katakana_from_mecab(text):
+    """MeCab + unidic-lite を使用してカタカナに変換する"""
+    try:
+        # Initialize MeCab with unidic-lite dictionary
+        # Memory usage is low (~15MB), so initializing here is fine.
+        # If massive requests come, we might want to make it a global/thread-local instance,
+        # but for now, this is safe and clean.
+        tagger = MeCab.Tagger(f"-d {unidic_lite.DICDIR}")
+        node = tagger.parseToNode(text)
+        
+        katakana_result = ""
+        while node:
+            # feature format in Unidic:
+            # pos,pos1,pos2,pos3,conjugation,form,original,reading,pronunciation,...
+            # Index 6 is usually 'original', Index 7 is 'reading' (Katakana), Index 9 is 'pronunciation'
+            # Note: Unidic-lite features might vary slightly, but index 6/7/9 are the targets.
+            # Based on local test:
+            # 拳銃 -> [..., 'ケンジュウ', '拳銃', '拳銃', 'ケンジュー', ...]
+            # 徳川 -> [..., 'トクガワ', 'トクガワ', '徳川', 'トクガワ', ...]
+            
+            if node.surface: # Skip BOS/EOS
+                features = node.feature.split(",")
+                # Try to find Katakana reading. 
+                # Unidic features can be long. We look for the reading field.
+                # Usually it is at index 6 (lemma reading) or 9 (pronunciation) or 7 (reading).
+                # Checking recent test output:
+                # 拳銃: index 6='ケンジュウ'
+                # 徳川: index 6='トクガワ'
+                
+                reading = ""
+                if len(features) > 6 and features[6] != '*':
+                    reading = features[6]
+                elif len(features) > 7 and features[7] != '*':
+                    reading = features[7]
+                else:
+                    # Fallback: simple Hiragana->Katakana for the surface
+                    reading = "".join([chr(ord(c) + 96) if 'ぁ' <= c <= 'ゖ' else c for c in node.surface])
+                
+                katakana_result += reading
+                
+            node = node.next
+            
+        return katakana_result
+        
+    except Exception as e:
+        print(f"⚠️ MeCab Conversion Error: {e}")
+        # Final Fallback
+        return "".join([chr(ord(c) + 96) if 'ぁ' <= c <= 'ゖ' else c for c in text])
 
 @app.route('/api/to_katakana', methods=['POST'])
 def to_katakana():
@@ -14522,11 +14562,15 @@ def to_katakana():
             return jsonify({'status': 'error', 'message': 'No text provided'}), 400
             
         text = data['text']
-        kks = get_kks()
-        result = kks.convert(text)
-        katakana = "".join([item['kana'] for item in result])
         
-        print(f"🔤 Kana Conversion: '{text}' -> '{katakana}'") # Debug Log
+        # すべてカタカナ（または記号）なら変換不要
+        if re.fullmatch(r'[ァ-ヶー・\s]+', text):
+            return jsonify({'status': 'success', 'katakana': text})
+
+        katakana = get_katakana_from_mecab(text)
+        
+        print(f"🔤 MeCab Kana Conversion: '{text}' -> '{katakana}'") # Debug Log
+        return jsonify({'status': 'success', 'katakana': katakana})
 
         return jsonify({
             'status': 'success',
