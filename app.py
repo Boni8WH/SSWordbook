@@ -1966,7 +1966,7 @@ if not scheduler.get_job('daily_reminder'):
     scheduler.add_job(id='daily_reminder', func=check_daily_quiz_reminders, trigger='cron', minute='*')
 
 # VAPID Keys (本来は環境変数推奨)
-VAPID_PUBLIC_KEY = "BJJXMPrN1SvmAwKkab8rW50Aa96KLVHCIDQcvPkWZ9xeTfmQ8CDWV-a1CJMO5Xqapcrw4fX85ekwbzmrJfi7qr0"
+VAPID_PUBLIC_KEY = "BPUZ8qA8yrG6CJTcLNnqA8WzUtl4HAaIAjD0zgjZGabJ-p4dBqGTZCgvicPtL2SuTv4ZmVri-pUvDznso_LGebY"
 VAPID_PRIVATE_KEY_PATH = os.path.join(basedir, 'private_key.pem')
 
 # サーバー環境(Render等)で秘密鍵ファイルがない場合、環境変数から復元
