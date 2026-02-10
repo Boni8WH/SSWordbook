@@ -2263,7 +2263,7 @@ def to_jst_filter(dt):
         
         # 9時間加算
         jst_dt = dt_obj + timedelta(hours=9)
-        return jst_dt.strftime('%Y-%m-%d %H:%M')
+        return jst_dt.strftime('%Y/%m/%d %H:%M')
         
     except Exception as e:
         print(f"🔍 エラー: {e}")
@@ -12970,15 +12970,24 @@ def admin_chat_action(request_id):
         
         if message:
             # 既存の返信に追記
+            now = datetime.now(JST)
+            timestamp_str = now.strftime('%Y/%m/%d %H:%M')
+            
             if req.reply_text:
-                req.reply_text += f"\n\n---\n{message}"
+                # 区切り文字にタイムスタンプを含める
+                req.reply_text += f"\n\n--- 返信 ({timestamp_str}) ---\n{message}"
             else:
                 req.reply_text = message
             
             # メッセージがある場合は自動的に replied にする
             req.status = 'replied'
             req.is_resolved = True # メッセージ送ったら解決済み扱いで良い
-            req.replied_at = datetime.now(JST)
+            
+            # 【変更点】
+            # 初回返信時のみ replied_at を設定する
+            # (チャットの順番が並べ替えられるのを防ぐため、ベースの時間は固定)
+            if not req.replied_at:
+                req.replied_at = now
         
         if resolve:
             req.status = 'replied'

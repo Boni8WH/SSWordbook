@@ -263,36 +263,75 @@
 
         // メッセージをパースして会話配列に変換
         function parseConversation(studentMessage, replyText, created, replied) {
-            const messages = [];
+            let messages = [];
 
-            // 最初のメッセージ部分と追加質問を分離
+            // --- 生徒のメッセージ ---
             if (studentMessage) {
                 const parts = studentMessage.split(/\n\n--- 追加質問 \(([^)]+)\) ---\n/);
 
                 // 最初のメッセージ
                 if (parts[0].trim()) {
-                    messages.push({ text: parts[0].trim(), isStudent: true, time: created });
-                }
-
-                // 先生の返信があれば（追加質問の前に表示）
-                if (replyText) {
-                    messages.push({ text: replyText, isStudent: false, time: replied });
+                    messages.push({
+                        text: parts[0].trim(),
+                        isStudent: true,
+                        time: created,
+                        timestamp: new Date(created).getTime() // ソート用
+                    });
                 }
 
                 // 追加質問群
                 for (let i = 1; i < parts.length; i += 2) {
-                    const time = parts[i];
+                    const timeStr = parts[i];
                     const text = parts[i + 1];
                     if (text && text.trim()) {
-                        messages.push({ text: text.trim(), isStudent: true, time: time });
+                        messages.push({
+                            text: text.trim(),
+                            isStudent: true,
+                            time: timeStr,
+                            timestamp: new Date(timeStr).getTime()
+                        });
                     }
                 }
-            } else {
-                // メッセージがなくても返信があれば表示
-                if (replyText) {
-                    messages.push({ text: replyText, isStudent: false, time: replied });
+            }
+
+            // --- 先生の返信 ---
+            if (replyText) {
+                // 新しい形式: \n\n--- 返信 (YYYY/MM/DD HH:MM) ---\n
+                // 後方互換性のため古い形式（単なる区切り）も考慮する必要があるが、
+                // 古い形式のデータは区切りがないか、単に追記されているだけなので
+                // 既存の replyText 全体を「replied」の時間として扱うしかない場合も多い。
+                // ただし、アプリの改修履歴からして、これまでは単に追記されていた（区切り文字なし、または改行のみ）可能性が高い。
+                // ここでは、今回導入した区切り文字で分割を試みる。
+
+                const replyParts = replyText.split(/\n\n--- 返信 \(([^)]+)\) ---\n/);
+
+                // 最初の返信 (replied_at の時間)
+                if (replyParts[0].trim()) {
+                    messages.push({
+                        text: replyParts[0].trim(),
+                        isStudent: false,
+                        time: replied,
+                        timestamp: new Date(replied).getTime()
+                    });
+                }
+
+                // 追加返信群
+                for (let i = 1; i < replyParts.length; i += 2) {
+                    const timeStr = replyParts[i];
+                    const text = replyParts[i + 1];
+                    if (text && text.trim()) {
+                        messages.push({
+                            text: text.trim(),
+                            isStudent: false,
+                            time: timeStr,
+                            timestamp: new Date(timeStr).getTime()
+                        });
+                    }
                 }
             }
+
+            // 時間順にソート (古い順)
+            messages.sort((a, b) => a.timestamp - b.timestamp);
 
             return messages;
         }

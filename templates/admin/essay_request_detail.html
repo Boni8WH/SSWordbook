@@ -283,27 +283,62 @@
             var created = container.dataset.createdAt;
             var replied = container.dataset.repliedAt;
 
+            // --- 生徒のメッセージ ---
             if (studentMessage) {
                 var parts = studentMessage.split(/\n\n--- 追加質問 \(([^)]+)\) ---\n/);
 
                 if (parts[0].trim()) {
-                    messages.push({ text: parts[0].trim(), isStudent: true, time: created });
-                }
-
-                if (replyText) {
-                    messages.push({ text: replyText, isStudent: false, time: replied });
+                    messages.push({
+                        text: parts[0].trim(),
+                        isStudent: true,
+                        time: created,
+                        timestamp: new Date(created).getTime()
+                    });
                 }
 
                 for (var i = 1; i < parts.length; i += 2) {
-                    var time = parts[i];
+                    var timeStr = parts[i];
                     var text = parts[i + 1];
                     if (text && text.trim()) {
-                        messages.push({ text: text.trim(), isStudent: true, time: time });
+                        messages.push({
+                            text: text.trim(),
+                            isStudent: true,
+                            time: timeStr,
+                            timestamp: new Date(timeStr).getTime()
+                        });
                     }
                 }
-            } else if (replyText) {
-                messages.push({ text: replyText, isStudent: false, time: replied });
             }
+
+            // --- 先生の返信 ---
+            if (replyText) {
+                var replyParts = replyText.split(/\n\n--- 返信 \(([^)]+)\) ---\n/);
+
+                if (replyParts[0].trim()) {
+                    messages.push({
+                        text: replyParts[0].trim(),
+                        isStudent: false,
+                        time: replied,
+                        timestamp: new Date(replied).getTime()
+                    });
+                }
+
+                for (var i = 1; i < replyParts.length; i += 2) {
+                    var timeStr = replyParts[i];
+                    var text = replyParts[i + 1];
+                    if (text && text.trim()) {
+                        messages.push({
+                            text: text.trim(),
+                            isStudent: false,
+                            time: timeStr,
+                            timestamp: new Date(timeStr).getTime()
+                        });
+                    }
+                }
+            }
+
+            // 時間順にソート (古い順)
+            messages.sort(function (a, b) { return a.timestamp - b.timestamp; });
 
             return messages;
         }
