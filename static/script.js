@@ -4461,11 +4461,12 @@ function startVoiceRecognition(e) {
     const recognition = new SpeechRecognition();
     window.currentRecognition = recognition; // Track instance
     recognition.lang = 'ja-JP';
-    recognition.interimResults = false;
 
-    // Safari might have issues with high maxAlternatives or Grammars
-    // STRICT MODE: 1 for Safari to prevent "service-not-allowed"
-    recognition.maxAlternatives = isSafari ? 1 : 20;
+    if (!isSafari) {
+        recognition.interimResults = false;
+        recognition.maxAlternatives = 20;
+    }
+    // Safari: Use defaults to prevent "service-not-allowed"
 
     // Grammar Support: Bias towards the correct answer AND global vocabulary
     // This helps recognition even with slight mispronunciations or difficult words
@@ -4567,275 +4568,273 @@ function startVoiceRecognition(e) {
                 // console.log(`Target Grammar Added: ${currentGrammarString}`);
             }
         }
-    }
-
-    // UI Updates (Disable BOTH buttons)
-    const setListeningState = (isListening) => {
-        const btns = [voiceAnswerBtn, voiceAnswerBtnMobile].filter(b => b);
-        btns.forEach(btn => {
-            if (isListening) {
-                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-                btn.classList.add('listening');
-                btn.disabled = true;
-            } else {
-                btn.innerHTML = '<i class="fas fa-microphone"></i>';
-                btn.classList.remove('listening');
-                btn.disabled = false;
-            }
-        });
-    };
-
-    setListeningState(true);
-
-    // Clean previous feedback
-    if (voiceFeedback) {
-        voiceFeedback.textContent = '';
-        voiceFeedback.classList.add('hidden');
-    }
-
-    recognition.start();
-
-    recognition.onresult = (event) => {
-        // Only process finalized results to prevent flickering
-        if (!event.results[0].isFinal) return;
-
-        // Collect ALL candidates
-        const candidates = [];
-        const results = event.results[0];
-        for (let i = 0; i < results.length; i++) {
-            candidates.push(results[i].transcript);
-        }
-
-        console.log(`Recognized Candidates:`, candidates);
-        verifyVoiceAnswer(candidates);
-    };
-
-    recognition.onspeechend = () => {
-        recognition.stop();
-    };
-
-    recognition.onerror = (event) => {
-        console.error('Speech recognition error', event.error);
-
-        let errorMsg = '聞き取れませんでした';
-        if (event.error === 'no-speech') errorMsg = '音声が検出されませんでした';
-        if (event.error === 'audio-capture') errorMsg = 'マイクが見つかりません';
-        if (event.error === 'not-allowed') {
-            errorMsg = 'マイクの使用が許可されていません。\nブラウザの設定でマイクを許可してください。(スマホの場合はHTTPS接続が必要です)';
-            alert(errorMsg);
-        }
-        if (event.error === 'service-not-allowed') {
-            if (isSafari) {
-                errorMsg = '音声入力が利用できません。\n\nMac/iPhoneの「設定」>「キーボード」>「音声入力」がオンになっているか確認してください。\nまたはChromeブラウザをお試しください。';
-            } else {
-                errorMsg = '音声入力サービスが利用できません。';
-            }
-            alert(errorMsg);
-        }
-
-        // Restore UI
-        setListeningState(false);
-
-        if (voiceFeedback) {
-            voiceFeedback.textContent = `❌ ${errorMsg}`;
-            voiceFeedback.classList.remove('hidden');
-        }
-    };
-
-    recognition.onend = () => {
-        // Check if any button is still in listening state (safety net)
-        if ((voiceAnswerBtn && voiceAnswerBtn.classList.contains('listening')) ||
-            (voiceAnswerBtnMobile && voiceAnswerBtnMobile.classList.contains('listening'))) {
-            setListeningState(false);
-        }
-    };
-}
-
-// ===================================
-// Helper: Dictionary Pre-calculation (Lazy)
-// ===================================
-let globalVoiceDictionary = null;
-
-function getVoiceDictionary() {
-    if (globalVoiceDictionary) return globalVoiceDictionary;
-
-    globalVoiceDictionary = new Set();
-    if (voice_vocab_data && Array.isArray(voice_vocab_data)) {
-        voice_vocab_data.forEach(w => {
-            // Answer
-            if (w.answer) {
-                // Split by delimiters to handle "A(B)" -> A, B
-                const parts = w.answer.split(/[（(）)]+/);
-                parts.forEach(p => {
-                    // Normalize using the same logic as verify
-                    const clean = normalizeString(p);
-                    if (clean.length > 0) globalVoiceDictionary.add(clean);
-                });
-            }
-            // 🆕 Reading
-            if (w.reading) {
-                const parts = w.reading.split(/[\/,]+/);
-                parts.forEach(p => {
-                    const clean = normalizeString(p);
-                    if (clean.length > 0) globalVoiceDictionary.add(clean);
-                });
-            }
-        });
-    }
-    // console.log(`Voice Dictionary Initialized: ${globalVoiceDictionary.size} words`);
-    return globalVoiceDictionary;
-}
-
-// Reuse normalization logic for dictionary
-function normalizeString(str) {
-    if (!str) return '';
-    let s = str.replace(/\s+/g, '') // Remove spaces
-        .replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
-        .replace(/[Ａ-Ｚ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
-        .replace(/[ａ-ｚ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
-        .replace(/[「」『』()（）\[\]【】＝=・、。]/g, '')
-        .replace(/ヴァ/g, 'バ').replace(/ヴィ/g, 'ビ').replace(/ヴェ/g, 'ベ').replace(/ヴォ/g, 'ボ').replace(/ヴ/g, 'ブ')
-        .toLowerCase();
-
-    // Numbers
-    const kanjiDigits = '〇一二三四五六七八九';
-    s = s.replace(/[〇一二三四五六七八九]/g, m => kanjiDigits.indexOf(m));
-    s = s.replace(/(\d)十(\d)/g, '$1$2').replace(/(\d)十/g, '$10').replace(/十(\d)/g, '1$1').replace(/十/g, '10');
-    s = s.replace(/(\d)百(\d+)/g, '$1$2').replace(/(\d)百/g, '$100').replace(/百(\d+)/g, '1$1').replace(/百/g, '100');
-    s = s.replace(/(\d)千(\d+)/g, '$1$2').replace(/(\d)千/g, '$1000').replace(/千(\d+)/g, '1$1').replace(/千/g, '1000');
-    s = s.replace(/(\d)万(\d+)/g, '$1$2').replace(/(\d)万/g, '$10000').replace(/万(\d+)/g, '1$1').replace(/万/g, '10000');
-
-    // 🆕 Unify Kana (Hiragana -> Katakana) for consistent matching
-    s = s.replace(/[\u3041-\u3096]/g, function (ch) {
-        return String.fromCharCode(ch.charCodeAt(0) + 0x60);
-    });
-
-    return s;
-}
-
-function verifyVoiceAnswer(candidates) {
-    if (!currentQuizData || !currentQuizData[currentQuestionIndex]) return;
-
-    // Ensure array
-    if (!Array.isArray(candidates)) candidates = [candidates];
-
-    const currentData = currentQuizData[currentQuestionIndex];
-    const correctAnswer = currentData.answer;
-    const correctReading = currentData.reading || ""; // 🆕
-
-    // Normalization wrapper
-    const normalize = normalizeString;
-
-    // Determine Answer Mode: "Slash (AND)" if either Answer OR Reading contains '/'
-    const isSlashMode = correctAnswer.includes('/') || (correctReading && correctReading.includes('/'));
-
-    // ---------------------------------------------------------
-    // Function to check Single/Comma (OR) match
-    // ---------------------------------------------------------
-    const checkSingleOrMatch = (transcript, targetAnswer, targetReading) => {
-        const cleanTranscript = normalize(transcript);
-
-        // 1. Prepare Valid Answers Set (OR logic)
-        const validSet = new Set();
-
-        // Add Answer variations
-        if (targetAnswer) {
-            validSet.add(normalize(targetAnswer));
-            // Parantheses A(B) -> A, B
-            const parts = targetAnswer.split(/[（(）)]+/);
-            parts.forEach(p => {
-                const n = normalize(p);
-                if (n) validSet.add(n);
-            });
-        }
-
-        // 🆕 Add Reading variations (Comma separated)
-        if (targetReading) {
-            const rParts = targetReading.split(/[,]+/);
-            rParts.forEach(r => {
-                const n = normalize(r); // 修正: n を定義
-                if (n) validSet.add(n);
-            });
-        }
-
-        // 🆕 Calculate Skeleton for Input
-        const inputSkeleton = getConsonantSkeleton(cleanTranscript);
-
-        // 2. Check against All Valid Options
-        let result = { match: false, type: 'none' };
-
-        for (let target of validSet) {
-            // Strict
-            if (cleanTranscript === target) {
-                return { match: true, type: 'exact' };
-            }
-
-            // 🆕 Consonant Skeleton Match (Ignoring Vowels)
-            // Only apply for longer words (length >= 5) to avoid short word collisions (e.g. Kita vs Kata)
-            if (target.length >= 5) {
-                const targetSkeleton = getConsonantSkeleton(target);
-                if (targetSkeleton && inputSkeleton === targetSkeleton) {
-                    console.log(`💀 Skeleton Match! ${cleanTranscript} (${inputSkeleton}) == ${target} (${targetSkeleton})`);
-                    return { match: true, type: 'exact' }; // Treat as exact match (GREEN)
-                }
-            }
-
-            // Fuzzy
-            if (target.length > 3 && cleanTranscript.includes(target)) {
-                result = { match: true, type: 'fuzzy' }; // Keep looking for exact
-            } else {
-                const dist = levenshteinDistance(cleanTranscript, target);
-
-                // 🆕 Adjusted Threshold based on User Feedback
-                // "Strictness" caused issues, so we relax it for longer words (0.2 -> 0.4)
-                // But keep it "not abnormally wide" for short words (length 4 allows 1 error, not 3).
-                let threshold;
-                if (target.length <= 4) {
-                    threshold = 1; // Strict for short words (Prevent 3 errors for 4 chars)
+        // UI Updates (Disable BOTH buttons)
+        const setListeningState = (isListening) => {
+            const btns = [voiceAnswerBtn, voiceAnswerBtnMobile].filter(b => b);
+            btns.forEach(btn => {
+                if (isListening) {
+                    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                    btn.classList.add('listening');
+                    btn.disabled = true;
                 } else {
-                    threshold = Math.floor(target.length * 0.4); // Relaxed to 40% (e.g., 5 chars -> 2 errors)
+                    btn.innerHTML = '<i class="fas fa-microphone"></i>';
+                    btn.classList.remove('listening');
+                    btn.disabled = false;
+                }
+            });
+        };
+
+        setListeningState(true);
+
+        // Clean previous feedback
+        if (voiceFeedback) {
+            voiceFeedback.textContent = '';
+            voiceFeedback.classList.add('hidden');
+        }
+
+        recognition.start();
+
+        recognition.onresult = (event) => {
+            // Only process finalized results to prevent flickering
+            if (!event.results[0].isFinal) return;
+
+            // Collect ALL candidates
+            const candidates = [];
+            const results = event.results[0];
+            for (let i = 0; i < results.length; i++) {
+                candidates.push(results[i].transcript);
+            }
+
+            console.log(`Recognized Candidates:`, candidates);
+            verifyVoiceAnswer(candidates);
+        };
+
+        recognition.onspeechend = () => {
+            recognition.stop();
+        };
+
+        recognition.onerror = (event) => {
+            console.error('Speech recognition error', event.error);
+
+            let errorMsg = '聞き取れませんでした';
+            if (event.error === 'no-speech') errorMsg = '音声が検出されませんでした';
+            if (event.error === 'audio-capture') errorMsg = 'マイクが見つかりません';
+            if (event.error === 'not-allowed') {
+                errorMsg = 'マイクの使用が許可されていません。\nブラウザの設定でマイクを許可してください。(スマホの場合はHTTPS接続が必要です)';
+                alert(errorMsg);
+            }
+            if (event.error === 'service-not-allowed') {
+                if (isSafari) {
+                    errorMsg = '音声入力が利用できません。\n\nMac/iPhoneの「設定」>「キーボード」>「音声入力」がオンになっているか確認してください。\nまたはChromeブラウザをお試しください。';
+                } else {
+                    errorMsg = '音声入力サービスが利用できません。';
+                }
+                alert(errorMsg);
+            }
+
+            // Restore UI
+            setListeningState(false);
+
+            if (voiceFeedback) {
+                voiceFeedback.textContent = `❌ ${errorMsg}`;
+                voiceFeedback.classList.remove('hidden');
+            }
+        };
+
+        recognition.onend = () => {
+            // Check if any button is still in listening state (safety net)
+            if ((voiceAnswerBtn && voiceAnswerBtn.classList.contains('listening')) ||
+                (voiceAnswerBtnMobile && voiceAnswerBtnMobile.classList.contains('listening'))) {
+                setListeningState(false);
+            }
+        };
+    }
+
+    // ===================================
+    // Helper: Dictionary Pre-calculation (Lazy)
+    // ===================================
+    let globalVoiceDictionary = null;
+
+    function getVoiceDictionary() {
+        if (globalVoiceDictionary) return globalVoiceDictionary;
+
+        globalVoiceDictionary = new Set();
+        if (voice_vocab_data && Array.isArray(voice_vocab_data)) {
+            voice_vocab_data.forEach(w => {
+                // Answer
+                if (w.answer) {
+                    // Split by delimiters to handle "A(B)" -> A, B
+                    const parts = w.answer.split(/[（(）)]+/);
+                    parts.forEach(p => {
+                        // Normalize using the same logic as verify
+                        const clean = normalizeString(p);
+                        if (clean.length > 0) globalVoiceDictionary.add(clean);
+                    });
+                }
+                // 🆕 Reading
+                if (w.reading) {
+                    const parts = w.reading.split(/[\/,]+/);
+                    parts.forEach(p => {
+                        const clean = normalizeString(p);
+                        if (clean.length > 0) globalVoiceDictionary.add(clean);
+                    });
+                }
+            });
+        }
+        // console.log(`Voice Dictionary Initialized: ${globalVoiceDictionary.size} words`);
+        return globalVoiceDictionary;
+    }
+
+    // Reuse normalization logic for dictionary
+    function normalizeString(str) {
+        if (!str) return '';
+        let s = str.replace(/\s+/g, '') // Remove spaces
+            .replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+            .replace(/[Ａ-Ｚ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+            .replace(/[ａ-ｚ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+            .replace(/[「」『』()（）\[\]【】＝=・、。]/g, '')
+            .replace(/ヴァ/g, 'バ').replace(/ヴィ/g, 'ビ').replace(/ヴェ/g, 'ベ').replace(/ヴォ/g, 'ボ').replace(/ヴ/g, 'ブ')
+            .toLowerCase();
+
+        // Numbers
+        const kanjiDigits = '〇一二三四五六七八九';
+        s = s.replace(/[〇一二三四五六七八九]/g, m => kanjiDigits.indexOf(m));
+        s = s.replace(/(\d)十(\d)/g, '$1$2').replace(/(\d)十/g, '$10').replace(/十(\d)/g, '1$1').replace(/十/g, '10');
+        s = s.replace(/(\d)百(\d+)/g, '$1$2').replace(/(\d)百/g, '$100').replace(/百(\d+)/g, '1$1').replace(/百/g, '100');
+        s = s.replace(/(\d)千(\d+)/g, '$1$2').replace(/(\d)千/g, '$1000').replace(/千(\d+)/g, '1$1').replace(/千/g, '1000');
+        s = s.replace(/(\d)万(\d+)/g, '$1$2').replace(/(\d)万/g, '$10000').replace(/万(\d+)/g, '1$1').replace(/万/g, '10000');
+
+        // 🆕 Unify Kana (Hiragana -> Katakana) for consistent matching
+        s = s.replace(/[\u3041-\u3096]/g, function (ch) {
+            return String.fromCharCode(ch.charCodeAt(0) + 0x60);
+        });
+
+        return s;
+    }
+
+    function verifyVoiceAnswer(candidates) {
+        if (!currentQuizData || !currentQuizData[currentQuestionIndex]) return;
+
+        // Ensure array
+        if (!Array.isArray(candidates)) candidates = [candidates];
+
+        const currentData = currentQuizData[currentQuestionIndex];
+        const correctAnswer = currentData.answer;
+        const correctReading = currentData.reading || ""; // 🆕
+
+        // Normalization wrapper
+        const normalize = normalizeString;
+
+        // Determine Answer Mode: "Slash (AND)" if either Answer OR Reading contains '/'
+        const isSlashMode = correctAnswer.includes('/') || (correctReading && correctReading.includes('/'));
+
+        // ---------------------------------------------------------
+        // Function to check Single/Comma (OR) match
+        // ---------------------------------------------------------
+        const checkSingleOrMatch = (transcript, targetAnswer, targetReading) => {
+            const cleanTranscript = normalize(transcript);
+
+            // 1. Prepare Valid Answers Set (OR logic)
+            const validSet = new Set();
+
+            // Add Answer variations
+            if (targetAnswer) {
+                validSet.add(normalize(targetAnswer));
+                // Parantheses A(B) -> A, B
+                const parts = targetAnswer.split(/[（(）)]+/);
+                parts.forEach(p => {
+                    const n = normalize(p);
+                    if (n) validSet.add(n);
+                });
+            }
+
+            // 🆕 Add Reading variations (Comma separated)
+            if (targetReading) {
+                const rParts = targetReading.split(/[,]+/);
+                rParts.forEach(r => {
+                    const n = normalize(r); // 修正: n を定義
+                    if (n) validSet.add(n);
+                });
+            }
+
+            // 🆕 Calculate Skeleton for Input
+            const inputSkeleton = getConsonantSkeleton(cleanTranscript);
+
+            // 2. Check against All Valid Options
+            let result = { match: false, type: 'none' };
+
+            for (let target of validSet) {
+                // Strict
+                if (cleanTranscript === target) {
+                    return { match: true, type: 'exact' };
                 }
 
-                if (dist <= threshold) {
-                    // 🆕 User Request: 1 char mistake -> Exact match (for length >= 3)
-                    if (dist <= 1 && target.length >= 3) {
-                        return { match: true, type: 'exact' };
+                // 🆕 Consonant Skeleton Match (Ignoring Vowels)
+                // Only apply for longer words (length >= 5) to avoid short word collisions (e.g. Kita vs Kata)
+                if (target.length >= 5) {
+                    const targetSkeleton = getConsonantSkeleton(target);
+                    if (targetSkeleton && inputSkeleton === targetSkeleton) {
+                        console.log(`💀 Skeleton Match! ${cleanTranscript} (${inputSkeleton}) == ${target} (${targetSkeleton})`);
+                        return { match: true, type: 'exact' }; // Treat as exact match (GREEN)
                     }
-                    result = { match: true, type: 'fuzzy' };
+                }
+
+                // Fuzzy
+                if (target.length > 3 && cleanTranscript.includes(target)) {
+                    result = { match: true, type: 'fuzzy' }; // Keep looking for exact
+                } else {
+                    const dist = levenshteinDistance(cleanTranscript, target);
+
+                    // 🆕 Adjusted Threshold based on User Feedback
+                    // "Strictness" caused issues, so we relax it for longer words (0.2 -> 0.4)
+                    // But keep it "not abnormally wide" for short words (length 4 allows 1 error, not 3).
+                    let threshold;
+                    if (target.length <= 4) {
+                        threshold = 1; // Strict for short words (Prevent 3 errors for 4 chars)
+                    } else {
+                        threshold = Math.floor(target.length * 0.4); // Relaxed to 40% (e.g., 5 chars -> 2 errors)
+                    }
+
+                    if (dist <= threshold) {
+                        // 🆕 User Request: 1 char mistake -> Exact match (for length >= 3)
+                        if (dist <= 1 && target.length >= 3) {
+                            return { match: true, type: 'exact' };
+                        }
+                        result = { match: true, type: 'fuzzy' };
+                    }
                 }
             }
-        }
-        return result;
-    };
+            return result;
+        };
 
 
-    let matchFound = false;
-    let matchType = 'none'; // 'exact', 'fuzzy'
-    let matchedCandidate = '';
+        let matchFound = false;
+        let matchType = 'none'; // 'exact', 'fuzzy'
+        let matchedCandidate = '';
 
-    // ==========================================
-    // Helpers
-    // ==========================================
+        // ==========================================
+        // Helpers
+        // ==========================================
 
-    // Helper: Execute Success Logic
-    const executeSuccess = (text, type) => {
-        if (type === 'exact') {
-            if (isProcessingVoiceSuccess) return;
-            isProcessingVoiceSuccess = true;
-            if (voiceFeedback) {
-                voiceFeedback.innerHTML = `
+        // Helper: Execute Success Logic
+        const executeSuccess = (text, type) => {
+            if (type === 'exact') {
+                if (isProcessingVoiceSuccess) return;
+                isProcessingVoiceSuccess = true;
+                if (voiceFeedback) {
+                    voiceFeedback.innerHTML = `
                 <div style="padding: 20px; background: #e8f5e9; border: 2px solid #a5d6a7; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.01); text-align: center; animation: pulse 0.5s;">
                     <h3 style="margin: 0 0 10px 0; color: #2e7d32; font-size: 1.4em; font-weight: bold;"><i class="fas fa-check-circle"></i> 正解！</h3>
                     <p style="margin: 0; font-size: 1.1em; color: #388e3c; font-weight: bold;">"${correctAnswer}"</p>
                     <div style="margin-top: 10px; font-size: 0.9em; color: #66bb6a;"><i class="fas fa-spinner fa-spin"></i> 次の問題へ進みます...</div>
                 </div>`;
-                voiceFeedback.classList.remove('hidden');
-            }
-            setTimeout(() => { handleAnswer(true); }, 1500);
-        } else {
-            // Fuzzy match confirmation
-            if (voiceFeedback) {
-                voiceFeedback.innerHTML = `
+                    voiceFeedback.classList.remove('hidden');
+                }
+                setTimeout(() => { handleAnswer(true); }, 1500);
+            } else {
+                // Fuzzy match confirmation
+                if (voiceFeedback) {
+                    voiceFeedback.innerHTML = `
                 <div style="padding: 15px; background: #fffde7; border: 2px solid #fff176; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
                     <p style="margin: 0 0 5px; color: #f57f17; font-weight: bold; font-size: 1.1em;">
                         <i class="fas fa-question-circle"></i> 「${correctAnswer}」？
@@ -4848,45 +4847,45 @@ function verifyVoiceAnswer(candidates) {
                         <button id="voiceConfirmNo" class="btn btn-secondary btn-sm" style="flex: 1;"><i class="fas fa-times"></i> いいえ</button>
                     </div>
                 </div>`;
-                voiceFeedback.classList.remove('hidden');
-                document.getElementById('voiceConfirmYes').onclick = () => {
-                    if (isProcessingVoiceSuccess) return;
-                    isProcessingVoiceSuccess = true;
-                    handleAnswer(true);
-                };
-                document.getElementById('voiceConfirmNo').onclick = () => {
-                    voiceFeedback.classList.add('hidden');
-                    voiceFeedback.innerHTML = '';
-                };
+                    voiceFeedback.classList.remove('hidden');
+                    document.getElementById('voiceConfirmYes').onclick = () => {
+                        if (isProcessingVoiceSuccess) return;
+                        isProcessingVoiceSuccess = true;
+                        handleAnswer(true);
+                    };
+                    document.getElementById('voiceConfirmNo').onclick = () => {
+                        voiceFeedback.classList.add('hidden');
+                        voiceFeedback.innerHTML = '';
+                    };
+                }
             }
-        }
-    };
+        };
 
-    // Helper: Execute Failure Logic
-    const executeFailure = () => {
-        const dictionary = getVoiceDictionary();
-        let bestDisplayCandidate = null;
-        let isDictionaryTerm = false;
+        // Helper: Execute Failure Logic
+        const executeFailure = () => {
+            const dictionary = getVoiceDictionary();
+            let bestDisplayCandidate = null;
+            let isDictionaryTerm = false;
 
-        for (let transcript of candidates) {
-            const clean = normalize(transcript);
-            if (dictionary.has(clean)) {
-                bestDisplayCandidate = transcript;
-                isDictionaryTerm = true;
-                break;
+            for (let transcript of candidates) {
+                const clean = normalize(transcript);
+                if (dictionary.has(clean)) {
+                    bestDisplayCandidate = transcript;
+                    isDictionaryTerm = true;
+                    break;
+                }
             }
-        }
 
-        if (!bestDisplayCandidate) {
-            bestDisplayCandidate = "（用語として認識できませんでした）";
-        }
+            if (!bestDisplayCandidate) {
+                bestDisplayCandidate = "（用語として認識できませんでした）";
+            }
 
-        console.log(`Voice mismatch. Displaying: ${bestDisplayCandidate}`);
+            console.log(`Voice mismatch. Displaying: ${bestDisplayCandidate}`);
 
-        if (voiceFeedback) {
-            let msgHtml = '';
-            if (isDictionaryTerm) {
-                msgHtml = `
+            if (voiceFeedback) {
+                let msgHtml = '';
+                if (isDictionaryTerm) {
+                    msgHtml = `
                 <div style="background: #fff5f5; padding: 15px; border-radius: 12px; border: 2px solid #ffcccc; margin-bottom: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
                     <p style="margin: 0 0 5px; color: #e74c3c; font-weight: bold; font-size: 1.1em;">
                         <i class="fas fa-times-circle"></i> 不正解
@@ -4898,8 +4897,8 @@ function verifyVoiceAnswer(candidates) {
                         ※辞書にある単語ですが、この問題の正解ではありません。
                     </p>
                 </div>`;
-            } else {
-                msgHtml = `
+                } else {
+                    msgHtml = `
                 <div style="background: #f8f9fa; padding: 15px; border-radius: 12px; border: 2px solid #dee2e6; margin-bottom: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
                      <p style="margin: 0 0 5px; color: #7f8c8d; font-weight: bold; font-size: 1.1em;">
                         <i class="fas fa-microphone-slash"></i> 聞き取れませんでした
@@ -4908,237 +4907,238 @@ function verifyVoiceAnswer(candidates) {
                         歴史用語として認識されませんでした。<br>もう一度お話しください。
                     </p>
                 </div>`;
+                }
+
+                voiceFeedback.innerHTML = msgHtml;
+                voiceFeedback.classList.remove('hidden');
             }
+        };
 
-            voiceFeedback.innerHTML = msgHtml;
-            voiceFeedback.classList.remove('hidden');
-        }
-    };
+        // ==========================================
+        // Helper: Consonant Skeleton Extraction
+        // ==========================================
+        const getConsonantSkeleton = (str) => {
+            if (!str) return "";
+            let s = normalize(str); // Base normalization first
 
-    // ==========================================
-    // Helper: Consonant Skeleton Extraction
-    // ==========================================
-    const getConsonantSkeleton = (str) => {
-        if (!str) return "";
-        let s = normalize(str); // Base normalization first
+            // Remove Vowels and special ignoring chars
+            // A I U E O, small ya/yu/yo, long vowel, small tsu (maybe?)
+            // Let's map Kana to approximate consonant
+            // This is a simplified mapping.
 
-        // Remove Vowels and special ignoring chars
-        // A I U E O, small ya/yu/yo, long vowel, small tsu (maybe?)
-        // Let's map Kana to approximate consonant
-        // This is a simplified mapping.
+            let res = "";
+            for (let i = 0; i < s.length; i++) {
+                const c = s.charAt(i);
 
-        let res = "";
-        for (let i = 0; i < s.length; i++) {
-            const c = s.charAt(i);
+                // Skip Long Vowels / Small Tsu / Symbols
+                if (/[ーっッ]/.test(c)) continue;
 
-            // Skip Long Vowels / Small Tsu / Symbols
-            if (/[ーっッ]/.test(c)) continue;
+                // Map standard Gojuon (Basic Consonant Groups)
+                if (/[あいうえおアイウエオ]/.test(c)) { /* Vowel -> Skip (or placeholder?) Skip for skeleton */ continue; }
 
-            // Map standard Gojuon (Basic Consonant Groups)
-            if (/[あいうえおアイウエオ]/.test(c)) { /* Vowel -> Skip (or placeholder?) Skip for skeleton */ continue; }
+                if (/[かきくけこカキクケコ]/.test(c)) { res += "K"; continue; }
+                if (/[さしすせそサシスセソ]/.test(c)) { res += "S"; continue; }
+                if (/[たちつてとタチツテト]/.test(c)) { res += "T"; continue; }
+                if (/[なにぬねのナニヌネノ]/.test(c)) { res += "N"; continue; }
+                if (/[はひふへほハヒフヘホ]/.test(c)) { res += "H"; continue; }
+                if (/[まみむめもマミムメモ]/.test(c)) { res += "M"; continue; }
+                if (/[やゆよヤユヨ]/.test(c)) { res += "Y"; continue; }
+                if (/[らりるれろラリルレロ]/.test(c)) { res += "R"; continue; }
+                if (/[わをワヲ]/.test(c)) { res += "W"; continue; }
+                if (/[んン]/.test(c)) { res += "N"; continue; } // N is important
 
-            if (/[かきくけこカキクケコ]/.test(c)) { res += "K"; continue; }
-            if (/[さしすせそサシスセソ]/.test(c)) { res += "S"; continue; }
-            if (/[たちつてとタチツテト]/.test(c)) { res += "T"; continue; }
-            if (/[なにぬねのナニヌネノ]/.test(c)) { res += "N"; continue; }
-            if (/[はひふへほハヒフヘホ]/.test(c)) { res += "H"; continue; }
-            if (/[まみむめもマミムメモ]/.test(c)) { res += "M"; continue; }
-            if (/[やゆよヤユヨ]/.test(c)) { res += "Y"; continue; }
-            if (/[らりるれろラリルレロ]/.test(c)) { res += "R"; continue; }
-            if (/[わをワヲ]/.test(c)) { res += "W"; continue; }
-            if (/[んン]/.test(c)) { res += "N"; continue; } // N is important
+                if (/[がぎぐげごガギグゲゴ]/.test(c)) { res += "G"; continue; }
+                if (/[ざじずぜぞザジズゼゾ]/.test(c)) { res += "Z"; continue; }
+                if (/[だぢづでどダヂヅデド]/.test(c)) { res += "D"; continue; }
+                if (/[ばびぶべぼバビブベボ]/.test(c)) { res += "B"; continue; }
+                if (/[ぱぴぷぺぽパピプペポ]/.test(c)) { res += "P"; continue; }
 
-            if (/[がぎぐげごガギグゲゴ]/.test(c)) { res += "G"; continue; }
-            if (/[ざじずぜぞザジズゼゾ]/.test(c)) { res += "Z"; continue; }
-            if (/[だぢづでどダヂヅデド]/.test(c)) { res += "D"; continue; }
-            if (/[ばびぶべぼバビブベボ]/.test(c)) { res += "B"; continue; }
-            if (/[ぱぴぷぺぽパピプペポ]/.test(c)) { res += "P"; continue; }
+                // Small Ya/Yu/Yo often modify consonant (Kya -> K), so they are skippable if we took the consonant from the main char beforehand.
+                // e.g. キャ (Ki-ya) -> Ki (K) + ya (Y or skip). 
+                // In strict Hepburn, Kya -> KY. But for skeleton "K" is enough core.
+                if (/[ゃゅょャュョ]/.test(c)) continue;
 
-            // Small Ya/Yu/Yo often modify consonant (Kya -> K), so they are skippable if we took the consonant from the main char beforehand.
-            // e.g. キャ (Ki-ya) -> Ki (K) + ya (Y or skip). 
-            // In strict Hepburn, Kya -> KY. But for skeleton "K" is enough core.
-            if (/[ゃゅょャュョ]/.test(c)) continue;
-
-            // If unknown (Kanji or other), keep it? Or skip?
-            // Since we normalize to Kana usually via server, this might not be hit often.
-            // But if mixed, let's keep it to differentiate.
-            res += c;
-        }
-        return res;
-    };
-
-
-    // Helper: Check a single transcript against logic
-    const checkTranscriptMatch = (text) => {
-        const clean = normalize(text);
-
-        // 🆕 Calculate Skeleton for Input
-        const inputSkeleton = getConsonantSkeleton(clean);
-
-        // Helper: Check if string contains target (Exact or Fuzzy)
-        const containsFuzzy = (haystack, needle) => {
-
-            if (haystack.includes(needle)) return true;
-
-            // Fuzzy check
-            // We scan the haystack with a window of needle.length size.
-            // If any window has small edit distance, return true.
-            if (needle.length < 2) return false; // Too short for fuzzy
-
-            // 🆕 Adjusted Threshold for Substring
-            let threshold;
-            if (needle.length <= 4) {
-                threshold = 1;
-            } else {
-                threshold = Math.floor(needle.length * 0.4);
+                // If unknown (Kanji or other), keep it? Or skip?
+                // Since we normalize to Kana usually via server, this might not be hit often.
+                // But if mixed, let's keep it to differentiate.
+                res += c;
             }
+            return res;
+        };
 
-            // Optimization: If difference in length is too big, it can't match? 
-            // But we are looking for a SUBSTRING match, so haystack is usually longer.
 
-            // Sliding window approach
-            for (let i = 0; i <= haystack.length - needle.length; i++) {
-                const sub = haystack.substr(i, needle.length);
-                const dist = levenshteinDistance(sub, needle);
-                if (dist <= threshold) return true;
-            }
-            // Check slightly larger/smaller windows too? (e.g. +/- 1 char)
-            // For simplicity, just checking exact length window often works for minor typos.
-            // Let's add +/- 1 length for robustness if haystack allows.
-            for (let lenOffset = -1; lenOffset <= 1; lenOffset++) {
-                if (lenOffset === 0) continue; // Already did
-                const wLen = needle.length + lenOffset;
-                if (wLen < 1) continue;
-                for (let i = 0; i <= haystack.length - wLen; i++) {
-                    const sub = haystack.substr(i, wLen);
+        // Helper: Check a single transcript against logic
+        const checkTranscriptMatch = (text) => {
+            const clean = normalize(text);
+
+            // 🆕 Calculate Skeleton for Input
+            const inputSkeleton = getConsonantSkeleton(clean);
+
+            // Helper: Check if string contains target (Exact or Fuzzy)
+            const containsFuzzy = (haystack, needle) => {
+
+                if (haystack.includes(needle)) return true;
+
+                // Fuzzy check
+                // We scan the haystack with a window of needle.length size.
+                // If any window has small edit distance, return true.
+                if (needle.length < 2) return false; // Too short for fuzzy
+
+                // 🆕 Adjusted Threshold for Substring
+                let threshold;
+                if (needle.length <= 4) {
+                    threshold = 1;
+                } else {
+                    threshold = Math.floor(needle.length * 0.4);
+                }
+
+                // Optimization: If difference in length is too big, it can't match? 
+                // But we are looking for a SUBSTRING match, so haystack is usually longer.
+
+                // Sliding window approach
+                for (let i = 0; i <= haystack.length - needle.length; i++) {
+                    const sub = haystack.substr(i, needle.length);
                     const dist = levenshteinDistance(sub, needle);
                     if (dist <= threshold) return true;
                 }
-            }
+                // Check slightly larger/smaller windows too? (e.g. +/- 1 char)
+                // For simplicity, just checking exact length window often works for minor typos.
+                // Let's add +/- 1 length for robustness if haystack allows.
+                for (let lenOffset = -1; lenOffset <= 1; lenOffset++) {
+                    if (lenOffset === 0) continue; // Already did
+                    const wLen = needle.length + lenOffset;
+                    if (wLen < 1) continue;
+                    for (let i = 0; i <= haystack.length - wLen; i++) {
+                        const sub = haystack.substr(i, wLen);
+                        const dist = levenshteinDistance(sub, needle);
+                        if (dist <= threshold) return true;
+                    }
+                }
 
-            return false;
+                return false;
+            };
+
+            if (isSlashMode) {
+                const answerParts = correctAnswer.split('/').map(s => normalize(s)).filter(s => s && s.trim().length > 0);
+                const readingParts = correctReading ? correctReading.split(/[\/,]+/).map(s => normalize(s)).filter(s => s && s.trim().length > 0) : [];
+
+                // Check 1: All Answer Parts
+                let allAns = true;
+                let ansFuzzy = false;
+                for (const p of answerParts) {
+                    if (!containsFuzzy(clean, p)) { allAns = false; break; }
+                    if (!clean.includes(p)) ansFuzzy = true; // Found via fuzzy
+                }
+                if (allAns) return { match: true, type: ansFuzzy ? 'fuzzy' : 'exact' };
+
+                // Check 2: All Reading Parts
+                if (readingParts.length > 0) {
+                    let allRead = true;
+                    let readFuzzy = false;
+                    for (const p of readingParts) {
+                        if (!containsFuzzy(clean, p)) { allRead = false; break; }
+                        if (!clean.includes(p)) readFuzzy = true;
+                    }
+                    if (allRead) return { match: true, type: readFuzzy ? 'fuzzy' : 'exact' };
+                }
+
+                // Check 3: Hybrid
+                if (answerParts.length === readingParts.length && answerParts.length > 0) {
+                    let allSlots = true;
+                    let slotFuzzy = false;
+                    for (let i = 0; i < answerParts.length; i++) {
+                        const hasAns = containsFuzzy(clean, answerParts[i]);
+                        const hasRead = containsFuzzy(clean, readingParts[i]);
+                        if (!hasAns && !hasRead) { allSlots = false; break; }
+
+                        if (hasAns && !clean.includes(answerParts[i])) slotFuzzy = true;
+                        if (!hasAns && hasRead && !clean.includes(readingParts[i])) slotFuzzy = true;
+                    }
+                    if (allSlots) return { match: true, type: slotFuzzy ? 'fuzzy' : 'exact' };
+                }
+                return { match: false, type: 'none' };
+            } else {
+                return checkSingleOrMatch(text, correctAnswer, correctReading);
+            }
         };
 
-        if (isSlashMode) {
-            const answerParts = correctAnswer.split('/').map(s => normalize(s)).filter(s => s && s.trim().length > 0);
-            const readingParts = correctReading ? correctReading.split(/[\/,]+/).map(s => normalize(s)).filter(s => s && s.trim().length > 0) : [];
+        // ==========================================
+        // Check all candidates
+        // ==========================================
 
-            // Check 1: All Answer Parts
-            let allAns = true;
-            let ansFuzzy = false;
-            for (const p of answerParts) {
-                if (!containsFuzzy(clean, p)) { allAns = false; break; }
-                if (!clean.includes(p)) ansFuzzy = true; // Found via fuzzy
+        for (let transcript of candidates) {
+            const res = checkTranscriptMatch(transcript);
+            if (res.match) {
+                matchFound = true;
+                matchType = res.type;
+                matchedCandidate = transcript;
+                if (matchType === 'exact') break;
             }
-            if (allAns) return { match: true, type: ansFuzzy ? 'fuzzy' : 'exact' };
+        }
 
-            // Check 2: All Reading Parts
-            if (readingParts.length > 0) {
-                let allRead = true;
-                let readFuzzy = false;
-                for (const p of readingParts) {
-                    if (!containsFuzzy(clean, p)) { allRead = false; break; }
-                    if (!clean.includes(p)) readFuzzy = true;
-                }
-                if (allRead) return { match: true, type: readFuzzy ? 'fuzzy' : 'exact' };
-            }
 
-            // Check 3: Hybrid
-            if (answerParts.length === readingParts.length && answerParts.length > 0) {
-                let allSlots = true;
-                let slotFuzzy = false;
-                for (let i = 0; i < answerParts.length; i++) {
-                    const hasAns = containsFuzzy(clean, answerParts[i]);
-                    const hasRead = containsFuzzy(clean, readingParts[i]);
-                    if (!hasAns && !hasRead) { allSlots = false; break; }
-
-                    if (hasAns && !clean.includes(answerParts[i])) slotFuzzy = true;
-                    if (!hasAns && hasRead && !clean.includes(readingParts[i])) slotFuzzy = true;
-                }
-                if (allSlots) return { match: true, type: slotFuzzy ? 'fuzzy' : 'exact' };
-            }
-            return { match: false, type: 'none' };
+        // If we have a match (correct answer), handle it.
+        if (matchFound) {
+            executeSuccess(matchedCandidate, matchType);
         } else {
-            return checkSingleOrMatch(text, correctAnswer, correctReading);
-        }
-    };
+            // 🆕 Fallback: Server-side Katakana Conversion (Batch)
+            if (candidates.length > 0) {
+                // Take top 5 candidates to increase hit rate (especially for Safari/No-Grammar)
+                const fallbackCandidates = candidates.slice(0, 5);
 
-    // ==========================================
-    // Check all candidates
-    // ==========================================
-
-    for (let transcript of candidates) {
-        const res = checkTranscriptMatch(transcript);
-        if (res.match) {
-            matchFound = true;
-            matchType = res.type;
-            matchedCandidate = transcript;
-            if (matchType === 'exact') break;
-        }
-    }
-
-
-    // If we have a match (correct answer), handle it.
-    if (matchFound) {
-        executeSuccess(matchedCandidate, matchType);
-    } else {
-        // 🆕 Fallback: Server-side Katakana Conversion (Batch)
-        if (candidates.length > 0) {
-            // Take top 5 candidates to increase hit rate (especially for Safari/No-Grammar)
-            const fallbackCandidates = candidates.slice(0, 5);
-
-            // Show Loading Feedback
-            if (voiceFeedback) {
-                voiceFeedback.innerHTML = `
+                // Show Loading Feedback
+                if (voiceFeedback) {
+                    voiceFeedback.innerHTML = `
                  <div style="padding: 15px; background: #e3f2fd; border: 2px solid #90caf9; border-radius: 12px; color: #1565c0; animation: pulse 1s infinite; text-align: center;">
                     <i class="fas fa-sync fa-spin"></i> 読み仮名変換で再確認中...<br>
                     <small>(${fallbackCandidates.length}件の候補を解析中)</small>
                  </div>`;
-                voiceFeedback.classList.remove('hidden');
-            }
+                    voiceFeedback.classList.remove('hidden');
+                }
 
-            fetch('/api/to_katakana', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ texts: fallbackCandidates }) // Send list
-            })
-                .then(r => r.json())
-                .then(data => {
-                    // Support both new list format and legacy single format (just in case)
-                    let convertedList = [];
-                    if (data.status === 'success') {
-                        if (data.katakana_list) {
-                            convertedList = data.katakana_list;
-                        } else if (data.katakana) {
-                            convertedList = [data.katakana];
-                        }
-
-                        console.log(`Server conversion results:`, convertedList);
-
-                        // Check each converted candidate
-                        let foundInFallback = false;
-                        for (const katakana of convertedList) {
-                            const res = checkTranscriptMatch(katakana);
-                            if (res.match) {
-                                executeSuccess(katakana, res.type);
-                                foundInFallback = true;
-                                break;
+                fetch('/api/to_katakana', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ texts: fallbackCandidates }) // Send list
+                })
+                    .then(r => r.json())
+                    .then(data => {
+                        // Support both new list format and legacy single format (just in case)
+                        let convertedList = [];
+                        if (data.status === 'success') {
+                            if (data.katakana_list) {
+                                convertedList = data.katakana_list;
+                            } else if (data.katakana) {
+                                convertedList = [data.katakana];
                             }
-                        }
 
-                        if (!foundInFallback) {
+                            console.log(`Server conversion results:`, convertedList);
+
+                            // Check each converted candidate
+                            let foundInFallback = false;
+                            for (const katakana of convertedList) {
+                                const res = checkTranscriptMatch(katakana);
+                                if (res.match) {
+                                    executeSuccess(katakana, res.type);
+                                    foundInFallback = true;
+                                    break;
+                                }
+                            }
+
+                            if (!foundInFallback) {
+                                executeFailure();
+                            }
+                        } else {
                             executeFailure();
                         }
-                    } else {
+                    })
+                    .catch(err => {
+                        console.warn("Server conversion failed:", err);
                         executeFailure();
-                    }
-                })
-                .catch(err => {
-                    console.warn("Server conversion failed:", err);
-                    executeFailure();
-                });
-        } else {
-            executeFailure();
+                    });
+            } else {
+                executeFailure();
+            }
         }
     }
 }
