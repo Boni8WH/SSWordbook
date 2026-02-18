@@ -5057,15 +5057,17 @@ function verifyVoiceAnswer(candidates) {
     if (matchFound) {
         executeSuccess(matchedCandidate, matchType);
     } else {
-        // 🆕 Fallback: Server-side Katakana Conversion
+        // 🆕 Fallback: Server-side Katakana Conversion (Batch)
         if (candidates.length > 0) {
-            const bestCandidate = candidates[0]; // Try the top candidate
+            // Take top 5 candidates to increase hit rate (especially for Safari/No-Grammar)
+            const fallbackCandidates = candidates.slice(0, 5);
 
             // Show Loading Feedback
             if (voiceFeedback) {
                 voiceFeedback.innerHTML = `
                  <div style="padding: 15px; background: #e3f2fd; border: 2px solid #90caf9; border-radius: 12px; color: #1565c0; animation: pulse 1s infinite; text-align: center;">
-                    <i class="fas fa-sync fa-spin"></i> 読み仮名変換で再確認中...
+                    <i class="fas fa-sync fa-spin"></i> 読み仮名変換で再確認中...<br>
+                    <small>(${fallbackCandidates.length}件の候補を解析中)</small>
                  </div>`;
                 voiceFeedback.classList.remove('hidden');
             }
@@ -5073,19 +5075,33 @@ function verifyVoiceAnswer(candidates) {
             fetch('/api/to_katakana', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ text: bestCandidate })
+                body: JSON.stringify({ texts: fallbackCandidates }) // Send list
             })
                 .then(r => r.json())
                 .then(data => {
+                    // Support both new list format and legacy single format (just in case)
+                    let convertedList = [];
                     if (data.status === 'success') {
-                        const katakana = data.katakana;
-                        console.log(`Server conversion: ${bestCandidate} -> ${katakana}`);
+                        if (data.katakana_list) {
+                            convertedList = data.katakana_list;
+                        } else if (data.katakana) {
+                            convertedList = [data.katakana];
+                        }
 
-                        // Re-check with the converted katakana
-                        const res = checkTranscriptMatch(katakana);
-                        if (res.match) {
-                            executeSuccess(katakana, res.type);
-                        } else {
+                        console.log(`Server conversion results:`, convertedList);
+
+                        // Check each converted candidate
+                        let foundInFallback = false;
+                        for (const katakana of convertedList) {
+                            const res = checkTranscriptMatch(katakana);
+                            if (res.match) {
+                                executeSuccess(katakana, res.type);
+                                foundInFallback = true;
+                                break;
+                            }
+                        }
+
+                        if (!foundInFallback) {
                             executeFailure();
                         }
                     } else {

@@ -14586,7 +14586,37 @@ def get_katakana_from_mecab(text):
 def to_katakana():
     try:
         data = request.get_json()
-        if not data or 'text' not in data:
+        if not data:
+            return jsonify({'status': 'error', 'message': 'No data provided'}), 400
+
+        # 🆕 Multi-candidate mode (for Safari robustness)
+        if 'texts' in data and isinstance(data['texts'], list):
+            results = []
+            seen = set()
+            for text in data['texts']:
+                if not text: continue
+                
+                # Check cache/dedup
+                if text in seen: continue
+                seen.add(text)
+
+                # Simple check for already katakana
+                if re.fullmatch(r'[ァ-ヶー・\s]+', text):
+                     results.append(text)
+                     continue
+                
+                # Conversion
+                converted = get_katakana_from_mecab(text)
+                results.append(converted)
+            
+            # Print debug for first item to avoid log spam, or summary
+            if len(data['texts']) > 0:
+                print(f"🔤 Batch MeCab Conversion: Processed {len(data['texts'])} candidates.")
+            
+            return jsonify({'status': 'success', 'katakana_list': results})
+
+        # Single text mode (Legacy)
+        if 'text' not in data:
             return jsonify({'status': 'error', 'message': 'No text provided'}), 400
             
         text = data['text']
