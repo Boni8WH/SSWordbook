@@ -4440,6 +4440,15 @@ function startVoiceRecognition(e) {
 
 
 
+    // Global tracker (outside, ensure this is top-level or handled)
+    if (window.currentRecognition) {
+        try {
+            window.currentRecognition.onend = null; // Prevent loops
+            window.currentRecognition.stop();
+            window.currentRecognition.abort();
+        } catch (e) { console.error(e); }
+    }
+
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
         alert("お使いのブラウザは音声入力に対応していません。ChromeやSafariをお試しください。");
@@ -4450,11 +4459,13 @@ function startVoiceRecognition(e) {
     const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
 
     const recognition = new SpeechRecognition();
+    window.currentRecognition = recognition; // Track instance
     recognition.lang = 'ja-JP';
     recognition.interimResults = false;
 
     // Safari might have issues with high maxAlternatives or Grammars
-    recognition.maxAlternatives = isSafari ? 5 : 20;
+    // STRICT MODE: 1 for Safari to prevent "service-not-allowed"
+    recognition.maxAlternatives = isSafari ? 1 : 20;
 
     // Grammar Support: Bias towards the correct answer AND global vocabulary
     // This helps recognition even with slight mispronunciations or difficult words
