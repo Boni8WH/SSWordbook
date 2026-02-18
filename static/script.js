@@ -4446,14 +4446,20 @@ function startVoiceRecognition(e) {
         return;
     }
 
+    // Detect Safari
+    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+
     const recognition = new SpeechRecognition();
     recognition.lang = 'ja-JP';
     recognition.interimResults = false;
-    recognition.maxAlternatives = 20; // Check up to 20 candidates (Fix for Katakana/Kanji bias)
+
+    // Safari might have issues with high maxAlternatives or Grammars
+    recognition.maxAlternatives = isSafari ? 5 : 20;
 
     // Grammar Support: Bias towards the correct answer AND global vocabulary
     // This helps recognition even with slight mispronunciations or difficult words
-    if (currentQuizData && currentQuizData[currentQuestionIndex]) {
+    // SKIP for Safari to avoid "service-not-allowed" caused by unsupported API usage
+    if (!isSafari && currentQuizData && currentQuizData[currentQuestionIndex]) {
         // Correct Answer Data
         const currentData = currentQuizData[currentQuestionIndex];
         const correctAnswer = currentData.answer;
@@ -4605,6 +4611,14 @@ function startVoiceRecognition(e) {
         if (event.error === 'audio-capture') errorMsg = 'マイクが見つかりません';
         if (event.error === 'not-allowed') {
             errorMsg = 'マイクの使用が許可されていません。\nブラウザの設定でマイクを許可してください。(スマホの場合はHTTPS接続が必要です)';
+            alert(errorMsg);
+        }
+        if (event.error === 'service-not-allowed') {
+            if (isSafari) {
+                errorMsg = '音声入力が利用できません。\n\nMac/iPhoneの「設定」>「キーボード」>「音声入力」がオンになっているか確認してください。\nまたはChromeブラウザをお試しください。';
+            } else {
+                errorMsg = '音声入力サービスが利用できません。';
+            }
             alert(errorMsg);
         }
 
