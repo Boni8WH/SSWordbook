@@ -2282,9 +2282,15 @@
 
                                         <!-- 問題文（全幅） -->
                                         <div class="essay-input-group essay-form-full-width">
-                                            <label for="new_essay_question">
-                                                <i class="fas fa-question-circle"></i> 問題文
-                                            </label>
+                                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                                <label for="new_essay_question">
+                                                    <i class="fas fa-question-circle"></i> 問題文
+                                                </label>
+                                                <button type="button" class="btn btn-sm btn-outline-secondary"
+                                                    onmousedown="saveSelectionBeforeClick()" onclick="openLinkModal()">
+                                                    <i class="fas fa-link"></i> リンク挿入
+                                                </button>
+                                            </div>
                                             <textarea id="new_essay_question" name="question"
                                                 class="essay-question-input" placeholder="問題文を入力してください..."
                                                 required></textarea>
@@ -2302,9 +2308,15 @@
                                         </div>
                                         <!-- 解答（全幅） -->
                                         <div class="essay-input-group essay-form-full-width">
-                                            <label for="new_essay_answer">
-                                                <i class="fas fa-lightbulb"></i> 模範解答
-                                            </label>
+                                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                                <label for="new_essay_answer">
+                                                    <i class="fas fa-lightbulb"></i> 模範解答
+                                                </label>
+                                                <button type="button" class="btn btn-sm btn-outline-secondary"
+                                                    onmousedown="saveSelectionBeforeClick()" onclick="openLinkModal()">
+                                                    <i class="fas fa-link"></i> リンク挿入
+                                                </button>
+                                            </div>
                                             <div class="textarea-wrapper">
                                                 <textarea id="new_essay_answer" name="answer" class="essay-answer-input"
                                                     placeholder="模範解答を入力してください..."
@@ -5235,6 +5247,9 @@
                                         <button type="button" class="btn btn-outline-secondary" onmousedown="event.preventDefault()" onclick="insertTag('edit_question', 'underline')" title="下線">
                                             <i class="fas fa-underline"></i>
                                         </button>
+                                        <button type="button" class="btn btn-outline-secondary" onmousedown="saveSelectionBeforeClick()" onclick="openLinkModal()" title="リンク挿入">
+                                            <i class="fas fa-link"></i>
+                                        </button>
                                     </div>
                                 </div>
                                 <textarea class="form-control" id="edit_question" rows="4" required>${problem.question}</textarea>
@@ -5251,6 +5266,9 @@
                                         </button>
                                         <button type="button" class="btn btn-outline-secondary" onmousedown="event.preventDefault()" onclick="insertTag('edit_answer', 'underline')" title="下線">
                                             <i class="fas fa-underline"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-outline-secondary" onmousedown="saveSelectionBeforeClick()" onclick="openLinkModal()" title="リンク挿入">
+                                            <i class="fas fa-link"></i>
                                         </button>
                                     </div>
                                 </div>

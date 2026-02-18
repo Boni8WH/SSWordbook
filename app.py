@@ -195,16 +195,35 @@ def linkify_html(text):
     for i, part in enumerate(parts):
         # タグでない部分（テキスト）のみ処理
         if i % 2 == 0 and part:
+            # 1. Markdown-style links: [text](url)
+            markdown_pattern = r'\[([^\]]+)\]\((https?://[a-zA-Z0-9.\-_~:/?#\[\]@!$&\'()*+,;=%]+)\)'
+            
+            def replace_markdown(match):
+                text = match.group(1)
+                url = match.group(2)
+                return f'<a href="{url}" target="_blank" rel="noopener noreferrer">{text}</a>'
+            
+            part = re.sub(markdown_pattern, replace_markdown, part)
+
+            # 2. Raw URLs
             # URL正規表現 (http/https)
-            # 既存のHTMLタグ内ではない純粋なテキスト中のURLを置換
-            # URLの末尾に来がちな記号を除外する工夫が必要だが、簡易的に実装
-            url_pattern = r'(https?://[a-zA-Z0-9.\-_~:/?#\[\]@!$&\'()*+,;=%]+)'
+            # 既に<a>タグになった部分は除外する必要があるが、
+            # シンプルに「<a ...>...</a>」にマッチしない部分だけで実行するのは難しい
+            # ここでは簡易的に、Markdown置換済みの部分は <a>...</a> になっているので
+            # 再度分割して処理するか、あるいは lookbehind 等を使う
             
-            def replace_link(match):
-                url = match.group(0)
-                return f'<a href="{url}" target="_blank" rel="noopener noreferrer">{url}</a>'
+            # 手堅くやるため、Markdown置換後の文字列を再度タグ分割して、タグ外のみRaw URL置換する
+            # （再帰的処理の簡易版）
+            sub_parts = re.split(r'(<[^>]+>)', part)
+            for j, sub_part in enumerate(sub_parts):
+                if j % 2 == 0 and sub_part:
+                     url_pattern = r'(https?://[a-zA-Z0-9.\-_~:/?#\[\]@!$&\'()*+,;=%]+)'
+                     def replace_link(match):
+                         url = match.group(0)
+                         return f'<a href="{url}" target="_blank" rel="noopener noreferrer">{url}</a>'
+                     sub_parts[j] = re.sub(url_pattern, replace_link, sub_part)
             
-            parts[i] = re.sub(url_pattern, replace_link, part)
+            parts[i] = "".join(sub_parts)
             
     return "".join(parts)
 
