@@ -443,7 +443,10 @@
                         container.dataset.status = data.new_status;
                         container.dataset.isResolved = data.is_resolved ? 'true' : 'false';
                         renderChat();
-                        document.getElementById('adminQuickReply').value = '';
+                        var quickReplyArea = document.getElementById('adminQuickReply');
+                        if (quickReplyArea) {
+                            quickReplyArea.value = '';
+                        }
                         updateTopStatusBadge(data.new_status);
 
                         // チェックボックスの状態を同期
