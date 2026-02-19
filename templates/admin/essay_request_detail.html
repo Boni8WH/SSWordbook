@@ -419,9 +419,9 @@
             // Textareaからの入力はプレーンテキストなので、送信前にHTMLっぽく変換（改行反映）しておくのが無難か
             // APIの実装が見えないので、安全側に倒して「改行を<br>」に変換してから送る？
             // いえ、Adminのメイン返信がHTMLになるなら、ここも合わせるべき。
-            var formattedMessage = message;
-            if (message) {
-                formattedMessage = message.replace(/[&<>"']/g, function (m) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m]; }).replace(/\n/g, '<br>');
+            var formattedMessage = (message || '').trim();
+            if (formattedMessage) {
+                formattedMessage = formattedMessage.replace(/[&<>"']/g, function (m) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m]; }).replace(/\n/g, '<br>');
             }
 
             fetch('/api/admin/essay_request/' + requestId + '/chat_action', {

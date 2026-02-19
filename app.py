@@ -12984,7 +12984,11 @@ def admin_chat_action(request_id):
     
     try:
         data = request.get_json()
-        message = data.get('message', '').strip()
+        # ensure null is treated as empty string
+        message = (data.get('message') or '').strip()
+        if message.lower() == 'null':
+            message = ""
+        
         resolve = data.get('resolve', False)
         
         if message:
