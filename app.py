@@ -4878,7 +4878,7 @@ JSON形式のリスト（配列）のみを出力してください。配列の�
         for rec_id in recommended_ids:
             # python側で該当IDのオブジェクトを探す（DB再クエリよりメモリ内検索が早い）
             # filtered candidatesから探す
-            found = next((c for c in candidates if c.id == rec_id), None)
+            found = next((c for c in top_candidates if c.id == rec_id), None)
             if found:
                 clean_found_q = re.sub(r'<[^>]+>', '', found.question)
                 snippet = clean_found_q[:100] + '...' if len(clean_found_q) > 100 else clean_found_q
