@@ -1741,6 +1741,78 @@ class EssayCsvFile(db.Model):
     problem_count = db.Column(db.Integer, default=0, nullable=False)
     upload_date = db.Column(db.DateTime, default=lambda: datetime.now(JST))
 
+class ChronologicalChapterOrder(db.Model):
+    __tablename__ = 'chronological_chapter_orders'
+    __table_args__ = {'extend_existing': True}
+    
+    id = db.Column(db.Integer, primary_key=True)
+    chapter_name = db.Column(db.String(100), unique=True, nullable=False)
+    display_order = db.Column(db.Integer, nullable=False, default=0)
+
+class ChronologicalProblem(db.Model):
+    __tablename__ = 'chronological_problems'
+    __table_args__ = {'extend_existing': True}
+    
+    id = db.Column(db.Integer, primary_key=True)
+    chapter = db.Column(db.String(10), nullable=False)
+    university = db.Column(db.String(100), nullable=True)
+    year = db.Column(db.Integer, nullable=True)
+    difficulty = db.Column(db.Integer, default=2) # 1:Easy, 2:Standard, 3:Hard, 4:Master
+    question = db.Column(db.Text, nullable=True)
+    explanation = db.Column(db.Text, nullable=True)
+    total_attempts = db.Column(db.Integer, default=0, nullable=False)
+    total_correct = db.Column(db.Integer, default=0, nullable=False)
+    items = db.Column(JSONEncodedDict, nullable=False)
+    enabled = db.Column(db.Boolean, default=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))
+    
+    @property
+    def display_question(self):
+        """問題文が空の場合はデフォルト文を返す"""
+        return self.question if self.question else "以下の出来事を年代の古い順に並び替えなさい"
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'chapter': self.chapter,
+            'university': self.university,
+            'year': self.year,
+            'difficulty': self.difficulty,
+            'question': self.question,
+            'explanation': self.explanation,
+            'total_attempts': self.total_attempts,
+            'total_correct': self.total_correct,
+            'display_question': self.display_question,
+            'items': self.items,
+            'enabled': self.enabled
+        }
+
+class ChronologicalProgress(db.Model):
+    __tablename__ = 'chronological_progress'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False)
+    problem_id = db.Column(db.Integer, db.ForeignKey('chronological_problems.id', ondelete='CASCADE'), nullable=False)
+    is_correct = db.Column(db.Boolean, default=False, nullable=False)
+    last_answered_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))
+    
+    __table_args__ = (
+        db.UniqueConstraint('user_id', 'problem_id', name='unique_user_chrono_problem'),
+        {'extend_existing': True}
+    )
+
+class ChronologicalCsvFile(db.Model):
+    __tablename__ = 'chronological_csv_files'
+    __table_args__ = {'extend_existing': True}
+    
+    id = db.Column(db.Integer, primary_key=True)
+    filename = db.Column(db.String(100), unique=True, nullable=False)
+    original_filename = db.Column(db.String(100), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    file_size = db.Column(db.Integer, nullable=False)
+    problem_count = db.Column(db.Integer, default=0, nullable=False)
+    upload_date = db.Column(db.DateTime, default=lambda: datetime.now(JST))
 
 class EssayCorrectionRequest(db.Model):
     """論述添削依頼テーブル"""
@@ -12019,8 +12091,257 @@ def debug_room_setting_model():
     except Exception as e:
         return f"<h1>診断エラー: {str(e)}</h1>"
 
-# ========================================
-# 論述問題集用ルート
+
+# ====================================================================
+# 年代順並び替え問題 (Chronological Sorting) 生徒用画面
+# ====================================================================
+
+@app.route('/chronological')
+def chronological_index():
+    """年代順並び替え問題のセクション一覧ページ"""
+    if 'user_id' not in session:
+        return redirect(url_for('login_page'))
+    
+    try:
+        # Get all active chapters
+        problems = ChronologicalProblem.query.filter_by(enabled=True).all()
+        chapters_dict = {}
+        for p in problems:
+            if p.chapter not in chapters_dict:
+                chapters_dict[p.chapter] = {'total': 0, 'completed': 0}
+            chapters_dict[p.chapter]['total'] += 1
+            
+        # Get user progress
+        user_id = session['user_id']
+        completed_progress = ChronologicalProgress.query.filter_by(user_id=user_id, is_correct=True).all()
+        completed_problem_ids = {p.problem_id for p in completed_progress}
+        
+        for p in problems:
+            if p.id in completed_problem_ids:
+                chapters_dict[p.chapter]['completed'] += 1
+                
+        # Sort chapters
+        sorted_chapters = []
+        for chapter, stats in chapters_dict.items():
+            sorted_chapters.append({
+                'name': chapter,
+                'total': stats['total'],
+                'completed': stats['completed'],
+                'is_complete': stats['total'] > 0 and stats['total'] == stats['completed']
+            })
+        # Fetch chapter order mapping
+        chapter_orders = ChronologicalChapterOrder.query.all()
+        order_map = {o.chapter_name: o.display_order for o in chapter_orders}
+            
+        def _chapter_sort_key(c):
+            name = str(c['name'])
+            # Priority 1: custom order from DB
+            if name in order_map:
+                return (0, order_map[name], name)
+            # Priority 2: numeric if digit
+            if name.isdigit():
+                return (1, int(name), name)
+            # Priority 3: alphabetical fallback
+            return (2, 0, name)
+            
+        sorted_chapters.sort(key=_chapter_sort_key)
+
+        return render_template('chrono_list.html', chapters=sorted_chapters)
+    except Exception as e:
+        app.logger.error(f"Chronological index error: {e}")
+        return render_template('error.html', message="セクション情報の取得に失敗しました。")
+
+@app.route('/admin/api/chronological/reorder_chapters', methods=['POST'])
+def admin_api_chrono_reorder_chapters():
+    """管理画面: セクションの表示順を更新"""
+    if 'user_id' not in session:
+        return jsonify({'status': 'error', 'message': 'ログインが必要です'}), 401
+    
+    current_user_id = session.get('user_id')
+    user = User.query.get(current_user_id)
+    if not user or (user.username != 'admin' and not user.is_manager):
+        return jsonify({'status': 'error', 'message': '権限がありません'}), 403
+
+    try:
+        data = request.get_json()
+        orders = data.get('orders', [])
+        
+        for item in orders:
+            chapter_name = item.get('chapter_name')
+            display_order = item.get('display_order')
+            
+            if not chapter_name:
+                continue
+                
+            record = ChronologicalChapterOrder.query.filter_by(chapter_name=chapter_name).first()
+            if not record:
+                record = ChronologicalChapterOrder(chapter_name=chapter_name, display_order=display_order)
+                db.session.add(record)
+            else:
+                record.display_order = display_order
+                
+        db.session.commit()
+        return jsonify({'status': 'success', 'message': '表示順を保存しました'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/chronological/section/<chapter>/difficulty_counts')
+def api_chrono_difficulty_counts(chapter):
+    """特定のセクションの難易度別問題数と正解数を取得"""
+    if 'user_id' not in session:
+        return jsonify({'status': 'error', 'message': 'ログインが必要です'}), 401
+        
+    try:
+        user_id = session['user_id']
+        problems = ChronologicalProblem.query.filter_by(chapter=chapter, enabled=True).all()
+        progress = ChronologicalProgress.query.filter_by(user_id=user_id, is_correct=True).all()
+        completed_ids = {p.problem_id for p in progress}
+        
+        counts = {
+            'total': {'total': 0, 'mastered': 0},
+            'easy': {'total': 0, 'mastered': 0},      # 1
+            'standard': {'total': 0, 'mastered': 0},  # 2
+            'hard': {'total': 0, 'mastered': 0},      # 3
+            'master': {'total': 0, 'mastered': 0}     # 4
+        }
+        
+        diff_map = {1: 'easy', 2: 'standard', 3: 'hard', 4: 'master'}
+        
+        for p in problems:
+            is_mastered = p.id in completed_ids
+            # Total counts
+            counts['total']['total'] += 1
+            if is_mastered: counts['total']['mastered'] += 1
+                
+            # Difficulty counts
+            diff_key = diff_map.get(p.difficulty, 'standard')
+            counts[diff_key]['total'] += 1
+            if is_mastered: counts[diff_key]['mastered'] += 1
+            
+        return jsonify({'status': 'success', 'counts': counts})
+    except Exception as e:
+        app.logger.error(f"Chrono difficulty counts error: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/chronological/<chapter>')
+def chronological_solve(chapter):
+    """年代順並び替え問題の解答画面"""
+    if 'user_id' not in session:
+        return redirect(url_for('login_page'))
+        
+    try:
+        difficulty_str = request.args.get('difficulty')
+        query = ChronologicalProblem.query.filter_by(chapter=chapter, enabled=True)
+        if difficulty_str and difficulty_str.isdigit() and int(difficulty_str) > 0:
+            query = query.filter_by(difficulty=int(difficulty_str))
+            
+        problems = query.all()
+        unsolved_only = request.args.get('unsolved') == 'true'
+        
+        user_id = session['user_id']
+        progress = ChronologicalProgress.query.filter_by(user_id=user_id).all()
+        completed_ids = {p.problem_id for p in progress if p.is_correct}
+        
+        if unsolved_only:
+            problems = [p for p in problems if p.id not in completed_ids]
+            
+        if not problems:
+            flash('出題する問題がありません（既に全問正解済みか、問題が登録されていません）。', 'warning')
+            return redirect(url_for('chronological_index'))
+            
+        # 出題順をランダムにする
+        random.shuffle(problems)
+        
+        problem_data = []
+        for p in problems:
+            items = p.items.copy()
+            random.shuffle(items)
+            
+            acc_rate = int((p.total_correct / p.total_attempts) * 100) if p.total_attempts > 0 else 0
+            
+            problem_data.append({
+                'id': p.id,
+                'question': p.display_question,
+                'explanation': p.explanation,
+                'university': p.university,
+                'year': p.year,
+                'difficulty': p.difficulty,
+                'accuracy_rate': acc_rate,
+                'items': items,
+                'is_completed': p.id in completed_ids
+            })
+            
+        return render_template('chrono_solve.html', chapter=chapter, problems=problem_data)
+    except Exception as e:
+        app.logger.error(f"Chronological solve view error: {e}")
+        return render_template('error.html', message="問題の表示に失敗しました。")
+
+
+@app.route('/chronological/<chapter>/answer', methods=['POST'])
+def chronological_answer(chapter):
+    """年代順並び替えの解答判定"""
+    if 'user_id' not in session:
+        return jsonify({'status': 'error', 'message': 'ログインが必要です'}), 401
+        
+    try:
+        data = request.json
+        problem_id = data.get('problem_id')
+        user_order = data.get('ordered_ids', [])
+        
+        problem = ChronologicalProblem.query.get_or_404(problem_id)
+        
+        # Check correctness
+        correct_order = [item['id'] for item in sorted(problem.items, key=lambda x: x['order'])]
+        is_correct = (user_order == correct_order)
+        
+        # Global stats update
+        problem.total_attempts += 1
+        if is_correct:
+            problem.total_correct += 1
+            
+        user_id = session['user_id']
+        progress = ChronologicalProgress.query.filter_by(user_id=user_id, problem_id=problem_id).first()
+        
+        is_first_correct = False
+        if not progress:
+            progress = ChronologicalProgress(user_id=user_id, problem_id=problem_id)
+            db.session.add(progress)
+            
+        if is_correct and not progress.is_correct:
+            progress.is_correct = True
+            is_first_correct = True
+            
+        progress.last_answered_at = datetime.now(JST)
+        
+        # Grant exp
+        exp_gained = 0
+        leveled_up = False
+        new_level = 0
+        
+        if is_correct and is_first_correct:
+            # Note: For now, we omit EXP/Level up as the RPG system handles it differently.
+            # If RPG integration is needed, it should be done identically to how `map_quiz` updates it.
+            pass
+            
+        db.session.commit()
+        
+        return jsonify({
+            'status': 'success',
+            'is_correct': is_correct,
+            'exp_gained': exp_gained,
+            'leveled_up': leveled_up,
+            'new_level': new_level,
+            'correct_order': correct_order
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Chronological answer error: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
 # ========================================
 @app.route('/essay')
 def essay_index():
@@ -21131,6 +21452,273 @@ def check_and_create_correction_tables():
         except Exception as e:
             print(f"Error creating tables: {e}")
 
+# ====================================================================
+# 年代順並び替え問題 (Chronological Problems) API
+# ====================================================================
+
+@app.route('/admin/chrono/problems')
+@admin_required
+def admin_chrono_problems():
+    try:
+        chapter = request.args.get('chapter', '').strip()
+        search = request.args.get('search', '').strip()
+        page = int(request.args.get('page', 1))
+        per_page = int(request.args.get('per_page', 50))
+        
+        query = ChronologicalProblem.query
+        
+        if chapter:
+            query = query.filter(ChronologicalProblem.chapter == chapter)
+        
+        if search:
+            search_pattern = f'%{search}%'
+            query = query.filter(
+                db.or_(
+                    ChronologicalProblem.question.like(search_pattern),
+                    ChronologicalProblem.university.like(search_pattern)
+                )
+            )
+        
+        pagination = query.order_by(ChronologicalProblem.id.desc()).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
+        
+        all_chapters = db.session.query(ChronologicalProblem.chapter).distinct().all()
+        chapters_list = [c[0] for c in all_chapters if c[0]]
+        
+        # Sort chapters mapping
+        chapter_orders = ChronologicalChapterOrder.query.all()
+        order_map = {o.chapter_name: o.display_order for o in chapter_orders}
+            
+        def _chapter_sort_key(name):
+            if name in order_map:
+                return (0, order_map[name], name)
+            if name.isdigit():
+                return (1, int(name), name)
+            return (2, 0, name)
+            
+        chapters_list.sort(key=_chapter_sort_key)
+        
+        return jsonify({
+            'status': 'success',
+            'problems': [p.to_dict() for p in pagination.items],
+            'chapters': chapters_list,
+            'pagination': {
+                'page': pagination.page,
+                'pages': pagination.pages,
+                'total': pagination.total,
+                'has_prev': pagination.has_prev,
+                'has_next': pagination.has_next,
+                'iter_pages': list(pagination.iter_pages())
+            }
+        })
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/admin/chrono/add_problem', methods=['POST'])
+@admin_required
+def admin_chrono_add_problem():
+    try:
+        data = request.json
+        chapter = data.get('chapter')
+        university = data.get('university')
+        year = data.get('year')
+        difficulty = int(data.get('difficulty', 2))
+        question = data.get('question', '')
+        explanation = data.get('explanation', '')
+        items = data.get('items', [])
+        
+        if not chapter or len(items) < 2:
+            return jsonify({'status': 'error', 'message': '必須項目が不足しています'}), 400
+            
+        problem = ChronologicalProblem(
+            chapter=chapter,
+            university=university,
+            year=year,
+            difficulty=difficulty,
+            question=question,
+            explanation=explanation,
+            items=items
+        )
+        db.session.add(problem)
+        db.session.commit()
+        return jsonify({'status': 'success', 'problem_id': problem.id})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/admin/chrono/problem/<int:problem_id>')
+@admin_required
+def admin_chrono_get_problem(problem_id):
+    try:
+        p = ChronologicalProblem.query.get_or_404(problem_id)
+        return jsonify({'status': 'success', 'problem': p.to_dict()})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/admin/chrono/update_problem', methods=['POST'])
+@admin_required
+def admin_chrono_update_problem():
+    try:
+        data = request.json
+        p = ChronologicalProblem.query.get_or_404(data['id'])
+        items = data.get('items', [])
+        if len(items) < 2:
+            return jsonify({'status': 'error', 'message': '最低でも2つの項目が必要です'}), 400
+
+        p.chapter = data['chapter']
+        p.university = data.get('university', '')
+        p.year = data.get('year')
+        p.difficulty = int(data.get('difficulty', 2))
+        p.question = data.get('question', '')
+        p.explanation = data.get('explanation', '')
+        p.items = data.get('items', [])
+        p.updated_at = datetime.now(JST)
+        
+        db.session.commit()
+        return jsonify({'status': 'success', 'problem_id': p.id})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/admin/chrono/delete_problem', methods=['POST'])
+@admin_required
+def admin_chrono_delete_problem():
+    try:
+        data = request.json
+        ids = data.get('ids', [])
+        if not ids:
+            return jsonify({'status': 'error', 'message': '削除する問題が選択されていません'}), 400
+            
+        deleted_count = ChronologicalProblem.query.filter(ChronologicalProblem.id.in_(ids)).delete(synchronize_session=False)
+        db.session.commit()
+        return jsonify({'status': 'success', 'deleted_count': deleted_count})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/admin/chrono/toggle_enabled', methods=['POST'])
+@admin_required
+def admin_chrono_toggle_enabled():
+    try:
+        data = request.json
+        p = ChronologicalProblem.query.get_or_404(data['id'])
+        p.enabled = not p.enabled
+        p.updated_at = datetime.now(JST)
+        db.session.commit()
+        return jsonify({'status': 'success', 'enabled': p.enabled})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/admin/chrono/upload_csv', methods=['POST'])
+@admin_required
+def admin_chrono_upload_csv():
+    try:
+        if 'file' not in request.files:
+            return jsonify({'status': 'error', 'message': 'ファイルが選択されていません'}), 400
+            
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'status': 'error', 'message': 'ファイルが選択されていません'}), 400
+            
+        replace_existing = request.form.get('replace_existing') == 'on'
+        
+        # Read file with encodings
+        content = file.read()
+        try:
+            text_content = content.decode('utf-8')
+        except UnicodeDecodeError:
+            try:
+                text_content = content.decode('shift_jis')
+            except UnicodeDecodeError:
+                return jsonify({'status': 'error', 'message': 'ファイルの形式が正しくありません (UTF-8またはShift_JISを使用してください)'}), 400
+
+        reader = csv.reader(text_content.splitlines())
+        headers = next(reader, None)
+        
+        if replace_existing:
+            ChronologicalProblem.query.delete()
+            
+        added_count = 0
+        for row in reader:
+            if not row or len(row) < 7:
+                continue
+            
+            chapter = row[0].strip()
+            university = row[1].strip() if len(row) > 1 else ''
+            year_str = row[2].strip() if len(row) > 2 else ''
+            year = int(year_str) if year_str.isdigit() else None
+            diff_str = row[3].strip() if len(row) > 3 else '2'
+            difficulty = int(diff_str) if diff_str.isdigit() and 1 <= int(diff_str) <= 4 else 2
+            question = row[4].strip() if len(row) > 4 else ''
+            explanation = row[5].strip() if len(row) > 5 else ''
+            
+            # items are from index 6 onwards
+            items = []
+            for i in range(6, len(row)):
+                text = row[i].strip()
+                if text:
+                    items.append({
+                        'id': i - 5,
+                        'order': i - 5,
+                        'text': text
+                    })
+            
+            if len(items) < 2:
+                continue # Skip problems with < 2 items
+                
+            problem = ChronologicalProblem(
+                chapter=chapter,
+                university=university,
+                year=year,
+                difficulty=difficulty,
+                question=question,
+                explanation=explanation,
+                items=items
+            )
+            db.session.add(problem)
+            added_count += 1
+            
+        db.session.commit()
+        return jsonify({'status': 'success', 'added': added_count})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/admin/chrono/download_csv')
+@admin_required
+def admin_chrono_download_csv():
+    try:
+        problems = ChronologicalProblem.query.order_by(ChronologicalProblem.id).all()
+        si = io.StringIO()
+        writer = csv.writer(si)
+        
+        # Header
+        writer.writerow(['chapter', 'university', 'year', 'difficulty', 'question', 'explanation', 'item1', 'item2', 'item3', 'item4', 'item...'])
+        
+        for p in problems:
+            row = [
+                p.chapter,
+                p.university or '',
+                p.year or '',
+                p.difficulty or 2,
+                p.question or '',
+                p.explanation or ''
+            ]
+            for item in p.items:
+                row.append(item['text'])
+            writer.writerow(row)
+            
+        output = make_response(si.getvalue().encode('utf-8-sig'))
+        output.headers["Content-Disposition"] = "attachment; filename=chronological_problems.csv"
+        output.headers["Content-type"] = "text/csv"
+        return output
+        
+    except Exception as e:
+        return f"Error creating CSV: {e}", 500
+
 check_and_create_correction_tables()
 
 with app.app_context():
@@ -21317,12 +21905,58 @@ def _add_essay_problem_columns_safe():
     except Exception as e:
         print(f"⚠️ EssayProblem migration warning: {e}")
 
+def _create_chronological_tables():
+    """Chronological sorting related tables creation"""
+    from sqlalchemy import inspect
+    try:
+        inspector = inspect(db.engine)
+        table_names = inspector.get_table_names()
+        
+        if 'chronological_problems' not in table_names:
+            print("🔄 chronological_problems table creating...")
+            ChronologicalProblem.__table__.create(db.engine)
+            print("✅ chronological_problems table created")
+        else:
+            # Migration for difficulty and explanation
+            try:
+                db.session.execute(text("ALTER TABLE chronological_problems ADD COLUMN difficulty INTEGER DEFAULT 2"))
+                db.session.execute(text("ALTER TABLE chronological_problems ADD COLUMN explanation TEXT"))
+                db.session.commit()
+                print("✅ chronological_problems table updated (difficulty, explanation)")
+            except Exception as e:
+                db.session.rollback()
+                pass # Already exists
+                
+            # Migration for total_attempts, total_correct
+            try:
+                db.session.execute(text("ALTER TABLE chronological_problems ADD COLUMN total_attempts INTEGER DEFAULT 0 NOT NULL"))
+                db.session.execute(text("ALTER TABLE chronological_problems ADD COLUMN total_correct INTEGER DEFAULT 0 NOT NULL"))
+                db.session.commit()
+                print("✅ chronological_problems table updated (total_attempts, total_correct)")
+            except Exception as e:
+                db.session.rollback()
+                pass # Already exists
+            
+        if 'chronological_progress' not in table_names:
+            print("🔄 chronological_progress table creating...")
+            ChronologicalProgress.__table__.create(db.engine)
+            print("✅ chronological_progress table created")
+
+        if 'chronological_csv_files' not in table_names:
+            print("🔄 chronological_csv_files table creating...")
+            ChronologicalCsvFile.__table__.create(db.engine)
+            print("✅ chronological_csv_files table created")
+            
+    except Exception as e:
+        print(f"⚠️ Chronological tables creation warning: {e}")
+
 with app.app_context():
     _create_map_quiz_tables()
     _add_mq_complete_columns_safe()
     _add_shape_columns_to_map_location()
     _add_ellipse_columns_to_map_location()
     _add_essay_problem_columns_safe()
+    _create_chronological_tables()
 
 if __name__ == '__main__':
     try:

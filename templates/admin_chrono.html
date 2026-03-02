@@ -1,0 +1,291 @@
+<!-- 年代順問題集管理セクション -->
+<div class="tab-pane fade" id="section-chrono-management" role="tabpanel">
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-white">
+            <h3><i class="fas fa-sort-numeric-down"></i> 年代順問題集管理</h3>
+        </div>
+        <div class="card-body">
+            <p>年代順問題の登録・管理・インポートを行います。</p>
+
+            <!-- 年代順問題CSV一括インポート -->
+            <div class="csv-import-section mb-5">
+                <h4><i class="fas fa-upload"></i> CSV一括インポート</h4>
+                <div class="csv-template-section mb-3">
+                    <h5><i class="fas fa-download"></i> 年代順問題CSVテンプレート</h5>
+                    <p>正しい形式の年代順問題CSVファイルを作成するためのテンプレートです。</p>
+                    <div class="template-format mb-3">
+                        <strong>CSVフォーマット:</strong><br>
+                        <code>chapter,university,year,difficulty,question,explanation,item1,item2,item3,item4</code><br><br>
+                        <strong>各列の説明:</strong><br>
+                        • <strong>chapter</strong>: セクション名（例: 基礎, 標準, 応用）<br>
+                        • <strong>university</strong>: 出題大学名（任意）<br>
+                        • <strong>year</strong>: 出題年度（任意）<br>
+                        • <strong>difficulty</strong>: 難易度（任意: 1=易, 2=標準, 3=難, 4=最難関。空欄は2に設定されます）<br>
+                        • <strong>question</strong>: 問題文（任意: 空欄時はデフォルト文）<br>
+                        • <strong>explanation</strong>: 解説文（任意）<br>
+                        • <strong>item1〜itemN</strong>: 並べ替える項目（古い順から入力）
+                    </div>
+                    <button class="btn btn-outline-info btn-sm" onclick="downloadChronoTemplate()">
+                        <i class="fas fa-file-csv"></i> CSVテンプレートをダウンロード
+                    </button>
+                    <a href="{{ url_for('admin_chrono_download_csv') }}" class="btn btn-outline-primary btn-sm ms-2">
+                        <i class="fas fa-file-download"></i> 登録済み問題をCSVでダウンロード
+                    </a>
+                </div>
+
+                <form id="chronoUploadForm" enctype="multipart/form-data" class="csv-upload-form">
+                    <div class="upload-area">
+                        <div class="file-input-wrapper mb-3">
+                            <label for="chrono_csv_file" class="file-input-label d-block text-center border p-3 rounded"
+                                style="cursor: pointer; background: #f8f9fa;">
+                                <i class="fas fa-cloud-upload-alt text-primary fa-2x"></i><br>
+                                <span>CSVファイルを選択</span>
+                            </label>
+                            <input type="file" id="chrono_csv_file" name="file" accept=".csv" required
+                                style="display: none;">
+                            <div id="chrono_filename_display" class="mt-2 text-center text-success fw-bold"></div>
+                            <small
+                                class="form-text text-muted d-block text-center mt-2">UTF-8またはShift_JISエンコーディングのCSVファイルを選択</small>
+                        </div>
+                        <div class="upload-options mb-3">
+                            <div class="form-check text-center">
+                                <input class="form-check-input float-none" type="checkbox" id="chronoReplaceExisting"
+                                    name="replace_existing">
+                                <label class="form-check-label d-inline-block" for="chronoReplaceExisting">
+                                    <i class="fas fa-exclamation-triangle text-warning"></i>
+                                    既存の問題を置き換える（注意：全ての年代順問題が削除されます）
+                                </label>
+                            </div>
+                        </div>
+                        <div class="text-center">
+                            <button type="submit" class="btn btn-success btn-upload">
+                                <i class="fas fa-upload"></i> 年代順問題CSV一括インポート
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <!-- 個別年代順問題登録 -->
+            <div class="chrono-form-section mb-5">
+                <h4><i class="fas fa-plus-circle"></i> 個別年代順問題登録</h4>
+                <div class="chrono-form-container card p-4 bg-light">
+                    <form id="newChronoProblemForm" class="chrono-registration-form">
+                        <div class="row mb-3">
+                            <div class="col-md-3">
+                                <label for="new_chrono_chapter" class="form-label"><i class="fas fa-bookmark"></i>
+                                    セクション名</label>
+                                <input type="text" id="new_chrono_chapter" name="chapter" class="form-control"
+                                    placeholder="例: 基礎編, 標準編" required>
+                            </div>
+                            <div class="col-md-5">
+                                <label for="new_chrono_university" class="form-label"><i class="fas fa-university"></i>
+                                    出典</label>
+                                <input type="text" id="new_chrono_university" name="university" class="form-control"
+                                    placeholder="例: 東大, 共通テスト" required>
+                            </div>
+                            <div class="col-md-3">
+                                <label for="new_chrono_year" class="form-label"><i class="fas fa-calendar-alt"></i>
+                                    年度</label>
+                                <input type="number" id="new_chrono_year" name="year" class="form-control"
+                                    placeholder="例: 2024">
+                            </div>
+                            <div class="col-md-2">
+                                <label for="new_chrono_difficulty" class="form-label"><i class="fas fa-gamepad"></i>
+                                    難易度</label>
+                                <select id="new_chrono_difficulty" name="difficulty" class="form-select">
+                                    <option value="1">1: 易</option>
+                                    <option value="2" selected>2: 標準</option>
+                                    <option value="3">3: 難</option>
+                                    <option value="4">4: 最難関</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="new_chrono_question" class="form-label"><i class="fas fa-question-circle"></i>
+                                問題文 (任意)</label>
+                            <textarea id="new_chrono_question" name="question" class="form-control" rows="2"
+                                placeholder="空欄時は「以下の出来事を年代の古い順に並び替えなさい」になります"></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="new_chrono_explanation" class="form-label"><i class="fas fa-info-circle"></i>
+                                解説 (任意)</label>
+                            <textarea id="new_chrono_explanation" name="explanation" class="form-control" rows="2"
+                                placeholder="正解後に表示される解説などを入力してください"></textarea>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label"><i class="fas fa-list-ol"></i> 項目（古い順に上から入力してください）</label>
+                            <div id="chrono_items_container">
+                                <!-- 動的に項目が追加される -->
+                                <div class="input-group mb-2 chrono-item">
+                                    <span class="input-group-text">1</span>
+                                    <input type="text" class="form-control item-text" name="items"
+                                        placeholder="一番古い項目 (例: 大化の改新)" required>
+                                </div>
+                                <div class="input-group mb-2 chrono-item">
+                                    <span class="input-group-text">2</span>
+                                    <input type="text" class="form-control item-text" name="items"
+                                        placeholder="2番目に古い項目" required>
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-secondary mt-2"
+                                onclick="addChronoItem()">
+                                <i class="fas fa-plus"></i> 項目を追加
+                            </button>
+                        </div>
+
+                        <div class="text-end">
+                            <button type="button" class="btn btn-primary" onclick="addChronoProblem()">
+                                <i class="fas fa-save"></i> 登録する
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- セクションの表示順設定 -->
+            <div class="chrono-reorder-section mb-5">
+                <h4><i class="fas fa-sort-amount-down"></i> セクションの表示順設定</h4>
+                <div class="card p-4 bg-light">
+                    <p class="text-muted small mb-3"><i class="fas fa-info-circle"></i>
+                        ドラッグ＆ドロップで生徒画面でのセクションの表示順を変更できます。</p>
+                    <ul id="chrono_chapter_reorder_list"
+                        class="list-group mb-3 list-group-flush border rounded bg-white">
+                        <li class="list-group-item text-center text-muted">セクションを読み込み中...</li>
+                    </ul>
+                    <div class="text-end">
+                        <button type="button" class="btn btn-success" onclick="saveChronoChapterOrder()">
+                            <i class="fas fa-save"></i> 順序を保存する
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 年代順問題一覧・管理 -->
+            <div class="chrono-list-section">
+                <h4><i class="fas fa-list"></i> 年代順問題一覧・管理</h4>
+
+                <div class="filter-controls mb-4 p-3 bg-light rounded">
+                    <div class="row align-items-end">
+                        <div class="col-md-3">
+                            <label class="form-label">セクションで絞り込み</label>
+                            <select id="chrono_filter_chapter" class="form-select" onchange="loadChronoProblems(1)">
+                                <option value="">すべて</option>
+                                <!-- 動的に追加される -->
+                            </select>
+                        </div>
+                        <div class="col-md-5">
+                            <label class="form-label">検索 (出題元・問題文)</label>
+                            <div class="input-group">
+                                <input type="text" id="chrono_search_query" class="form-control"
+                                    placeholder="検索キーワード...">
+                                <button class="btn btn-outline-secondary" onclick="loadChronoProblems(1)">検索</button>
+                            </div>
+                        </div>
+                        <div class="col-md-4 text-end">
+                            <button class="btn btn-danger" onclick="bulkDeleteChronoProblems()">
+                                <i class="fas fa-trash-alt"></i> 選択した問題を削除
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover align-middle">
+                        <thead class="table-dark">
+                            <tr>
+                                <th style="width: 40px;"><input type="checkbox" id="selectAllChrono"
+                                        onclick="toggleAllChronoCheckboxes()"></th>
+                                <th style="width: 60px;">ID</th>
+                                <th style="width: 80px;">セクション</th>
+                                <th>出典 (年度)</th>
+                                <th>問題文</th>
+                                <th style="width: 150px;">項目数</th>
+                                <th style="width: 80px;">状態</th>
+                                <th style="width: 150px;">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="chronoProblemListBody">
+                            <tr>
+                                <td colspan="8" class="text-center py-4">
+                                    <div class="spinner-border text-primary"></div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- ページネーション -->
+                <nav>
+                    <ul class="pagination justify-content-center" id="chronoPagination">
+                    </ul>
+                </nav>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 編集モーダル -->
+<div class="modal fade" id="chronoEditModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">年代順問題編集</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editChronoForm">
+                    <input type="hidden" id="edit_chrono_id">
+                    <div class="row mb-3">
+                        <div class="col-md-3">
+                            <label class="form-label">セクション</label>
+                            <input type="text" id="edit_chrono_chapter" class="form-control" required>
+                        </div>
+                        <div class="col-md-5">
+                            <label class="form-label">出典</label>
+                            <input type="text" id="edit_chrono_university" class="form-control" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">年度</label>
+                            <input type="number" id="edit_chrono_year" class="form-control">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">難易度</label>
+                            <select id="edit_chrono_difficulty" class="form-select">
+                                <option value="1">1: 易</option>
+                                <option value="2">2: 標準</option>
+                                <option value="3">3: 難</option>
+                                <option value="4">4: 最難関</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">問題文</label>
+                        <textarea id="edit_chrono_question" class="form-control" rows="2"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">解説</label>
+                        <textarea id="edit_chrono_explanation" class="form-control" rows="2"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">項目（古い順）</label>
+                        <div id="edit_chrono_items_container">
+                            <!-- JSで埋める -->
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-secondary mt-2"
+                            onclick="addEditChronoItem()">
+                            <i class="fas fa-plus"></i> 追加
+                        </button>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+                <button type="button" class="btn btn-primary" onclick="saveChronoProblem()">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/admin_chrono.js') }}"></script>
