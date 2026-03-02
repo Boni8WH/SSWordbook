@@ -53,32 +53,72 @@
         text-transform: uppercase;
     }
 
-    .chapter-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        gap: 15px;
+    .chapter-list {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0;
         margin-bottom: 40px;
+        position: relative;
+    }
+
+    /* Central lineage connector line */
+    .chapter-list::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 50%;
+        width: 2px;
+        background: linear-gradient(to bottom, transparent, #d4af37 10%, #d4af37 90%, transparent);
+        transform: translateX(-50%);
+        opacity: 0.3;
+        z-index: 0;
+    }
+
+    .chapter-card-wrapper {
+        width: 100%;
+        max-width: 600px;
+        position: relative;
+        padding: 20px 0;
+        z-index: 1;
     }
 
     .chapter-card {
         background: white;
         border-radius: 12px;
-        padding: 15px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        padding: 18px 25px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
         border: 1px solid #e1e8ed;
         cursor: pointer;
-        transition: all 0.3s ease;
-        position: relative;
+        transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
         text-decoration: none;
         color: inherit;
         display: block;
+        position: relative;
+    }
+
+    /* Node on the lineage line */
+    .chapter-card::after {
+        content: '';
+        position: absolute;
+        left: -15px;
+        top: 50%;
+        width: 10px;
+        height: 10px;
+        background: #d4af37;
+        border-radius: 50%;
+        transform: translateY(-50%);
+        box-shadow: 0 0 0 4px white;
+        display: none;
+        /* Only show node if we use an offset layout, but user wants clean list */
     }
 
     .chapter-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+        transform: scale(1.02);
+        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
         border-color: #667eea;
-        color: inherit;
+        z-index: 10;
     }
 
     .chapter-card-header {
@@ -89,52 +129,31 @@
 
     .chapter-title {
         margin: 0;
-        font-size: 1.2rem;
-        font-weight: 600;
+        font-size: 1.25rem;
+        font-family: 'Kaisei Tokumin', serif;
+        font-weight: 700;
         color: #2d3748;
+        letter-spacing: 0.02em;
     }
 
     .chapter-title i {
         color: #667eea;
-        margin-right: 8px;
+        margin-right: 12px;
+        opacity: 0.8;
     }
 
     .badge-count {
         background: linear-gradient(135deg, #667eea, #764ba2);
         color: white;
-        padding: 6px 12px;
+        padding: 6px 16px;
         border-radius: 20px;
-        font-weight: 600;
-        font-size: 0.9rem;
-    }
-
-    .progress-stats {
-        display: flex;
-        justify-content: space-around;
-        text-align: center;
-        margin-bottom: 15px;
-    }
-
-    .stat-label {
-        color: #718096;
+        font-weight: 700;
         font-size: 0.85rem;
-        display: block;
-        margin-bottom: 5px;
-    }
-
-    .stat-value {
-        font-size: 1.2rem;
-        font-weight: 600;
-        color: #2d3748;
-    }
-
-    .stat-value.completed {
-        color: #38a169;
+        box-shadow: 0 4px 10px rgba(102, 126, 234, 0.2);
     }
 
     .chapter-card.is-complete {
-        border: 2px solid #38a169;
-        background-color: #f0fff4;
+        border-left: 5px solid #38a169;
     }
 
     .no-problems {
@@ -152,18 +171,20 @@
         <div class="chrono-subtitle">〜Chronos Lineage〜</div>
     </div>
 
-    <div class="chapter-grid">
+    <div class="chapter-list">
         {% for chapter in chapters %}
-        <a href="javascript:void(0)" onclick="openDifficultyModal('{{ chapter.name }}')"
-            class="chapter-card {% if chapter.is_complete %}is-complete{% endif %}">
-            <div class="chapter-card-header">
-                <h3 class="chapter-title">
-                    <i class="fas {% if chapter.name == 'com' %}fa-star{% else %}fa-book{% endif %}"></i>
-                    {{ chapter.name }} {% if chapter.name == 'com' %}(総合){% endif %}
-                </h3>
-                <span class="badge-count">{{ chapter.total }}問</span>
-            </div>
-        </a>
+        <div class="chapter-card-wrapper">
+            <a href="javascript:void(0)" onclick="openDifficultyModal('{{ chapter.name }}')"
+                class="chapter-card {% if chapter.is_complete %}is-complete{% endif %}">
+                <div class="chapter-card-header">
+                    <h3 class="chapter-title">
+                        <i class="fas {% if chapter.name == 'com' %}fa-star{% else %}fa-book{% endif %}"></i>
+                        {{ chapter.name }} {% if chapter.name == 'com' %}(総合){% endif %}
+                    </h3>
+                    <span class="badge-count">{{ chapter.total }}問</span>
+                </div>
+            </a>
+        </div>
         {% endfor %}
 
         {% if not chapters %}
