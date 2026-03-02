@@ -1754,7 +1754,7 @@ class ChronologicalProblem(db.Model):
     __table_args__ = {'extend_existing': True}
     
     id = db.Column(db.Integer, primary_key=True)
-    chapter = db.Column(db.String(10), nullable=False)
+    chapter = db.Column(db.String(100), nullable=False)
     university = db.Column(db.String(100), nullable=True)
     year = db.Column(db.Integer, nullable=True)
     difficulty = db.Column(db.Integer, default=2) # 1:Easy, 2:Standard, 3:Hard, 4:Master
@@ -21927,6 +21927,18 @@ def _create_chronological_tables():
                 db.session.rollback()
                 pass # Already exists
                 
+            # SQLite does not support ALTER TABLE ALTER COLUMN easily, so we rely on SQLAlchemy session extending the length in-memory or recreation if needed.
+            # However, for SQLite, varchar length limits aren't strictly enforced at the DB level, so changing the model to String(100) is usually enough.
+            # For PostgreSQL (production), we must explicitly alter the column type.
+            if db.engine.name == 'postgresql':
+                try:
+                    db.session.execute(text("ALTER TABLE chronological_problems ALTER COLUMN chapter TYPE VARCHAR(100)"))
+                    db.session.commit()
+                    print("✅ chronological_problems table updated (chapter length to 100)")
+                except Exception as e:
+                    db.session.rollback()
+                    pass
+
             # Migration for total_attempts, total_correct
             try:
                 db.session.execute(text("ALTER TABLE chronological_problems ADD COLUMN total_attempts INTEGER DEFAULT 0 NOT NULL"))
