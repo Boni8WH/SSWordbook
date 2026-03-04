@@ -64,6 +64,204 @@
         text-transform: uppercase;
         padding: 0 15px;
     }
+
+    /* Modal Styling */
+    .stylish-modal-content {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(12px);
+        border-radius: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.8);
+        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+        overflow: hidden;
+        position: relative;
+    }
+
+    .stylish-modal-content::before {
+        content: '';
+        position: absolute;
+        top: -50%;
+        left: -50%;
+        width: 200%;
+        height: 200%;
+        background: radial-gradient(circle, rgba(0, 168, 255, 0.03) 0%, transparent 70%);
+        pointer-events: none;
+        animation: rotateGlow 30s linear infinite;
+        z-index: 0;
+    }
+
+    .stylish-modal-header {
+        border-bottom: none;
+        padding: 25px 25px 10px 25px;
+        position: relative;
+        z-index: 1;
+    }
+
+    .stylish-modal-title {
+        font-family: 'Shippori Mincho', serif;
+        font-size: 1.5rem;
+        color: #1e272e;
+        width: 100%;
+        text-align: center;
+        letter-spacing: 0.05em;
+    }
+
+    .stylish-modal-body {
+        padding: 10px 30px 30px 30px;
+        position: relative;
+        z-index: 1;
+    }
+
+    .difficulty-card-btn {
+        background: #fff;
+        border: 1px solid #edf2f7;
+        border-radius: 12px;
+        padding: 16px 20px;
+        margin-bottom: 15px;
+        text-align: left;
+        position: relative;
+        overflow: hidden;
+        cursor: pointer;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.02);
+        transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        display: block;
+        width: 100%;
+        color: #2d3748;
+        font-family: 'Kaisei Tokumin', serif;
+    }
+
+    .difficulty-card-btn:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 15px rgba(0, 0, 0, 0.05);
+    }
+
+    .difficulty-card-btn.diff-1 {
+        border-left: 5px solid #2ecc71;
+    }
+
+    .difficulty-card-btn.diff-2 {
+        border-left: 5px solid #3498db;
+    }
+
+    .difficulty-card-btn.diff-3 {
+        border-left: 5px solid #e74c3c;
+    }
+
+    .difficulty-card-btn.diff-4 {
+        border-left: 5px solid #9b59b6;
+    }
+
+    .difficulty-card-btn.diff-all {
+        border-left: 5px solid #34495e;
+    }
+
+    .difficulty-card-btn.diff-1:hover {
+        border-color: #2ecc71;
+    }
+
+    .difficulty-card-btn.diff-2:hover {
+        border-color: #3498db;
+    }
+
+    .difficulty-card-btn.diff-3:hover {
+        border-color: #e74c3c;
+    }
+
+    .difficulty-card-btn.diff-4:hover {
+        border-color: #9b59b6;
+    }
+
+    .difficulty-card-btn.diff-all:hover {
+        border-color: #34495e;
+    }
+
+    .diff-icon {
+        margin-right: 12px;
+        font-size: 1.2rem;
+        opacity: 0.9;
+    }
+
+    .diff-1 .diff-icon {
+        color: #2ecc71;
+    }
+
+    .diff-2 .diff-icon {
+        color: #3498db;
+    }
+
+    .diff-3 .diff-icon {
+        color: #e74c3c;
+    }
+
+    .diff-4 .diff-icon {
+        color: #9b59b6;
+    }
+
+    .diff-all .diff-icon {
+        color: #34495e;
+    }
+
+    .diff-content-wrapper {
+        position: relative;
+        z-index: 2;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .diff-name {
+        font-size: 1.1rem;
+        font-weight: 700;
+    }
+
+    .mastery-badge {
+        background: rgba(241, 242, 246, 0.8);
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: #57606f;
+        font-family: sans-serif;
+    }
+
+    .difficulty-progress-fill {
+        position: absolute;
+        top: 0;
+        left: 0;
+        height: 100%;
+        width: 0%;
+        z-index: 1;
+        transition: width 1s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .diff-1 .difficulty-progress-fill {
+        background: rgba(46, 204, 113, 0.08);
+    }
+
+    .diff-2 .difficulty-progress-fill {
+        background: rgba(52, 152, 219, 0.08);
+    }
+
+    .diff-3 .difficulty-progress-fill {
+        background: rgba(231, 76, 60, 0.08);
+    }
+
+    .diff-4 .difficulty-progress-fill {
+        background: rgba(155, 89, 182, 0.08);
+    }
+
+    .diff-all .difficulty-progress-fill {
+        background: rgba(52, 73, 94, 0.08);
+    }
+
+    @keyframes rotateGlow {
+        from {
+            transform: rotate(0deg);
+        }
+
+        to {
+            transform: rotate(360deg);
+        }
+    }
 </style>
 {% endblock %}
 
@@ -194,14 +392,15 @@
 <!-- Difficulty Selection Modal -->
 <div class="modal fade" id="difficultyModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title"><i class="fas fa-gamepad"></i> 難易度を選択</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+        <div class="modal-content stylish-modal-content">
+            <div class="modal-header stylish-modal-header">
+                <h5 class="modal-title stylish-modal-title"><i class="fas fa-gamepad pb-1"></i> 難易度を選択</h5>
+                <button type="button" class="btn-close position-absolute top-0 end-0 m-3" data-bs-dismiss="modal"
                     aria-label="Close"></button>
             </div>
-            <div class="modal-body text-center">
-                <p class="mb-4">「<span id="selectedMapName" class="fw-bold"></span>」に挑戦します。<br>難易度を選んでください。</p>
+            <div class="modal-body stylish-modal-body text-center">
+                <p class="mb-4 text-muted" style="font-size: 0.95rem;">「<span id="selectedMapName"
+                        class="fw-bold text-dark"></span>」に挑戦します。<br>難易度を選んでください。</p>
 
                 <div id="difficultyLoading" class="py-3">
                     <div class="spinner-border text-primary" role="status">
@@ -210,66 +409,45 @@
                     <p class="text-muted mt-2 small">問題を読み込み中...</p>
                 </div>
 
-                <div id="difficultyButtons" class="d-grid gap-2 col-10 mx-auto" style="display: none;">
-                    <button id="difficulty-btn-1"
-                        class="btn btn-outline-success btn-lg text-start position-relative overflow-hidden"
-                        onclick="startMapQuiz(1)">
-                        <div class="d-flex justify-content-between align-items-center position-relative"
-                            style="z-index: 2;">
-                            <span><i class="fas fa-seedling me-2"></i>易</span>
-                            <small class="mastery-text">0/0</small>
+                <div id="difficultyButtons" class="text-start" style="display: none;">
+                    <button id="difficulty-btn-1" class="difficulty-card-btn diff-1" onclick="startMapQuiz(1)">
+                        <div class="diff-content-wrapper">
+                            <div><i class="fas fa-seedling diff-icon"></i><span class="diff-name">易</span></div>
+                            <span class="mastery-badge"><span class="mastery-text">0/0</span></span>
                         </div>
-                        <div class="difficulty-progress-bg bg-success opacity-25" id="difficulty-progress-1"
-                            style="position: absolute; top:0; left:0; height:100%; width: 0%; z-index: 1;"></div>
+                        <div class="difficulty-progress-fill" id="difficulty-progress-1"></div>
                     </button>
 
-                    <button id="difficulty-btn-2"
-                        class="btn btn-outline-primary btn-lg text-start position-relative overflow-hidden"
-                        onclick="startMapQuiz(2)">
-                        <div class="d-flex justify-content-between align-items-center position-relative"
-                            style="z-index: 2;">
-                            <span><i class="fas fa-walking me-2"></i>標準</span>
-                            <small class="mastery-text">0/0</small>
+                    <button id="difficulty-btn-2" class="difficulty-card-btn diff-2" onclick="startMapQuiz(2)">
+                        <div class="diff-content-wrapper">
+                            <div><i class="fas fa-walking diff-icon"></i><span class="diff-name">標準</span></div>
+                            <span class="mastery-badge"><span class="mastery-text">0/0</span></span>
                         </div>
-                        <div class="difficulty-progress-bg bg-primary opacity-25" id="difficulty-progress-2"
-                            style="position: absolute; top:0; left:0; height:100%; width: 0%; z-index: 1;"></div>
+                        <div class="difficulty-progress-fill" id="difficulty-progress-2"></div>
                     </button>
 
-                    <button id="difficulty-btn-3"
-                        class="btn btn-outline-danger btn-lg text-start position-relative overflow-hidden"
-                        onclick="startMapQuiz(3)">
-                        <div class="d-flex justify-content-between align-items-center position-relative"
-                            style="z-index: 2;">
-                            <span><i class="fas fa-skull me-2"></i>難</span>
-                            <small class="mastery-text">0/0</small>
+                    <button id="difficulty-btn-3" class="difficulty-card-btn diff-3" onclick="startMapQuiz(3)">
+                        <div class="diff-content-wrapper">
+                            <div><i class="fas fa-skull diff-icon"></i><span class="diff-name">難</span></div>
+                            <span class="mastery-badge"><span class="mastery-text">0/0</span></span>
                         </div>
-                        <div class="difficulty-progress-bg bg-danger opacity-25" id="difficulty-progress-3"
-                            style="position: absolute; top:0; left:0; height:100%; width: 0%; z-index: 1;"></div>
+                        <div class="difficulty-progress-fill" id="difficulty-progress-3"></div>
                     </button>
 
-                    <button id="difficulty-btn-4"
-                        class="btn btn-outline-dark btn-lg text-start position-relative overflow-hidden"
-                        onclick="startMapQuiz(4)" style="border-color: #6610f2; color: #6610f2;">
-                        <div class="d-flex justify-content-between align-items-center position-relative"
-                            style="z-index: 2;">
-                            <span><i class="fas fa-crown me-2"></i>最難関</span>
-                            <small class="mastery-text">0/0</small>
+                    <button id="difficulty-btn-4" class="difficulty-card-btn diff-4" onclick="startMapQuiz(4)">
+                        <div class="diff-content-wrapper">
+                            <div><i class="fas fa-crown diff-icon"></i><span class="diff-name">最難関</span></div>
+                            <span class="mastery-badge"><span class="mastery-text">0/0</span></span>
                         </div>
-                        <div class="difficulty-progress-bg opacity-25" id="difficulty-progress-4"
-                            style="background-color: #6610f2; position: absolute; top:0; left:0; height:100%; width: 0%; z-index: 1;">
-                        </div>
+                        <div class="difficulty-progress-fill" id="difficulty-progress-4"></div>
                     </button>
 
-                    <button id="difficulty-btn-all"
-                        class="btn btn-secondary btn-lg text-start position-relative overflow-hidden"
-                        onclick="startMapQuiz(0)">
-                        <div class="d-flex justify-content-between align-items-center position-relative"
-                            style="z-index: 2;">
-                            <span><i class="fas fa-layer-group me-2"></i>すべて</span>
-                            <small class="mastery-text">0/0</small>
+                    <button id="difficulty-btn-all" class="difficulty-card-btn diff-all" onclick="startMapQuiz(0)">
+                        <div class="diff-content-wrapper">
+                            <div><i class="fas fa-layer-group diff-icon"></i><span class="diff-name">すべて</span></div>
+                            <span class="mastery-badge"><span class="mastery-text">0/0</span></span>
                         </div>
-                        <div class="difficulty-progress-bg bg-dark opacity-25" id="difficulty-progress-0"
-                            style="position: absolute; top:0; left:0; height:100%; width: 0%; z-index: 1;"></div>
+                        <div class="difficulty-progress-fill" id="difficulty-progress-0"></div>
                     </button>
                 </div>
 
