@@ -6704,7 +6704,7 @@
                 .then(response => response.json())
                 .then(data => {
                     if (data.status === 'success') {
-                        showToast('保存しました', 'success');
+                        alert('表示順を保存しました');
                     } else {
                         alert('保存に失敗しました: ' + (data.message || '不明なエラー'));
                     }
