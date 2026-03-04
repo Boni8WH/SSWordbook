@@ -492,16 +492,14 @@
                 {% for subject, columns in data.items() %}
                 <div class="accordion-item">
                     <h2 class="accordion-header" id="heading-{{ school_type }}-{{ loop.index }}">
-                        <button class="accordion-button {% if not loop.first %}collapsed{% endif %}" type="button"
-                            data-bs-toggle="collapse" data-bs-target="#collapse-{{ school_type }}-{{ loop.index }}"
-                            aria-expanded="{{ 'true' if loop.first else 'false' }}"
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                            data-bs-target="#collapse-{{ school_type }}-{{ loop.index }}" aria-expanded="false"
                             aria-controls="collapse-{{ school_type }}-{{ loop.index }}">
                             <i class="fas fa-bookmark me-2 text-primary"></i> {{ subject }}
                             <span class="badge bg-light text-dark ms-2">{{ columns|length }}本</span>
                         </button>
                     </h2>
-                    <div id="collapse-{{ school_type }}-{{ loop.index }}"
-                        class="accordion-collapse collapse {% if loop.first %}show{% endif %}"
+                    <div id="collapse-{{ school_type }}-{{ loop.index }}" class="accordion-collapse collapse"
                         aria-labelledby="heading-{{ school_type }}-{{ loop.index }}">
                         <div class="accordion-body bg-light p-2">
                             <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-2">

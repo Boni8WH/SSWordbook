@@ -18436,6 +18436,25 @@ def columns_page():
             # DB上のデータに合わせてIDの整合性を保つ
             # unique_id = school_type + '-' + subject + '-' + str(numbering)
             # 既にリストに入っているIDはそのまま使われる
+            
+    # Apply configured subject order
+    app_info = AppInfo.get_current_info()
+    settings = app_info.app_settings or {}
+    subject_order = settings.get('column_subject_order', [])
+    
+    if subject_order:
+        # Create a mapping of subject -> index for fast lookup
+        order_map = {subj: idx for idx, subj in enumerate(subject_order)}
+        
+        # Function to sort subjects. Subjects not in order list go to the end.
+        def sort_key(subject):
+            return order_map.get(subject, len(subject_order))
+            
+        # Rebuild dictionaries with sorted keys
+        for school in ['middle', 'high']:
+            sorted_subjects = sorted(columns_data[school].keys(), key=sort_key)
+            sorted_dict = {subj: columns_data[school][subj] for subj in sorted_subjects}
+            columns_data[school] = sorted_dict
 
     context['columns_data'] = columns_data
     context['read_columns'] = read_columns
@@ -18638,6 +18657,44 @@ def admin_upload_columns():
         flash('CSVファイルのみアップロード可能です', 'danger')
         
     return redirect(url_for('admin_page'))
+
+@app.route('/admin/api/column_subject_order', methods=['GET', 'POST'])
+@admin_required
+def admin_column_subject_order():
+    if not session.get('admin_logged_in'):
+        return jsonify({'status': 'error', 'message': '管理者権限が必要です'}), 403
+
+    app_info = AppInfo.get_current_info()
+    settings = app_info.app_settings or {}
+
+    if request.method == 'GET':
+        order = settings.get('column_subject_order', [])
+        return jsonify({'status': 'success', 'order': order})
+
+    elif request.method == 'POST':
+        try:
+            data = request.get_json()
+            new_order = data.get('order', [])
+            
+            if not isinstance(new_order, list):
+                return jsonify({'status': 'error', 'message': 'Invalid data format'}), 400
+
+            # app_settingsを更新
+            settings['column_subject_order'] = new_order
+            # SQLAlchemyにJSONDictの変更を検知させるための再代入
+            app_info.app_settings = dict(settings)
+            
+            # 手動で更新としてマーク (JSON/Dict型の変更検知のため)
+            from sqlalchemy.orm.attributes import flag_modified
+            flag_modified(app_info, "app_settings")
+            
+            db.session.commit()
+            
+            return jsonify({'status': 'success', 'message': '表示順を保存しました'})
+        except Exception as e:
+            db.session.rollback()
+            print(f"Error saving subject order: {e}")
+            return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/admin/manual_fix_columns')
 def manual_fix_columns():

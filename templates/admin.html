@@ -1466,6 +1466,26 @@
                                 </button>
                             </form>
                         </div>
+
+                        <!-- 科目表示順設定 -->
+                        <div class="admin-panel mt-4"
+                            style="background-color: #fff8e1; border-left: 5px solid #ffc107;">
+                            <h4><i class="fas fa-sort-numeric-down"></i> 科目表示順設定</h4>
+                            <p class="text-muted small">コラム集ページでの各科目の表示順（アコーディオンの並び順）を設定します。</p>
+
+                            <div class="row">
+                                <div class="col-md-8 col-lg-6">
+                                    <ul class="list-group" id="subjectOrderList">
+                                        <!-- JSで動的にリストを生成します -->
+                                        <li class="list-group-item text-center text-muted"><i
+                                                class="fas fa-spinner fa-spin"></i> 読み込み中...</li>
+                                    </ul>
+                                    <button class="btn btn-warning mt-3" onclick="saveSubjectOrder()">
+                                        <i class="fas fa-save"></i> 表示順を保存する
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -6558,6 +6578,145 @@
             setTimeout(() => {
                 updateAnswerCharCount(textareaId, counterId);
             }, 100);
+        }
+
+        // ========================================
+        // 科目表示順設定機能
+        // ========================================
+        document.addEventListener('DOMContentLoaded', function () {
+            // Adminタブ切り替え時に科目順をロードする
+            const columnTabBtn = document.querySelector('button[data-bs-target="#section-column-management"]');
+            if (columnTabBtn) {
+                columnTabBtn.addEventListener('shown.bs.tab', function (e) {
+                    loadSubjectOrder();
+                });
+            }
+            // 初期表示オプションとしてとりあえずロード
+            if (document.getElementById('section-column-management').classList.contains('active')) {
+                loadSubjectOrder();
+            }
+        });
+
+        function loadSubjectOrder() {
+            const listEl = document.getElementById('subjectOrderList');
+            if (!listEl) return;
+
+            listEl.innerHTML = '<li class="list-group-item text-center text-muted"><i class="fas fa-spinner fa-spin"></i> 読み込み中...</li>';
+
+            fetch('/admin/api/column_subject_order')
+                .then(response => response.json())
+                .then(data => {
+                    listEl.innerHTML = '';
+                    if (data.status === 'success' && data.order && data.order.length > 0) {
+                        data.order.forEach((subject, index) => {
+                            const li = createSubjectListItem(subject, index, data.order.length);
+                            listEl.appendChild(li);
+                        });
+                    } else {
+                        // デフォルトの科目（もしAPIから空で返ってきた場合）
+                        const defaultSubjects = ['歴史', '地理', '公民', '歴史総合', '日本史探究', '世界史探究', '地理総合', '地理探究', '公共', '倫理', '政治経済'];
+                        defaultSubjects.forEach((subject, index) => {
+                            const li = createSubjectListItem(subject, index, defaultSubjects.length);
+                            listEl.appendChild(li);
+                        });
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading subject order:', error);
+                    listEl.innerHTML = '<li class="list-group-item text-danger">読み込みエラーが発生しました。</li>';
+                });
+        }
+
+        function createSubjectListItem(subject, index, total) {
+            const li = document.createElement('li');
+            li.className = 'list-group-item d-flex justify-content-between align-items-center subject-order-item';
+            li.dataset.subject = subject;
+
+            let btnHtml = '<div class="btn-group btn-group-sm">';
+            btnHtml += `<button class="btn btn-outline-secondary" onclick="moveSubjectUp(this)" ${index === 0 ? 'disabled' : ''} title="上へ"><i class="fas fa-arrow-up"></i></button>`;
+            btnHtml += `<button class="btn btn-outline-secondary" onclick="moveSubjectDown(this)" ${index === total - 1 ? 'disabled' : ''} title="下へ"><i class="fas fa-arrow-down"></i></button>`;
+            btnHtml += '</div>';
+
+            li.innerHTML = `
+                <div class="d-flex align-items-center">
+                    <i class="fas fa-grip-vertical text-muted me-3 cursor-grab"></i>
+                    <span class="fw-bold">${subject}</span>
+                </div>
+                ${btnHtml}
+            `;
+            return li;
+        }
+
+        function updateSubjectListButtons() {
+            const items = document.querySelectorAll('#subjectOrderList .subject-order-item');
+            const total = items.length;
+            items.forEach((item, index) => {
+                const btns = item.querySelectorAll('button');
+                if (btns.length === 2) {
+                    btns[0].disabled = (index === 0);
+                    btns[1].disabled = (index === total - 1);
+                }
+            });
+        }
+
+        function moveSubjectUp(btn) {
+            const li = btn.closest('li');
+            const prev = li.previousElementSibling;
+            if (prev) {
+                li.parentNode.insertBefore(li, prev);
+                updateSubjectListButtons();
+            }
+        }
+
+        function moveSubjectDown(btn) {
+            const li = btn.closest('li');
+            const next = li.nextElementSibling;
+            if (next) {
+                li.parentNode.insertBefore(next, li);
+                updateSubjectListButtons();
+            }
+        }
+
+        function saveSubjectOrder() {
+            const items = document.querySelectorAll('#subjectOrderList .subject-order-item');
+            const newOrder = Array.from(items).map(item => item.dataset.subject);
+
+            if (newOrder.length === 0) {
+                alert('科目がありません。');
+                return;
+            }
+
+            const btn = event.currentTarget;
+            const originalHtml = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 保存中...';
+            btn.disabled = true;
+
+            const csrfToken = document.querySelector('input[name="csrf_token"]') ? document.querySelector('input[name="csrf_token"]').value : '';
+
+            fetch('/admin/api/column_subject_order', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify({ order: newOrder })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        showToast('保存しました', 'success');
+                    } else {
+                        alert('保存に失敗しました: ' + (data.message || '不明なエラー'));
+                    }
+                })
+                .catch(error => {
+                    console.error('Error saving subject order:', error);
+                    alert('通信エラーが発生しました。');
+                })
+                .finally(() => {
+                    btn.innerHTML = originalHtml;
+                    btn.disabled = false;
+                });
         }
 
         // admin.html の <script> タグの末尾に追加
