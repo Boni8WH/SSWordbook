@@ -130,11 +130,13 @@
 
     /* 問題文セクション */
     .question-section {
-        background: #f8f9fa;
-        border-radius: 12px;
+        background: rgba(248, 249, 250, 0.95);
+        backdrop-filter: blur(10px);
+        border-radius: 16px;
         padding: 25px;
         margin-bottom: 25px;
         border-left: 4px solid #667eea;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.03);
     }
 
     .section-title {
@@ -170,11 +172,13 @@
 
     /* 解答セクション */
     .answer-section {
-        background: #fff8e1;
-        border-radius: 12px;
+        background: rgba(255, 248, 225, 0.95);
+        backdrop-filter: blur(10px);
+        border-radius: 16px;
         padding: 25px;
         margin-bottom: 25px;
         border-left: 4px solid #ff9800;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.03);
         display: none;
     }
 
@@ -306,11 +310,13 @@
 
     /* 進捗管理セクション */
     .progress-section {
-        background: white;
-        border: 1px solid #dee2e6;
-        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(222, 226, 230, 0.8);
+        border-radius: 16px;
         padding: 25px;
         margin-bottom: 25px;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.03);
     }
 
     .progress-controls {
@@ -623,12 +629,13 @@
 
     /* 答案作成セクション */
     .submission-section {
-        background: #ffffff;
-        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        border-radius: 16px;
         padding: 25px;
         margin-bottom: 25px;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
-        border: 1px solid #e9ecef;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+        border: 1px solid rgba(233, 236, 239, 0.8);
     }
 
     .editor-toolbar {
@@ -860,7 +867,7 @@
             <i class="fas fa-question-circle"></i>
             問題文
         </h2>
-        <p class="question-text">{{ problem.question | linkify_html | safe }}</p>
+        <p class="question-text">{{ problem.question.strip() | linkify_html | safe }}</p>
 
         <!-- 画像表示部分を修正 -->
         {% if has_essay_image(problem.id) %}

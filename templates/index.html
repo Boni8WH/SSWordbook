@@ -1,6 +1,521 @@
 {% extends "base.html" %}
 {% block title %}{{ app_name }}{% endblock %}
 
+{% block head_extra %}
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet">
+<style>
+    /* 共通タイポグラフィ＆高級感 */
+    .premium-title {
+        color: #1a1a2e;
+        letter-spacing: 0.1em;
+        text-shadow: 2px 2px 0px rgba(212, 175, 55, 0.1);
+    }
+
+    .premium-text {}
+
+    /* セレクションエリアのカード化 */
+    .controls-area {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        border-radius: 20px;
+        padding: 30px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.8);
+        margin-bottom: 30px;
+    }
+
+    /* セクション見出し */
+    .section-header-styled {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        width: 100%;
+        border-bottom: 2px solid #f0f2f5;
+        margin-bottom: 20px;
+        padding-bottom: 12px;
+    }
+
+    .section-header-styled h3 {
+        margin: 0;
+        border: none;
+        padding: 0;
+        color: #2c3e50;
+        font-size: 1.4rem;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .section-header-styled h3 i {
+        color: #667eea;
+    }
+
+    /* 克服モード: 燃えるフォント＆アニメーション */
+    .overcome-title {
+        font-family: 'Dela Gothic One', 'Noto Sans JP', sans-serif;
+        background: linear-gradient(90deg,
+                #f5a623 0%, #e74c3c 30%, #c0392b 60%, #f5a623 100%);
+        background-size: 200% auto;
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        font-size: 1.5rem;
+        letter-spacing: 0.03em;
+        animation: overcomeShimmer 2.4s linear infinite,
+            overcomePopIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    }
+
+    @keyframes overcomeShimmer {
+        0% {
+            background-position: 0% center;
+        }
+
+        100% {
+            background-position: 200% center;
+        }
+    }
+
+    @keyframes overcomePopIn {
+        0% {
+            opacity: 0;
+            transform: scale(0.6) rotate(-4deg);
+        }
+
+        60% {
+            transform: scale(1.14) rotate(1.5deg);
+        }
+
+        100% {
+            opacity: 1;
+            transform: scale(1) rotate(0deg);
+        }
+    }
+
+
+
+    /* 出題数ボタン（ピル型） */
+    /* セグメンテッドコントロール */
+    .question-count-buttons {
+        display: flex;
+        align-items: stretch;
+        background: #f1f3f7;
+        border-radius: 12px;
+        padding: 4px;
+        margin-bottom: 18px;
+        gap: 2px;
+    }
+
+    .count-btn {
+        flex: 1;
+        padding: 7px 6px;
+        border-radius: 9px;
+        background: transparent;
+        border: none;
+        color: #718096;
+        font-weight: 600;
+        font-size: 0.85rem;
+        cursor: pointer;
+        transition: all 0.22s ease;
+        text-align: center;
+        white-space: nowrap;
+    }
+
+    .count-btn:hover {
+        background: rgba(255, 255, 255, 0.7);
+        color: #2d3748;
+    }
+
+    .count-btn.active {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+        box-shadow: 0 2px 8px rgba(102, 126, 234, 0.35);
+    }
+
+    /* フィルター（ボタンスタイル） */
+    .premium-filters {
+        display: flex;
+        flex-wrap: nowrap;
+        /* 一段に並べる */
+        gap: 10px;
+        margin-bottom: 25px;
+        justify-content: center;
+        overflow-x: auto;
+        /* 画面が狭い場合はスクロール可能にする */
+        padding-bottom: 5px;
+        /* スクロールバー用の余白 */
+    }
+
+    .filter-toggle {
+        display: inline-block;
+    }
+
+    .filter-checkbox {
+        display: none;
+    }
+
+    .filter-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 16px;
+        border-radius: 25px;
+        background: #fff;
+        border: 1px solid #edf2f7;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        color: #4a5568;
+        font-size: 0.9rem;
+        /* 少し小さくして1行に収まりやすくする */
+        white-space: nowrap;
+        /* テキストの折り返しを防ぐ */
+        user-select: none;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.02);
+    }
+
+    .filter-btn:hover {
+        background: #fcfcfc;
+        border-color: #cbd5e0;
+    }
+
+    .filter-checkbox:checked+.filter-btn {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+        border-color: transparent;
+        box-shadow: 0 4px 10px rgba(102, 126, 234, 0.3);
+    }
+
+    .filter-checkbox:checked+.filter-btn i {
+        color: white !important;
+    }
+
+    .filter-btn.disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    /* 出題範囲の章リスト（カード型） */
+    .chapters-container {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+        max-height: 45vh;
+        /* スマホでボタンが押し出されないように制限 */
+        overflow-y: auto;
+        padding-right: 5px;
+        /* スクロールバー用の余白 */
+    }
+
+    .chapter-item {
+        background: white;
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+        overflow: hidden;
+        transition: all 0.3s ease;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+    }
+
+    .chapter-item:hover {
+        border-color: #a0aec0;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    }
+
+    /* 選択不可状態の視覚効果 */
+    .dimmed {
+        opacity: 0.35;
+        pointer-events: none;
+        filter: grayscale(0.5);
+        transition: all 0.4s ease;
+    }
+
+
+    .chapter-header {
+        padding: 15px 20px;
+        background: #fcfcfc;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        cursor: pointer;
+        border-bottom: 1px solid transparent;
+    }
+
+    .chapter-item.active .chapter-header {
+        border-bottom-color: #e2e8f0;
+        background: #f8f9fa;
+    }
+
+    .chapter-title {
+        font-weight: 700;
+        font-size: 1.1rem;
+        color: #2d3748;
+    }
+
+    .chapter-options {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+    }
+
+    .select-all-chapter-btn {
+        background: rgba(102, 126, 234, 0.1);
+        color: #667eea;
+        border: none;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .select-all-chapter-btn:hover {
+        background: rgba(102, 126, 234, 0.2);
+    }
+
+    .unit-list {
+        padding: 0 20px;
+        background: white;
+    }
+
+    .unit-item {
+        padding: 12px 0;
+        border-bottom: 1px solid #f0f2f5;
+        display: flex;
+        align-items: center;
+    }
+
+    .unit-item:last-child {
+        border-bottom: none;
+    }
+
+    .unit-item input[type="checkbox"] {
+        width: 18px;
+        height: 18px;
+        margin-right: 12px;
+        cursor: pointer;
+        accent-color: #667eea;
+    }
+
+    .unit-item label {
+        color: #4a5568;
+        cursor: pointer;
+        flex: 1;
+        font-size: 0.95rem;
+    }
+
+    /* 学習開始ボタン（左パネル下部配置用） */
+    .btn-start {
+        background: linear-gradient(135deg, #3498db, #2980b9);
+        color: white;
+        border: none;
+        border-radius: 16px;
+        padding: 14px 20px !important;
+        font-size: 1.05rem;
+        font-weight: 700;
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        box-shadow: 0 6px 18px rgba(52, 152, 219, 0.35);
+        letter-spacing: 0.04em;
+        transition: all 0.3s ease;
+    }
+
+    .btn-start:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 25px rgba(52, 152, 219, 0.45);
+        color: white;
+    }
+
+    /* ナビゲーションリンク群（グリッドカード型） */
+    .nav-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+        gap: 12px;
+        margin-top: 25px;
+        padding-top: 20px;
+        border-top: 1px solid #edf2f7;
+    }
+
+    .nav-card {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+        padding: 10px 8px;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: white;
+        text-decoration: none;
+        cursor: pointer;
+        border: none;
+        transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12);
+        letter-spacing: 0.02em;
+    }
+
+    .nav-card i {
+        font-size: 1.1rem;
+        opacity: 0.95;
+    }
+
+    .nav-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+        color: white;
+    }
+
+    .nav-card.daily {
+        background: linear-gradient(135deg, #2ecc71, #27ae60);
+        box-shadow: 0 4px 12px rgba(46, 204, 113, 0.35);
+    }
+
+    .nav-card.weak {
+        background: linear-gradient(135deg, #e74c3c, #c0392b);
+        box-shadow: 0 4px 12px rgba(231, 76, 60, 0.35);
+    }
+
+    .nav-card.essay {
+        background: linear-gradient(135deg, #3498db, #2980b9);
+        box-shadow: 0 4px 12px rgba(52, 152, 219, 0.35);
+    }
+
+    .nav-card.map {
+        background: linear-gradient(135deg, #00b894, #00cec9);
+        box-shadow: 0 4px 12px rgba(0, 184, 148, 0.35);
+    }
+
+    .nav-card.chrono {
+        background: linear-gradient(135deg, #f39c12, #e67e22, #d35400);
+        box-shadow: 0 4px 12px rgba(230, 126, 34, 0.35);
+    }
+
+    .nav-card.columns {
+        background: linear-gradient(135deg, #8e44ad, #9b59b6, #d980fa);
+        box-shadow: 0 4px 12px rgba(155, 89, 182, 0.35);
+    }
+
+    /* カードのガラス風リデザイン */
+    .card {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        border-radius: 20px;
+        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.8);
+        padding: 40px 30px;
+        margin-bottom: 25px;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: linear-gradient(90deg, #667eea, #764ba2);
+    }
+
+    .question-content p {
+        font-size: 1.3rem;
+        color: #2d3748;
+        line-height: 1.6;
+    }
+
+    .answer-content p {
+        font-size: 1.4rem;
+        font-weight: 700;
+        color: #e74c3c;
+        margin-top: 20px;
+        padding-top: 20px;
+        border-top: 1px dashed #cbd5e0;
+        animation: fadeIn 0.5s ease;
+    }
+
+    /* 答えを隠す間も高さを確保してカードサイズを固定 */
+    #answer.hidden {
+        display: block !important;
+        visibility: hidden;
+        opacity: 0;
+    }
+
+    #answer {
+        transition: opacity 0.4s ease;
+    }
+
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    /* 解答ボタン群をスタイリッシュに */
+    .primary-button {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+        border: none;
+        border-radius: 30px;
+        padding: 12px 24px;
+        font-weight: 600;
+        letter-spacing: 0.1em;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        transition: all 0.3s ease;
+    }
+
+    .primary-button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(102, 126, 234, 0.6);
+    }
+
+    .correct-button {
+        background: linear-gradient(135deg, #2ecc71, #27ae60);
+        color: white;
+        border-radius: 30px;
+        border: none;
+        box-shadow: 0 4px 15px rgba(46, 204, 113, 0.4);
+    }
+
+    .incorrect-button {
+        background: linear-gradient(135deg, #e74c3c, #c0392b);
+        color: white;
+        border-radius: 30px;
+        border: none;
+        box-shadow: 0 4px 15px rgba(231, 76, 60, 0.4);
+    }
+
+    /* PC: 左カラムのグリッドを表示、スマホ用は非表示 */
+    #navGridDesktop {
+        display: grid;
+    }
+
+    #navGridMobile {
+        display: none;
+    }
+
+    /* スマホ: 左カラムのグリッドを非表示、チャプター下を表示 */
+    @media (max-width: 767px) {
+        #navGridDesktop {
+            display: none;
+        }
+
+        #navGridMobile {
+            display: grid;
+        }
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <section class="selection-area">
     <!-- RPG Trigger Banner -->
@@ -23,14 +538,15 @@
 
         <div class="question-count-and-auth">
             <div class="question-count-selection">
-                <div
-                    style="display: flex; justify-content: space-between; align-items: center; width: 100%; border-bottom: 1px solid #eee; margin-bottom: 12px; padding-bottom: 8px;">
-                    <h3 style="margin: 0; border: none; padding: 0;"><span id="rangeSelectionTitleText">出題数を選択</span>
+                <div class="section-header-styled">
+                    <h3><i class="fas fa-layer-group" id="rangeSelectionIcon"></i><span
+                            id="rangeSelectionTitleText">出題数を選択</span>
                         <span id="selectionTotalCount"
-                            style="font-size: 0.8em; color: #666; font-weight: normal; margin-left: 10px;"></span>
+                            style="font-size: 0.6em; color: #7f8c8d; font-weight: normal; margin-left: 10px;"></span>
                     </h3>
-                    <button id="resetSelectionButton" class="btn btn-sm btn-link text-secondary text-decoration-none"
-                        style="font-size: 0.85rem;">
+                    <button id="resetSelectionButton"
+                        class="btn btn-sm btn-light text-secondary rounded-pill px-3 shadow-sm"
+                        style="font-size: 0.85rem; background: #fff; border: 1px solid #edf2f7;">
                         <i class="fas fa-undo-alt"></i> リセット
                     </button>
                 </div>
@@ -41,23 +557,32 @@
                     <span class="count-btn" data-value="2">50問</span>
                     <span class="count-btn" data-value="3">全問</span>
                 </div>
-                <!-- オプションボタン（統一デザイン） -->
-                <div class="filter-options-bar">
-                    <label class="filter-option-btn {% if not session.get('user_id') %}disabled{% endif %}">
-                        <input type="checkbox" id="incorrectOnlyCheckbox2" {% if not session.get('user_id') %}disabled{%
-                            endif %}>
-                        <span><i class="fas fa-crosshairs"></i> 克服モード</span>
-                    </label>
-                    <label class="filter-option-btn {% if not session.get('user_id') %}disabled{% endif %}">
-                        <input type="checkbox" id="unsolvedOnlyCheckbox" {% if not session.get('user_id') %}disabled{%
-                            endif %}>
-                        <span><i class="fas fa-question-circle"></i> 未解答のみ</span>
-                    </label>
-                    <label class="filter-option-btn {% if not session.get('user_id') %}disabled{% endif %}">
-                        <input type="checkbox" id="unmasteredOnlyCheckbox" {% if not session.get('user_id') %}disabled{%
-                            endif %}>
-                        <span><i class="fas fa-star-half-alt"></i> 未マスター</span>
-                    </label>
+                <!-- オプションボタン -->
+                <div class="premium-filters">
+                    <div class="filter-toggle">
+                        <input type="checkbox" id="incorrectOnlyCheckbox2" class="filter-checkbox" {% if not
+                            session.get('user_id') %}disabled{% endif %}>
+                        <label for="incorrectOnlyCheckbox2"
+                            class="filter-btn {% if not session.get('user_id') %}disabled{% endif %}">
+                            <i class="fas fa-crosshairs text-danger"></i> 克服
+                        </label>
+                    </div>
+                    <div class="filter-toggle">
+                        <input type="checkbox" id="unsolvedOnlyCheckbox" class="filter-checkbox" {% if not
+                            session.get('user_id') %}disabled{% endif %}>
+                        <label for="unsolvedOnlyCheckbox"
+                            class="filter-btn {% if not session.get('user_id') %}disabled{% endif %}">
+                            <i class="fas fa-question-circle text-primary"></i> 未解答
+                        </label>
+                    </div>
+                    <div class="filter-toggle">
+                        <input type="checkbox" id="unmasteredOnlyCheckbox" class="filter-checkbox" {% if not
+                            session.get('user_id') %}disabled{% endif %}>
+                        <label for="unmasteredOnlyCheckbox"
+                            class="filter-btn {% if not session.get('user_id') %}disabled{% endif %}">
+                            <i class="fas fa-star-half-alt text-warning"></i> 未マスター
+                        </label>
+                    </div>
                 </div>
                 <!-- 隠しラジオ（既存JS互換用） -->
                 <div style="display: none;">
@@ -68,14 +593,51 @@
                     <input type="radio" name="questionCount" value="incorrectOnly" id="incorrectOnlyRadio">
                 </div>
             </div>
+
+            <!-- ナビゲーショングリッド（PC: 左パネルのフィルター下に表示） -->
+            <div id="navGridDesktop" class="nav-grid" style="grid-template-columns: repeat(3, 1fr); margin-top: 20px;">
+                <button id="dailyQuizButton" class="nav-card daily">
+                    <i class="fas fa-stopwatch"></i>
+                    <span>今日の10問</span>
+                </button>
+                <a href="{{ url_for('weak_problems_page') }}" class="nav-card weak" {% if not session.get('user_id')
+                    %}style="display: none;" {% endif %}>
+                    <i class="fas fa-crosshairs"></i>
+                    <span>苦手問題</span>
+                </a>
+                <a href="{{ url_for('essay_index') }}" class="nav-card essay">
+                    <i class="fas fa-edit"></i>
+                    <span>論述問題集</span>
+                </a>
+                <a href="{{ url_for('map_quiz_index') }}" class="nav-card map">
+                    <i class="fas fa-globe-americas"></i>
+                    <span>地図の深淵</span>
+                </a>
+                <a href="{{ url_for('chronological_index') }}" class="nav-card chrono">
+                    <i class="fas fa-hourglass-half"></i>
+                    <span>刻の系譜</span>
+                </a>
+                <a href="{{ url_for('columns_page') }}" class="nav-card columns">
+                    <i class="fas fa-book-open"></i>
+                    <span>コラム集</span>
+                </a>
+            </div>
         </div>
 
         <div class="range-selection-area">
-            <div class="section-header-with-action">
-                <h3>出題範囲を選択</h3>
-                <button id="openSearchButton" class="btn btn-sm btn-outline-secondary">
-                    <i class="fas fa-search"></i> 問題検索
-                </button>
+            <div class="section-header-styled"
+                style="display: flex; justify-content: space-between; align-items: center;">
+                <h3 style="margin-bottom: 0;"><i class="fas fa-book-open"></i> 出題範囲</h3>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <button id="openSearchButton" class="btn btn-sm btn-light text-primary rounded-pill px-3 shadow-sm"
+                        style="background:#fff; border: 1px solid #edf2f7; white-space: nowrap;">
+                        <i class="fas fa-search"></i> 検索
+                    </button>
+                    <button id="startButton" class="btn btn-start"
+                        style="padding: 8px 20px !important; font-size: 1rem; border-radius: 20px; white-space: nowrap;">
+                        <i class="fas fa-play"></i> 開始
+                    </button>
+                </div>
             </div>
             <div class="chapters-container">
                 {% for chapter_num, chapter in chapter_data.items() %}
@@ -105,34 +667,36 @@
                 {% endfor %}
             </div>
         </div>
+    </div>
 
-        <div class="bottom-controls">
-            <button id="startButton" class="btn btn-start">
-                <i class="fas fa-play"></i> 学習開始
-            </button>
-            <button id="dailyQuizButton" class="btn btn-daily">
-                <i class="fas fa-stopwatch"></i> 今日の10問
-            </button>
-            <a href="{{ url_for('weak_problems_page') }}" class="btn btn-weak" {% if not session.get('user_id')
-                %}style="display: none;" {% endif %}>
-                <i class="fas fa-crosshairs"></i> 苦手問題
-            </a>
-            <a href="{{ url_for('essay_index') }}" class="btn btn-essay">
-                <i class="fas fa-edit"></i> 論述問題集
-            </a>
-            <a href="{{ url_for('map_quiz_index') }}" class="btn btn-primary"
-                style="background-color: #27ae60; border-color: #2ecc71;">
-                <i class="fas fa-globe-americas"></i> 地図の深淵
-            </a>
-            <a href="{{ url_for('chronological_index') }}" class="btn btn-primary"
-                style="background-color: #e67e22; border-color: #d35400;">
-                <i class="fas fa-hourglass-half"></i> 刻の系譜
-            </a>
-            <a href="{{ url_for('columns_page') }}" class="btn btn-primary"
-                style="background-color: #9b59b6; border-color: #8e44ad;">
-                <i class="fas fa-book-open"></i> コラム集
-            </a>
-        </div>
+    <!-- ナビゲーショングリッド（スマホ: チャプターリストの下に表示） -->
+    <!-- 修正: range-selection-area の外に移動し、制限中(display:none)でも消えないようにする -->
+    <div id="navGridMobile" class="nav-grid" style="grid-template-columns: repeat(3, 1fr); margin-top: 20px;">
+        <button id="dailyQuizButtonMobile" class="nav-card daily">
+            <i class="fas fa-stopwatch"></i>
+            <span>今日の10問</span>
+        </button>
+        <a href="{{ url_for('weak_problems_page') }}" class="nav-card weak" {% if not session.get('user_id')
+            %}style="display: none;" {% endif %}>
+            <i class="fas fa-crosshairs"></i>
+            <span>苦手問題</span>
+        </a>
+        <a href="{{ url_for('essay_index') }}" class="nav-card essay">
+            <i class="fas fa-edit"></i>
+            <span>論述問題集</span>
+        </a>
+        <a href="{{ url_for('map_quiz_index') }}" class="nav-card map">
+            <i class="fas fa-globe-americas"></i>
+            <span>地図の深淵</span>
+        </a>
+        <a href="{{ url_for('chronological_index') }}" class="nav-card chrono">
+            <i class="fas fa-hourglass-half"></i>
+            <span>刻の系譜</span>
+        </a>
+        <a href="{{ url_for('columns_page') }}" class="nav-card columns">
+            <i class="fas fa-book-open"></i>
+            <span>コラム集</span>
+        </a>
     </div>
 </section>
 
@@ -157,7 +721,6 @@
                 <button id="incorrectButton" class="incorrect-button hidden">不正解</button>
             </div>
             <!-- PC用マイクボタン (Mobileでは非表示) -->
-            <!-- PC用マイクボタン (Mobileでは非表示) -->
             <button id="voiceAnswerBtn" class="voice-button voice-btn-pc"
                 style="display: none; width: 60px !important; height: 60px !important; min-width: 60px !important; min-height: 60px !important; border-radius: 50% !important; background-color: #e74c3c; border: none; color: white; font-size: 1.5em; align-items: center; justify-content: center; box-shadow: 0 4px 8px rgba(0,0,0,0.2); flex-shrink: 0 !important; flex: 0 0 60px !important; padding: 0 !important; transition: transform 0.2s;">
                 <i class="fas fa-microphone"></i>
@@ -167,28 +730,28 @@
     <div id="voiceFeedback" class="voice-feedback hidden" style="margin-top: 10px; text-align: center; color: #666;">
     </div>
     <div class="back-to-selection-container"
-        style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-        <div style="display: flex; align-items: center; gap: 10px; flex-grow: 1;">
+        style="display: flex; justify-content: space-between; align-items: center; width: 100%; gap: 10px;">
+        <div style="display: flex; align-items: center; flex-grow: 0;">
             <button id="backToSelectionFromCardButton" class="secondary-button" style="margin: 0;">選択画面に戻る</button>
-            <!-- Mobile Voice Button Removed from here -->
         </div>
 
-        <div class="font-size-controls">
-            <span style="font-size: 0.8rem; color: #7f8c8d;">文字サイズ</span>
-            <div class="btn-group" role="group">
-                <button type="button" class="btn btn-sm btn-outline-secondary" id="decreaseFontSize" title="文字を小さくする"><i
-                        class="fas fa-minus"></i></button>
-                <button type="button" class="btn btn-sm btn-outline-secondary" id="increaseFontSize" title="文字を大きくする"><i
-                        class="fas fa-plus"></i></button>
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <!-- Mobile Voice Button: Grouped with font controls for balance -->
+            <button id="voiceAnswerBtnMobile" class="voice-button voice-btn-mobile"
+                style="display: none; width: 44px !important; height: 44px !important; min-width: 44px !important; min-height: 44px !important; border-radius: 50%; background-color: #e74c3c; border: none; color: white; font-size: 1.1em; align-items: center; justify-content: center; box-shadow: 0 4px 8px rgba(0,0,0,0.2); flex-shrink: 0; z-index: 1000; pointer-events: auto; cursor: pointer;">
+                <i class="fas fa-microphone"></i>
+            </button>
+
+            <div class="font-size-controls" style="margin: 0;">
+                <span style="font-size: 0.8rem; color: #7f8c8d;">文字サイズ</span>
+                <div class="btn-group" role="group">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="decreaseFontSize"
+                        title="文字を小さくする"><i class="fas fa-minus"></i></button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="increaseFontSize"
+                        title="文字を大きくする"><i class="fas fa-plus"></i></button>
+                </div>
             </div>
         </div>
-
-        <!-- Mobile用マイクボタン (PCでは非表示) -->
-        <button id="voiceAnswerBtnMobile" class="voice-button voice-btn-mobile"
-            style="display: none; width: 50px !important; height: 50px !important; min-width: 50px !important; min-height: 50px !important; border-radius: 50%; background-color: #e74c3c; border: none; color: white; font-size: 1.2em; align-items: center; justify-content: center; box-shadow: 0 4px 8px rgba(0,0,0,0.2); flex-shrink: 0; margin-left: 10px;">
-            <i class="fas fa-microphone"></i>
-        </button>
-
     </div>
 
 </section>
@@ -196,36 +759,110 @@
 <section id="quizResult" class="quiz-result-area hidden">
     <div id="quizResultContent">
         <h2>学習結果</h2>
-        <p>出題数: <span id="totalQuestionsCount"></span>問</p>
-        <p>正解数: <span id="correctCount"></span>問</p>
-        <p>不正解数: <span id="incorrectCount"></span>問</p>
-        <p>正答率: <span id="accuracyRate"></span>%</p>
+
+        <!-- 正答率サークルガージ -->
+        <div class="result-gauge-wrap">
+            <div class="result-gauge">
+                <svg width="100%" height="100%" viewBox="0 0 160 160" style="display:block;">
+                    <defs>
+                        <linearGradient id="gaugeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" stop-color="#667eea" />
+                            <stop offset="100%" stop-color="#764ba2" />
+                        </linearGradient>
+                    </defs>
+                    <circle class="gauge-track" cx="80" cy="80" r="66" />
+                    <circle id="gaugeFill" class="gauge-fill" cx="80" cy="80" r="66" stroke-dasharray="414.69"
+                        stroke-dashoffset="414.69" />
+                </svg>
+                <div class="gauge-text">
+                    <span class="gauge-pct"><span id="accuracyRate">0</span>%</span>
+                    <span class="gauge-label">正答率</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 正解・不正解 ミニマル表示 -->
+        <!-- 出題数は非JS用に隠して持つ -->
+        <span id="totalQuestionsCount" style="display:none;">0</span>
+
+        <div class="result-score-row">
+            <div class="score-item correct">
+                <span class="score-icon">&#10003;</span>
+                <span class="score-num" id="correctCount">0</span>
+                <span class="score-sub">正解</span>
+            </div>
+            <div class="score-divider"></div>
+            <div class="score-item incorrect">
+                <span class="score-icon">&#10007;</span>
+                <span class="score-num" id="incorrectCount">0</span>
+                <span class="score-sub">不正解</span>
+            </div>
+        </div>
+
         <p class="total-in-range">選択範囲の全問題数: <span id="selectedRangeTotalQuestions"></span>問</p>
     </div>
 
     <div id="incorrectWordList" class="incorrect-word-list hidden">
-        <h3>今回の不正解問題</h3>
+        <h3><i class="fas fa-exclamation-triangle"></i> 今回の不正解問題</h3>
         <ul id="incorrectWordsContainer">
         </ul>
     </div>
 
-    <div id="recommendedEssaysSection" class="incorrect-word-list hidden" style="border-color: #3498db;">
-        <h3 style="color: #2980b9; border-color: #a9cce3;">
-            <i class="fas fa-edit"></i> 論述問題にチャレンジ！
+    <div class="result-buttons">
+        <button id="backToSelectionButton" class="secondary-button"><i class="fas fa-undo"></i> 選択画面に戻る</button>
+        <button id="restartQuizButton" class="primary-button"><i class="fas fa-redo"></i> 同じ条件で再学習</button>
+        <button id="shareXButton" class="share-button" style="display: none;">Xでシェア</button>
+        <button id="downloadImageButton" class="share-button" style="display: none;">画像でシェア</button>
+    </div>
+
+    <div id="recommendedEssaysSection" class="incorrect-word-list hidden">
+        <h3>
+            <i class="fas fa-edit"></i> 論述チャレンジ！
         </h3>
         <ul id="recommendedEssaysContainer">
         </ul>
     </div>
-
-    <div class="result-buttons">
-        <button id="backToSelectionButton" class="secondary-button">選択画面に戻る</button>
-        <button id="restartQuizButton" class="primary-button">同じ条件で再学習</button>
-        <button id="shareXButton" class="share-button">Xでシェア</button>
-        <button id="downloadImageButton" class="share-button">画像でシェア</button>
-    </div>
 </section>
 
+<!-- 【師範の試練】シネマティック演出用要素 -->
+<div id="katanaSlash" class="katana-slash hidden"></div>
+<div id="inkSplashContainer" class="ink-splash-container hidden"></div>
 
+<!-- SVG Filter for Ink Bleed Effect -->
+<svg style="position: absolute; width: 0; height: 0;" aria-hidden="true" focusable="false">
+    <filter id="inkFilter">
+        <feTurbulence type="fractalNoise" baseFrequency="0.03" numOctaves="4" result="noise" />
+        <feDisplacementMap in="SourceGraphic" in2="noise" scale="35" />
+        <feGaussianBlur stdDeviation="1.5" result="blur" />
+        <feComposite in="SourceGraphic" in2="blur" operator="atop" />
+    </filter>
+</svg>
+
+<!-- 師範の試練（Master's Trial / Sumi-e Style）オーバーレイ -->
+<div id="strategicRetreatOverlay" class="strategic-retreat-overlay zen-mode hidden">
+    <div class="sakura-container" id="sakuraContainer"></div>
+    <div class="retreat-card zen-card">
+        <div class="retreat-icon zen-icon">
+            <i class="fas fa-scroll"></i>
+        </div>
+        <h2 class="retreat-title zen-title">研ぎ澄ます時</h2>
+        <div class="retreat-message zen-message">
+            <p class="main-msg">刃がこぼれておりますぞ</p>
+            <p class="sub-msg">連戦により、集中という名の刃が欠け始めています。一度砥石に向かい、心を整えるのが真の武士の嗜みです。</p>
+        </div>
+        <div class="retreat-advice zen-advice">
+            <i class="fas fa-seedling"></i>
+            <span>急がば回れ 今は一歩下がり技を磨くのが最善</span>
+        </div>
+        <button id="retreatToResultButton" class="retreat-confirm-btn zen-btn">
+            刃を研ぐ <i class="fas fa-leaf"></i>
+        </button>
+        <!-- 師範ペルの配置 -->
+        <div id="zenPerContainer" class="zen-per-container">
+            <img src="/static/pergamon/zen.png" alt="Zen Per">
+        </div>
+    </div>
+</div>
 
 <!-- 検索モーダル -->
 <div class="modal fade" id="searchModal" tabindex="-1" aria-hidden="true">
@@ -492,6 +1129,13 @@
             display: flex !important;
         }
 
+        /* モバイルマイクボタンのアクティブ状態（タップフィードバック） */
+        .voice-btn-mobile:active {
+            transform: scale(0.9);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            background-color: #c0392b !important;
+        }
+
         /* Adjust alignment for mobile container */
         .back-to-selection-container {
             align-items: center !important;
@@ -516,6 +1160,721 @@
     .answer-buttons-container button {
         flex: 1;
         /* Split width equally */
+    }
+
+    /* ===== リザルト画面のプレミアムスタイリング ===== */
+    .quiz-result-area {
+        max-width: 600px;
+        margin: 0 auto;
+        padding: 20px;
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        border-radius: 20px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.8);
+        text-align: center;
+        animation: fadeIn 0.5s ease;
+    }
+
+    #quizResultContent h2 {
+        font-size: 1.5rem;
+        color: #2c3e50;
+        margin-bottom: 20px;
+        font-weight: 700;
+        position: relative;
+        display: inline-block;
+    }
+
+    #quizResultContent h2::after {
+        content: '';
+        position: absolute;
+        bottom: -10px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 60px;
+        height: 3px;
+        background: linear-gradient(90deg, #667eea, #764ba2);
+        border-radius: 3px;
+    }
+
+    /* ============================================
+       リザルト画面 リデザイン
+    ============================================ */
+    .quiz-result-area {
+        animation: resultSlideIn 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+
+    @keyframes resultSlideIn {
+        from {
+            opacity: 0;
+            transform: translateY(30px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    /* 正答率サークルガージ */
+    .result-gauge-wrap {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        margin: 5px 0 15px;
+    }
+
+    .result-gauge {
+        position: relative;
+        width: 140px;
+        height: 140px;
+        margin-bottom: 5px;
+    }
+
+    .result-gauge svg {
+        transform: rotate(-90deg);
+    }
+
+    .gauge-track {
+        fill: none;
+        stroke: #edf2f7;
+        stroke-width: 12;
+    }
+
+    .gauge-fill {
+        fill: none;
+        stroke-width: 12;
+        stroke-linecap: round;
+        stroke: url(#gaugeGradient);
+        transition: stroke-dashoffset 1.4s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .gauge-text {
+        position: absolute;
+        inset: 15px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: rgba(255, 255, 255, 0.7);
+        backdrop-filter: blur(4px);
+        border-radius: 50%;
+        box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.05);
+        z-index: 2;
+        gap: 0;
+    }
+
+    .gauge-pct {
+        font-size: 1.6rem;
+        font-weight: 900;
+        color: #2c3e50;
+        line-height: 1.1;
+        text-align: center;
+        letter-spacing: -0.02em;
+    }
+
+    .gauge-label {
+        font-size: 0.65rem;
+        font-weight: 700;
+        color: #718096;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+    }
+
+    .gauge-fill {
+        fill: none;
+        stroke-width: 14;
+        stroke-linecap: round;
+        stroke: url(#gaugeGradient);
+        transition: stroke-dashoffset 1.4s cubic-bezier(0.22, 1, 0.36, 1);
+        filter: drop-shadow(0 0 4px rgba(102, 126, 234, 0.3));
+    }
+
+    .gauge-track {
+        fill: none;
+        stroke: #f1f5f9;
+        stroke-width: 14;
+    }
+
+    /* 正解・不正解 ミニマルスコア行 */
+    .result-score-row {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0;
+        margin: 0 0 10px;
+        background: #f8fafc;
+        padding: 10px;
+        border-radius: 12px;
+    }
+
+    .score-item {
+        display: flex;
+        align-items: baseline;
+        padding: 0 20px;
+        gap: 8px;
+        animation: fadeInUp 0.5s ease both;
+    }
+
+    .score-item.correct {
+        animation-delay: 0.25s;
+    }
+
+    .score-item.incorrect {
+        animation-delay: 0.38s;
+    }
+
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(12px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .score-icon {
+        font-size: 1rem;
+        font-weight: 700;
+        line-height: 1;
+    }
+
+    .score-item.correct .score-icon {
+        color: #48bb78;
+    }
+
+    .score-item.incorrect .score-icon {
+        color: #f56565;
+    }
+
+    .score-num {
+        font-size: 1.8rem;
+        font-weight: 800;
+        line-height: 1;
+    }
+
+    .score-item.correct .score-num {
+        color: #48bb78;
+    }
+
+    .score-item.incorrect .score-num {
+        color: #f56565;
+    }
+
+    .score-sub {
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: #718096;
+        letter-spacing: 0.04em;
+    }
+
+    .score-divider {
+        width: 1px;
+        height: 30px;
+        background: #e2e8f0;
+        flex-shrink: 0;
+    }
+
+
+    @media (max-width: 600px) {
+        .result-gauge {
+            width: 120px;
+            height: 120px;
+        }
+
+        .gauge-text {
+            inset: 12px;
+        }
+
+        .gauge-pct {
+            font-size: 1.4rem;
+        }
+
+        .score-num {
+            font-size: 1.4rem;
+        }
+
+        .score-item {
+            padding: 0 10px;
+        }
+    }
+
+    .total-in-range {
+        margin-top: 10px !important;
+        padding-top: 10px;
+        border-top: 1px dashed #e2e8f0;
+        font-size: 0.85rem !important;
+        color: #a0aec0 !important;
+    }
+
+    .incorrect-word-list,
+    #recommendedEssaysSection {
+        background: rgba(248, 249, 250, 0.8);
+        border-radius: 15px;
+        padding: 15px 20px;
+        margin: 15px 0;
+        border: 1px solid rgba(226, 232, 240, 0.8);
+        text-align: left;
+    }
+
+    .incorrect-word-list h3,
+    #recommendedEssaysSection h3 {
+        font-size: 1.1rem;
+        color: #e53e3e;
+        margin-bottom: 12px;
+        border-bottom: 2px solid #fed7d7;
+        padding-bottom: 8px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    #recommendedEssaysSection h3 {
+        color: #3182ce;
+        /* おすすめ論述は青系 */
+        border-color: #bee3f8;
+    }
+
+    .incorrect-word-list ul,
+    #recommendedEssaysSection ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+
+    .incorrect-word-list li,
+    #recommendedEssaysSection li {
+        padding: 12px 15px;
+        background: white;
+        border-radius: 8px;
+        margin-bottom: 10px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.02);
+        border: 1px solid #edf2f7;
+        transition: transform 0.2s ease;
+    }
+
+    .incorrect-word-list li:hover,
+    #recommendedEssaysSection li:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        border-color: #cbd5e1;
+        background: #fff;
+    }
+
+    .result-buttons {
+        display: flex;
+        justify-content: center;
+        gap: 12px;
+        margin-top: 15px;
+        flex-wrap: wrap;
+    }
+
+    .result-buttons button {
+        padding: 12px 25px;
+        border-radius: 30px;
+        font-size: 1rem;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        border: none;
+        cursor: pointer;
+    }
+
+    #backToSelectionButton {
+        background: #f1f5f9;
+        color: #475569;
+        border: 1px solid #cbd5e1;
+    }
+
+    #backToSelectionButton:hover {
+        background: #e2e8f0;
+        transform: translateY(-2px);
+    }
+
+    #restartQuizButton {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+    }
+
+    #restartQuizButton:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+    }
+
+    /* Mobile用マイクボタン (PCでは非表示) */
+    .voice-btn-mobile {
+        display: none !important;
+    }
+
+    @media (max-width: 768px) {
+        .voice-btn-mobile {
+            display: flex !important;
+        }
+
+        .quiz-result-area {
+            padding: 20px;
+            margin: 10px;
+        }
+
+        .result-buttons {
+            flex-direction: column;
+            align-items: stretch;
+        }
+    }
+
+    .hidden {
+        display: none !important;
+    }
+
+    /* ============================================
+       シネマティック演出：一閃（Katana Slash）
+    ============================================ */
+    .katana-slash {
+        position: fixed;
+        width: 150%;
+        height: 4px;
+        background: #fff;
+        top: 50%;
+        left: -25%;
+        z-index: 10001;
+        transform: rotate(-15deg) scaleX(0);
+        box-shadow: 0 0 20px 5px rgba(255, 255, 255, 0.8);
+        pointer-events: none;
+    }
+
+    .katana-slash.animate {
+        animation: slashAnim 0.3s cubic-bezier(0.19, 1, 0.22, 1) forwards;
+    }
+
+    @keyframes slashAnim {
+        0% {
+            transform: rotate(-15deg) scaleX(0);
+            opacity: 0;
+        }
+
+        20% {
+            opacity: 1;
+        }
+
+        70% {
+            transform: rotate(-15deg) scaleX(1);
+            opacity: 1;
+        }
+
+        100% {
+            transform: rotate(-15deg) scaleX(1);
+            opacity: 0;
+        }
+    }
+
+    .ink-splash-container {
+        position: fixed;
+        inset: 0;
+        z-index: 10000;
+        pointer-events: none;
+        overflow: hidden;
+        filter: url(#inkFilter);
+    }
+
+    .ink-blot {
+        position: absolute;
+        background: #1a1a1a;
+        border-radius: 50%;
+        transform: scale(0);
+        opacity: 0;
+        transition: transform 0.8s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.5s ease-out;
+    }
+
+    .ink-blot.active {
+        transform: scale(1);
+        opacity: 1;
+    }
+
+    .ink-blot.dissolve {
+        transform: scale(0.05);
+        /* より小さく収縮 */
+        opacity: 0;
+        filter: blur(5px);
+        /* 消える瞬間に和紙に滲むようなボケを追加 */
+        transition: transform 2.0s cubic-bezier(0.4, 0, 1, 1), opacity 1.8s ease-in-out, filter 1.5s ease-out;
+    }
+
+    /* スクリーンシェイク */
+    .screen-shake {
+        animation: shakeAnim 0.4s cubic-bezier(.36, .07, .19, .97) both;
+    }
+
+    @keyframes shakeAnim {
+
+        10%,
+        90% {
+            transform: translate3d(-2px, 0, 0);
+        }
+
+        20%,
+        80% {
+            transform: translate3d(4px, 0, 0);
+        }
+
+        30%,
+        50%,
+        70% {
+            transform: translate3d(-6px, 0, 0);
+        }
+
+        40%,
+        60% {
+            transform: translate3d(6px, 0, 0);
+        }
+    }
+
+    /* ============================================
+       師範の試練（Master's Trial / Sumi-e Style）
+    ============================================ */
+    .strategic-retreat-overlay.zen-mode {
+        position: fixed;
+        inset: 0;
+        background: rgba(245, 245, 240, 0);
+        /* 和紙のようなごく薄いクリーム色 */
+        backdrop-filter: blur(0px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        padding: 20px;
+        transition: all 1.2s cubic-bezier(0.23, 1, 0.32, 1);
+        pointer-events: none;
+        opacity: 0;
+    }
+
+    .strategic-retreat-overlay.zen-mode:not(.hidden) {
+        background: rgba(245, 245, 240, 0.94);
+        backdrop-filter: blur(20px);
+        pointer-events: auto;
+        opacity: 1;
+    }
+
+    .sakura-container {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        overflow: hidden;
+        z-index: 1;
+    }
+
+    .petal {
+        position: absolute;
+        background: #ffdbed;
+        border-radius: 150% 0 150% 0;
+        opacity: 0.7;
+        transform-origin: center;
+        animation: sakuraFall linear infinite;
+    }
+
+    @keyframes sakuraFall {
+        0% {
+            transform: translate(0, -10%) rotate(0deg);
+            opacity: 0;
+        }
+
+        10% {
+            opacity: 0.7;
+        }
+
+        90% {
+            opacity: 0.7;
+        }
+
+        100% {
+            transform: translate(150px, 110vh) rotate(720deg);
+            opacity: 0;
+        }
+    }
+
+    .retreat-card.zen-card {
+        background: #fff;
+        width: 100%;
+        max-width: 480px;
+        border: 1px solid #1a1a1a;
+        padding: 50px 40px;
+        text-align: center;
+        box-shadow:
+            0 40px 100px -20px rgba(0, 0, 0, 0.15),
+            10px 10px 0 rgba(0, 0, 0, 0.05);
+        transform: scale(0.95) translateY(20px);
+        opacity: 0;
+        transition: all 1s cubic-bezier(0.16, 1, 0.3, 1);
+        position: relative;
+        z-index: 2;
+    }
+
+    .strategic-retreat-overlay:not(.hidden) .retreat-card.zen-card {
+        transform: scale(1) translateY(0);
+        opacity: 1;
+    }
+
+    .retreat-icon.zen-icon {
+        width: 80px;
+        height: 80px;
+        background: #1a1a1a;
+        color: #fff;
+        font-size: 2.2rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 4px;
+        margin: 0 auto 30px;
+        box-shadow: 6px 6px 0 rgba(0, 0, 0, 0.1);
+    }
+
+    .retreat-title.zen-title {
+        font-size: 2.4rem;
+        font-weight: 900;
+        color: #1a1a1a;
+        margin-bottom: 24px;
+        letter-spacing: 0.1em;
+        font-family: 'Noto Serif JP', serif;
+    }
+
+    .retreat-message.zen-message {
+        margin-bottom: 40px;
+    }
+
+    .retreat-message.zen-message .main-msg {
+        font-size: 1.4rem;
+        font-weight: 800;
+        color: #1a1a1a;
+        margin-bottom: 12px;
+        display: block;
+        border-bottom: 1px solid #eee;
+        padding-bottom: 10px;
+    }
+
+    .retreat-message.zen-message .sub-msg {
+        font-size: 1.05rem;
+        color: #444;
+        line-height: 1.8;
+        font-style: italic;
+    }
+
+    .retreat-advice.zen-advice {
+        background: #fdfdfb;
+        padding: 16px 24px;
+        border-radius: 4px;
+        color: #555;
+        font-size: 0.95rem;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        margin-bottom: 44px;
+        border: 1px dashed #ccc;
+    }
+
+    .retreat-advice.zen-advice i {
+        color: #2d5a27;
+    }
+
+    .retreat-confirm-btn.zen-btn {
+        width: 100%;
+        background: #1a1a1a;
+        color: #fff;
+        border: 1px solid #1a1a1a;
+        padding: 20px;
+        border-radius: 4px;
+        font-size: 1.1rem;
+        font-weight: 800;
+        cursor: pointer;
+        transition: all 0.4s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+    }
+
+    .retreat-confirm-btn.zen-btn:hover {
+        background: #fff;
+        color: #1a1a1a;
+        box-shadow: 6px 6px 0 #1a1a1a;
+    }
+
+    /* 師範ペルの配置と演出 (左下 & ひょっこり演出) */
+    .zen-per-container {
+        position: absolute;
+        bottom: -40px;
+        left: -50px;
+        width: 180px;
+        /* 少し大きく */
+        height: auto;
+        z-index: 10;
+        opacity: 0;
+        pointer-events: none;
+        filter: drop-shadow(6px 6px 15px rgba(0, 0, 0, 0.2));
+    }
+
+    /* JavaScriptで .show が付与されたらアニメーション開始 */
+    .zen-per-container.show {
+        /* ひょっこり登場 + ぷかぷか浮遊を組み合わせ */
+        animation:
+            zenPerPopUp 1.2s cubic-bezier(0.34, 1.56, 0.64, 1) forwards,
+            zenPerFloat 3s ease-in-out 1.2s infinite;
+    }
+
+    @keyframes zenPerPopUp {
+        0% {
+            transform: translateY(120px) scale(0.6) rotate(-5deg);
+            opacity: 0;
+        }
+
+        20% {
+            opacity: 1;
+        }
+
+        100% {
+            transform: translateY(0) scale(1.1) rotate(0deg);
+            opacity: 1;
+        }
+    }
+
+    @keyframes zenPerFloat {
+
+        0%,
+        100% {
+            transform: translateY(0) scale(1.1);
+        }
+
+        50% {
+            transform: translateY(-10px) scale(1.12);
+        }
+    }
+
+    .zen-per-container img {
+        width: 100%;
+        height: auto;
+    }
+
+    @media (max-width: 480px) {
+        .retreat-card.zen-card {
+            padding: 40px 24px;
+        }
+
+        .retreat-title.zen-title {
+            font-size: 1.9rem;
+        }
+    }
+
+    @media (max-width: 480px) {
+        .retreat-card {
+            padding: 30px 20px;
+        }
+
+        .retreat-title {
+            font-size: 1.5rem;
+        }
     }
 </style>
 <script>
@@ -543,26 +1902,6 @@
             countBtns.forEach((btn, index) => {
                 btn.classList.toggle('active', index == value);
             });
-
-            // Uncheck weak problem if count is selected -> REVERTED: Keep mode active logic
-            // if (weakCheckbox && weakCheckbox.checked) {
-            //     weakCheckbox.checked = false;
-            // }
-
-            // Show range selection area ONLY if weak mode is OFF
-            if (weakCheckbox && weakCheckbox.checked) {
-                if (rangeSelectionArea) rangeSelectionArea.style.display = 'none';
-                if (rangeSelectionTitleText) {
-                    rangeSelectionTitleText.textContent = '克服モード';
-                    rangeSelectionTitleText.style.color = '#e74c3c';
-                }
-            } else {
-                if (rangeSelectionArea) rangeSelectionArea.style.display = 'block';
-                if (rangeSelectionTitleText) {
-                    rangeSelectionTitleText.textContent = '出題数を選択';
-                    rangeSelectionTitleText.style.color = '#34495e';
-                }
-            }
         }
 
         // Click on count buttons
@@ -580,61 +1919,28 @@
         function updateFilterCheckboxState(disabled) {
             if (unsolvedCheckbox) {
                 unsolvedCheckbox.disabled = disabled;
-                unsolvedCheckbox.closest('.filter-option-btn').classList.toggle('disabled', disabled);
+                if (unsolvedCheckbox.nextElementSibling) {
+                    unsolvedCheckbox.nextElementSibling.classList.toggle('disabled', disabled);
+                }
                 if (disabled) unsolvedCheckbox.checked = false;
             }
             if (unmasteredCheckbox) {
                 unmasteredCheckbox.disabled = disabled;
-                unmasteredCheckbox.closest('.filter-option-btn').classList.toggle('disabled', disabled);
+                if (unmasteredCheckbox.nextElementSibling) {
+                    unmasteredCheckbox.nextElementSibling.classList.toggle('disabled', disabled);
+                }
                 if (disabled) unmasteredCheckbox.checked = false;
             }
         }
 
         if (weakCheckbox) {
             weakCheckbox.addEventListener('change', function () {
+                // 能動的にONにした場合、自動的に「全問(value=3)」を選択する
                 if (this.checked) {
-                    // 克服モードON
-                    // incorrectOnlyRadio.checked = true; // 廃止：カウント選択を維持する
-                    // incorrectOnlyRadio.dispatchEvent(new Event('change', { bubbles: true }));
-
-                    // Count buttons allow selection, so DON'T remove active class
-                    // countBtns.forEach(btn => btn.classList.remove('active'));
-
-                    // Hide range selection area when weak problem is selected
-                    if (rangeSelectionArea) {
-                        rangeSelectionArea.style.display = 'none';
-                    }
-                    if (rangeSelectionTitleText) {
-                        rangeSelectionTitleText.textContent = '克服モード';
-                        rangeSelectionTitleText.style.color = '#e74c3c';
-                    }
-
-                    // Disable other filters
-                    updateFilterCheckboxState(true);
-
-                    // ★追加: 苦手モードON時はデフォルトで「全問」を選択
-                    // value 3 is "All" (mapped as qcAll in selectCount logic)
-                    // Note: using direct button click or selectCount(3)
                     selectCount(3);
-                } else {
-                    // 克服モードOFF
-                    // Default back to 10問 if needed, but current selection is fine
-                    // selectCount(0); // Optional: keep current count
-
-                    // Show range selection area
-                    if (rangeSelectionArea) {
-                        rangeSelectionArea.style.display = 'block';
-                    }
-                    if (rangeSelectionTitleText) {
-                        rangeSelectionTitleText.textContent = '出題数を選択';
-                        rangeSelectionTitleText.style.color = '#34495e';
-                    }
-
-                    // Re-enable other filters
-                    updateFilterCheckboxState(false);
                 }
 
-                // Trigger update in script.js to handle total count and restrictions
+                // Trigger update in script.js to handle all UI logic and state
                 if (typeof window.updateIncorrectOnlySelection === 'function') {
                     window.updateIncorrectOnlySelection();
                 }

@@ -98,102 +98,119 @@
         background: #f39c12;
     }
 
-    /* 章グリッド */
+    /* 章リスト */
     .chapter-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-        gap: 20px;
+        display: flex;
+        flex-direction: column;
+        background: rgba(255, 255, 255, 0.97);
+        border-radius: 16px;
+        border: 1px solid #e2e8f0;
+        overflow: hidden;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
         margin-bottom: 40px;
     }
 
     .chapter-card {
-        background: white;
-        border-radius: 15px;
-        padding: 20px;
-        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
-        border: 1px solid #e1e8ed;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 14px 20px;
+        border-bottom: 1px solid #f0f2f5;
         cursor: pointer;
-        transition: all 0.3s ease;
-        position: relative;
-        overflow: hidden;
+        transition: background 0.2s ease;
+        text-decoration: none;
+    }
+
+    .chapter-card:last-child {
+        border-bottom: none;
     }
 
     .chapter-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
-        border-color: #667eea;
+        background: rgba(102, 126, 234, 0.05);
     }
 
-    .chapter-card-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        margin-bottom: 15px;
-        padding-bottom: 15px;
-        border-bottom: 2px solid #f5f7fa;
-        flex-wrap: wrap;
-        gap: 10px;
-    }
-
-    .chapter-title {
-        margin: 0;
-        font-size: clamp(1.1rem, 2.5vw, 1.3rem);
-        font-weight: 600;
-        color: #2d3748;
-        display: flex;
-        align-items: center;
-        gap: 10px;
+    .chapter-card-left {
         flex: 1;
         min-width: 0;
     }
 
+    .chapter-title {
+        margin: 0 0 6px 0;
+        font-size: 1rem;
+        font-weight: 700;
+        color: #2d3748;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
     .chapter-title i {
         color: #667eea;
-        font-size: 1.2em;
+        font-size: 0.9rem;
+        flex-shrink: 0;
     }
 
     .problem-count .total-count {
         background: linear-gradient(135deg, #667eea, #764ba2);
         color: white;
-        padding: 6px 12px;
+        padding: 3px 10px;
         border-radius: 20px;
         font-weight: 600;
-        font-size: clamp(0.8rem, 2vw, 0.9rem);
+        font-size: 0.78rem;
         white-space: nowrap;
+        flex-shrink: 0;
     }
 
     .progress-section {
         margin-bottom: 15px;
     }
 
-    .progress-stats {
+    .compact-stats {
         display: flex;
-        justify-content: space-between;
-        margin-bottom: 15px;
-        gap: 10px;
+        flex-direction: column;
+        gap: 6px;
+        margin-bottom: 10px;
     }
 
-    .stat-item {
-        text-align: center;
-        flex: 1;
+    .compact-stat-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.78rem;
+        color: #4a5568;
     }
 
-    .stat-label {
-        display: block;
-        font-size: clamp(0.75rem, 2vw, 0.85rem);
-        color: #718096;
-        margin-bottom: 5px;
+    .compact-stat-row .stat-emoji {
+        font-size: 0.95rem;
+        flex-shrink: 0;
     }
 
-    .stat-value {
-        display: block;
-        font-size: clamp(1rem, 2.5vw, 1.2rem);
-        font-weight: 600;
+    .compact-stat-row .stat-pct {
+        font-weight: 700;
+        min-width: 38px;
         color: #2d3748;
     }
 
-    .stat-value.understood {
-        color: #38a169;
+    .compact-mini-bar {
+        flex: 1;
+        height: 5px;
+        background: #e2e8f0;
+        border-radius: 10px;
+        overflow: hidden;
+    }
+
+    .compact-mini-bar-fill {
+        height: 100%;
+        border-radius: 10px;
+        transition: width 0.6s ease;
+    }
+
+    .compact-mini-bar-fill.viewed {
+        background: linear-gradient(90deg, #3498db, #63b3ed);
+    }
+
+    .compact-mini-bar-fill.understood {
+        background: linear-gradient(90deg, #38a169, #68d391);
     }
 
     .progress-bar-container {
@@ -275,63 +292,58 @@
 
     /* 学習のヒント */
     .study-tips {
-        background: white;
-        border-radius: 15px;
-        padding: 25px 20px;
-        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
-        border: 1px solid #e1e8ed;
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        border-radius: 20px;
+        padding: 30px 25px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.8);
+        margin-top: 20px;
     }
 
     .study-tips h3 {
         text-align: center;
-        margin-bottom: 25px;
-        color: #2d3748;
-        font-size: clamp(1.3rem, 3vw, 1.5rem);
+        margin-bottom: 14px;
+        color: #718096;
+        font-size: 0.82rem;
+        font-weight: 600;
         display: flex;
         align-items: center;
         justify-content: center;
-        gap: 10px;
+        gap: 6px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
     }
 
     .tips-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-        gap: 20px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        justify-content: center;
     }
 
-    .tip-card {
-        text-align: center;
-        padding: 20px 15px;
-        background: #f8f9fa;
-        border-radius: 12px;
-        border: 1px solid #e9ecef;
-        transition: all 0.3s ease;
-    }
-
-    .tip-card:hover {
-        background: #e9ecef;
-        transform: translateY(-2px);
-        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-    }
-
-    .tip-card i {
-        font-size: clamp(1.8rem, 4vw, 2rem);
-        color: #667eea;
-        margin-bottom: 15px;
-    }
-
-    .tip-card h4 {
-        margin: 0 0 10px 0;
-        color: #2d3748;
-        font-size: clamp(1rem, 2.5vw, 1.1rem);
-    }
-
-    .tip-card p {
-        margin: 0;
+    .tip-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        padding: 7px 14px;
+        background: rgba(248, 249, 250, 0.9);
+        border: 1px solid #e2e8f0;
+        border-radius: 20px;
+        font-size: 0.82rem;
         color: #4a5568;
-        font-size: clamp(0.85rem, 2vw, 0.9rem);
-        line-height: 1.5;
-        text-align: left;
+        transition: all 0.2s ease;
+    }
+
+    .tip-item:hover {
+        background: #fff;
+        border-color: #c3dafe;
+        color: #2d3748;
+    }
+
+    .tip-item i {
+        color: #667eea;
+        font-size: 0.82rem;
     }
 
     /* タブレット向け調整 */
@@ -663,36 +675,39 @@
 <div class="chapter-grid">
     {% for chapter_stat in chapter_stats %}
     <div class="chapter-card" data-chapter-url="{{ url_for('essay_chapter', chapter=chapter_stat.chapter) }}">
-        <div class="chapter-card-header">
+        <div class="chapter-card-left">
             <h3 class="chapter-title">
                 {% if chapter_stat.chapter == 'com' %}
-                <i class="fas fa-star"></i> {{ chapter_stat.chapter_name }}
+                <i class="fas fa-star"></i>
                 {% else %}
-                <i class="fas fa-book"></i> {{ chapter_stat.chapter_name }}
+                <i class="fas fa-book"></i>
                 {% endif %}
+                {{ chapter_stat.chapter_name }}
             </h3>
-            <div class="problem-count">
-                <span class="total-count">{{ chapter_stat.total_problems }}問</span>
+            {% set total = chapter_stat.total_problems %}
+            {% set viewed_pct = ((chapter_stat.viewed_problems / total * 100) | int) if total > 0 else 0 %}
+            {% set understood_pct = ((chapter_stat.understood_problems / total * 100) | int) if total > 0 else 0 %}
+            <div class="compact-stats">
+                <div class="compact-stat-row">
+                    <span class="stat-emoji">📖</span>
+                    <span class="stat-pct">{{ viewed_pct }}%</span>
+                    <div class="compact-mini-bar">
+                        <div class="compact-mini-bar-fill viewed" style="width: {{ viewed_pct }}%"></div>
+                    </div>
+                    <span style="color:#718096; font-size:0.72rem;">閲覧済み</span>
+                </div>
+                <div class="compact-stat-row">
+                    <span class="stat-emoji">⭐</span>
+                    <span class="stat-pct">{{ understood_pct }}%</span>
+                    <div class="compact-mini-bar">
+                        <div class="compact-mini-bar-fill understood" style="width: {{ understood_pct }}%"></div>
+                    </div>
+                    <span style="color:#718096; font-size:0.72rem;">理解済み</span>
+                </div>
             </div>
         </div>
-
-        <div class="progress-section">
-            <div class="progress-stats">
-                <div class="stat-item">
-                    <span class="stat-label">閲覧済み</span>
-                    <span class="stat-value">{{ chapter_stat.viewed_problems }}</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">理解済み</span>
-                    <span class="stat-value understood">{{ chapter_stat.understood_problems }}</span>
-                </div>
-            </div>
-        </div>
-
-        <div class="chapter-card-footer">
-            <span class="enter-hint">
-                <i class="fas fa-arrow-right"></i> クリックして問題一覧へ
-            </span>
+        <div class="problem-count">
+            <span class="total-count">{{ chapter_stat.total_problems }}問</span>
         </div>
     </div>
     {% endfor %}
@@ -708,32 +723,7 @@
     {% endif %}
 </div>
 
-<!-- 学習のヒント -->
-<div class="study-tips">
-    <h3><i class="fas fa-lightbulb"></i> 学習のコツ</h3>
-    <div class="tips-grid">
-        <div class="tip-card">
-            <i class="fas fa-eye"></i>
-            <h4>まずは問題を読む</h4>
-            <p>解答を見る前に、自分なりに答えを考えてみましょう。</p>
-        </div>
-        <div class="tip-card">
-            <i class="fas fa-check-circle"></i>
-            <h4>理解度をマーク</h4>
-            <p>「理解した」ボタンで進捗を記録し、学習状況を把握しましょう。</p>
-        </div>
-        <div class="tip-card">
-            <i class="fas fa-sticky-note"></i>
-            <h4>メモを活用</h4>
-            <p>重要なポイントや覚えにくい内容はメモ機能を使って記録しましょう。</p>
-        </div>
-        <div class="tip-card">
-            <i class="fas fa-flag"></i>
-            <h4>復習フラグ</h4>
-            <p>後で見返したい問題には復習フラグを付けておきましょう。</p>
-        </div>
-    </div>
-</div>
+
 </div>
 
 <script>
@@ -901,12 +891,14 @@
                             badge = `<span class="badge bg-warning text-dark ms-2"><i class="fas fa-crown"></i> おすすめ${index + 1}位</span>`;
                         }
 
+                        const formattedSnippet = essay.question_snippet.replace(/\n+/g, ' ');
+
                         item.innerHTML = `
-                            <div class="d-flex w-100 justify-content-between">
-                                <h6 class="mb-1">${essay.university} ${essay.year}年 (${essay.type})${badge}</h6>
+                            <span class="d-flex w-100 justify-content-between mb-1" style="display: block;">
+                                <strong class="mb-1">${essay.university} ${essay.year}年 (${essay.type})${badge}</strong>
                                 <small class="text-muted">${essay.chapter === 'com' ? '総合問題' : '第' + essay.chapter + '章'}</small>
-                            </div>
-                            <div class="mb-1 small text-secondary essay-search-snippet">${essay.question_snippet}</div>
+                            </span>
+                            <span class="d-block small text-secondary essay-search-snippet">${formattedSnippet}</span>
                         `;
                         searchResults.appendChild(item);
                     });

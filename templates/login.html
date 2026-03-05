@@ -20,12 +20,7 @@
                     <input type="text" id="room_number" name="room_number" required placeholder="例: 101">
                 </div>
 
-                <div class="input-group">
-                    <label for="room_password">
-                        <i class="fas fa-key"></i> 入室パスワード
-                    </label>
-                    <input type="password" id="room_password" name="room_password" required placeholder="入室用パスワード">
-                </div>
+
 
                 <div class="input-group">
                     <label for="student_id">
@@ -513,7 +508,6 @@
         const loginForm = document.getElementById('loginRegisterForm');
 
         const roomNumberInput = document.getElementById('room_number');
-        const roomPasswordInput = document.getElementById('room_password');
         const studentIdInput = document.getElementById('student_id');
 
         // 1. ページ読み込み時に記憶された情報を復元する
@@ -523,7 +517,6 @@
                 if (rememberedData) {
                     const info = JSON.parse(rememberedData);
                     roomNumberInput.value = info.room || '';
-                    roomPasswordInput.value = info.password || '';
                     studentIdInput.value = info.studentId || '';
                     rememberInfoCheckbox.checked = true;
                 }
@@ -540,7 +533,6 @@
                     // チェックボックスがオンなら情報を保存
                     const infoToRemember = {
                         room: roomNumberInput.value,
-                        password: roomPasswordInput.value,
                         studentId: studentIdInput.value
                     };
                     try {

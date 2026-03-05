@@ -4638,16 +4638,27 @@ a.nav-link.btn.change-username-button:hover,
     background-color: #ecf0f1;
 }
 
-.recommended-essay-link strong {
+.recommended-essay-link .essay-title {
     color: #2980b9;
     font-size: 0.9em;
+    font-weight: bold;
 }
 
-.recommended-essay-link p {
+.recommended-essay-link .essay-snippet {
     font-size: 0.85em;
     margin: 5px 0 0 0;
     color: #555;
     line-height: 1.4;
+    display: block;
+}
+
+#recommendedEssaysContainer {
+    padding-left: 0;
+}
+
+#recommendedEssaysContainer li {
+    list-style: none;
+    margin-bottom: 10px;
 }
 
 .no-recommendation {

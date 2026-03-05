@@ -86,11 +86,13 @@
 
     /* フィルターセクション */
     .filter-section {
-        background: white;
-        padding: 20px;
-        border-radius: 12px;
-        margin-bottom: 30px;
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        padding: 25px;
+        border-radius: 16px;
+        margin-bottom: 35px;
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.8);
     }
 
     .filter-grid {
@@ -121,134 +123,100 @@
 
     /* タイプセクション */
     .type-section {
-        margin-bottom: 40px;
+        margin-bottom: 30px;
     }
 
     .type-header {
         display: flex;
         align-items: center;
-        gap: 15px;
-        margin-bottom: 20px;
-        padding: 15px 0;
-        /* border-bottomを削除 - これが横線問題の原因 */
-        /* border-bottom: 2px solid #e9ecef; */
+        gap: 10px;
+        margin-bottom: 10px;
+        padding: 8px 4px;
     }
 
     .type-badge {
         background: linear-gradient(135deg, #667eea, #764ba2);
         color: white;
-        padding: 8px 16px;
+        padding: 4px 12px;
         border-radius: 20px;
         font-weight: 600;
-        font-size: 0.9rem;
-        min-width: 80px;
-        text-align: center;
-        /* 右側にボーダーを追加してセパレーターとして機能 */
-        margin-right: 15px;
+        font-size: 0.8rem;
     }
 
     .type-title {
         margin: 0;
-        color: #2c3e50;
-        font-size: 1.4rem;
-        font-weight: 600;
-        /* 下部にのみボーダーを追加 */
-        border-bottom: 2px solid #e9ecef;
-        padding-bottom: 10px;
-        flex: 1;
+        color: #718096;
+        font-size: 0.9rem;
+        font-weight: 500;
     }
 
-    /* 問題グリッド - さらなる改善 */
+    /* 問題リスト */
     .problems-grid {
-        display: grid;
-        /* グリッド列の設定を修正 */
-        grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-        gap: 20px;
-        /* カードを上部に揃える */
-        align-items: start;
-        /* 行の高さを内容に合わせて自動調整 */
-        grid-auto-rows: min-content;
-        /* グリッドコンテナの幅を明示的に設定 */
+        display: flex;
+        flex-direction: column;
+        background: rgba(255, 255, 255, 0.97);
+        border-radius: 14px;
+        border: 1px solid #e2e8f0;
+        overflow: hidden;
+        box-shadow: 0 3px 12px rgba(0, 0, 0, 0.04);
         width: 100%;
-        max-width: 1200px;
+    }
+
+    .problem-card-link {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 12px 18px;
+        border-bottom: 1px solid #f0f2f5;
+        text-decoration: none;
+        color: inherit;
+        transition: background 0.18s ease;
+    }
+
+    .problem-card-link:last-child {
+        border-bottom: none;
+    }
+
+    .problem-card-link:hover {
+        background: rgba(102, 126, 234, 0.05);
+    }
+
+    .problem-card-left {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .problem-meta {
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+        margin-bottom: 4px;
+    }
+
+    .university {
+        font-weight: 700;
+        color: #2c3e50;
+        font-size: 0.95rem;
+    }
+
+    .year {
+        color: #6c757d;
+        font-size: 0.82rem;
+    }
+
+    .problem-preview {
+        color: #718096;
+        font-size: 0.82rem;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
     }
 
     /* 大画面での最適化 */
     @media (min-width: 1200px) {
         .problems-grid {
-            /* 大画面では最大3列に制限 */
-            grid-template-columns: repeat(3, 1fr);
             max-width: 1200px;
-            margin: 0 auto;
         }
-    }
-
-    @media (min-width: 768px) and (max-width: 1199px) {
-        .problems-grid {
-            /* 中画面では2列 */
-            grid-template-columns: repeat(2, 1fr);
-            max-width: 800px;
-            margin: 0 auto;
-        }
-    }
-
-    /* 問題カード */
-    .problem-card-link {
-        text-decoration: none;
-        color: inherit;
-        display: block;
-        /* カード全体の高さを統一 */
-        height: 100%;
-    }
-
-    .problem-card {
-        background: white;
-        border: 1px solid #e9ecef;
-        border-radius: 12px;
-        padding: 20px;
-        transition: all 0.3s ease;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-        /* フレックスボックスでカード内容を整理 */
-        display: flex;
-        flex-direction: column;
-        /* カードの高さを100%に設定 */
-        height: 100%;
-        /* 最小高さを設定して統一感を出す */
-        min-height: 200px;
-        position: relative;
-    }
-
-    .problem-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 20px rgba(102, 126, 234, 0.15);
-        border-color: #667eea;
-    }
-
-    .problem-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        margin-bottom: 15px;
-        gap: 15px;
-    }
-
-    .university-year {
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-        flex: 1;
-    }
-
-    .university {
-        font-weight: 600;
-        color: #2c3e50;
-        font-size: 1.05rem;
-        line-height: 1.2;
-    }
-
-    .year {
-        color: #6c757d;
-        font-size: 0.9rem;
     }
 
     /* 進捗インジケーター */
@@ -327,13 +295,8 @@
 
     /* 子要素のスタイルを強制リセット */
     .problem-preview * {
-        margin: 0;
-        padding: 0;
         color: inherit;
         font-size: inherit;
-        line-height: inherit;
-        display: inline;
-        /* インライン表示を強制して改行崩れを防ぐ */
     }
 
     /* 問題がない場合 */
@@ -625,43 +588,37 @@
 
             <div class="problems-grid">
                 {% for problem in type_problems %}
-                <!-- 個別問題カード -->
                 <a href="{{ url_for('essay_problem', problem_id=problem.id) }}" class="problem-card-link">
-                    <div class="problem-card">
-                        <div class="problem-header">
-                            <div class="university-year">
-                                <span class="university">{{ problem.university }}</span>
-                                <span class="year">{{ problem.year }}年</span>
-                            </div>
-                            <div class="progress-indicators">
-                                {% if problem.progress and problem.progress.viewed_answer %}
-                                <span class="indicator viewed" title="解答閲覧済み">
-                                    <i class="fas fa-eye"></i>
-                                </span>
-                                {% endif %}
-                                {% if problem.progress and problem.progress.understood %}
-                                <span class="indicator understood" title="理解済み">
-                                    <i class="fas fa-check-circle"></i>
-                                </span>
-                                {% endif %}
-                                {% if problem.progress and problem.progress.review_flag %}
-                                <span class="indicator review" title="復習フラグ">
-                                    <i class="fas fa-flag"></i>
-                                </span>
-                                {% endif %}
-                                {% if problem.progress and problem.progress.difficulty_rating %}
-                                <span class="indicator difficulty"
-                                    title="難易度: {{ problem.progress.difficulty_rating }}/5">
-                                    <i class="fas fa-star"></i>{{ problem.progress.difficulty_rating }}
-                                </span>
-                                {% endif %}
-                            </div>
+                    <div class="problem-card-left">
+                        <div class="problem-meta">
+                            <span class="university">{{ problem.university }}</span>
+                            <span class="year">{{ problem.year }}年</span>
                         </div>
-
-                        <div class="problem-content">
-                            <div class="problem-preview">{{ (problem.question[:150] + '...' if problem.question|length >
-                                150 else problem.question) | striptags }}</div>
-                        </div>
+                        <div class="problem-preview">{{ (problem.question[:80] + '...' if problem.question|length > 80
+                            else problem.question) | striptags }}</div>
+                    </div>
+                    <div class="progress-indicators">
+                        {% if problem.progress and problem.progress.viewed_answer %}
+                        <span class="indicator viewed" title="解答閑覧済み">
+                            <i class="fas fa-eye"></i>
+                        </span>
+                        {% endif %}
+                        {% if problem.progress and problem.progress.understood %}
+                        <span class="indicator understood" title="理解済み">
+                            <i class="fas fa-check-circle"></i>
+                        </span>
+                        {% endif %}
+                        {% if problem.progress and problem.progress.review_flag %}
+                        <span class="indicator review" title="復習フラグ">
+                            <i class="fas fa-flag"></i>
+                        </span>
+                        {% endif %}
+                        {% if problem.progress and problem.progress.difficulty_rating %}
+                        <span class="indicator difficulty" title="難易度: {{ problem.progress.difficulty_rating }}/5">
+                            <i class="fas fa-star"></i>{{ problem.progress.difficulty_rating }}
+                        </span>
+                        {% endif %}
+                        <i class="fas fa-chevron-right" style="color:#cbd5e0; font-size:0.8rem; margin-left:4px;"></i>
                     </div>
                 </a>
                 {% endfor %}

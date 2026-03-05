@@ -20,6 +20,8 @@ let isAnswerButtonDisabled = false;
 let answerButtonTimeout = null;
 let hasBeenRestricted = false; // 一度でも制限されたかのフラグ
 let restrictionReleased = false; // 制限が解除されたかのフラグ
+let isStrategicRetreat = false; // 戦略的撤退（強制終了）が発生したかのフラグ
+let pendingReloadAfterRelease = false; // 制限解除後のリロード待ちフラグ
 
 
 window.word_data = [];
@@ -61,16 +63,22 @@ function isCoolingDown(history) {
 
 function getValidWeakProblemCount() {
     if (!incorrectWords || incorrectWords.length === 0) return 0;
+    if (!word_data || word_data.length === 0) return 0;
 
-    // Count only problems that are NOT in cooldown
-    let count = 0;
+    // 現在のword_dataに存在する問題IDのセットを作成 (削除された問題を除外するため)
+    const validDataIds = new Set(word_data.map(word => generateProblemId(word)));
+
+    // Count only problems that exist in current data AND are NOT in cooldown
+    const validWeakSet = new Set();
     for (const problemId of incorrectWords) {
+        if (!validDataIds.has(problemId)) continue;
+
         const history = problemHistory[problemId];
         if (!isCoolingDown(history)) {
-            count++;
+            validWeakSet.add(problemId);
         }
     }
-    return count;
+    return validWeakSet.size;
 }
 
 
@@ -176,11 +184,13 @@ function updateSelectAllButtonText(button, isAllSelected) {
         button.textContent = isMobile ? '解除' : '選択解除';
         button.style.backgroundColor = '#e74c3c';
         button.style.borderColor = '#c0392b';
+        button.style.color = '#ffffff';
         button.classList.add('deselect-mode');
     } else {
         button.textContent = isMobile ? '選択' : '全て選択';
         button.style.backgroundColor = '#3498db';
         button.style.borderColor = '#2980b9';
+        button.style.color = '#ffffff';
         button.classList.remove('deselect-mode');
     }
 }
@@ -779,13 +789,15 @@ function updateIncorrectOnlySelection() {
     const chaptersContainer = document.querySelector('.chapters-container');
     const rangeSelectionArea = document.querySelector('.range-selection-area');
     const rangeSelectionTitleText = document.getElementById('rangeSelectionTitleText');
+    const rangeSelectionIcon = document.getElementById('rangeSelectionIcon');
     const questionCountRadios = document.querySelectorAll('input[name="questionCount"]:not(#incorrectOnlyRadio)');
-
     const weakCheckbox = document.getElementById('incorrectOnlyCheckbox2');
+    const startBtn = document.getElementById('startButton');
+    const resetBtn = document.getElementById('resetSelectionButton');
+    const mainHeader = document.querySelector('.question-count-selection .section-header-styled');
 
     // ★修正：有効な苦手問題数を使用
     const weakProblemCount = getValidWeakProblemCount();
-    const rawWeakProblemCount = incorrectWords.length;
 
     let stateChanged = false;
     const oldHasBeenRestricted = hasBeenRestricted;
@@ -802,17 +814,16 @@ function updateIncorrectOnlySelection() {
 
     if (hasBeenRestricted && !restrictionReleased && weakProblemCount <= 10) {
         restrictionReleased = true;
+        pendingReloadAfterRelease = true; // ★追記: 解除されたらリロード待ちにする
         stateChanged = true;
     }
 
-    // 状態が変更された場合はサーバーに保存
     if (stateChanged) {
         saveRestrictionState();
     }
 
     // 現在の制限状態判定
     let isCurrentlyRestricted = false;
-
     if (weakProblemCount >= 20) {
         isCurrentlyRestricted = true;
     } else if (hasBeenRestricted && !restrictionReleased && weakProblemCount >= 11) {
@@ -821,64 +832,103 @@ function updateIncorrectOnlySelection() {
         isCurrentlyRestricted = false;
     }
 
-    if (isCurrentlyRestricted) {
-        // 制限発動中
-        // ★修正: 苦手問題チェックボックスを強制ONにして無効化
-        if (weakCheckbox) {
+    const isOvercomeModeOn = isCurrentlyRestricted || (weakCheckbox && weakCheckbox.checked);
+
+    if (isOvercomeModeOn) {
+        // 克服モードON（制限中または手動ON）
+        if (isCurrentlyRestricted && weakCheckbox) {
             weakCheckbox.checked = true;
-            weakCheckbox.disabled = true; // 解除不可
-            weakCheckbox.closest('.filter-option-btn')?.classList.add('disabled'); // 見た目も無効化
+            weakCheckbox.disabled = true;
+            weakCheckbox.closest('.filter-option-btn')?.classList.add('disabled');
         }
 
-        // ★修正: カウント選択は許可する（制限中でも10問ずつ解けるように）
         questionCountRadios.forEach(radio => {
             radio.disabled = false;
             radio.parentElement.style.opacity = '1';
         });
 
         if (rangeSelectionArea) {
-            rangeSelectionArea.style.display = 'none';
-        }
-        if (chaptersContainer) {
-            chaptersContainer.style.display = 'none';
+            const searchBtn = document.getElementById('openSearchButton');
+            if (isCurrentlyRestricted) {
+                // 制限がかかっている場合：出題範囲セクションごと非表示にする
+                rangeSelectionArea.style.display = 'none';
+
+                if (mainHeader && startBtn && startBtn.parentElement !== mainHeader) {
+                    if (resetBtn) resetBtn.style.display = 'none';
+                    mainHeader.appendChild(startBtn);
+                    // ヘッダー用のコンパクトな微調整
+                    startBtn.style.setProperty('width', 'auto', 'important');
+                    startBtn.style.setProperty('padding', '5px 15px', 'important');
+                    startBtn.style.setProperty('font-size', '0.85rem', 'important');
+                    startBtn.style.setProperty('min-width', '0', 'important');
+                    startBtn.style.setProperty('display', 'inline-flex', 'important');
+                    startBtn.style.setProperty('flex', '0 0 auto', 'important');
+                    startBtn.classList.add('btn-sm', 'rounded-pill', 'shadow-sm');
+                }
+            } else {
+                // 制限はないが「克服モード」がONの場合（手動）：構成要素を再表示し、チャプター類のみを薄くする
+                rangeSelectionArea.style.display = 'block';
+                const rangeHeader = rangeSelectionArea.querySelector('.section-header-styled h3');
+                if (rangeHeader) rangeHeader.style.display = 'block';
+                if (searchBtn) {
+                    searchBtn.style.display = 'inline-flex';
+                    searchBtn.classList.add('dimmed');
+                }
+                if (chaptersContainer) {
+                    chaptersContainer.style.display = 'block';
+                    chaptersContainer.classList.add('dimmed');
+                    chaptersContainer.style.opacity = '';
+                    chaptersContainer.style.pointerEvents = 'none';
+                }
+                rangeSelectionArea.classList.remove('dimmed');
+
+                // 開始ボタンを元の位置に戻す（もし移動していたら）
+                const originalBtnParent = document.querySelector('.range-selection-area .section-header-styled div:last-child');
+                if (originalBtnParent && startBtn && startBtn.parentElement !== originalBtnParent) {
+                    if (resetBtn) resetBtn.style.display = 'inline-block';
+                    originalBtnParent.appendChild(startBtn);
+                    // スタイルのリセット
+                    startBtn.style.marginLeft = '';
+                    startBtn.style.setProperty('width', '', '');
+                    startBtn.style.setProperty('padding', '8px 20px', '');
+                    startBtn.style.setProperty('font-size', '', '');
+                    startBtn.style.setProperty('min-width', '', '');
+                    startBtn.style.setProperty('display', '', '');
+                    startBtn.style.setProperty('flex', '', '');
+                    startBtn.classList.remove('btn-sm', 'rounded-pill', 'shadow-sm');
+                }
+            }
         }
 
-        if (weakProblemCount >= 20) {
-            showWeakProblemWarning(weakProblemCount);
-        } else if (weakProblemCount > 10) {
-            showIntermediateWeakProblemWarning(weakProblemCount);
-        }
-
-    } else if (weakCheckbox && weakCheckbox.checked) {
-        // 手動で苦手問題が選択されている場合
-        // ★修正: カウント選択は許可する
-        questionCountRadios.forEach(radio => {
-            radio.disabled = false;
-            radio.parentElement.style.opacity = '1';
-        });
-
-        if (rangeSelectionArea) {
-            rangeSelectionArea.style.display = 'none';
-        }
         if (rangeSelectionTitleText) {
             rangeSelectionTitleText.textContent = '克服モード';
-            rangeSelectionTitleText.style.color = '#e74c3c'; // 赤色強調
+            if (!rangeSelectionTitleText.classList.contains('overcome-title')) {
+                rangeSelectionTitleText.classList.remove('overcome-title');
+                void rangeSelectionTitleText.offsetWidth; // reflow
+                rangeSelectionTitleText.classList.add('overcome-title');
+            }
+            rangeSelectionTitleText.style.color = '';
+        }
+        if (rangeSelectionIcon) {
+            rangeSelectionIcon.className = 'fas fa-fire';
+            rangeSelectionIcon.style.color = '#f5a623';
         }
 
-        // WeakCheckbox should be enabled
-        if (weakCheckbox) {
-            weakCheckbox.disabled = false;
-            weakCheckbox.closest('.filter-option-btn')?.classList.remove('disabled');
+        if (isCurrentlyRestricted) {
+            if (weakProblemCount >= 20) {
+                showWeakProblemWarning(weakProblemCount);
+            } else if (weakProblemCount > 10) {
+                showIntermediateWeakProblemWarning(weakProblemCount);
+            }
         }
 
     } else {
-        // 制限なし（通常モード）
+        // 通常モード
         questionCountRadios.forEach(radio => {
             radio.disabled = false;
             radio.parentElement.style.opacity = '1';
         });
 
-        // WeakCheckbox should be enabled
         if (weakCheckbox) {
             weakCheckbox.disabled = false;
             weakCheckbox.closest('.filter-option-btn')?.classList.remove('disabled');
@@ -886,15 +936,46 @@ function updateIncorrectOnlySelection() {
 
         if (rangeSelectionArea) {
             rangeSelectionArea.style.display = 'block';
+            rangeSelectionArea.classList.remove('dimmed');
+            const rangeHeader = rangeSelectionArea.querySelector('.section-header-styled h3');
+            if (rangeHeader) rangeHeader.style.display = 'block';
         }
         if (chaptersContainer) {
             chaptersContainer.style.display = 'block';
             chaptersContainer.style.opacity = '1';
             chaptersContainer.style.pointerEvents = 'auto';
+            chaptersContainer.classList.remove('dimmed');
         }
+        const searchBtn = document.getElementById('openSearchButton');
+        if (searchBtn) {
+            searchBtn.style.display = 'inline-flex';
+            searchBtn.classList.remove('dimmed');
+        }
+
+        // 開始ボタンを元の位置に戻す
+        const originalBtnParent = document.querySelector('.range-selection-area .section-header-styled div:last-child');
+        if (originalBtnParent && startBtn && startBtn.parentElement !== originalBtnParent) {
+            if (resetBtn) resetBtn.style.display = 'inline-block';
+            originalBtnParent.appendChild(startBtn);
+            // スタイルのリセット
+            startBtn.style.marginLeft = '';
+            startBtn.style.setProperty('width', '', '');
+            startBtn.style.setProperty('padding', '8px 20px', '');
+            startBtn.style.setProperty('font-size', '', '');
+            startBtn.style.setProperty('min-width', '', '');
+            startBtn.style.setProperty('display', '', '');
+            startBtn.style.setProperty('flex', '', '');
+            startBtn.classList.remove('btn-sm', 'rounded-pill', 'shadow-sm');
+        }
+
         if (rangeSelectionTitleText) {
             rangeSelectionTitleText.textContent = '出題数を選択';
-            rangeSelectionTitleText.style.color = '#34495e';
+            rangeSelectionTitleText.classList.remove('overcome-title');
+            rangeSelectionTitleText.style.color = '';
+        }
+        if (rangeSelectionIcon) {
+            rangeSelectionIcon.className = 'fas fa-layer-group';
+            rangeSelectionIcon.style.color = '';
         }
 
         const existingWarning = document.getElementById('weakProblemWarning');
@@ -902,6 +983,9 @@ function updateIncorrectOnlySelection() {
             existingWarning.remove();
         }
     }
+
+    // ★追記: 表示を同期させる（制限中の「全20問」などの表示を反映）
+    updateSelectionTotalCount();
 }
 
 // =========================================================
@@ -920,6 +1004,11 @@ function setupEventListeners() {
             if (voiceAnswerBtnMobile) {
                 voiceAnswerBtnMobile.style.display = 'inline-flex';
                 voiceAnswerBtnMobile.addEventListener('click', startVoiceRecognition);
+                // モバイル・タブレット向けに touchstart も追加
+                // passive: false にして preventDefault を許可する
+                voiceAnswerBtnMobile.addEventListener('touchstart', function (e) {
+                    startVoiceRecognition(e);
+                }, { passive: false });
             }
         } else {
             console.log("Web Speech API not supported.");
@@ -1100,19 +1189,7 @@ function initializeSelectAllButtons() {
 // ヘルパー関数
 // =========================================================
 
-// ★新規追加：有効な苦手問題数を計算する関数
-function getValidWeakProblemCount() {
-    if (!word_data || word_data.length === 0) return 0;
-
-    // 現在のword_dataに存在する問題IDのセットを作成
-    const validProblemIds = new Set(word_data.map(word => generateProblemId(word)));
-
-    // incorrectWordsのうち、現在も存在する有効なものだけをカウント
-    // ★修正: 重複を除外してカウント (Setを使用)
-    const validWeakProblems = new Set(incorrectWords.filter(id => validProblemIds.has(id)));
-
-    return validWeakProblems.size;
-}
+// getValidWeakProblemCount moved to top level
 
 function getSelectedQuestionCount() {
     const selectedRadio = document.querySelector('input[name="questionCount"]:checked');
@@ -1288,6 +1365,7 @@ let lastQuizSettings = {
 
 function startQuiz() {
     try {
+        isStrategicRetreat = false; // フラグをリセット
 
         isAnswerButtonDisabled = false;
         if (answerButtonTimeout) {
@@ -1300,6 +1378,10 @@ function startQuiz() {
             showAnswerButton.style.cursor = 'pointer';
             showAnswerButton.style.pointerEvents = 'auto';
         }
+
+        // ★追記: 途中介入（戦略的撤退）で無効化されたボタンを確実に有効化する
+        if (correctButton) correctButton.disabled = false;
+        if (incorrectButton) incorrectButton.disabled = false;
 
         const weakProblemCount = getValidWeakProblemCount();
         const rawWeakProblemCount = incorrectWords.length; // 表示用などに元の数も保持
@@ -1319,6 +1401,7 @@ function startQuiz() {
                 console.warn('⚠️ 制限中ですが有効な苦手問題が0問です。制限を自動解除します。');
                 hasBeenRestricted = false;
                 restrictionReleased = true;
+                pendingReloadAfterRelease = true; // ★追記
                 saveRestrictionState(); // サーバーに保存
 
                 flashMessage('有効な苦手問題が見つからないため、制限を解除しました。', 'info');
@@ -1755,6 +1838,7 @@ function handleAnswer(isCorrect) {
         // 制限状態の即座更新
         setTimeout(() => {
             updateIncorrectOnlySelection();
+            checkMidQuizIntervention(); // ★新機能：途中経過での制限・演出チェック
         }, 300);
 
     }).catch((error) => {
@@ -1772,6 +1856,236 @@ function handleAnswer(isCorrect) {
     }
 }
 
+let hasShown20Warning = false;
+
+/**
+ * 途中経過での制限・演出チェック
+ * 苦手が溜まりすぎた際の「戦略的撤退」を促す
+ */
+function checkMidQuizIntervention() {
+    // 克服モード（苦手のみ）実行中は中断しない
+    if (lastQuizSettings && lastQuizSettings.isIncorrectOnly) return;
+
+    const weakCount = getValidWeakProblemCount();
+
+    // 20問：戦略的撤退（ハードストップ）
+    if (weakCount >= 20) {
+        triggerStrategicRetreat();
+    }
+}
+
+function showWarningPulse() {
+    const flash = document.createElement('div');
+    flash.style.cssText = `
+        position: fixed; inset: 0; z-index: 9000;
+        pointer-events: none; border: 10px solid rgba(231, 76, 60, 0.5);
+        animation: pulseWarn 1.5s ease-out forwards;
+    `;
+    document.body.appendChild(flash);
+
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes pulseWarn {
+            0% { opacity: 0; transform: scale(1.05); }
+            30% { opacity: 1; transform: scale(1); }
+            100% { opacity: 0; transform: scale(0.95); }
+        }
+    `;
+    document.head.appendChild(style);
+
+    flashMessage('⚠️ 苦手問題が20問を超えました。一旦区切りをつけて克服に集中しましょう。', 'warning');
+
+    setTimeout(() => {
+        flash.remove();
+        style.remove();
+    }, 2000);
+}
+
+function triggerStrategicRetreat() {
+    const overlay = document.getElementById('strategicRetreatOverlay');
+    if (!overlay) return;
+
+    isStrategicRetreat = true; // 戦略的撤退フラグを立てる
+
+    // ボタン類を無効化して誤操作を防ぐ
+    if (correctButton) correctButton.disabled = true;
+    if (incorrectButton) incorrectButton.disabled = true;
+
+    // --- シネマティック演出開始 ---
+    const slash = document.getElementById('katanaSlash');
+    const inkContainer = document.getElementById('inkSplashContainer');
+
+    // 1. スクリーンシェイク (瞬時に開始)
+    document.body.classList.add('screen-shake');
+
+    // 2. 一閃 (ほんの少し遅らせ、シェイクと同調)
+    if (slash) {
+        slash.classList.remove('hidden');
+        slash.classList.add('animate');
+    }
+
+    // 3. 墨汁の「浸食」 (複数の墨だまりを不規則に発生)
+    setTimeout(() => {
+        if (inkContainer) {
+            inkContainer.classList.remove('hidden');
+            spawnInkBlots(inkContainer, 20); // 少し数を増やしてサイズを小さく
+        }
+    }, 150);
+
+    // 4. モダールの表示と墨の「吸い込み（解散）」
+    setTimeout(() => {
+        overlay.classList.remove('hidden');
+        startSakuraAnimation();
+
+        // 演出用要素のクリーンアップ
+        document.body.classList.remove('screen-shake');
+        if (slash) {
+            slash.classList.add('hidden');
+            slash.classList.remove('animate');
+        }
+
+        // 墨を吸い込ませる（dissolve）
+        dissolveInkBlots();
+
+        // 5. 師範ペルの登場 (カードが出てから少し遅らせる)
+        setTimeout(() => {
+            const zenPer = document.getElementById('zenPerContainer');
+            if (zenPer) zenPer.classList.add('show');
+        }, 600);
+
+        // 最後にコンテナを隠す
+        setTimeout(() => {
+            if (inkContainer) {
+                inkContainer.classList.add('hidden');
+                inkContainer.innerHTML = '';
+            }
+        }, 4000); // 1200 -> 4000 (ディレイ ＋ フェードアウトの完遂を待つ)
+    }, 800);
+
+    const retreatBtn = document.getElementById('retreatToResultButton');
+    if (retreatBtn) {
+        retreatBtn.onclick = () => {
+            const zenPer = document.getElementById('zenPerContainer');
+            if (zenPer) zenPer.classList.remove('show'); // リセット
+            stopSakuraAnimation();
+            overlay.classList.add('hidden');
+            showQuizResult();
+        };
+    }
+}
+
+/**
+ * 有機的な「墨だまり」を生成
+ */
+function spawnInkBlots(container, count) {
+    container.innerHTML = '';
+
+    // 画面を均等にカバーするためのセクター分割（5列x4行など）
+    const cols = 5;
+    const rows = Math.ceil(count / cols);
+
+    for (let i = 0; i < count; i++) {
+        const blot = document.createElement('div');
+        blot.classList.add('ink-blot');
+
+        // セクターに基づいた基本位置 + ランダムな揺らぎ
+        const sectorX = (i % cols) / cols * 100;
+        const sectorY = Math.floor(i / cols) / rows * 100;
+
+        // 偏りを防ぐために位置を分散させる
+        const left = sectorX + (Math.random() * (100 / cols) - 10);
+        const top = sectorY + (Math.random() * (100 / rows) - 10);
+
+        // 画面幅に応じてベースサイズを調整 (スマホ・タブレットは少し大きく)
+        const isSmallScreen = window.innerWidth <= 768;
+        const minSize = isSmallScreen ? 30 : 15;
+        const extraSize = isSmallScreen ? 20 : 20;
+
+        // サイズをさらに小さくし、より繊細な「点」としての表現を強化
+        const size = minSize + Math.random() * extraSize;
+        const delay = Math.random() * 0.8; // 出現タイミングをよりまばらに (0.3 -> 0.8)
+
+        blot.style.width = `${size}vw`;
+        blot.style.height = `${size}vw`;
+        blot.style.top = `${top}%`;
+        blot.style.left = `${left}%`;
+        blot.style.transitionDelay = `${delay}s`;
+
+        container.appendChild(blot);
+
+        // 次のフレームで活性化
+        requestAnimationFrame(() => {
+            blot.classList.add('active');
+        });
+    }
+}
+
+/**
+ * 墨が和紙に吸い込まれるような演出
+ */
+function dissolveInkBlots() {
+    const blots = document.querySelectorAll('.ink-blot');
+    blots.forEach((blot, index) => {
+        const delay = Math.random() * 1.2; // より長く、まばらに消えるように調整 (0.6 -> 1.2)
+        setTimeout(() => {
+            blot.classList.remove('active');
+            blot.classList.add('dissolve');
+        }, delay * 1000);
+    });
+}
+
+// --- 桜のアニメーション制御 ---
+let sakuraInterval = null;
+
+function startSakuraAnimation() {
+    const container = document.getElementById('sakuraContainer');
+    if (!container) return;
+
+    container.innerHTML = '';
+
+    // 最初にある程度降らせる
+    for (let i = 0; i < 15; i++) {
+        createSakura(container);
+    }
+
+    // 継続的に降らせる
+    sakuraInterval = setInterval(() => {
+        createSakura(container);
+    }, 400);
+}
+
+function stopSakuraAnimation() {
+    if (sakuraInterval) {
+        clearInterval(sakuraInterval);
+        sakuraInterval = null;
+    }
+    const container = document.getElementById('sakuraContainer');
+    if (container) container.innerHTML = '';
+}
+
+function createSakura(container) {
+    const petal = document.createElement('div');
+    petal.classList.add('petal');
+
+    const size = Math.random() * 10 + 10;
+    const startX = Math.random() * 100;
+    const duration = Math.random() * 5 + 5;
+    const delay = Math.random() * 2;
+
+    petal.style.width = `${size}px`;
+    petal.style.height = `${size}px`;
+    petal.style.left = `${startX}vw`;
+    petal.style.animationDuration = `${duration}s`;
+    petal.style.animationDelay = `-${delay}s`;
+
+    container.appendChild(petal);
+
+    // アニメーション終了後に削除
+    setTimeout(() => {
+        petal.remove();
+    }, duration * 1000);
+}
+
 // 1問回答後の軽量な進捗通知
 function showQuizTimeProgressNotification(weakCount) {
     // 制限状態に関わる重要な変化のみ通知
@@ -1781,11 +2095,7 @@ function showQuizTimeProgressNotification(weakCount) {
 
     // 制限解除の瞬間のみ通知
     if (wasRestricted && currentWeakCount <= 10) {
-        showQuizTimeNotification('🔓 制限解除まであと少し！', 'success');
-    }
-    // 制限発動の瞬間のみ通知
-    else if (!wasRestricted && currentWeakCount >= 20) {
-        showQuizTimeNotification('⚠️ 苦手問題が蓄積されています', 'warning');
+        showQuizTimeNotification('🔓 制限解除！', 'success');
     }
 }
 
@@ -1872,6 +2182,48 @@ function showQuizResult() {
     const accuracy = totalQuestions === 0 ? 0 : (correctCount / totalQuestions) * 100;
     if (accuracyRateSpan) accuracyRateSpan.textContent = accuracy.toFixed(1);
 
+    // ── アニメーション演出 ──────────────────────────────
+    // ① SVG ゲージリングを正答率に合わせてアニメーション
+    const gaugeFill = document.getElementById('gaugeFill');
+    if (gaugeFill) {
+        const circumference = 414.69; // 2π × r(66)
+        const offset = circumference * (1 - accuracy / 100);
+        // 開始は全て非表示 → 少し遅延後にアニメーション開始
+        gaugeFill.style.strokeDashoffset = circumference;
+        setTimeout(() => {
+            gaugeFill.style.strokeDashoffset = offset;
+        }, 150);
+    }
+
+    // ② 数字カウントアップ
+    function countUp(el, target, decimals = 0, duration = 900) {
+        if (!el) return;
+        const start = 0;
+        const step = (timestamp) => {
+            if (!step.startTime) step.startTime = timestamp;
+            const progress = Math.min((timestamp - step.startTime) / duration, 1);
+            const eased = 1 - Math.pow(1 - progress, 3); // easeOutCubic
+            el.textContent = (start + (target - start) * eased).toFixed(decimals);
+            if (progress < 1) requestAnimationFrame(step);
+        };
+        requestAnimationFrame(step);
+    }
+
+    setTimeout(() => {
+        countUp(totalQuestionsCountSpan, totalQuestions, 0);
+        countUp(correctCountSpan, correctCount, 0, 1100);
+        countUp(incorrectCountSpan, incorrectCount, 0, 1000);
+        countUp(accuracyRateSpan, accuracy, 1, 1400);
+    }, 200);
+
+    // ③ stat-box を順番にフェードイン
+    const statBoxes = document.querySelectorAll('.stat-box');
+    statBoxes.forEach((box, i) => {
+        box.classList.remove('visible');
+        setTimeout(() => box.classList.add('visible'), 300 + i * 120);
+    });
+    // ───────────────────────────────────────────────────
+
     // 正確な選択範囲の全問題数を表示
     let displayedRangeTotal = 0;
 
@@ -1907,6 +2259,17 @@ function showQuizResult() {
     }, 300);
 
     updateRestartButtonText();
+
+    // ★重要: 戦略的撤退（強制終了）の場合は「同じ範囲でリプレイ」を表示させない
+    const restartButton = document.getElementById('restartQuizButton');
+    const explanationDiv = document.querySelector('.restart-explanation');
+    if (isStrategicRetreat) {
+        if (restartButton) restartButton.style.display = 'none';
+        if (explanationDiv) explanationDiv.style.display = 'none';
+    } else {
+        if (restartButton) restartButton.style.display = 'flex';
+        if (explanationDiv) explanationDiv.style.display = 'block';
+    }
 
     // 1. 今回出題された全ての問題の【答え】と【章】を収集する <--- ★変更点
     const sessionKeywords = new Set();
@@ -1954,19 +2317,21 @@ function showQuizResult() {
                     // 4.【見つかった場合】受け取った問題リストを画面に表示する
                     data.essays.forEach(essay => {
                         const li = document.createElement('li');
+                        const formattedSnippet = essay.question_snippet.replace(/\n+/g, ' ');
                         li.innerHTML = `
                         <a href="/essay/problem/${essay.id}" class="recommended-essay-link">
-                            <strong>${essay.university} ${essay.year}年 (${essay.type})</strong>
-                            <p>${essay.question_snippet}</p>
+                            <span class="essay-title">
+                                ${essay.university} ${essay.year}年 (${essay.type})
+                            </span>
+                            <span class="essay-snippet">${formattedSnippet}</span>
                         </a>
                     `;
                         recommendedContainer.appendChild(li);
                     });
                     recommendedSection.classList.remove('hidden');
                 } else {
-                    // 4.【見つからなかった場合】メッセージを表示する
-                    recommendedContainer.innerHTML = '<li class="no-recommendation">関連する論述問題は見つかりませんでした。幅広い分野を学習してみましょう！</li>';
-                    recommendedSection.classList.remove('hidden');
+                    // 4.【見つからなかった場合】セクションごと非表示にする
+                    recommendedSection.classList.add('hidden');
                 }
             })
             .catch(error => {
@@ -2090,6 +2455,13 @@ function toggleIncorrectAnswer(index) {
 }
 
 function backToSelectionScreen() {
+    // ★新機能: 制限解除後の初回戻り時のみリロード
+    if (pendingReloadAfterRelease) {
+        pendingReloadAfterRelease = false;
+        location.reload();
+        return;
+    }
+
     // お祝いメッセージをクリア
     clearPreviousCelebrationMessages();
 
@@ -2315,7 +2687,7 @@ function updateRestartButtonText() {
 
     } else {
         // ★通常モードの場合
-        restartButton.innerHTML = '<i class="fas fa-redo"></i> 同じ範囲から新しい問題で再学習';
+        restartButton.innerHTML = '<i class="fas fa-redo"></i> 同じ範囲でリプレイ';
 
         if (explanationDiv) {
             explanationDiv.innerHTML = `
@@ -2335,7 +2707,7 @@ function resetRestartButtonToDefault() {
     const explanationDiv = document.querySelector('.restart-explanation');
 
     if (restartButton) {
-        restartButton.innerHTML = '<i class="fas fa-redo"></i> 同じ範囲から新しい問題で再学習';
+        restartButton.innerHTML = '<i class="fas fa-redo"></i> 同じ範囲でリプレイ';
     }
 
     if (explanationDiv) {
@@ -2945,9 +3317,6 @@ function showWeakProblemWarning(count) {
                 現在 <strong style="font-size: 1.2em; color: #e74c3c;">${count}問</strong> の苦手問題があります。<br>
                 まず苦手問題を <strong style="color: #e74c3c;">10問以下</strong> に減らしてから通常学習に戻りましょう。
             </p>
-            <p style="margin: 15px 0 0 0; font-size: 1em; color: #a94442; background-color: #f8d7da; padding: 10px; border-radius: 5px;">
-                💡 苦手問題モードで学習を続けると、通常モードが利用できるようになります。
-            </p>
         </div>
     `;
 
@@ -2977,7 +3346,6 @@ function showIntermediateWeakProblemWarning(count) {
             </h4>
             <p style="margin: 10px 0; color: #b7950b; font-size: 1.1em; line-height: 1.6;">
                 苦手問題が <strong style="font-size: 1.2em; color: #f39c12;">${count}問</strong> あります。<br>
-                <strong style="color: #f39c12;">10問以下</strong> に減らすまで制限は解除されません。
             </p>
             <p style="margin: 15px 0 0 0; font-size: 1em; color: #d68910; background-color: #fcf3cd; padding: 10px; border-radius: 5px;">
                 🎯 あと <strong style="color: #f39c12;">${count - 10}問</strong> 克服すれば制限解除です！
@@ -4433,7 +4801,7 @@ let isProcessingVoiceSuccess = false; // Lock flag to prevent double submission
 
 
 function startVoiceRecognition(e) {
-    if (e) {
+    if (e && typeof e.preventDefault === 'function' && e.cancelable) {
         e.preventDefault();
         e.stopPropagation();
     }
@@ -4476,8 +4844,6 @@ function startVoiceRecognition(e) {
         const currentData = currentQuizData[currentQuestionIndex];
         const correctAnswer = currentData.answer;
         const correctReading = currentData.reading || ""; // 🆕 Reading from CSV
-
-        console.log(`🎤 Voice Target: Answer="${correctAnswer}", Reading="${correctReading}"`); // Debug Log
 
         const SpeechGrammarList = window.SpeechGrammarList || window.webkitSpeechGrammarList;
 
