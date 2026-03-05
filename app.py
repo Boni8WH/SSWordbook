@@ -12255,6 +12255,9 @@ def chronological_solve(chapter):
         # 出題順をランダムにする
         random.shuffle(problems)
         
+        # 1回のプレイで最大5問に制限
+        problems = problems[:5]
+        
         problem_data = []
         for p in problems:
             items = p.items.copy()
@@ -12311,9 +12314,9 @@ def chronological_answer(chapter):
             db.session.add(progress)
             
         if is_correct and not progress.is_correct:
-            progress.is_correct = True
             is_first_correct = True
             
+        progress.is_correct = is_correct
         progress.last_answered_at = datetime.now(JST)
         
         # Grant exp

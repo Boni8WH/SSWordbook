@@ -762,15 +762,6 @@
                     <i class="fas fa-paper-plane"></i> 解答する
                 </button>
 
-                <div class="nav-buttons">
-                    <button class="btn btn-outline-secondary" onclick="prevProblem()" ${currentIndex === 0 ? 'disabled' : ''}>
-                        <i class="fas fa-chevron-left"></i> 前の問題
-                    </button>
-                    <button class="btn btn-outline-secondary" onclick="nextProblem()" ${currentIndex === chronoProblems.length - 1 ? 'disabled' : ''}>
-                        次の問題 <i class="fas fa-chevron-right"></i>
-                    </button>
-                </div>
-
                 <div class="result-overlay" id="resultOverlay">
                     <div id="resultContent"></div>
                 </div>

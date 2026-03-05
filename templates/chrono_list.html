@@ -375,6 +375,36 @@
         margin-top: 0;
         margin-right: 10px;
     }
+
+    /* Toggle Button Style */
+    .filter-toggle-btn {
+        background: #f8f9fa;
+        border: 1px solid #edf2f7;
+        border-radius: 12px;
+        padding: 12px 15px;
+        margin-bottom: 20px;
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        color: #718096;
+        font-weight: 600;
+        font-size: 0.95rem;
+    }
+
+    .filter-toggle-btn.active {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+        border-color: transparent;
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    }
+
+    .filter-toggle-btn i {
+        margin-right: 10px;
+        font-size: 1.1rem;
+    }
 </style>
 {% endblock %}
 
@@ -420,7 +450,7 @@
                     aria-label="Close"></button>
             </div>
             <div class="modal-body stylish-modal-body text-center">
-                <p class="mb-4 text-muted" style="font-size: 0.95rem;">セクション「<span id="selectedSectionName"
+                <p class="mb-4 text-muted" style="font-size: 0.95rem;">「<span id="selectedSectionName"
                         class="fw-bold text-dark"></span>」に挑戦します。<br>難易度を選んでください。</p>
 
                 <div id="difficultyLoading" class="py-3">
@@ -431,13 +461,10 @@
                 </div>
 
                 <div id="difficultyButtons" class="text-start" style="display: none;">
-                    <div class="form-check form-switch styled-switch cursor-pointer">
-                        <input class="form-check-input" type="checkbox" id="unsolvedOnlyToggle">
-                        <label class="form-check-label user-select-none" for="unsolvedOnlyToggle"
-                            style="cursor: pointer; font-size: 0.95rem; display: flex; align-items: center; width: 100%; margin: 0;">
-                            <i class="fas fa-filter text-secondary me-2"></i> 未正解のみ出題する
-                        </label>
-                    </div>
+                    <button type="button" id="unsolvedOnlyBtn" class="filter-toggle-btn"
+                        onclick="toggleUnsolvedFilter()">
+                        <i class="fas fa-filter"></i> 未正解のみ出題する？
+                    </button>
 
                     <button id="difficulty-btn-1" class="difficulty-card-btn diff-1" onclick="startChronoQuiz(1)">
                         <div class="diff-content-wrapper">
@@ -560,9 +587,15 @@
         }
     }
 
+    function toggleUnsolvedFilter() {
+        const btn = document.getElementById('unsolvedOnlyBtn');
+        const isActive = btn.classList.toggle('active');
+        btn.innerHTML = `<i class="fas fa-filter"></i> 未正解のみ出題${isActive ? '！' : 'する？'}`;
+    }
+
     function startChronoQuiz(difficulty) {
         if (!currentChapter) return;
-        const unsolvedOnly = document.getElementById('unsolvedOnlyToggle').checked;
+        const unsolvedOnly = document.getElementById('unsolvedOnlyBtn').classList.contains('active');
         let url = "{{ url_for('chronological_solve', chapter='__CHAPTER__') }}".replace('__CHAPTER__', currentChapter);
 
         const params = new URLSearchParams();
