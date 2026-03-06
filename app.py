@@ -18708,6 +18708,27 @@ def manual_fix_columns():
     except Exception as e:
         return f"修正エラー: {e}"
 
+@app.route('/api/columns_for_home')
+def api_columns_for_home():
+    """ホーム画面の「今日の1本」ウィジェット用にコラムリストを返す（認証不要）"""
+    try:
+        all_columns = Column.query.order_by(Column.school_type, Column.subject, Column.numbering).all()
+        result = []
+        for col in all_columns:
+            unique_id = f"{col.school_type}-{col.subject}-{col.numbering}"
+            result.append({
+                'unique_id': unique_id,
+                'school_type': col.school_type,
+                'subject': col.subject,
+                'numbering': col.numbering,
+                'title': col.title,
+                'subtitle': col.subtitle,
+                'body': col.body,
+            })
+        return jsonify({'status': 'success', 'columns': result})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
 # 起動時ログを改善
 def enhanced_startup_check():
     """起動時の詳細チェック（修正版）"""

@@ -8,158 +8,324 @@
     rel="stylesheet">
 <style>
     .chrono-container {
-        max-width: 1200px;
+        max-width: 900px;
         margin: 0 auto;
-        padding: 15px;
+        padding: 20px 15px;
+        position: relative;
     }
 
+    /* Background subtle glow */
+    .chrono-container::after {
+        content: '';
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: radial-gradient(circle at top right, rgba(102, 126, 234, 0.05) 0%, transparent 60%);
+        pointer-events: none;
+        z-index: -1;
+    }
+
+    /* Compact Header */
     .chrono-header {
-        text-align: center;
+        display: flex;
+        align-items: baseline;
+        justify-content: flex-start;
         margin-bottom: 2rem;
-        padding: 2rem 0;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.05);
         background: transparent;
-        border-bottom: 1px solid #e0e0e0;
+        position: relative;
+        z-index: 2;
+        text-align: left;
+        flex-wrap: wrap;
+        gap: 15px;
     }
 
     .chrono-title {
         font-family: 'Shippori Mincho', serif;
-        font-size: clamp(1.8rem, 5vw, 2.8rem);
+        font-size: clamp(1.5rem, 4vw, 2rem);
         font-weight: 700;
         color: #1a1a2e;
-        letter-spacing: 0.12em;
-        display: inline-flex;
+        letter-spacing: 0.1em;
+        margin: 0;
+        display: flex;
         align-items: center;
-        justify-content: center;
-        position: relative;
-        padding: 0 10px;
-        text-shadow: 2px 2px 0px rgba(212, 175, 55, 0.2);
-        max-width: 100%;
-        white-space: nowrap;
-        margin-bottom: 0.5rem;
+        justify-content: flex-start;
+        text-shadow: none;
+        padding: 0;
     }
 
     .chrono-title i {
         color: #d4af37;
         margin-right: 0.4em;
-        font-size: 0.8em;
+        font-size: 0.9em;
+        filter: drop-shadow(0 0 5px rgba(212, 175, 55, 0.4));
+        animation: none;
     }
 
     .chrono-subtitle {
         font-family: 'Kaisei Tokumin', serif;
-        color: #666;
-        font-size: clamp(0.7rem, 3vw, 0.9rem);
-        margin-top: 0.5rem;
+        color: #8c909e;
+        font-size: 0.8rem;
+        margin-left: 1rem;
         letter-spacing: 0.2em;
         text-transform: uppercase;
+        border-left: 2px solid #d4af37;
+        padding-left: 1rem;
+        margin-top: 0;
     }
 
+    /* Rhythm Game Style List */
     .chapter-list {
         display: flex;
         flex-direction: column;
-        align-items: center;
-        gap: 0;
-        margin-bottom: 40px;
+        gap: 12px;
         position: relative;
+        margin-bottom: 60px;
+        align-items: stretch;
+        padding-top: 0;
     }
 
-    /* Central lineage connector line */
+    /* Side line (Lineage visual) */
     .chapter-list::before {
         content: '';
         position: absolute;
-        top: 0;
-        bottom: 0;
-        left: 50%;
+        top: 10px;
+        bottom: 10px;
+        left: 30px;
         width: 2px;
-        background: linear-gradient(to bottom, transparent, #d4af37 10%, #d4af37 90%, transparent);
-        transform: translateX(-50%);
-        opacity: 0.3;
+        background: linear-gradient(to bottom, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.5) 50%, rgba(102, 126, 234, 0.1));
         z-index: 0;
+        transform: none;
+        box-shadow: none;
     }
 
     .chapter-card-wrapper {
         width: 100%;
-        max-width: 600px;
+        max-width: 100%;
         position: relative;
-        padding: 20px 0;
         z-index: 1;
+        padding: 0;
+        padding-left: 60px;
+        /* Space for the line and node */
     }
 
     .chapter-card {
-        background: white;
-        border-radius: 12px;
-        padding: 18px 25px;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
-        border: 1px solid #e1e8ed;
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(248, 249, 250, 0.98));
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        border-radius: 4px 16px 16px 4px;
+        padding: 15px 25px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.8);
+        border-left: 4px solid #667eea;
         cursor: pointer;
-        transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+        transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         text-decoration: none;
         color: inherit;
-        display: block;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
         position: relative;
+        overflow: hidden;
+        transform: translateX(0);
     }
 
-    /* Node on the lineage line */
-    .chapter-card::after {
+    /* Subtle slanted background pattern */
+    .chapter-card::before {
         content: '';
         position: absolute;
-        left: -15px;
+        top: 0;
+        right: -20px;
+        bottom: 0;
+        width: 100px;
+        background: repeating-linear-gradient(45deg,
+                rgba(0, 0, 0, 0.02),
+                rgba(0, 0, 0, 0.02) 10px,
+                transparent 10px,
+                transparent 20px);
+        z-index: 0;
+        transform: none;
+        left: auto;
+        height: auto;
+    }
+
+    /* Node on the side line */
+    .chapter-card-wrapper::before {
+        content: '';
+        position: absolute;
+        left: 26px;
+        /* Centered on the 30px line (30 - 10/2 = 25, +1 for border = 26) */
         top: 50%;
         width: 10px;
         height: 10px;
-        background: #d4af37;
+        background: #fff;
+        border: 2px solid #667eea;
         border-radius: 50%;
         transform: translateY(-50%);
-        box-shadow: 0 0 0 4px white;
-        display: none;
-        /* Only show node if we use an offset layout, but user wants clean list */
+        transition: all 0.3s ease;
+        z-index: 2;
     }
 
-    .chapter-card:hover {
-        transform: scale(1.02);
-        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
-        border-color: #667eea;
+    /* Hover Effects - The "Slide out" */
+    .chapter-card-wrapper:hover .chapter-card {
+        transform: translateX(15px);
+        box-shadow: -5px 10px 20px rgba(102, 126, 234, 0.15);
+        border-left-color: #d4af37;
+        background: linear-gradient(135deg, rgba(255, 255, 255, 1), rgba(240, 244, 255, 0.95));
         z-index: 10;
+        border-color: rgba(255, 255, 255, 0.8);
+        border-left: 4px solid #d4af37;
+    }
+
+    .chapter-card-wrapper:hover::before,
+    .chapter-card-wrapper:has(.chapter-card.is-complete):hover::before {
+        background: #d4af37 !important;
+        border-color: #d4af37 !important;
+        box-shadow: 0 0 10px rgba(212, 175, 55, 0.5) !important;
+        transform: translateY(-50%) scale(1.5) !important;
     }
 
     .chapter-card-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
+        width: 100%;
+        position: relative;
+        z-index: 1;
     }
 
     .chapter-title {
         margin: 0;
-        font-size: 1.25rem;
+        font-size: 1.15rem;
         font-family: 'Kaisei Tokumin', serif;
         font-weight: 700;
         color: #2d3748;
-        letter-spacing: 0.02em;
+        letter-spacing: 0.05em;
+        transition: color 0.3s ease;
     }
 
     .chapter-title i {
-        color: #667eea;
+        color: #a0aec0;
         margin-right: 12px;
-        opacity: 0.8;
+        font-size: 1em;
+        transition: all 0.3s ease;
+    }
+
+    .chapter-card-wrapper:hover .chapter-title {
+        color: #1a1a2e;
+    }
+
+    .chapter-card-wrapper:hover .chapter-title i {
+        color: #d4af37;
+        transform: scale(1.1);
     }
 
     .badge-count {
-        background: linear-gradient(135deg, #667eea, #764ba2);
-        color: white;
-        padding: 6px 16px;
+        background: #f1f3f5;
+        color: #495057;
+        padding: 5px 15px;
         border-radius: 20px;
         font-weight: 700;
         font-size: 0.85rem;
-        box-shadow: 0 4px 10px rgba(102, 126, 234, 0.2);
+        transition: all 0.3s ease;
+        letter-spacing: 0.05em;
+        border: 1px solid #dee2e6;
+        box-shadow: none;
+    }
+
+    .chapter-card-wrapper:hover .badge-count {
+        background: linear-gradient(135deg, #1a1a2e, #16213e);
+        color: white;
+        border-color: transparent;
+        box-shadow: 0 4px 10px rgba(26, 26, 46, 0.2);
+        transform: scale(1.05) translateY(0);
     }
 
     .chapter-card.is-complete {
-        border-left: 5px solid #38a169;
+        border-left-color: #2ecc71;
+        border-left-width: 4px;
+    }
+
+    .chapter-card.is-complete .badge-count {
+        background: rgba(46, 204, 113, 0.1);
+        color: #27ae60;
+        border-color: #2ecc71;
+    }
+
+    .chapter-card-wrapper:hover .chapter-card.is-complete {
+        border-left-color: #2ecc71;
+    }
+
+    .chapter-card-wrapper:has(.chapter-card.is-complete)::before {
+        border-color: #2ecc71;
     }
 
     .no-problems {
         text-align: center;
         padding: 40px;
-        color: #6c757d;
+        color: #8c909e;
+        background: rgba(255, 255, 255, 0.7);
+        border-radius: 12px;
+        margin-top: 20px;
+        border: 1px dashed #d1d5db;
+        margin-left: 60px;
+        /* Align with cards */
+    }
+
+    @media (max-width: 768px) {
+        .chrono-header {
+            justify-content: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.8rem;
+            padding-top: 5px;
+        }
+
+        .header-left {
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 0;
+            gap: 2px;
+        }
+
+        .chrono-title {
+            font-size: 1.3rem;
+        }
+
+        .chrono-subtitle {
+            margin-left: 0;
+            border-left: none;
+            padding-left: 0;
+            margin-top: 0;
+            border-top: none;
+            padding-top: 0;
+            font-size: 0.7rem;
+        }
+
+        .header-home-btn {
+            position: absolute;
+            left: 0;
+            top: 5px;
+            padding: 6px 12px !important;
+        }
+
+        .header-home-btn.ms-auto {
+            margin-left: 0 !important;
+        }
+
+        .chapter-card-wrapper {
+            padding-left: 40px;
+        }
+
+        .chapter-card-wrapper::before {
+            left: 11px;
+        }
+
+        .chapter-list::before {
+            left: 15px;
+        }
     }
 
     /* Modal Styling */
@@ -411,8 +577,18 @@
 {% block content %}
 <div class="chrono-container">
     <div class="chrono-header">
-        <h1 class="chrono-title"><i class="fas fa-hourglass-half"></i>刻の系譜</h1>
-        <div class="chrono-subtitle">〜Chronos Lineage〜</div>
+        <div class="header-left d-flex flex-column align-items-center flex-md-row align-items-md-baseline gap-2">
+            <h1 class="chrono-title"><i class="fas fa-hourglass-half"></i>刻の系譜</h1>
+            <div class="chrono-subtitle">〜Chronos Lineage〜</div>
+        </div>
+        <a href="{{ url_for('index') }}"
+            class="header-home-btn btn btn-sm btn-outline-secondary rounded-pill px-3 shadow-sm d-none d-md-inline-flex ms-auto">
+            <i class="fas fa-arrow-left"></i><span class="ms-1">ホーム</span>
+        </a>
+        <a href="{{ url_for('index') }}"
+            class="header-home-btn btn btn-sm btn-outline-secondary rounded-pill px-3 shadow-sm d-md-none">
+            <i class="fas fa-arrow-left"></i>
+        </a>
     </div>
 
     <div class="chapter-list">

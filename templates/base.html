@@ -43,6 +43,19 @@
             font-weight: 700 !important;
             /* ボールド */
         }
+
+        /* Global fix for icon alignment in rounded buttons */
+        .btn.rounded-pill {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            vertical-align: middle;
+        }
+
+        .btn.rounded-pill i {
+            margin-bottom: 0.1em;
+            /* Subtle adjustment for Font Awesome icons which often feel slightly "top-heavy" */
+        }
     </style>
 
     {% block head_extra %}{% endblock %}

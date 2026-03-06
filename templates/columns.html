@@ -6,67 +6,97 @@
     href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@700&family=Kaisei+Tokumin:wght@400;700&display=swap"
     rel="stylesheet">
 <style>
-    /* Map Abyss Style Header */
+    /* Map Abyss Style Header -> Standarized Flexbox Style */
     .column-header {
-        text-align: center;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
         margin-bottom: 2rem;
-        padding: 2rem 0;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.05);
         background: transparent;
-        border-bottom: 1px solid #e0e0e0;
+        position: relative;
+        z-index: 2;
+        text-align: left;
+    }
+
+    .header-left {
+        display: flex;
+        align-items: center;
     }
 
     .column-title {
         font-family: 'Shippori Mincho', serif;
-        font-size: clamp(1.8rem, 5vw, 2.8rem);
+        font-size: clamp(1.5rem, 4vw, 2rem);
         font-weight: 700;
         color: #1a1a2e;
-        letter-spacing: 0.12em;
-        display: inline-flex;
+        letter-spacing: 0.1em;
+        margin: 0;
+        display: flex;
         align-items: center;
-        justify-content: center;
-        position: relative;
-        padding: 0 10px;
-        text-shadow: 2px 2px 0px rgba(212, 175, 55, 0.2);
-        max-width: 100%;
-        white-space: nowrap;
-        margin-bottom: 0.5rem;
-    }
-
-    .column-title::before,
-    .column-title::after {
-        content: "";
-        height: 1px;
-        background: linear-gradient(to right, transparent, #d4af37, transparent);
-        flex: 1;
-        min-width: 10px;
-        margin: 0 10px;
-    }
-
-    @media (min-width: 768px) {
-
-        .column-title::before,
-        .column-title::after {
-            min-width: 50px;
-            margin: 0 20px;
-        }
+        justify-content: flex-start;
+        text-shadow: none;
+        padding: 0;
     }
 
     .column-title i {
         color: #d4af37;
         margin-right: 0.4em;
-        font-size: 0.8em;
-        filter: drop-shadow(1px 1px 1px rgba(0, 0, 0, 0.2));
+        font-size: 0.9em;
+        filter: drop-shadow(0 0 5px rgba(212, 175, 55, 0.4));
     }
 
     .column-subtitle {
         font-family: 'Kaisei Tokumin', serif;
-        color: #666;
-        font-size: clamp(0.7rem, 3vw, 0.9rem);
-        margin-top: 0.5rem;
+        color: #8c909e;
+        font-size: 0.8rem;
+        margin-left: 1rem;
         letter-spacing: 0.2em;
         text-transform: uppercase;
-        padding: 0 15px;
-        margin-bottom: 1rem;
+        border-left: 2px solid #d4af37;
+        padding-left: 1rem;
+        margin-top: 0;
+    }
+
+    @media (max-width: 768px) {
+        .column-header {
+            justify-content: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.8rem;
+            padding-top: 5px;
+        }
+
+        .header-left {
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 0;
+            gap: 2px;
+        }
+
+        .column-title {
+            font-size: 1.3rem;
+        }
+
+        .column-subtitle {
+            margin-left: 0;
+            border-left: none;
+            padding-left: 0;
+            margin-top: 0;
+            border-top: none;
+            padding-top: 0;
+            font-size: 0.7rem;
+        }
+
+        .header-home-btn {
+            position: absolute;
+            left: 0;
+            top: 5px;
+            padding: 6px 12px !important;
+        }
+
+        .header-home-btn.ms-auto {
+            margin-left: 0 !important;
+        }
     }
 
     .subject-title {
@@ -446,9 +476,70 @@
 <div class="container py-4">
     <!-- Header -->
     <div class="column-header">
-        <h1 class="column-title"><i class="fas fa-book-open"></i>コラム集</h1>
-        <div class="column-subtitle">Trace the Legacy</div>
+        <div class="header-left">
+            <h1 class="column-title"><i class="fas fa-book-open"></i>コラム集</h1>
+            <div class="column-subtitle">Trace the Legacy</div>
+        </div>
+        <a href="{{ url_for('index') }}"
+            class="header-home-btn btn btn-sm btn-outline-secondary rounded-pill px-3 shadow-sm ms-auto">
+            <i class="fas fa-arrow-left"></i><span class="d-none d-md-inline ms-1">ホーム</span>
+        </a>
     </div>
+
+    <!-- 今日のオススメバナー -->
+    <div id="featuredColumnBanner" style="display:none; margin-bottom: 1.5rem;"
+        data-read-columns="{{ read_columns | tojson | safe }}">
+        <div style="
+            background: linear-gradient(135deg, #1a1a2e 0%, #2c1654 100%);
+            border-radius: 16px;
+            padding: 20px 24px;
+            position: relative;
+            overflow: hidden;
+            cursor: pointer;
+        " onclick="openFeaturedColumn()" id="featuredColumnInner">
+            <!-- 背景装飾 -->
+            <div
+                style="position:absolute;top:50%;right:-20px;transform:translateY(-50%);width:140px;height:140px;border-radius:50%;background:radial-gradient(circle,rgba(212,175,55,0.18),transparent);pointer-events:none;">
+            </div>
+            <div
+                style="position:absolute;bottom:-30px;left:10%;width:200px;height:200px;border-radius:50%;background:radial-gradient(circle,rgba(155,89,182,0.1),transparent);pointer-events:none;">
+            </div>
+            <!-- 既読バッジ -->
+            <div id="featuredReadBadge"
+                style="display:none;position:absolute;top:12px;right:16px;background:rgba(149,165,166,0.85);color:#fff;font-size:0.6rem;font-weight:bold;padding:2px 10px;border-radius:4px;letter-spacing:0.1em;backdrop-filter:blur(4px);">
+                READ</div>
+            <div style="display:flex;gap:16px;align-items:flex-start;">
+                <div style="flex-shrink:0;">
+                    <div
+                        style="background:linear-gradient(135deg,#d4af37,#f0c040);width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(212,175,55,0.4);">
+                        <i class="fas fa-star" style="color:#1a1a2e;font-size:1.1rem;"></i>
+                    </div>
+                </div>
+                <div style="flex:1;min-width:0;">
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                        <span
+                            style="font-size:0.6rem;font-weight:700;color:#d4af37;letter-spacing:0.18em;text-transform:uppercase;">Today's
+                            Pick</span>
+                        <span id="featuredColumnSubject"
+                            style="font-size:0.62rem;color:rgba(255,255,255,0.6);background:rgba(255,255,255,0.08);padding:1px 8px;border-radius:10px;"></span>
+                    </div>
+                    <div id="featuredColumnTitle"
+                        style="font-weight:700;color:#fff;font-size:1.05rem;margin-bottom:8px;line-height:1.3;"></div>
+                    <div id="featuredColumnSubtitle"
+                        style="font-size:0.78rem;color:rgba(255,255,255,0.55);margin-bottom:8px;font-style:italic;">
+                    </div>
+                    <div id="featuredColumnPreview"
+                        style="font-size:0.82rem;color:rgba(255,255,255,0.7);line-height:1.6;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">
+                    </div>
+                </div>
+                <div style="flex-shrink:0;align-self:center;">
+                    <span style="font-size:0.8rem;color:#d4af37;font-weight:700;white-space:nowrap;">読む <i
+                            class="fas fa-chevron-right" style="font-size:0.7rem;"></i></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Filter Toolbar -->
     <div class="d-flex justify-content-end mb-3 align-items-center gap-3">
         <div class="d-flex align-items-center">
@@ -466,6 +557,7 @@
             </label>
         </div>
     </div>
+
 
     <!-- Main Tabs for School Type -->
     <ul class="nav nav-tabs nav-fill mb-4" id="schoolTabs" role="tablist">
@@ -578,28 +670,40 @@
                 <div id="modalColumnSubtitle" class="modal-subtitle"></div>
                 <div id="modalColumnBody" class="modal-column-content"></div>
             </div>
-            <div class="modal-footer justify-content-between align-items-center">
-                <div class="d-flex align-items-center gap-3">
+            <div class="modal-footer" style="flex-wrap: wrap; gap: 6px 12px; padding: 10px 16px;">
+                <!-- 1行目: 既読スイッチ（左） ＋ 閲覧数・いいね（右） -->
+                <div class="d-flex align-items-center justify-content-between w-100">
                     {% if current_user and current_user.is_authenticated %}
                     <div class="form-check form-switch m-0">
                         <input class="form-check-input" type="checkbox" id="modalReadSwitch">
                         <label class="form-check-label" for="modalReadSwitch">既読にする</label>
                     </div>
+                    {% else %}
+                    <div></div>
                     {% endif %}
+                    <div class="d-flex align-items-center gap-3">
+                        <span id="modalViewCount" class="text-muted small">
+                            <i class="fas fa-chart-line"></i> <span></span>
+                        </span>
+                        <button type="button" class="btn p-0" id="modalLikeButton" onclick="toggleLikeFromModal()">
+                            <i class="far fa-heart"></i>
+                            <span id="modalLikeCount"></span>
+                        </button>
+                    </div>
+                </div>
+                <!-- 2行目: 表示設定（左） ＋ 次を読む（右） -->
+                <div class="d-flex align-items-center justify-content-between w-100">
                     <button type="button" class="btn btn-outline-secondary btn-sm" onclick="toggleSettingsPanel()">
                         <i class="fas fa-font"></i> 表示設定
                     </button>
-                </div>
-                <div class="d-flex align-items-center gap-4">
-                    <span id="modalViewCount" class="text-muted">
-                        <i class="fas fa-chart-line"></i> <span></span>
-                    </span>
-                    <button type="button" class="btn" id="modalLikeButton" onclick="toggleLikeFromModal()">
-                        <i class="far fa-heart"></i>
-                        <span id="modalLikeCount"></span>
+                    <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3" id="nextColumnButton"
+                        onclick="openNextColumn()" style="display:none; font-size:0.8rem;">
+                        次を読む <i class="fas fa-arrow-right ms-1" style="font-size:0.7rem;"></i>
                     </button>
                 </div>
             </div>
+
+
         </div>
     </div>
 </div>
@@ -1436,7 +1540,212 @@
             modalBody.scrollLeft = 0;
         }
     });
+
+    // ================================================================
+    // 今日のオススメ バナー ロジック
+    // ================================================================
+    (function initFeaturedBanner() {
+        function getDailyColumnSeed() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const offset = parseInt(urlParams.get('date_offset') || '0');
+            const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
+            const RESET_HOUR = 7;
+            const nowUtc = Date.now() + (offset * 86400000);
+            const jstDate = new Date(nowUtc + JST_OFFSET_MS);
+            const jstHour = jstDate.getUTCHours();
+            const dayNum = Math.floor((nowUtc + JST_OFFSET_MS) / 86400000);
+            return jstHour < RESET_HOUR ? dayNum - 1 : dayNum;
+        }
+        let featuredCol = null;
+
+        window.openFeaturedColumn = function () {
+            if (!featuredCol) return;
+            // safe_id compatible encoding
+            const safeId = featuredCol.unique_id.replace(/[\s'"]/g, '_');
+            openColumnModal(featuredCol.unique_id, safeId);
+        };
+
+        function simpleHash(str) {
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                hash = ((hash << 5) - hash) + str.charCodeAt(i);
+                hash |= 0;
+            }
+            return (hash >>> 0);
+        }
+        function loadFeaturedBanner() {
+            fetch('/api/columns_for_home')
+                .then(r => r.json())
+                .then(data => {
+                    if (data.status !== 'success' || !data.columns || !data.columns.length) return;
+                    const total = data.columns.length;
+                    const dayCount = getDailyColumnSeed();
+                    const round = Math.floor(dayCount / total);
+                    const dayInRound = dayCount % total;
+
+                    const baseList = data.columns.slice().sort((a, b) => a.unique_id.localeCompare(b.unique_id));
+                    const rankedList = baseList.map(col => ({
+                        col: col,
+                        rank: simpleHash(col.unique_id + round)
+                    })).sort((a, b) => a.rank - b.rank);
+
+                    featuredCol = rankedList[dayInRound].col;
+
+                    document.getElementById('featuredColumnTitle').textContent = featuredCol.title;
+                    document.getElementById('featuredColumnSubject').textContent = featuredCol.subject;
+                    document.getElementById('featuredColumnSubtitle').textContent = featuredCol.subtitle || '';
+                    document.getElementById('featuredColumnPreview').textContent = (featuredCol.body || '').slice(0, 100);
+
+                    // 既読チェック
+                    let readCols = [];
+                    try { readCols = JSON.parse(document.getElementById('featuredColumnBanner').dataset.readColumns || '[]'); } catch (e) { }
+                    if (readCols.includes(featuredCol.unique_id)) {
+                        document.getElementById('featuredReadBadge').style.display = 'block';
+                    }
+
+                    document.getElementById('featuredColumnBanner').style.display = 'block';
+                })
+                .catch(function () { });
+        }
+        loadFeaturedBanner();
+    })();
+
+    // ================================================================
+    // 次のコラムを読む ロジック
+    // ================================================================
+    let allCardsData = null; // lazy cache
+
+    function buildCardsData() {
+        // DOM から全カードを収集してリスト化
+        const cards = document.querySelectorAll('.column-card');
+        const result = [];
+        cards.forEach(card => {
+            const col = card.closest('.col');
+            if (!col) return;
+            // accordion グループ（科目）を取得
+            const accordionBody = card.closest('.accordion-body');
+            const accordionItem = accordionBody ? accordionBody.closest('.accordion-item') : null;
+            const subjectEl = accordionItem ? accordionItem.querySelector('.accordion-button') : null;
+            const subject = subjectEl ? subjectEl.textContent.trim().replace(/\s*\d+本\s*$/, '').trim() : '';
+            result.push({
+                uniqueId: card.dataset.uniqueId,
+                safeId: card.dataset.safeId,
+                isRead: card.classList.contains('read'),
+                number: parseInt(col.dataset.number) || 0,
+                subject: subject,
+                card: card
+            });
+        });
+        return result;
+    }
+
+    function updateNextColumnButton() {
+        if (!currentModalId) return;
+        if (!allCardsData) allCardsData = buildCardsData();
+
+        const current = allCardsData.find(c => c.uniqueId === currentModalId);
+        if (!current) { document.getElementById('nextColumnButton').style.display = 'none'; return; }
+
+        // 同じ科目の次の番号（未読優先）
+        const sameSubject = allCardsData
+            .filter(c => c.subject === current.subject && c.uniqueId !== current.uniqueId)
+            .sort((a, b) => a.number - b.number);
+
+        // 現在より番号が大きいもの優先
+        const afterCurrent = sameSubject.filter(c => c.number > current.number);
+        const unreadAfter = afterCurrent.filter(c => !c.isRead);
+        const next = unreadAfter[0] || afterCurrent[0] || sameSubject.filter(c => !c.isRead)[0] || sameSubject[0];
+
+        const btn = document.getElementById('nextColumnButton');
+        if (next) {
+            btn.style.display = 'inline-flex';
+            btn._nextUniqueId = next.uniqueId;
+            btn._nextSafeId = next.safeId;
+        } else {
+            btn.style.display = 'none';
+        }
+    }
+
+    window.openNextColumn = function () {
+        const btn = document.getElementById('nextColumnButton');
+        const nextId = btn._nextUniqueId;
+        const nextSafeId = btn._nextSafeId;
+        if (!nextId || !nextSafeId) return;
+
+        // 現在のモーダルを閉じてから次を開く
+        const modalEl = document.getElementById('columnReaderModal');
+        const modal = bootstrap.Modal.getInstance(modalEl);
+        if (modal) {
+            modalEl.addEventListener('hidden.bs.modal', function handler() {
+                modalEl.removeEventListener('hidden.bs.modal', handler);
+                openColumnModal(nextId, nextSafeId);
+            });
+            modal.hide();
+        } else {
+            openColumnModal(nextId, nextSafeId);
+        }
+    };
+
+    // openColumnModal を拡張して nextColumnButton を更新
+    const _origOpenColumnModal = openColumnModal;
+    openColumnModal = function (uniqueId, safeId) {
+        _origOpenColumnModal(uniqueId, safeId);
+        // モーダル表示後に更新（shown.bs.modal は openColumnModal 内で一度のみ登録）
+        document.getElementById('columnReaderModal').addEventListener('shown.bs.modal', function onShown() {
+            document.getElementById('columnReaderModal').removeEventListener('shown.bs.modal', onShown);
+            allCardsData = null; // リセットして再収集（既読状態が変化する可能性）
+            updateNextColumnButton();
+        });
+        // localStorage に既読キャッシュを同期（ホーム画面ウィジェット用）
+        try {
+            const readColsRaw = document.getElementById('featuredColumnBanner').dataset.readColumns || '[]';
+            localStorage.setItem('readColumnsCache', readColsRaw);
+        } catch (e) { }
+    };
+
+
+    // ================================================================
+    // ?open= クエリパラメータによる自動モーダルオープン
+    // ================================================================
+    document.addEventListener('DOMContentLoaded', function () {
+        const params = new URLSearchParams(window.location.search);
+        const openId = params.get('open');
+        if (!openId) return;
+
+        // カードを探す
+        const targetCard = document.querySelector(`.column-card[data-unique-id="${CSS.escape(openId)}"]`);
+        if (targetCard) {
+            const safeId = targetCard.dataset.safeId;
+            // アコーディオンを開いてからモーダルを表示
+            const accordionCollapse = targetCard.closest('.accordion-collapse');
+            if (accordionCollapse && !accordionCollapse.classList.contains('show')) {
+                const collapseInstance = new bootstrap.Collapse(accordionCollapse, { toggle: false });
+                accordionCollapse.addEventListener('shown.bs.collapse', function handler() {
+                    accordionCollapse.removeEventListener('shown.bs.collapse', handler);
+                    // タブも切り替える（高校タブの場合）
+                    const tabPane = targetCard.closest('.tab-pane');
+                    if (tabPane && !tabPane.classList.contains('active')) {
+                        const tabId = tabPane.id;
+                        const tabBtn = document.querySelector(`#schoolTabs button[data-bs-target="#${tabId}"]`);
+                        if (tabBtn) new bootstrap.Tab(tabBtn).show();
+                    }
+                    setTimeout(() => openColumnModal(openId, safeId), 200);
+                }, { once: true });
+                // タブを先に切り替え
+                const tabPane = targetCard.closest('.tab-pane');
+                if (tabPane && !tabPane.classList.contains('active')) {
+                    const tabId = tabPane.id;
+                    const tabBtn = document.querySelector(`#schoolTabs button[data-bs-target="#${tabId}"]`);
+                    if (tabBtn) new bootstrap.Tab(tabBtn).show();
+                }
+                collapseInstance.show();
+            } else {
+                setTimeout(() => openColumnModal(openId, safeId), 300);
+            }
+        }
+    });
 </script>
+
 {% endblock %}
 
 {% block footer %}{% endblock %}

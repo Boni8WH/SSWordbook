@@ -257,6 +257,23 @@
         border-radius: 3px;
         transform-origin: top;
         animation: drawTimelineLine 1.5s ease-in-out forwards;
+        overflow: hidden;
+        /* For the pulse effect */
+    }
+
+    /* The moving light pulse along the timeline */
+    .timeline-line::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 30px;
+        background: rgba(255, 255, 255, 0.8);
+        box-shadow: 0 0 10px 3px rgba(255, 255, 255, 0.8);
+        border-radius: 5px;
+        animation: movePulse 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+        opacity: 0;
     }
 
     @keyframes drawTimelineLine {
@@ -266,6 +283,26 @@
 
         to {
             transform: scaleY(1);
+        }
+    }
+
+    @keyframes movePulse {
+        0% {
+            top: -30px;
+            opacity: 0;
+        }
+
+        10% {
+            opacity: 1;
+        }
+
+        90% {
+            opacity: 1;
+        }
+
+        100% {
+            top: 100%;
+            opacity: 0;
         }
     }
 
@@ -481,20 +518,45 @@
         }
     }
 
-    /* Subtle pulse on dragged item */
+    /* Subtle pulse and glow on dragged item */
     .sortable-drag {
         animation: dragPulse 1s infinite alternate;
+        background: linear-gradient(to right, #ffffff, #f0f8ff);
+        /* Hint of theme color */
+        box-shadow: 0 15px 30px rgba(52, 152, 219, 0.25);
+        border-left: 5px solid #2980b9;
+        transform: scale(1.04);
+    }
+
+    /* Animation for when item is dropped (added via JS later) */
+    .item-dropped {
+        animation: dropFeedback 0.3s ease-out;
     }
 
     @keyframes dragPulse {
         from {
-            box-shadow: 0 5px 15px rgba(52, 152, 219, 0.2);
-            border-color: #3498db;
+            box-shadow: 0 10px 20px rgba(52, 152, 219, 0.2);
         }
 
         to {
-            box-shadow: 0 10px 25px rgba(52, 152, 219, 0.4);
-            border-color: #2980b9;
+            box-shadow: 0 15px 35px rgba(52, 152, 219, 0.4);
+            background: linear-gradient(to right, #ffffff, #e1f0fa);
+        }
+    }
+
+    @keyframes dropFeedback {
+        0% {
+            transform: scale(1.04);
+            background-color: #f0f8ff;
+        }
+
+        50% {
+            transform: scale(0.98);
+        }
+
+        100% {
+            transform: scale(1);
+            background-color: #ffffff;
         }
     }
 
@@ -523,6 +585,30 @@
         background: radial-gradient(circle, rgba(212, 175, 55, 0.05) 0%, transparent 70%);
         pointer-events: none;
         animation: rotateGlow 20s linear infinite;
+    }
+
+    /* Perfect Clear Intensity Glow */
+    .final-result-card.perfect-clear {
+        border: 2px solid rgba(241, 196, 15, 0.6);
+        box-shadow: 0 20px 50px rgba(241, 196, 15, 0.2), inset 0 0 40px rgba(241, 196, 15, 0.1);
+        animation: resultFadeUp 0.8s cubic-bezier(0.22, 1, 0.36, 1) forwards, intenseAuraGlow 3s infinite alternate;
+    }
+
+    .final-result-card.perfect-clear::before {
+        background: radial-gradient(circle, rgba(241, 196, 15, 0.15) 0%, rgba(212, 175, 55, 0.05) 40%, transparent 80%);
+        animation: rotateGlow 15s linear infinite;
+        /* Faster rotation for perfect clear */
+    }
+
+    @keyframes intenseAuraGlow {
+        0% {
+            box-shadow: 0 20px 50px rgba(241, 196, 15, 0.2), inset 0 0 20px rgba(241, 196, 15, 0.05);
+        }
+
+        100% {
+            box-shadow: 0 25px 60px rgba(241, 196, 15, 0.4), 0 0 30px rgba(255, 215, 0, 0.3), inset 0 0 60px rgba(241, 196, 15, 0.2);
+            border-color: rgba(241, 196, 15, 0.9);
+        }
     }
 
     @keyframes rotateGlow {
@@ -677,12 +763,16 @@
             const offset = 439.6 - (439.6 * (chronoCorrectCount / chronoProblems.length));
 
             let message = "お疲れ様でした！";
-            if (percentage === 100) message = "完全制覇！あなたは歴史の真理に到達しました。";
+            let resultCardClass = "final-result-card text-center";
+            if (percentage === 100) {
+                message = "完全制覇！あなたは歴史の真理に到達しました。";
+                resultCardClass += " perfect-clear";
+            }
             else if (percentage >= 80) message = "素晴らしい洞察力です。歴史の流れを掴んでいますね。";
             else if (percentage >= 50) message = "着実に知識が定着しています。さらなる高みを目指しましょう。";
 
             document.getElementById('problemArea').innerHTML = `
-                <div class="final-result-card text-center">
+                <div class="${resultCardClass}">
                     <svg style="width:0;height:0;position:absolute;">
                         <defs>
                             <linearGradient id="scoreGradient" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -775,6 +865,14 @@
             ghostClass: 'sortable-ghost',
             dragClass: 'sortable-drag',
             handle: '.sortable-item', // Whole item is draggable
+            onEnd: function (evt) {
+                // Add snap feedback animation
+                const itemEl = evt.item;
+                itemEl.classList.add('item-dropped');
+                setTimeout(() => {
+                    itemEl.classList.remove('item-dropped');
+                }, 300);
+            }
         });
     }
 

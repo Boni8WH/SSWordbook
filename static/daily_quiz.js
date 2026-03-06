@@ -5,6 +5,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (dailyQuizButton) {
         dailyQuizButton.addEventListener('click', initializeDailyQuiz);
     }
+    const dailyQuizButtonMobile = document.getElementById('dailyQuizButtonMobile');
+    if (dailyQuizButtonMobile) {
+        dailyQuizButtonMobile.addEventListener('click', initializeDailyQuiz);
+    }
 });
 
 let quizTimerInterval;

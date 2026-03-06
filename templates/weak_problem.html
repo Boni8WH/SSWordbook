@@ -1,12 +1,166 @@
 {% extends "base.html" %}
 {% block title %}苦手問題一覧 - {{ app_name }}{% endblock %}
 
+{% block head_extra %}
+<link
+    href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@700&family=Kaisei+Tokumin:wght@400;700&display=swap"
+    rel="stylesheet">
+{% endblock %}
+
 {% block content %}
+<style>
+    /* Standarized Flexbox Style for Weak Problem Header */
+    .weak-header {
+        display: flex;
+        align-items: baseline;
+        justify-content: flex-start;
+        margin-bottom: 2rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        background: transparent;
+        position: relative;
+        z-index: 2;
+        text-align: left;
+        flex-wrap: wrap;
+        gap: 15px;
+    }
+
+    .header-left {
+        display: flex;
+        align-items: baseline;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    .weak-title {
+        font-family: 'Shippori Mincho', serif;
+        font-size: clamp(1.5rem, 4vw, 2rem);
+        font-weight: 700;
+        color: #1a1a2e;
+        letter-spacing: 0.1em;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        text-shadow: none;
+        padding: 0;
+    }
+
+    .weak-title i {
+        color: #d4af37;
+        margin-right: 0.4em;
+        font-size: 0.9em;
+        filter: drop-shadow(0 0 5px rgba(212, 175, 55, 0.4));
+    }
+
+    .weak-subtitle {
+        font-family: 'Kaisei Tokumin', serif;
+        color: #8c909e;
+        font-size: 0.8rem;
+        margin-left: 1rem;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        border-left: 2px solid #d4af37;
+        padding-left: 1rem;
+        margin-top: 0;
+    }
+
+    @media (max-width: 768px) {
+        .weak-header {
+            justify-content: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.8rem;
+            padding-top: 5px;
+        }
+
+        .header-left {
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 0;
+            gap: 2px;
+        }
+
+        .weak-title {
+            font-size: 1.3rem;
+        }
+
+        .weak-subtitle {
+            margin-left: 0;
+            border-left: none;
+            padding-left: 0;
+            margin-top: 0;
+            border-top: none;
+            padding-top: 0;
+            font-size: 0.7rem;
+        }
+
+        .header-home-btn {
+            position: absolute;
+            left: 0;
+            top: 5px;
+            padding: 6px 12px !important;
+        }
+
+        .header-home-btn.ms-auto {
+            margin-left: 0 !important;
+        }
+    }
+
+    /* Tab Styling (Horizontal Scrollable Pills for all sizes) */
+    #weakProblemTabs {
+        flex-wrap: wrap;
+        justify-content: center;
+        border-bottom: none;
+        padding-bottom: 8px;
+        margin-bottom: 1.5rem !important;
+        gap: 8px;
+    }
+
+    #weakProblemTabs .nav-item {
+        margin-bottom: 0;
+    }
+
+    #weakProblemTabs .nav-link {
+        white-space: nowrap;
+        border: 1px solid #e2e8f0;
+        border-radius: 20px;
+        padding: 8px 16px;
+        /* Slightly larger padding for desktop, fits on mobile since names are short */
+        background: #fff;
+        color: #6c757d;
+        font-size: 0.9rem;
+        /* Slightly larger font */
+        margin: 0;
+        transition: all 0.2s ease;
+    }
+
+    #weakProblemTabs .nav-link:hover {
+        background: #f8f9fa;
+        color: #1a1a2e;
+    }
+
+    #weakProblemTabs .nav-link.active {
+        background: #1a1a2e;
+        color: white;
+        border-color: #1a1a2e;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        font-weight: bold;
+    }
+</style>
+
 <div class="container mt-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2><i class="fas fa-crosshairs me-2"></i>克服状況データ</h2>
-        <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">
-            <i class="fas fa-arrow-left me-1"></i>学習画面に戻る
+    <div class="weak-header">
+        <div class="header-left">
+            <h1 class="weak-title"><i class="fas fa-crosshairs"></i>克服状況データ</h1>
+            <div class="weak-subtitle">Mastery & Analysis</div>
+        </div>
+        <a href="{{ url_for('index') }}"
+            class="header-home-btn btn btn-sm btn-outline-secondary rounded-pill px-3 shadow-sm d-none d-md-inline-flex ms-auto">
+            <i class="fas fa-arrow-left"></i><span class="ms-1">ホーム</span>
+        </a>
+        <a href="{{ url_for('index') }}"
+            class="header-home-btn btn btn-sm btn-outline-secondary rounded-pill px-3 shadow-sm d-md-none">
+            <i class="fas fa-arrow-left"></i>
         </a>
     </div>
 
@@ -14,19 +168,19 @@
         <li class="nav-item" role="presentation">
             <button class="nav-link active" id="my-mastery-tab" data-bs-toggle="tab" data-bs-target="#my-mastery"
                 type="button" role="tab" aria-controls="my-mastery" aria-selected="true">
-                <i class="fas fa-check-circle me-1"></i>特訓中：克服リスト
+                <i class="fas fa-check-circle me-1"></i>克服リスト
             </button>
         </li>
         <li class="nav-item" role="presentation">
             <button class="nav-link" id="my-weak-tab" data-bs-toggle="tab" data-bs-target="#my-weak" type="button"
                 role="tab" aria-controls="my-weak" aria-selected="false">
-                <i class="fas fa-chart-bar me-1"></i>分析：正答率ワースト
+                <i class="fas fa-chart-bar me-1"></i>苦手リスト
             </button>
         </li>
         <li class="nav-item" role="presentation">
             <button class="nav-link" id="everyone-weak-tab" data-bs-toggle="tab" data-bs-target="#everyone-weak"
                 type="button" role="tab" aria-controls="everyone-weak" aria-selected="false">
-                <i class="fas fa-users me-1"></i>みんなの正答率ワースト
+                <i class="fas fa-users me-1"></i>みんなの苦手
             </button>
         </li>
     </ul>
@@ -36,10 +190,9 @@
         <div class="tab-pane fade show active" id="my-mastery" role="tabpanel" aria-labelledby="my-mastery-tab">
             <div class="card shadow-sm border-primary">
                 <div class="card-body">
-                    <h5 class="card-title mb-3 text-primary">現在進行形の特訓リスト</h5>
                     <p class="text-muted small">
                         現在「克服モード」の出題対象になっている全ての単語です。<br>
-                        （2回連続正解でリストから卒業します。クールダウン中のものは一時的に出題されません）
+                        2回連続正解でリストから卒業します。クールダウン中のものは一時的に出題されません。
                     </p>
 
                     <div id="myMasteryLoading" class="text-center py-4">
@@ -63,7 +216,6 @@
         <div class="tab-pane fade" id="my-weak" role="tabpanel" aria-labelledby="my-weak-tab">
             <div class="card shadow-sm">
                 <div class="card-body">
-                    <h5 class="card-title mb-3">正答率ワースト20</h5>
                     <p class="text-muted small">過去の全学習履歴から、正答率が低い順に20問を表示しています<br>
                         「Progress」が表示されている問題は克服モードの対象ですが、クールダウン中のものは出題されません</p>
 
@@ -89,7 +241,6 @@
         <div class="tab-pane fade" id="everyone-weak" role="tabpanel" aria-labelledby="everyone-weak-tab">
             <div class="card shadow-sm">
                 <div class="card-body">
-                    <h5 class="card-title mb-3">みんなの正答率ワースト20</h5>
                     <p class="text-muted small">同じ部屋のメンバー全員の正答率を集計した、間違いやすい問題Top20です。<br>※Z問題（難関私大対策）は集計対象外です。</p>
 
                     <div id="everyoneWeakLoading" class="text-center py-4">
