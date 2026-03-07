@@ -169,6 +169,7 @@
                 <h3 id="rpgBossName" class="boss-name-large">BOSS NAME</h3>
                 <div class="boss-visual">
                     <img src="" id="rpgBossImage" alt="Boss" class="boss-img" onerror="this.style.display='none'">
+                    <div class="boss-shadow">?</div>
                 </div>
                 <div class="difficulty-stars-container">
                     <div id="rpgDifficultyStars" class="difficulty-stars">★★★★★</div>
@@ -474,10 +475,21 @@
 
                 // Show Overlay
                 const overlay = document.getElementById('rpgOverlay');
+                const introScreen = document.getElementById('rpgIntroScreen');
+
                 overlay.classList.remove('hidden');
-                document.getElementById('rpgIntroScreen').classList.remove('hidden');
+                introScreen.classList.remove('hidden');
                 document.getElementById('rpgBattleScreen').classList.add('hidden');
                 document.getElementById('rpgResultScreen').classList.add('hidden');
+
+                // Trigger CSS Animation
+                overlay.classList.remove('anim-active');
+                void overlay.offsetWidth;
+                overlay.classList.add('anim-active');
+
+                introScreen.classList.remove('anim-active');
+                void introScreen.offsetWidth;
+                introScreen.classList.add('anim-active');
 
                 // Update Start Button to call startRpgGame with enemyId
                 // This is where we finally hit the API
