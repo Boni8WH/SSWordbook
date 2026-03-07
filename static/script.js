@@ -15,6 +15,7 @@ let incorrectCount = 0;
 let totalQuestions = 0;
 let problemHistory = {};
 let incorrectWords = [];
+let currentSessionAnswered = new Set(); // 今回のセッションで回答した問題のIDを記録
 let quizStartTime;
 let isAnswerButtonDisabled = false;
 let answerButtonTimeout = null;
@@ -1516,6 +1517,7 @@ function startQuiz() {
         incorrectCount = 0;
         totalQuestions = currentQuizData.length;
         quizStartTime = Date.now();
+        currentSessionAnswered.clear();
 
         // UIの切り替え
         if (selectionArea) selectionArea.classList.add('hidden');
@@ -1523,6 +1525,9 @@ function startQuiz() {
         if (quizResultArea) quizResultArea.classList.add('hidden');
         // weakWordsListSection reference removed
         if (noWeakWordsMessage) noWeakWordsMessage.classList.add('hidden');
+
+        // ★追加: コラムを非表示にする
+        toggleTodaysColumn(false);
 
         updateProgressBar();
         showNextQuestion();
@@ -1590,10 +1595,14 @@ function restartWeakProblemsQuiz() {
     incorrectCount = 0;
     totalQuestions = currentQuizData.length;
     quizStartTime = Date.now();
+    currentSessionAnswered.clear();
 
     // UIの切り替え
     if (quizResultArea) quizResultArea.classList.add('hidden');
     if (cardArea) cardArea.classList.remove('hidden');
+
+    // ★追加: コラムを非表示にする
+    toggleTodaysColumn(false);
 
     updateProgressBar();
     showNextQuestion();
@@ -1796,6 +1805,7 @@ function handleAnswer(isCorrect) {
     }
 
     problemHistory[wordIdentifier].last_answered = new Date().toISOString();
+    currentSessionAnswered.add(wordIdentifier);
 
     if (isCorrect) {
         correctCount++;
@@ -2271,6 +2281,13 @@ function showQuizResult() {
         if (explanationDiv) explanationDiv.style.display = 'block';
     }
 
+    // ★追加: 戦略的撤退時は「論述チャレンジ」を非表示にして処理をスキップ
+    if (isStrategicRetreat) {
+        const recommendedSection = document.getElementById('recommendedEssaysSection');
+        if (recommendedSection) recommendedSection.classList.add('hidden');
+        return;
+    }
+
     // 1. 今回出題された全ての問題の【答え】と【章】を収集する <--- ★変更点
     const sessionKeywords = new Set();
     const sessionChapters = new Set(); // <--- ★章を保存するSetを追加
@@ -2413,7 +2430,7 @@ function displayIncorrectWordsForCurrentQuiz() {
         const wordIdentifier = generateProblemId(word);
         const history = problemHistory[wordIdentifier];
 
-        if (history && history.incorrect_attempts > 0 && history.correct_streak === 0) {
+        if (currentSessionAnswered.has(wordIdentifier) && history && history.incorrect_attempts > 0 && history.correct_streak === 0) {
             currentQuizIncorrectWords.push(word);
         }
     });
@@ -2478,8 +2495,11 @@ function backToSelectionScreen() {
     if (selectionArea) selectionArea.classList.remove('hidden');
     if (cardArea) cardArea.classList.add('hidden');
     if (quizResultArea) quizResultArea.classList.add('hidden');
-    if (weakWordsListSection) weakWordsListSection.classList.add('hidden');
+    // weakWordsListSection reference removed
     if (noWeakWordsMessage) noWeakWordsMessage.classList.add('hidden');
+
+    // ★追加: コラムを再表示する
+    toggleTodaysColumn(true);
 
     // ★重要：範囲選択画面に戻った時に制限状態を更新（少し遅延）
     setTimeout(() => {
@@ -2516,12 +2536,23 @@ function backToSelectionScreen() {
                 chaptersContainer.style.pointerEvents = 'auto';
             }
             if (rangeSelectionTitle) {
-                rangeSelectionTitle.textContent = '出題数を選択';
+                const rangeSelectionTitleText = document.getElementById('rangeSelectionTitleText');
+                if (rangeSelectionTitleText) {
+                    rangeSelectionTitleText.textContent = '出題数を選択';
+                }
+                const selectionTotalCount = document.getElementById('selectionTotalCount');
+                if (selectionTotalCount) {
+                    selectionTotalCount.textContent = ''; // 初期状態なので空にする
+                }
                 rangeSelectionTitle.style.color = '#34495e';
             }
 
             // 警告メッセージを削除
             removeWeakProblemWarning();
+
+            // ★追記: 手動リセット後に再度現在のモード状態を評価してUIを正しく反映させる
+            updateIncorrectOnlySelection();
+
         } else if (isCurrentlyRestricted) {
 
             // 制限中の場合は何もしない（updateIncorrectOnlySelectionが適切に処理）
@@ -2555,6 +2586,7 @@ function restartQuiz() {
         incorrectCount = 0;
         currentQuizData = shuffleArray(currentQuizData);
         quizStartTime = Date.now();
+        currentSessionAnswered.clear();
 
         if (quizResultArea) quizResultArea.classList.add('hidden');
         if (cardArea) cardArea.classList.remove('hidden');
@@ -2635,6 +2667,7 @@ function restartQuiz() {
     incorrectCount = 0;
     totalQuestions = currentQuizData.length;
     quizStartTime = Date.now();
+    currentSessionAnswered.clear();
 
     // UIの切り替え
     if (quizResultArea) quizResultArea.classList.add('hidden');
@@ -2719,6 +2752,22 @@ function resetRestartButtonToDefault() {
         `;
         explanationDiv.style.borderLeftColor = '#3498db';
         explanationDiv.style.backgroundColor = '#e8f4fd';
+    }
+}
+
+/**
+ * 今日のコラムウィジェットの表示・非表示を切り替える
+ * @param {boolean} show - trueで表示、falseで非表示
+ */
+function toggleTodaysColumn(show) {
+    const widget = document.getElementById('todaysColumnWidget');
+    if (widget) {
+        if (show) {
+            widget.classList.remove('hidden'); // 防御的措置：古い状態が残っている場合を考慮
+            widget.style.display = 'block';
+        } else {
+            widget.style.display = 'none';
+        }
     }
 }
 
