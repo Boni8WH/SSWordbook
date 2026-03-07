@@ -1584,10 +1584,14 @@
                     const dayInRound = dayCount % total;
 
                     const baseList = data.columns.slice().sort((a, b) => a.unique_id.localeCompare(b.unique_id));
-                    const rankedList = baseList.map(col => ({
-                        col: col,
-                        rank: simpleHash(col.unique_id + round)
-                    })).sort((a, b) => a.rank - b.rank);
+                    const rankedList = baseList.map(col => {
+                        let hash = simpleHash(col.unique_id + "_round_" + round);
+                        let rand = Math.sin(hash) * 10000;
+                        return {
+                            col: col,
+                            rank: rand - Math.floor(rand)
+                        };
+                    }).sort((a, b) => a.rank - b.rank);
 
                     featuredCol = rankedList[dayInRound].col;
 

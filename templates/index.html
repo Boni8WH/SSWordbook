@@ -800,10 +800,14 @@
 
                     // 2. Roundごとに異なる順序を作るためのランク付け
                     // hash(ID + Round) を使うことで、Round内では安定し、Round間では順序が変わる
-                    const rankedList = baseList.map(col => ({
-                        col: col,
-                        rank: simpleHash(col.unique_id + round)
-                    })).sort((a, b) => a.rank - b.rank);
+                    const rankedList = baseList.map(col => {
+                        let hash = simpleHash(col.unique_id + "_round_" + round);
+                        let rand = Math.sin(hash) * 10000;
+                        return {
+                            col: col,
+                            rank: rand - Math.floor(rand)
+                        };
+                    }).sort((a, b) => a.rank - b.rank);
 
                     const col = rankedList[dayInRound].col;
 
