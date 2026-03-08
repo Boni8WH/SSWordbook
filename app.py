@@ -589,7 +589,8 @@ class AppInfo(db.Model):
         """現在のアプリ情報を取得。存在しない場合はデフォルトを作成"""
         app_info = cls.query.first()
         if not app_info:
-            app_info = cls()
+            default_email = os.environ.get('MAIL_DEFAULT_SENDER', 'baytalhikmah.info@gmail.com')
+            app_info = cls(contact_email=default_email)
             db.session.add(app_info)
             try:
                 db.session.commit()
@@ -2176,10 +2177,30 @@ if not os.path.exists(VAPID_PRIVATE_KEY_PATH):
     else:
         print("WARNING: VAPID private key not found in file or environment.")
 
-VAPID_CLAIMS = {"sub": "mailto:admin@example.com"}
+# VAPID claims. Send mailto: parameter from environment variable to allow identifying the sender of push notifications.
+vapid_contact_email = os.environ.get('MAIL_DEFAULT_SENDER', 'baytalhikmah.info@gmail.com')
+VAPID_CLAIMS = {"sub": f"mailto:{vapid_contact_email}"}
 
 # ===== SQLAlchemy初期化 =====
 db.init_app(app)
+
+def _sync_contact_email_from_env():
+    """環境変数のMAIL_DEFAULT_SENDERをDBのcontact_emailに同期させる（空または初期設定の場合）"""
+    try:
+        env_email = os.environ.get('MAIL_DEFAULT_SENDER')
+        if not env_email:
+            return
+
+        app_info = AppInfo.query.first()
+        if app_info:
+            # 現在の連絡先が空、もしくは古いサンプルのままの場合に環境変数の値で上書き
+            current_email = (app_info.contact_email or '').strip()
+            if not current_email or current_email == 'admin@example.com' or current_email == 'example@example.com':
+                app_info.contact_email = env_email
+                db.session.commit()
+                print(f"✅ AppInfo: contact_emailを環境変数から同期しました ({env_email})")
+    except Exception as e:
+        print(f"⚠️ AppInfo 連絡先メール同期エラー (無視可能): {e}")
 
 # ==========================================
 # 起動時マイグレーション (Render/Gunicorn対応)
@@ -2189,13 +2210,14 @@ with app.app_context():
         # データベース接続確認
         db.engine.connect().close()
         
-        # 必要なカラム追加を実行
-        # これらは __main__ ブロックだけでなく、ここで実行することで
-        # Gunicorn起動時にも確実に適用されるようにする
+        # 他の安全なマイグレーションも念のため実行
         _add_manager_columns()
         _add_updated_at_column_to_announcement()
         _add_draft_answer_to_essay_progress()
         _add_temp_answer_data_column()
+        
+        # 環境変数から連絡先メールを同期
+        _sync_contact_email_from_env()
         
         # 他の安全なマイグレーションも念のため実行
         _add_logo_columns_to_app_info()
