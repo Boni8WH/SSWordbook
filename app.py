@@ -12226,6 +12226,47 @@ def admin_api_chrono_reorder_chapters():
         db.session.rollback()
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
+@app.route('/admin/api/chronological/rename_chapter', methods=['POST'])
+def admin_api_chrono_rename_chapter():
+    """管理画面: セクション名を一括変更"""
+    if 'user_id' not in session:
+        return jsonify({'status': 'error', 'message': 'ログインが必要です'}), 401
+    
+    current_user_id = session.get('user_id')
+    user = User.query.get(current_user_id)
+    if not user or (user.username != 'admin' and not user.is_manager):
+        return jsonify({'status': 'error', 'message': '権限がありません'}), 403
+
+    try:
+        data = request.get_json()
+        old_name = data.get('old_name')
+        new_name = data.get('new_name')
+        
+        if not old_name or not new_name:
+            return jsonify({'status': 'error', 'message': 'セクション名が正しくありません'}), 400
+            
+        # 1. 問題のセクション名を更新
+        problems = ChronologicalProblem.query.filter_by(chapter=old_name).all()
+        for p in problems:
+            p.chapter = new_name
+            
+        # 2. 表示順設定のセクション名を更新
+        order_record = ChronologicalChapterOrder.query.filter_by(chapter_name=old_name).first()
+        if order_record:
+            # すでに新しい名前のレコードがあるか確認（マージ）
+            existing_new = ChronologicalChapterOrder.query.filter_by(chapter_name=new_name).first()
+            if existing_new:
+                # すでにある場合は古い方を削除
+                db.session.delete(order_record)
+            else:
+                order_record.chapter_name = new_name
+                
+        db.session.commit()
+        return jsonify({'status': 'success', 'message': 'セクション名を変更しました'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
 @app.route('/api/chronological/section/<chapter>/difficulty_counts')
 def api_chrono_difficulty_counts(chapter):
     """特定のセクションの難易度別問題数と正解数を取得"""

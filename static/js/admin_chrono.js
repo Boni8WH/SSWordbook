@@ -281,8 +281,13 @@ function updateChronoReorderList(chapters) {
         li.style.cursor = 'grab';
         li.dataset.id = ch;
         li.innerHTML = `
-            <span><i class="fas fa-grip-vertical text-muted me-3"></i> ${ch}</span>
-            <span class="badge bg-light text-dark border order-badge">${index + 1}</span>
+            <span><i class="fas fa-grip-vertical text-muted me-3"></i> <span class="chapter-name-text">${ch}</span></span>
+            <div>
+                <button type="button" class="btn btn-sm btn-outline-primary me-2" onclick="openRenameChronoChapterModal('${ch.replace(/'/g, "\\'")}')" title="セクション名を変更">
+                    <i class="fas fa-edit"></i>
+                </button>
+                <span class="badge bg-light text-dark border order-badge">${index + 1}</span>
+            </div>
         `;
         list.appendChild(li);
     });
@@ -339,6 +344,50 @@ function saveChronoChapterOrder() {
                 loadChronoProblems(1);
             } else {
                 showChronoToast(data.message || '保存に失敗しました', 'danger');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showChronoToast('通信エラーが発生しました', 'danger');
+        });
+}
+
+function openRenameChronoChapterModal(oldName) {
+    document.getElementById('old_chrono_chapter_name').value = oldName;
+    document.getElementById('new_chrono_chapter_name').value = oldName;
+    const modal = new bootstrap.Modal(document.getElementById('chronoRenameChapterModal'));
+    modal.show();
+}
+
+function submitRenameChronoChapter() {
+    const oldName = document.getElementById('old_chrono_chapter_name').value;
+    const newName = document.getElementById('new_chrono_chapter_name').value.trim();
+
+    if (!newName) {
+        showChronoToast('新しいセクション名を入力してください', 'warning');
+        return;
+    }
+
+    if (oldName === newName) {
+        bootstrap.Modal.getInstance(document.getElementById('chronoRenameChapterModal')).hide();
+        return;
+    }
+
+    fetch('/admin/api/chronological/rename_chapter', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ old_name: oldName, new_name: newName })
+    })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                showChronoToast('セクション名を変更しました', 'success');
+                bootstrap.Modal.getInstance(document.getElementById('chronoRenameChapterModal')).hide();
+                loadChronoProblems(1);
+            } else {
+                showChronoToast(data.message || '変更に失敗しました', 'danger');
             }
         })
         .catch(error => {

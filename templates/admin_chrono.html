@@ -82,7 +82,7 @@
                                 <label for="new_chrono_university" class="form-label"><i class="fas fa-university"></i>
                                     出典</label>
                                 <input type="text" id="new_chrono_university" name="university" class="form-control"
-                                    placeholder="例: 東大, 共通テスト" required>
+                                    placeholder="例: 東大, 共通テスト">
                             </div>
                             <div class="col-md-3">
                                 <label for="new_chrono_year" class="form-label"><i class="fas fa-calendar-alt"></i>
@@ -244,7 +244,7 @@
                         </div>
                         <div class="col-md-5">
                             <label class="form-label">出典</label>
-                            <input type="text" id="edit_chrono_university" class="form-control" required>
+                            <input type="text" id="edit_chrono_university" class="form-control">
                         </div>
                         <div class="col-md-3">
                             <label class="form-label">年度</label>
@@ -283,6 +283,34 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
                 <button type="button" class="btn btn-primary" onclick="saveChronoProblem()">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- セクション名編集モーダル -->
+<div class="modal fade" id="chronoRenameChapterModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">セクション名の変更</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="renameChronoChapterForm">
+                    <input type="hidden" id="old_chrono_chapter_name">
+                    <div class="mb-3">
+                        <label class="form-label">新しいセクション名</label>
+                        <input type="text" id="new_chrono_chapter_name" class="form-control" required>
+                    </div>
+                </form>
+                <div class="alert alert-warning small">
+                    <i class="fas fa-exclamation-triangle"></i> このセクション名に属するすべての年代順問題のセクション名が一括で変更されます。
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+                <button type="button" class="btn btn-success" onclick="submitRenameChronoChapter()">変更を保存</button>
             </div>
         </div>
     </div>
