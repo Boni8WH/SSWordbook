@@ -5111,6 +5111,23 @@ def contact_page():
             flash('お問い合わせを送信しました。', 'success')
             return redirect(url_for('index'))
 
+        # 4. 日本語が含まれていない場合はボット（海外スパム）とみなす
+        def contains_japanese(text):
+            # ひらがな、カタカナ、漢字のいずれかが含まれているか確認
+            return bool(re.search(r'[ぁ-んァ-ン一-龥]', text))
+
+        if not contains_japanese(message):
+            app.logger.info("Bot detected: No Japanese characters in message.")
+            flash('お問い合わせを送信しました。', 'success')
+            return redirect(url_for('index'))
+
+        # 5. URLの数が多すぎる場合はスパムとみなす (例: 3つ以上)
+        url_count = len(re.findall(r'https?://', message))
+        if url_count >= 3:
+            app.logger.info(f"Bot detected: Too many URLs ({url_count}) in message.")
+            flash('お問い合わせを送信しました。', 'success')
+            return redirect(url_for('index'))
+
         # 管理者への通知内容
         email_body = f"""
 新しいお問い合わせが届きました。
