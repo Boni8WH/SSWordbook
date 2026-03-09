@@ -2760,13 +2760,23 @@ function resetRestartButtonToDefault() {
  * @param {boolean} show - trueで表示、falseで非表示
  */
 function toggleTodaysColumn(show) {
-    const widget = document.getElementById('todaysColumnWidget');
-    if (widget) {
+    const columnWidget = document.getElementById('todaysColumnWidget');
+    const newsWidget = document.getElementById('dailyNewsWidget');
+    
+    if (columnWidget) {
         if (show) {
-            widget.classList.remove('hidden'); // 防御的措置：古い状態が残っている場合を考慮
-            widget.style.display = 'block';
+            columnWidget.classList.remove('hidden');
+            columnWidget.style.display = 'block';
         } else {
-            widget.style.display = 'none';
+            columnWidget.style.display = 'none';
+        }
+    }
+    
+    if (newsWidget) {
+        if (show) {
+            newsWidget.style.display = 'block';
+        } else {
+            newsWidget.style.display = 'none';
         }
     }
 }

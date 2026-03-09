@@ -1,0 +1,355 @@
+{% extends "base.html" %}
+
+{% block title %}時事ニュース - {{ app_name }}{% endblock %}
+
+{% block content %}
+<link
+    href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@700&family=Kaisei+Tokumin:wght@400;700&display=swap"
+    rel="stylesheet">
+
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-10 col-lg-9">
+            <!-- Standardized Header -->
+            <div class="news-header-container mb-4">
+                <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+                    <div class="header-left d-flex align-items-center flex-wrap">
+                        <h1 class="news-main-title">
+                            <i class="fas fa-globe-americas"></i>今日のニュース
+                        </h1>
+                        <div class="news-subtitle">
+                            PULSE OF THE WORLD
+                        </div>
+                    </div>
+                    <a href="{{ url_for('index') }}"
+                        class="header-home-btn btn btn-sm btn-outline-secondary rounded-pill px-3 shadow-sm">
+                        <i class="fas fa-arrow-left me-1"></i><span class="d-none d-md-inline">ホーム</span>
+                    </a>
+                </div>
+                <div class="header-meta mt-2 text-muted small d-flex align-items-center flex-wrap gap-2">
+                    <span class="d-inline-flex align-items-center">
+                        <i class="far fa-clock me-1"></i>更新: {{ news_data.display_date if news_data and
+                        news_data.display_date else '本日分は準備中です' }}
+                    </span>
+                    {% if news_data and news_data.total_processed %}
+                    <span class="badge bg-soft-secondary text-muted fw-normal border px-2 py-1 rounded-pill">
+                        {{ news_data.total_processed }}件の記事から厳選
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div
+                class="alert alert-info border-0 shadow-xs rounded-4 p-3 mb-4 animate__animated animate__fadeInDown d-flex align-items-start">
+                <div class="me-3 pt-1">
+                    <i class="fas fa-info-circle fa-lg text-info"></i>
+                </div>
+                <div class="text-start">
+                    <p class="mb-0 small fw-medium text-dark">
+                        このニュース解説はAIによって自動生成されています。<br>
+                        <span class="text-secondary fw-normal">事実と異なる内容が含まれる可能性があるため、正確な情報は必ず各出典元のリンク先でご確認ください。</span>
+                    </p>
+                </div>
+            </div>
+
+            {% if news_data and news_data.articles %}
+            <div class="news-feed">
+                {% for article in news_data.articles %}
+                <div class="news-card mb-4 shadow-sm border-0 rounded-4 overflow-hidden animate__animated animate__fadeInUp clickable-card"
+                    style="animation-delay: {{ loop.index0 * 0.1 }}s;" onclick="toggleAccordion(this)">
+                    <div class="card-body p-4">
+                        <div class="d-flex align-items-center justify-content-between mb-3">
+                            <span class="badge bg-soft-primary text-primary px-3 py-2 rounded-pill fw-bold">
+                                {{ article.source or 'ニュース' }}
+                            </span>
+                            {% if article.created_at %}
+                            <small class="text-muted">
+                                <i class="far fa-calendar-alt me-1"></i>{{ article.created_at }}
+                            </small>
+                            {% endif %}
+                        </div>
+                        <h3 class="h4 fw-bold mb-2 text-dark">{{ article.title }}</h3>
+
+                        <!-- キーワード（ハッシュタグ）をタイトルの直後に配置 -->
+                        {% if article.keywords %}
+                        <div class="mb-3 px-1">
+                            {% for keyword in article.keywords %}
+                            <span class="badge bg-white text-muted border me-1 mb-1 fw-normal">#{{ keyword }}</span>
+                            {% endfor %}
+                            <span class="ms-2 text-primary small accordion-hint"><i
+                                    class="fas fa-chevron-down ms-1"></i> 詳しく見る</span>
+                        </div>
+                        {% endif %}
+
+                        <!-- 折りたたみ部分 -->
+                        <div class="accordion-content">
+                            <div class="news-summary p-3 rounded-3 bg-light-blue mb-3 mt-3">
+                                <p class="mb-0 text-secondary leading-relaxed">
+                                    {{ article.summary }}
+                                </p>
+                            </div>
+
+                            <div
+                                class="educational-insight p-3 border-start border-4 border-info bg-white shadow-xs rounded-end-3 mb-3">
+                                <h4 class="h6 fw-bold text-info mb-2">
+                                    <i class="fas fa-lightbulb me-2"></i>学びのポイント
+                                </h4>
+                                <p class="mb-0 text-muted small">
+                                    {{ article.significance }}
+                                </p>
+                            </div>
+
+                            <div class="text-end">
+                                <a href="{{ article.url }}" target="_blank" rel="noopener noreferrer"
+                                    class="btn btn-link text-decoration-none p-0 fw-bold text-primary"
+                                    onclick="event.stopPropagation()">
+                                    元の記事を読む <i class="fas fa-external-link-alt ms-1 small"></i>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            </div>
+
+            {% if news_data.other_topics %}
+            <div class="other-topics-section mt-5 animate__animated animate__fadeIn" style="animation-delay: 0.5s;">
+                <div class="d-flex align-items-center mb-3">
+                    <div class="flex-grow-1 border-bottom me-3"></div>
+                    <h4 class="h6 fw-bold text-muted mb-0 text-uppercase tracking-wider">その他の注目トピック</h4>
+                    <div class="flex-grow-1 border-bottom ms-3"></div>
+                </div>
+                <div class="row g-3">
+                    {% for topic in news_data.other_topics %}
+                    <div class="col-md-6">
+                        <a href="{{ topic.url }}" target="_blank" rel="noopener noreferrer"
+                            class="other-topic-card d-flex flex-column align-items-start p-3 rounded-3 text-decoration-none bg-white border border-light shadow-xs h-100 transition-all">
+                            <div class="d-flex align-items-center mb-2">
+                                <span class="badge bg-soft-secondary text-muted px-2 py-1 rounded-pill me-2"
+                                    style="font-size: 0.7rem;">
+                                    {{ topic.source or 'ニュース' }}
+                                </span>
+                                <i class="fas fa-external-link-alt text-muted" style="font-size: 0.75rem;"></i>
+                            </div>
+                            <span class="text-dark small fw-medium">{{ topic.title }}</span>
+                        </a>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            <div class="text-center mt-5 p-4 bg-white rounded-4 shadow-sm border border-dashed">
+                <p class="text-muted mb-0 small">
+                    <i class="fas fa-robot me-2"></i>このニュースはAIが自動でピックアップ・要約しています。詳しい内容は各出典元で確認してください。
+                </p>
+            </div>
+
+            {% else %}
+            <div class="alert bg-white shadow-sm text-center py-5 border-0 rounded-4">
+                <div class="mb-4">
+                    <i class="fas fa-satellite-dish fa-3x text-muted opacity-50"></i>
+                </div>
+                <h4 class="text-dark fw-bold">ニュースを準備中です</h4>
+                <p class="text-muted px-4">AIが最新の世界情勢を解析しています。しばらくしてからもう一度ご確認ください。</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+    function toggleAccordion(card) {
+        card.classList.toggle('expanded');
+        const hint = card.querySelector('.accordion-hint');
+        if (hint) {
+            if (card.classList.contains('expanded')) {
+                hint.innerHTML = '<i class="fas fa-chevron-up ms-1"></i> 閉じる';
+            } else {
+                hint.innerHTML = '<i class="fas fa-chevron-down ms-1"></i> 詳しく見る';
+            }
+        }
+    }
+</script>
+
+<style>
+    .clickable-card {
+        cursor: pointer;
+    }
+
+    .accordion-content {
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease, margin-top 0.3s ease;
+        opacity: 0;
+    }
+
+    .news-card.expanded .accordion-content {
+        max-height: 1000px;
+        /* 十分な高さ */
+        opacity: 1;
+        margin-top: 1rem;
+    }
+
+    .accordion-hint {
+        transition: opacity 0.3s ease;
+    }
+
+    .news-card.expanded .accordion-hint {
+        opacity: 0.7;
+    }
+
+    .news-header-container {
+        padding-bottom: 1.5rem;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        position: relative;
+    }
+
+    .news-main-title {
+        font-family: 'Shippori Mincho', serif;
+        font-size: clamp(1.5rem, 4vw, 2rem);
+        font-weight: 700;
+        color: #1a1a2e;
+        letter-spacing: 0.1em;
+        margin: 0;
+        display: flex;
+        align-items: center;
+    }
+
+    .news-main-title i {
+        color: #d4af37;
+        margin-right: 0.4em;
+        font-size: 0.95em;
+        filter: drop-shadow(0 0 5px rgba(212, 175, 55, 0.4));
+    }
+
+    .news-subtitle {
+        font-family: 'Kaisei Tokumin', serif;
+        color: #8c909e;
+        font-size: 0.8rem;
+        margin-left: 1rem;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        border-left: 2px solid #d4af37;
+        padding-left: 1rem;
+    }
+
+    .border-start-md {
+        border-left: 2px solid #d4af37;
+    }
+
+    @media (max-width: 767px) {
+        .news-header-container {
+            text-align: center;
+        }
+
+        .header-left {
+            justify-content: center;
+            width: 100%;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .border-start-md {
+            border-left: none;
+            border-top: 1px solid #d4af37;
+            padding-top: 5px;
+            margin-left: 0 !important;
+            padding-left: 0 !important;
+        }
+
+        .header-meta {
+            justify-content: center;
+        }
+
+        .header-home-btn {
+            position: absolute;
+            left: 0;
+            top: 5px;
+            padding: 6px 12px !important;
+        }
+    }
+
+    .bg-soft-secondary {
+        background-color: #f8fafc;
+    }
+
+    .news-card {
+        background: #ffffff;
+        border-radius: 1.25rem;
+        transition: transform 0.3s ease, box-shadow 0.3s ease, background-color 0.3s ease;
+    }
+
+    .news-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.06) !important;
+        background-color: #fcfdfe;
+    }
+
+    .news-card.expanded:hover {
+        transform: none;
+    }
+
+    .bg-soft-primary {
+        background-color: rgba(59, 130, 246, 0.1);
+    }
+
+    .other-topic-card {
+        transition: all 0.2s ease;
+    }
+
+    .other-topic-card:hover {
+        background-color: #f8fafc !important;
+        border-color: #3b82f6 !important;
+        transform: translateX(5px);
+    }
+
+    .tracking-wider {
+        letter-spacing: 0.1em;
+    }
+
+    .transition-all {
+        transition: all 0.3s ease;
+    }
+
+    .bg-light-blue {
+        background-color: #f8fafc;
+    }
+
+    .leading-relaxed {
+        line-height: 1.7;
+    }
+
+    .shadow-xs {
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    }
+
+    .border-dashed {
+        border-style: dashed !important;
+    }
+
+    /* Animation */
+    .animate__animated {
+        animation-duration: 0.6s;
+        animation-fill-mode: both;
+    }
+
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translate3d(0, 30px, 0);
+        }
+
+        to {
+            opacity: 1;
+            transform: translate3d(0, 0, 0);
+        }
+    }
+
+    .animate__fadeInUp {
+        animation-name: fadeInUp;
+    }
+</style>
+{% endblock %}

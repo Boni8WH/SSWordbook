@@ -13,6 +13,9 @@ import io
 import pickle 
 import gc
 import psutil
+import requests
+import xml.etree.ElementTree as ET
+import email.utils
 
 import ctypes  # For malloc_trim
 
@@ -40,6 +43,7 @@ from datetime import date, datetime, timedelta
 import random
 import glob
 import pytz
+from pydantic import BaseModel, Field
 import threading
 from flask_apscheduler import APScheduler
 from pywebpush import webpush, WebPushException
@@ -1352,6 +1356,150 @@ def check_daily_quiz_reminders():
                     url="/"
                 )
 
+# --- 構造化データ用のPydanticモデル ---
+class ArticleSchema(BaseModel):
+    title: str = Field(description="ニュースのタイトル（必ず日本語に翻訳してください）")
+    summary: str = Field(description="歴史的背景を含めた詳しい要約（日本語、200〜300文字）")
+    significance: str = Field(description="世界史のどの単元と関連するか、何を学ぶべきかの解説（日本語、100〜200文字）")
+    keywords: list[str] = Field(description="関連する世界史の重要用語（例: 帝国主義、冷戦、サイクス・ピコ協定など）3〜5個")
+    url: str = Field(description="出典URL")
+    source: str = Field(description="出典メディア名（日本語翻訳、例: BBCニュース）")
+    created_at: str = Field(description="元の記事の公開日時（例: '3月9日 10:30' や '3月7日 22:15' など、日本の高校生が読みやすい月日・時刻を含む形式）")
+
+class OtherTopicSchema(BaseModel):
+    title: str = Field(description="ニュースのタイトル（必ず日本語に翻訳してください）")
+    url: str = Field(description="出典URL")
+
+class NewsResponseSchema(BaseModel):
+    articles: list[ArticleSchema] = Field(description="厳選された3つのニュース記事")
+    other_topics: list[OtherTopicSchema] = Field(description="その他の注目トピック（5〜7個）")
+# -------------------------------------
+
+def update_world_news():
+    """Geminiを使って世界情勢ニュースを更新するタスク"""
+    with app.app_context():
+        print("🌍 世の中のニュースを更新中...")
+        rss_feeds = [
+            {"name": "NHK (主要)", "url": "https://www3.nhk.or.jp/rss/news/cat0.xml"},
+            {"name": "NHK (国際)", "url": "https://www3.nhk.or.jp/rss/news/cat1.xml"},
+            {"name": "Nikkei Asia", "url": "https://asia.nikkei.com/rss/feed/nar"},
+            {"name": "Asahi Shimbun (AJW)", "url": "http://www.asahi.com/english/rss/index.rdf"},
+            {"name": "The Japan News", "url": "https://japannews.yomiuri.co.jp/feed/"},
+            {"name": "BBC News (World)", "url": "https://feeds.bbci.co.uk/news/world/rss.xml"},
+            {"name": "The Guardian (World)", "url": "https://www.theguardian.com/world/rss"},
+            {"name": "NYT (World)", "url": "https://rss.nytimes.com/services/xml/rss/nyt/World.xml"},
+            {"name": "Al Jazeera (English)", "url": "https://www.aljazeera.com/xml/rss/all.xml"},
+            {"name": "France 24 (English)", "url": "https://www.france24.com/en/rss"},
+            {"name": "DW (World)", "url": "https://rss.dw.com/rdf/rss-en-world"},
+            {"name": "Reuters (World)", "url": "https://www.reutersagency.com/feed/?best-topics=world-news&post_type=best"},
+            {"name": "AP News (World)", "url": "https://newsapi.org/fed/621"},
+            {"name": "SCMP (Asia)", "url": "https://www.scmp.com/rss/318208/feed"}
+        ]
+        
+        all_items = []
+        for feed in rss_feeds:
+            try:
+                response = requests.get(feed["url"], timeout=10)
+                response.encoding = 'utf-8'
+                root = ET.fromstring(response.text)
+                for item in root.findall('./channel/item'):
+                    pub_date_raw = item.find('pubDate').text if item.find('pubDate') is not None else ""
+                    pub_date_jst = ""
+                    if pub_date_raw:
+                        try:
+                            # RFC 2822形式のパース
+                            dt = email.utils.parsedate_to_datetime(pub_date_raw)
+                            if dt.tzinfo is None:
+                                dt = pytz.utc.localize(dt)
+                            pub_date_jst = dt.astimezone(JST).strftime("%Y-%m-%d %H:%M:%S")
+                        except Exception:
+                            pub_date_jst = pub_date_raw
+
+                    all_items.append({
+                        'title': item.find('title').text,
+                        'description': item.find('description').text if item.find('description') is not None else "",
+                        'link': item.find('link').text,
+                        'source': feed["name"],
+                        'pub_date': pub_date_jst
+                    })
+            except Exception as e:
+                print(f"⚠️ RSS Fetch Error ({feed['name']}): {e}")
+
+        if not all_items:
+            return
+
+        client = get_genai_client()
+        if not client:
+            return
+
+        # 重複排除のみ行い、件数は絞らずに全件をGeminiに渡す
+        unique_items = list({item['link']: item for item in all_items}.values())
+        news_text = "\n".join([f"- [{item['source']}] {item['title']} (PubDate: {item.get('pub_date')}): {item['description']} ({item['link']})" for item in unique_items])
+        
+        # 前回選出された記事の情報を取得して、重複を避ける
+        prev_articles_text = "なし"
+        file_path = os.path.join(basedir, 'data', 'featured_article.json')
+        if os.path.exists(file_path):
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    prev_data = json.load(f)
+                    prev_titles = [a.get('title') for a in prev_data.get('articles', [])]
+                    if prev_titles:
+                        prev_articles_text = ", ".join(prev_titles)
+            except Exception:
+                pass
+
+        current_time = datetime.now(JST).strftime("%Y年%m月%d日 %H:%M")
+        prompt = f"""
+あなたは、現代の国際情勢と世界史を結びつける解説が得意な、予備校のカリスマ世界史講師です。
+現在は **{current_time}** です。この日時を基準に、最新の状況を正確に判断してください（例：役職や現職・前職の区別など）。
+
+以下の最新ニュースリストの中から、**世界史を学んでいる日本の高校生**にとって知的好奇心を刺激し、学習の助けとなるトピックを選んでください。
+
+**構成の指示:**
+1. **厳選記事 (articles)**: 最も重要なものを**厳密に3つ**選び、詳細な解説を作成してください。
+2. **その他の注目トピック (other_topics)**: 次点で興味深いものを**厳密に6つ**選び、タイトル、URL、出典メディア名をリストアップしてください。**特定のメディアに偏らず、できるだけ多様な出典（NHK, Nikkei, BBC, Guardian等）からバランスよく選出してください。**
+
+**選出・要約のガイドライン（最優先）:**
+    1. **事実の正確性**: あなたの事前学習知識よりも、**提供されたニュースリストのテキスト内容を絶対的に優先**してください。人名、役職、現状について、リストと矛盾する推測や古い情報を入れないでください。
+    2. **歴史的背景・継続性**: 現在の出来事が、過去の歴史的事象（植民地支配、冷戦、宗教対立、条約など）と深く結びついているものを優先してください。
+    3. **トピックの多様性**: 前回のトピックと極力被らないようにしてください。
+       - 前回の記事タイトル: {prev_articles_text}
+       - 同じ問題（例：イラン情勢）に大きな進展がない限り、別の地域や異なる歴史テーマを優先してください。
+    4. **翻訳の徹底**: 記事のタイトルは、日本の高校生が理解しやすい自然な日本語に必ず翻訳してください。
+    5. **地域の均衡**: 特定の地域（欧米など）に偏らず、グローバルな視点（中東、アフリカ、アジア等）を含めてください。
+
+ニュースリスト:
+{news_text}
+"""
+        try:
+            response = client.models.generate_content(
+                model='gemini-2.0-flash',
+                contents=prompt,
+                config={
+                    'response_mime_type': 'application/json',
+                    'response_schema': NewsResponseSchema,
+                    'temperature': 0.3
+                }
+            )
+            data_json = json.loads(response.text)
+            
+            data = {
+                'updated_at': datetime.now(JST).isoformat(),
+                'total_processed': len(unique_items),
+                'articles': data_json.get('articles', []),
+                'other_topics': data_json.get('other_topics', [])
+            }
+            
+            data_dir = os.path.join(basedir, 'data')
+            os.makedirs(data_dir, exist_ok=True)
+            file_path = os.path.join(data_dir, 'featured_article.json')
+            with open(file_path, 'w', encoding='utf-8') as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+            print(f"✅ ニュースを更新しました: {file_path}")
+        except Exception as e:
+            print(f"⚠️ Gemini News Update Error: {e}")
+
 class PasswordResetToken(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False)
@@ -2151,6 +2299,10 @@ scheduler.start()
 # スケジューラーにジョブ追加
 if not scheduler.get_job('daily_reminder'):
     scheduler.add_job(id='daily_reminder', func=check_daily_quiz_reminders, trigger='cron', minute='*')
+
+if not scheduler.get_job('update_world_news'):
+    # 毎日午前7時に更新
+    scheduler.add_job(id='update_world_news', func=update_world_news, trigger='cron', hour=7, minute=0)
 
 # VAPID Keys (本来は環境変数推奨)
 VAPID_PUBLIC_KEY = "BPUZ8qA8yrG6CJTcLNnqA8WzUtl4HAaIAjD0zgjZGabJ-p4dBqGTZCgvicPtL2SuTv4ZmVri-pUvDznso_LGebY"
@@ -7312,6 +7464,63 @@ def get_announcements():
     except Exception as e:
         print(f"Error fetching announcements: {e}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/news')
+def news_page():
+    """時事ニュースページ"""
+    try:
+        file_path = os.path.join(basedir, 'data', 'featured_article.json')
+        if not os.path.exists(file_path):
+            # まだデータがない場合は初回更新を試みる（非同期が望ましいが簡易的に）
+            return render_template('news.html', news_data=None)
+            
+        with open(file_path, 'r', encoding='utf-8') as f:
+            news_data = json.load(f)
+            
+        # updated_at をパースしてフォーマット
+        if 'updated_at' in news_data:
+            dt = datetime.fromisoformat(news_data['updated_at'])
+            news_data['display_date'] = dt.strftime('%Y年%m月%d日 %H:%M')
+            
+        return render_template('news.html', news_data=news_data)
+    except Exception as e:
+        print(f"Error loading news: {e}")
+        return render_template('news.html', news_data=None)
+
+@app.route('/api/news_data')
+def get_news_data_api():
+    """ニュースデータをJSONで返すAPI"""
+    try:
+        file_path = os.path.join(basedir, 'data', 'featured_article.json')
+        if not os.path.exists(file_path):
+            return jsonify({'status': 'no_data'})
+            
+        with open(file_path, 'r', encoding='utf-8') as f:
+            news_data = json.load(f)
+        return jsonify(news_data)
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/admin/update_news_now', methods=['POST'])
+def admin_update_news():
+    """管理者が手動でニュースを更新する"""
+    user_id = session.get('user_id')
+    if not user_id:
+        flash("ログインが必要です", "danger")
+        return redirect(url_for('login_page'))
+    
+    user = User.query.get(user_id)
+    # if not user or not user.is_manager:
+    #     flash("権限がありません", "danger")
+    #     return redirect(url_for('index'))
+        
+    try:
+        update_world_news()
+        flash("ニュースを更新しました", "success")
+    except Exception as e:
+        flash(f"ニュース更新エラー: {e}", "danger")
+        
+    return redirect(url_for('news_page'))
 
 @app.route('/announcements')
 def announcements_page():
