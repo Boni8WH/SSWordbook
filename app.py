@@ -1164,6 +1164,7 @@ class StudyTip(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False)
     body = db.Column(db.Text, nullable=False)
     tag_id = db.Column(db.Integer, db.ForeignKey('study_tip_tag.id', ondelete='SET NULL'), nullable=True)
+    author_name = db.Column(db.String(100), nullable=True)  # 管理者投稿時の投稿者名
     is_anonymous = db.Column(db.Boolean, default=False, nullable=False)
     status = db.Column(db.String(20), default='pending', nullable=False)  # pending/approved/rejected
     reject_reason = db.Column(db.String(500), nullable=True)
@@ -1217,6 +1218,12 @@ def _create_study_tip_tables():
                     conn.execute(text("ALTER TABLE study_tip ADD COLUMN tag_id INTEGER REFERENCES study_tip_tag(id) ON DELETE SET NULL"))
                     conn.commit()
                 print("✅ StudyTip: tag_id カラム追加完了")
+            if 'author_name' not in columns:
+                print("🔄 StudyTip: author_name カラムを追加します...")
+                with db.engine.connect() as conn:
+                    conn.execute(text("ALTER TABLE study_tip ADD COLUMN author_name VARCHAR(100)"))
+                    conn.commit()
+                print("✅ StudyTip: author_name カラム追加完了")
             if 'chapter' in columns:
                 # chapter カラムは残しておいても問題ないが、新規では使わない
                 pass
@@ -19311,13 +19318,25 @@ def api_tips_list():
             key = (tag_order, tag_id, tag_name)
             if key not in grouped:
                 grouped[key] = []
+            # 投稿者名の決定
+            if t.is_anonymous:
+                author_display = '匿名'
+            elif t.author_name:
+                author_display = t.author_name
+            elif t.user and t.user.room_number == 'ADMIN':
+                author_display = '管理者'
+            elif t.user:
+                author_display = t.user.username
+            else:
+                author_display = 'Unknown'
+
             grouped[key].append({
                 'id': t.id,
                 'body': t.body,
                 'tag_name': tag_name,
                 'tag_id': tag_id,
                 'likes_count': t.likes_count,
-                'author': '匿名' if t.is_anonymous else (t.user.username if t.user else 'Unknown'),
+                'author': author_display,
                 'created_at': t.created_at.strftime('%m/%d') if t.created_at else '',
                 'is_liked': t.id in user_likes
             })
@@ -19546,6 +19565,50 @@ def api_admin_tips_reject(tip_id):
     db.session.commit()
     return jsonify({'status': 'success', 'message': '却下しました'})
 
+@app.route('/api/admin/tips/post', methods=['POST'])
+def api_admin_tips_post():
+    """管理者による直接Tips投稿（承認不要で即公開）"""
+    if not session.get('admin_logged_in') and not session.get('manager_logged_in'):
+        return jsonify({'status': 'error', 'message': '権限がありません'}), 403
+
+    data = request.get_json() or {}
+    body = (data.get('body') or '').strip()
+    author_name = (data.get('author_name') or '').strip()
+    tag_id = data.get('tag_id')
+
+    if not body:
+        return jsonify({'status': 'error', 'message': '本文を入力してください'}), 400
+    if len(body) > 1000:
+        return jsonify({'status': 'error', 'message': '本文は1000文字以内で入力してください'}), 400
+    if not tag_id:
+        return jsonify({'status': 'error', 'message': 'タグを選択してください'}), 400
+
+    tag = StudyTipTag.query.get(tag_id)
+    if not tag:
+        return jsonify({'status': 'error', 'message': 'タグが見つかりません'}), 404
+
+    # 管理者ユーザーを取得
+    admin_user = User.query.filter_by(username='admin', room_number='ADMIN').first()
+    if not admin_user:
+        return jsonify({'status': 'error', 'message': '管理者ユーザーが見つかりません'}), 500
+
+    try:
+        tip = StudyTip(
+            user_id=admin_user.id,
+            body=body,
+            author_name=author_name if author_name else None,
+            tag_id=tag_id,
+            is_anonymous=False,
+            status='approved',
+            approved_at=datetime.now(JST)
+        )
+        db.session.add(tip)
+        db.session.commit()
+        return jsonify({'status': 'success', 'message': 'Tipsを投稿しました', 'tip_id': tip.id})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
 @app.route('/api/admin/tips/<int:tip_id>/update_tag', methods=['POST'])
 def api_admin_tips_update_tag(tip_id):
     """承認済みTipのタグを変更"""
@@ -19587,7 +19650,8 @@ def api_admin_tips_approved():
             'body': t.body[:80] + ('…' if len(t.body) > 80 else ''),
             'body_full': t.body,
             'is_anonymous': t.is_anonymous,
-            'author': t.user.username if t.user else 'Unknown',
+            'author': t.author_name if t.author_name else (t.user.username if t.user else 'Unknown'),
+            'room_number': t.user.room_number if t.user else '',
             'tag_id': t.tag_id,
             'tag_name': t.tag.name if t.tag else 'タグなし',
             'likes_count': t.likes_count,

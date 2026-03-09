@@ -2509,6 +2509,33 @@
                         <div id="tagsList"></div>
                     </div>
                 </div>
+                <!-- 管理者Tips投稿 -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0"><i class="fas fa-pen-fancy text-primary"></i> 管理者Tips投稿</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="text-muted small mb-3">管理者として直接Tipsを投稿できます（承認不要で即公開）。</div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold small">投稿者名</label>
+                            <input type="text" id="adminTipAuthorName" class="form-control form-control-sm" placeholder="例: 山田先生（空欄の場合「管理者」と表示）" maxlength="100">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold small">本文 <span class="text-danger">*</span></label>
+                            <textarea id="adminTipBody" class="form-control" rows="4" placeholder="Tipsの内容を入力..." maxlength="1000"></textarea>
+                            <div class="text-end text-muted small mt-1"><span id="adminTipCharCount">0</span>/1000</div>
+                        </div>
+                        <div class="d-flex gap-2 align-items-center flex-wrap">
+                            <select class="form-select form-select-sm" style="max-width:200px;" id="adminTipTagSelect">
+                                <option value="" disabled selected>タグを選択 *</option>
+                            </select>
+                            <button class="btn btn-primary btn-sm" onclick="adminPostTip()">
+                                <i class="fas fa-paper-plane"></i> 投稿する
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- 承認待ち一覧 -->
                 <div class="card shadow-sm mb-4">
                     <div class="card-header bg-white d-flex justify-content-between align-items-center">
@@ -9369,7 +9396,7 @@
                             <div class="d-flex justify-content-between mb-2 flex-wrap">
                                 <div>
                                     <strong>${escapeHtmlAdmin(tip.author)}</strong>
-                                    <span class="text-muted small">(${escapeHtmlAdmin(tip.room_number)})</span>
+                                    <span class="text-muted small">(${tip.room_number === 'ADMIN' ? '管理者' : escapeHtmlAdmin(tip.room_number)})</span>
                                     ${tip.is_anonymous ? '<span class="badge bg-secondary ms-1" style="font-size:0.65rem;"><i class="fas fa-user-secret"></i> 匿名希望</span>' : ''}
                                 </div>
                                 <small class="text-muted">${escapeHtmlAdmin(tip.created_at)}</small>
@@ -9527,11 +9554,68 @@
             }
         };
 
+        // ── 管理者Tips投稿 ──
+        function loadAdminTipTagOptions() {
+            fetch('/api/admin/tips/tags')
+                .then(r => r.json())
+                .then(data => {
+                    if (data.status !== 'success') return;
+                    const select = document.getElementById('adminTipTagSelect');
+                    if (!select) return;
+                    const currentVal = select.value;
+                    select.innerHTML = '<option value="" disabled selected>タグを選択 *</option>';
+                    data.tags.forEach(tag => {
+                        select.innerHTML += `<option value="${tag.id}">${escapeHtmlAdmin(tag.name)}</option>`;
+                    });
+                    if (currentVal) select.value = currentVal;
+                });
+        }
+
+        // 文字数カウント
+        const adminTipBodyEl = document.getElementById('adminTipBody');
+        if (adminTipBodyEl) {
+            adminTipBodyEl.addEventListener('input', function() {
+                document.getElementById('adminTipCharCount').textContent = this.value.length;
+            });
+        }
+
+        window.adminPostTip = async function() {
+            const body = (document.getElementById('adminTipBody').value || '').trim();
+            const authorName = (document.getElementById('adminTipAuthorName').value || '').trim();
+            const tagId = document.getElementById('adminTipTagSelect').value;
+
+            if (!body) { alert('本文を入力してください'); return; }
+            if (!tagId) { alert('タグを選択してください'); return; }
+
+            try {
+                const res = await fetch('/api/admin/tips/post', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ body: body, author_name: authorName, tag_id: parseInt(tagId) })
+                });
+                const data = await res.json();
+                if (data.status === 'success') {
+                    alert('Tipsを投稿しました');
+                    document.getElementById('adminTipBody').value = '';
+                    document.getElementById('adminTipAuthorName').value = '';
+                    document.getElementById('adminTipCharCount').textContent = '0';
+                    document.getElementById('adminTipTagSelect').selectedIndex = 0;
+                    loadApprovedTips();
+                    loadTags();
+                } else {
+                    alert(data.message || '投稿に失敗しました');
+                }
+            } catch (e) {
+                alert('通信エラーが発生しました');
+            }
+        };
+
         // タブが表示された時に自動読込
         const tabLink = document.getElementById('tab-link-tips-moderation');
         if (tabLink) {
             tabLink.addEventListener('shown.bs.tab', function() {
                 loadTags();
+                loadAdminTipTagOptions();
                 loadPendingTips();
                 loadApprovedTips();
             });
