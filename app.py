@@ -1369,6 +1369,7 @@ class ArticleSchema(BaseModel):
 class OtherTopicSchema(BaseModel):
     title: str = Field(description="ニュースのタイトル（必ず日本語に翻訳してください）")
     url: str = Field(description="出典URL")
+    source: str = Field(description="出典メディア名（例: NHK、BBC、The Guardian）")
 
 class NewsResponseSchema(BaseModel):
     articles: list[ArticleSchema] = Field(description="厳選された3つのニュース記事")
@@ -1396,32 +1397,43 @@ def update_world_news():
             {"name": "SCMP (Asia)", "url": "https://www.scmp.com/rss/318208/feed"}
         ]
         
+        MAX_ITEMS_PER_FEED = 8   # 各フィードから最大8件
+        MAX_DESC_LEN = 120       # descriptionの最大文字数
+        MAX_TOTAL_ITEMS = 80     # Geminiに渡す最大件数
+
         all_items = []
         for feed in rss_feeds:
             try:
                 response = requests.get(feed["url"], timeout=10)
                 response.encoding = 'utf-8'
                 root = ET.fromstring(response.text)
+                feed_items = []
                 for item in root.findall('./channel/item'):
                     pub_date_raw = item.find('pubDate').text if item.find('pubDate') is not None else ""
                     pub_date_jst = ""
                     if pub_date_raw:
                         try:
-                            # RFC 2822形式のパース
                             dt = email.utils.parsedate_to_datetime(pub_date_raw)
                             if dt.tzinfo is None:
                                 dt = pytz.utc.localize(dt)
-                            pub_date_jst = dt.astimezone(JST).strftime("%Y-%m-%d %H:%M:%S")
+                            pub_date_jst = dt.astimezone(JST).strftime("%Y-%m-%d %H:%M")
                         except Exception:
                             pub_date_jst = pub_date_raw
 
-                    all_items.append({
+                    desc = item.find('description').text if item.find('description') is not None else ""
+                    if desc and len(desc) > MAX_DESC_LEN:
+                        desc = desc[:MAX_DESC_LEN] + "…"
+
+                    feed_items.append({
                         'title': item.find('title').text,
-                        'description': item.find('description').text if item.find('description') is not None else "",
+                        'description': desc,
                         'link': item.find('link').text,
                         'source': feed["name"],
                         'pub_date': pub_date_jst
                     })
+                    if len(feed_items) >= MAX_ITEMS_PER_FEED:
+                        break
+                all_items.extend(feed_items)
             except Exception as e:
                 print(f"⚠️ RSS Fetch Error ({feed['name']}): {e}")
 
@@ -1432,9 +1444,9 @@ def update_world_news():
         if not client:
             return
 
-        # 重複排除のみ行い、件数は絞らずに全件をGeminiに渡す
-        unique_items = list({item['link']: item for item in all_items}.values())
-        news_text = "\n".join([f"- [{item['source']}] {item['title']} (PubDate: {item.get('pub_date')}): {item['description']} ({item['link']})" for item in unique_items])
+        # 重複排除し、件数を上限に絞る
+        unique_items = list({item['link']: item for item in all_items}.values())[:MAX_TOTAL_ITEMS]
+        news_text = "\n".join([f"- [{item['source']}] {item['title']} ({item.get('pub_date')}): {item['description']} ({item['link']})" for item in unique_items])
         
         # 前回選出された記事の情報を取得して、重複を避ける
         prev_articles_text = "なし"
@@ -1497,8 +1509,41 @@ def update_world_news():
             with open(file_path, 'w', encoding='utf-8') as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
             print(f"✅ ニュースを更新しました: {file_path}")
+
+            # アーカイブDBに保存（当日分を upsert）
+            try:
+                today = get_logic_date(datetime.now(JST))
+                archive = NewsArchive.query.filter_by(date=today).first()
+                if archive:
+                    archive.articles_json = json.dumps(data['articles'], ensure_ascii=False)
+                    archive.other_topics_json = json.dumps(data['other_topics'], ensure_ascii=False)
+                    archive.total_processed = data['total_processed']
+                    archive.created_at = datetime.now(JST)
+                else:
+                    archive = NewsArchive(
+                        date=today,
+                        articles_json=json.dumps(data['articles'], ensure_ascii=False),
+                        other_topics_json=json.dumps(data['other_topics'], ensure_ascii=False),
+                        total_processed=data['total_processed']
+                    )
+                    db.session.add(archive)
+                db.session.commit()
+                print(f"✅ アーカイブに保存しました: {today}")
+            except Exception as e:
+                db.session.rollback()
+                print(f"⚠️ アーカイブ保存エラー: {e}")
         except Exception as e:
             print(f"⚠️ Gemini News Update Error: {e}")
+
+class NewsArchive(db.Model):
+    """過去のニュースアーカイブ（1日1レコード）"""
+    __tablename__ = 'news_archive'
+    id = db.Column(db.Integer, primary_key=True)
+    date = db.Column(db.Date, unique=True, nullable=False, index=True)
+    articles_json = db.Column(db.Text, nullable=False)
+    other_topics_json = db.Column(db.Text, nullable=False)
+    total_processed = db.Column(db.Integer, default=0)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))
 
 class PasswordResetToken(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -7500,6 +7545,82 @@ def get_news_data_api():
         return jsonify(news_data)
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/news/archive')
+def news_archive_list():
+    """過去ニュースアーカイブ一覧"""
+    page = request.args.get('page', 1, type=int)
+    per_page = 20
+    pagination = NewsArchive.query.order_by(NewsArchive.date.desc()).paginate(
+        page=page, per_page=per_page, error_out=False
+    )
+    return render_template('news_archive_list.html', pagination=pagination)
+
+@app.route('/news/archive/search')
+def news_archive_search():
+    """アーカイブニュース キーワード検索"""
+    query = request.args.get('q', '').strip()
+    results = []
+    if query:
+        q_lower = query.lower()
+        # SQL LIKE で対象アーカイブを絞り込んだあと Python 側で精査
+        archives = NewsArchive.query.filter(
+            NewsArchive.articles_json.like(f'%{query}%')
+        ).order_by(NewsArchive.date.desc()).all()
+
+        for archive in archives:
+            try:
+                articles = json.loads(archive.articles_json)
+            except Exception:
+                continue
+            matching = []
+            for a in articles:
+                searchable = ' '.join([
+                    a.get('title', ''),
+                    a.get('summary', ''),
+                    a.get('significance', ''),
+                    ' '.join(a.get('keywords', []))
+                ]).lower()
+                if q_lower in searchable:
+                    matching.append(a)
+            if matching:
+                results.append({
+                    'date': archive.date,
+                    'date_str': archive.date.strftime('%Y-%m-%d'),
+                    'display_date': archive.date.strftime('%Y年%m月%d日'),
+                    'articles': matching,
+                })
+    return render_template('news_archive_search.html', query=query, results=results)
+
+
+@app.route('/news/archive/<string:date_str>')
+def news_archive_detail(date_str):
+    """特定日のニュースアーカイブ詳細"""
+    try:
+        target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+    except ValueError:
+        return redirect(url_for('news_archive_list'))
+
+    archive = NewsArchive.query.filter_by(date=target_date).first_or_404()
+
+    articles = json.loads(archive.articles_json)
+    other_topics = json.loads(archive.other_topics_json)
+    display_date = target_date.strftime('%Y年%m月%d日')
+
+    # 前日・翌日のナビゲーション用
+    prev_archive = NewsArchive.query.filter(NewsArchive.date < target_date).order_by(NewsArchive.date.desc()).first()
+    next_archive = NewsArchive.query.filter(NewsArchive.date > target_date).order_by(NewsArchive.date.asc()).first()
+
+    news_data = {
+        'display_date': display_date,
+        'total_processed': archive.total_processed,
+        'articles': articles,
+        'other_topics': other_topics,
+        'is_archive': True,
+        'prev_date': prev_archive.date.strftime('%Y-%m-%d') if prev_archive else None,
+        'next_date': next_archive.date.strftime('%Y-%m-%d') if next_archive else None,
+    }
+    return render_template('news.html', news_data=news_data)
 
 @app.route('/admin/update_news_now', methods=['POST'])
 def admin_update_news():

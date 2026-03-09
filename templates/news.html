@@ -12,8 +12,15 @@
         <div class="col-md-10 col-lg-9">
             <!-- Standardized Header -->
             <div class="news-header-container mb-4">
-                <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
-                    <div class="header-left d-flex align-items-center flex-wrap">
+                <div class="d-flex align-items-center position-relative">
+                    <!-- モバイル: ← アイコンのみ（絶対配置 → タイトルの中央に影響しない） -->
+                    <a href="{{ url_for('index') }}"
+                        class="header-home-btn btn btn-sm btn-outline-secondary rounded-pill px-3 shadow-sm d-md-none">
+                        <i class="fas fa-arrow-left"></i>
+                    </a>
+
+                    <!-- タイトル -->
+                    <div class="header-left d-flex align-items-center flex-wrap flex-grow-1">
                         <h1 class="news-main-title">
                             <i class="fas fa-globe-americas"></i>今日のニュース
                         </h1>
@@ -21,9 +28,37 @@
                             PULSE OF THE WORLD
                         </div>
                     </div>
-                    <a href="{{ url_for('index') }}"
-                        class="header-home-btn btn btn-sm btn-outline-secondary rounded-pill px-3 shadow-sm">
-                        <i class="fas fa-arrow-left me-1"></i><span class="d-none d-md-inline">ホーム</span>
+
+                    <!-- PC: アーカイブ系ボタン + ← ホームボタン（右端） -->
+                    <div class="d-none d-md-flex align-items-center gap-2 ms-auto">
+                        {% if news_data and news_data.is_archive %}
+                        <a href="{{ url_for('news_page') }}"
+                            class="btn btn-sm btn-outline-primary rounded-pill px-3 shadow-sm">
+                            <i class="fas fa-sun me-1"></i>今日
+                        </a>
+                        {% endif %}
+                        <a href="{{ url_for('news_archive_list') }}"
+                            class="btn btn-sm btn-outline-secondary rounded-pill px-3 shadow-sm">
+                            <i class="fas fa-archive me-1"></i>アーカイブ
+                        </a>
+                        <a href="{{ url_for('index') }}"
+                            class="header-home-btn btn btn-sm btn-outline-secondary rounded-pill px-3 shadow-sm">
+                            <i class="fas fa-arrow-left"></i><span class="ms-1">ホーム</span>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- モバイル専用: タイトル下のアーカイブボタン行（中央揃え） -->
+                <div class="d-flex d-md-none justify-content-center gap-2 mt-2">
+                    {% if news_data and news_data.is_archive %}
+                    <a href="{{ url_for('news_page') }}"
+                        class="btn btn-sm btn-outline-primary rounded-pill px-3 shadow-sm">
+                        <i class="fas fa-sun me-1"></i>今日
+                    </a>
+                    {% endif %}
+                    <a href="{{ url_for('news_archive_list') }}"
+                        class="btn btn-sm btn-outline-secondary rounded-pill px-3 shadow-sm">
+                        <i class="fas fa-archive me-1"></i>アーカイブ
                     </a>
                 </div>
                 <div class="header-meta mt-2 text-muted small d-flex align-items-center flex-wrap gap-2">
@@ -141,6 +176,30 @@
             </div>
             {% endif %}
 
+            {% if news_data and news_data.is_archive %}
+            <div class="d-flex justify-content-between align-items-center mt-4">
+                {% if news_data.prev_date %}
+                <a href="{{ url_for('news_archive_detail', date_str=news_data.prev_date) }}"
+                    class="btn btn-outline-secondary rounded-pill px-4">
+                    <i class="fas fa-chevron-left me-1"></i>前の日
+                </a>
+                {% else %}
+                <span></span>
+                {% endif %}
+                <a href="{{ url_for('news_archive_list') }}" class="btn btn-link text-muted small">
+                    一覧に戻る
+                </a>
+                {% if news_data.next_date %}
+                <a href="{{ url_for('news_archive_detail', date_str=news_data.next_date) }}"
+                    class="btn btn-outline-secondary rounded-pill px-4">
+                    次の日<i class="fas fa-chevron-right ms-1"></i>
+                </a>
+                {% else %}
+                <span></span>
+                {% endif %}
+            </div>
+            {% endif %}
+
             <div class="text-center mt-5 p-4 bg-white rounded-4 shadow-sm border border-dashed">
                 <p class="text-muted mb-0 small">
                     <i class="fas fa-robot me-2"></i>このニュースはAIが自動でピックアップ・要約しています。詳しい内容は各出典元で確認してください。
@@ -175,6 +234,8 @@
 </script>
 
 <style>
+    html, body { overflow-x: hidden; }
+
     .clickable-card {
         cursor: pointer;
     }
@@ -245,11 +306,39 @@
             text-align: center;
         }
 
+        /* ← ボタンを絶対配置にしてタイトルの中央寄せに影響させない */
+        .header-home-btn {
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        /* タイトルを真ん中に */
         .header-left {
             justify-content: center;
-            width: 100%;
             flex-direction: column;
-            gap: 5px;
+            gap: 3px;
+            width: 100%;
+            text-align: center;
+        }
+
+        .news-main-title {
+            font-size: 1.5rem;
+            justify-content: center;
+        }
+
+        .news-subtitle {
+            margin-left: 0;
+            border-left: none;
+            border-top: 1px solid #d4af37;
+            padding-left: 0;
+            padding-top: 3px;
+            font-size: 0.65rem;
+        }
+
+        .header-meta {
+            justify-content: center;
         }
 
         .border-start-md {
@@ -258,17 +347,6 @@
             padding-top: 5px;
             margin-left: 0 !important;
             padding-left: 0 !important;
-        }
-
-        .header-meta {
-            justify-content: center;
-        }
-
-        .header-home-btn {
-            position: absolute;
-            left: 0;
-            top: 5px;
-            padding: 6px 12px !important;
         }
     }
 
