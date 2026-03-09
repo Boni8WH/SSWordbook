@@ -554,6 +554,10 @@
                 <i class="fas fa-map-marked-alt me-2"></i> 地図クイズ管理
             </a>
 
+            <a class="sidebar-link" id="tab-link-news-management" data-bs-toggle="pill" href="#section-news-management" role="tab">
+                <i class="fas fa-newspaper me-2"></i> ニュース管理
+            </a>
+
             {% if not is_manager %}
             <div class="sidebar-heading">システム</div>
             <a class="sidebar-link" id="tab-link-database-management" data-bs-toggle="pill"
@@ -2772,6 +2776,35 @@
                 </div>
             </div>
 
+            <div class="tab-pane fade" id="section-news-management" role="tabpanel">
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-white">
+                        <h3><i class="fas fa-newspaper"></i> ニュース管理</h3>
+                    </div>
+                    <div class="card-body">
+                        <p>時事ニュースは毎日午前7時に自動更新されます。手動で今すぐ更新することもできます。</p>
+
+                        <div class="admin-panel" style="background-color: #e8f4fd; border-left: 5px solid #3498db; margin-bottom: 20px;">
+                            <h4>📰 ニュース手動更新</h4>
+                            <p>複数のRSSフィードを取得し、Gemini AIで要約・整形します。<br>
+                                <strong>目安：</strong>更新には30秒〜1分程度かかる場合があります。
+                            </p>
+                            <div id="news-last-updated" class="mb-3 text-muted small">
+                                最終更新日時を読み込み中...
+                            </div>
+                            <div class="d-flex align-items-center gap-2">
+                                <button type="button" class="btn btn-primary" id="updateNewsBtn" onclick="updateNewsNow(event)">
+                                    <i class="fas fa-sync-alt me-1"></i> 今すぐ更新
+                                </button>
+                                <a href="{{ url_for('news_page') }}" target="_blank" class="btn btn-outline-secondary btn-sm">
+                                    <i class="fas fa-external-link-alt me-1"></i> ニュースページを見る
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div class="tab-pane fade" id="section-database-management" role="tabpanel">
                 <div class="card shadow-sm mb-4">
                     <div class="card-header bg-white">
@@ -4238,6 +4271,75 @@
                 });
             });
         });
+
+        function updateNewsNow(event) {
+            if (event) event.preventDefault();
+
+            showConfirmModal(
+                'ニュース手動更新',
+                '今すぐニュースを更新しますか？\n\n※RSSフィードの取得とAI処理のため、完了まで1分程度かかる場合があります。',
+                () => {
+                    const btn = document.getElementById('updateNewsBtn');
+                    const originalHtml = btn.innerHTML;
+                    btn.disabled = true;
+                    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> 更新中...';
+
+                    fetch('/admin/update_news_now', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' }
+                    })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.status === 'success') {
+                                if (data.updated_at) {
+                                    document.getElementById('news-last-updated').textContent = '最終更新: ' + data.updated_at;
+                                }
+                                alert('✅ ' + data.message);
+                            } else {
+                                alert('❌ エラー: ' + data.message);
+                            }
+                        })
+                        .catch(error => {
+                            console.error('ニュース更新エラー:', error);
+                            alert('❌ ニュース更新中にエラーが発生しました。');
+                        })
+                        .finally(() => {
+                            btn.disabled = false;
+                            btn.innerHTML = originalHtml;
+                        });
+                },
+                '更新する',
+                'btn-primary'
+            );
+        }
+
+        // ニュース管理タブが表示されたときに最終更新日時を読み込む
+        document.addEventListener('DOMContentLoaded', () => {
+            const newsTab = document.getElementById('tab-link-news-management');
+            if (newsTab) {
+                newsTab.addEventListener('shown.bs.tab', loadNewsLastUpdated);
+            }
+        });
+
+        function loadNewsLastUpdated() {
+            fetch('/api/news_data')
+                .then(response => response.json())
+                .then(data => {
+                    const el = document.getElementById('news-last-updated');
+                    if (!el) return;
+                    if (data.updated_at) {
+                        const dt = new Date(data.updated_at);
+                        const formatted = dt.toLocaleString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+                        el.textContent = '最終更新: ' + formatted;
+                    } else {
+                        el.textContent = 'まだニュースデータがありません。';
+                    }
+                })
+                .catch(() => {
+                    const el = document.getElementById('news-last-updated');
+                    if (el) el.textContent = '最終更新日時の取得に失敗しました。';
+                });
+        }
 
         function cleanupOrphanedTokens(event) {
             if (event) event.preventDefault();

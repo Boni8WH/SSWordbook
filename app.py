@@ -7506,21 +7506,25 @@ def admin_update_news():
     """管理者が手動でニュースを更新する"""
     user_id = session.get('user_id')
     if not user_id:
-        flash("ログインが必要です", "danger")
-        return redirect(url_for('login_page'))
-    
-    user = User.query.get(user_id)
-    # if not user or not user.is_manager:
-    #     flash("権限がありません", "danger")
-    #     return redirect(url_for('index'))
-        
+        return jsonify({'status': 'error', 'message': 'ログインが必要です'}), 401
+
+    if not session.get('admin_logged_in') and not session.get('manager_logged_in'):
+        return jsonify({'status': 'error', 'message': '権限がありません'}), 403
+
     try:
         update_world_news()
-        flash("ニュースを更新しました", "success")
+        # 更新後の最終更新日時を取得
+        file_path = os.path.join(basedir, 'data', 'featured_article.json')
+        updated_at = None
+        if os.path.exists(file_path):
+            with open(file_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                if 'updated_at' in data:
+                    dt = datetime.fromisoformat(data['updated_at'])
+                    updated_at = dt.strftime('%Y年%m月%d日 %H:%M')
+        return jsonify({'status': 'success', 'message': 'ニュースを更新しました', 'updated_at': updated_at})
     except Exception as e:
-        flash(f"ニュース更新エラー: {e}", "danger")
-        
-    return redirect(url_for('news_page'))
+        return jsonify({'status': 'error', 'message': f'ニュース更新エラー: {e}'}), 500
 
 @app.route('/announcements')
 def announcements_page():
