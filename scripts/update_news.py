@@ -12,7 +12,8 @@ from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 
 # Load environment variables
-load_dotenv()
+basedir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+load_dotenv(os.path.join(basedir, '.env'))
 
 JST = pytz.timezone('Asia/Tokyo')
 
@@ -88,7 +89,7 @@ def get_gemini_summary(news_items):
         
         # 前回選出された記事の情報を取得して、重複を避ける
         prev_articles_text = "なし"
-        json_path = os.path.join(os.path.dirname(__file__), '..', 'data', 'featured_article.json')
+        json_path = os.path.join(basedir, 'data', 'featured_article.json')
         if os.path.exists(json_path):
             try:
                 with open(json_path, 'r', encoding='utf-8') as f:
@@ -165,21 +166,28 @@ def update_news():
             response.encoding = 'utf-8'
             parsed = feedparser.parse(response.text)
 
-            for entry in parsed.entries:
+            # トークン節約のため、各ソースから最新10件のみに絞る
+            for entry in parsed.entries[:10]:
                 pub_date_jst = ""
                 if hasattr(entry, 'published_parsed') and entry.published_parsed:
                     try:
                         dt = datetime.utcfromtimestamp(timegm(entry.published_parsed))
                         dt = pytz.utc.localize(dt)
-                        pub_date_jst = dt.astimezone(JST).strftime("%Y-%m-%d %H:%M:%S")
+                        # より短い形式にする (MM-DD HH:MM)
+                        pub_date_jst = dt.astimezone(JST).strftime("%m-%d %H:%M")
                     except Exception:
                         pub_date_jst = getattr(entry, 'published', '')
                 elif hasattr(entry, 'published'):
                     pub_date_jst = entry.published
 
+                # 文字数を制限（200文字以内）
+                description = getattr(entry, 'summary', '')
+                if description and len(description) > 200:
+                    description = description[:197] + "..."
+
                 all_items.append({
                     'title': getattr(entry, 'title', ''),
-                    'description': getattr(entry, 'summary', ''),
+                    'description': description,
                     'link': getattr(entry, 'link', ''),
                     'source': feed["name"],
                     'pub_date': pub_date_jst
@@ -191,8 +199,12 @@ def update_news():
         print("❌ No news items found.")
         return
 
-    # 重複排除のみ行い、件数は絞らずに全件をGeminiに渡す
+    # 重複排除
     unique_items = list({item['link']: item for item in all_items}.values())
+    
+    # さらにトークン節約のため、全体で80件程度に絞る
+    if len(unique_items) > 80:
+        unique_items = unique_items[:80]
     
     print(f"🔍 {len(unique_items)}件のニュースから厳選します...")
     summarized_news = get_gemini_summary(unique_items)
@@ -210,7 +222,7 @@ def update_news():
             'other_topics': summarized_news.get('other_topics', [])
         }
         
-        data_dir = os.path.join(os.path.dirname(__file__), '..', 'data')
+        data_dir = os.path.join(basedir, 'data')
         os.makedirs(data_dir, exist_ok=True)
         
         file_path = os.path.join(data_dir, 'featured_article.json')

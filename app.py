@@ -51,7 +51,7 @@ from pywebpush import webpush, WebPushException
 from dotenv import load_dotenv
 
 # .envファイルの内容を環境変数として読み込む
-load_dotenv()
+# (basedir定義後に呼び出す)
 
 JST = pytz.timezone('Asia/Tokyo')
 
@@ -93,8 +93,7 @@ def get_s3_client():
         print(f"⚠️ S3クライアント初期化失敗: {e}")
         return None
 
-# Gemini API設定
-GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
+# Gemini API設定 (get_genai_client内で取得)
 
 # Gemini APIクライアントのシングルトンインスタンス（メモリリーク防止）
 _genai_client_instance = None
@@ -103,7 +102,8 @@ def get_genai_client():
     """google.genaiを遅延インポートして設定済みClientを返す（シングルトン）"""
     global _genai_client_instance
     
-    if not GEMINI_API_KEY:
+    api_key = os.environ.get('GEMINI_API_KEY')
+    if not api_key:
         print("⚠️ GEMINI_API_KEYが設定されていません")
         return None
     
@@ -114,7 +114,7 @@ def get_genai_client():
     # 初回のみクライアントを作成
     try:
         from google import genai
-        _genai_client_instance = genai.Client(api_key=GEMINI_API_KEY)
+        _genai_client_instance = genai.Client(api_key=api_key)
         print("✅ Gemini APIクライアントを初期化しました（シングルトン）")
         return _genai_client_instance
     except Exception as e:
@@ -1492,22 +1492,30 @@ def update_world_news():
                 response = requests.get(feed["url"], timeout=10)
                 response.encoding = 'utf-8'
                 parsed = feedparser.parse(response.text)
-                for entry in parsed.entries:
+                
+                # トークン節約のため、各ソースから最新10件のみに絞る
+                for entry in parsed.entries[:10]:
                     pub_date_jst = ""
                     if hasattr(entry, 'published_parsed') and entry.published_parsed:
                         try:
                             from calendar import timegm
                             dt = datetime.utcfromtimestamp(timegm(entry.published_parsed))
                             dt = pytz.utc.localize(dt)
-                            pub_date_jst = dt.astimezone(JST).strftime("%Y-%m-%d %H:%M:%S")
+                            # より短い形式にする (MM-DD HH:MM)
+                            pub_date_jst = dt.astimezone(JST).strftime("%m-%d %H:%M")
                         except Exception:
                             pub_date_jst = getattr(entry, 'published', '')
                     elif hasattr(entry, 'published'):
                         pub_date_jst = entry.published
 
+                    # 文字数を制限（200文字以内）
+                    description = getattr(entry, 'summary', '')
+                    if description and len(description) > 200:
+                        description = description[:197] + "..."
+
                     all_items.append({
                         'title': getattr(entry, 'title', ''),
-                        'description': getattr(entry, 'summary', ''),
+                        'description': description,
                         'link': getattr(entry, 'link', ''),
                         'source': feed["name"],
                         'pub_date': pub_date_jst
@@ -1516,15 +1524,20 @@ def update_world_news():
                 print(f"⚠️ RSS Fetch Error ({feed['name']}): {e}")
 
         if not all_items:
-            return
+            return False, "RSSフィードからニュースを取得できませんでした。ネットワーク接続を確認してください。"
 
         client = get_genai_client()
         if not client:
-            return
+            return False, "Gemini APIクライアントの初期化に失敗しました。APIキーが設定されているか確認してください。"
 
-        # 重複排除のみ行い、件数は絞らずに全件をGeminiに渡す
+        # 重複排除
         unique_items = list({item['link']: item for item in all_items}.values())
-        news_text = "\n".join([f"- [{item['source']}] {item['title']} (PubDate: {item.get('pub_date')}): {item['description']} ({item['link']})" for item in unique_items])
+        
+        # さらにトークン節約のため、全体で80件程度に絞る（多様性を維持しつつ）
+        if len(unique_items) > 80:
+            unique_items = unique_items[:80]
+            
+        news_text = "\n".join([f"- [{item['source']}] {item['title']} ({item.get('pub_date')}): {item['description']} ({item['link']})" for item in unique_items])
         
         # 過去3回分の選出記事タイトルを取得して、重複を避ける
         prev_articles_text = "なし"
@@ -1608,8 +1621,10 @@ def update_world_news():
                 json.dump(history, f, ensure_ascii=False, indent=2)
 
             print(f"✅ ニュースを更新しました: {file_path}")
+            return True, "ニュースを更新しました"
         except Exception as e:
             print(f"⚠️ Gemini News Update Error: {e}")
+            return False, f"Gemini APIによる生成に失敗しました: {str(e)}"
 
 class PasswordResetToken(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -2273,6 +2288,8 @@ def check_memory_and_cleanup():
 
 app.config['SECRET_KEY'] = 'your_secret_key_here_please_change_this_in_production'
 basedir = os.path.abspath(os.path.dirname(__file__))
+# .envを絶対パスで読み込む
+load_dotenv(os.path.join(basedir, '.env'))
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['PERMANENT_SESSION_LIFETIME'] = 3600 * 24 * 7
 
@@ -7740,15 +7757,19 @@ def admin_update_news():
         # 更新前のタイムスタンプを記録
         old_mtime = os.path.getmtime(file_path) if os.path.exists(file_path) else None
 
-        update_world_news()
+        # update_world_news は (success, message) を返すように変更
+        success, message = update_world_news()
+
+        if not success:
+            return jsonify({'status': 'error', 'message': message})
 
         # 更新後にファイルが実際に更新されたか確認
         if not os.path.exists(file_path):
-            return jsonify({'status': 'error', 'message': 'ニュースデータの生成に失敗しました。Gemini APIキーやネットワーク接続を確認してください。'})
+            return jsonify({'status': 'error', 'message': 'ニュースデータのファイル生成に失敗しました。'})
 
         new_mtime = os.path.getmtime(file_path)
         if old_mtime is not None and new_mtime == old_mtime:
-            return jsonify({'status': 'error', 'message': 'ニュースデータが更新されませんでした。Gemini APIキーやRSSフィードの取得状況を確認してください。'})
+            return jsonify({'status': 'error', 'message': 'ニュースデータファイルの内容が更新されませんでした（同一内容）。'})
 
         # 更新後の最終更新日時を取得
         updated_at = None
@@ -7757,7 +7778,7 @@ def admin_update_news():
             if 'updated_at' in data:
                 dt = datetime.fromisoformat(data['updated_at'])
                 updated_at = dt.strftime('%Y年%m月%d日 %H:%M')
-        return jsonify({'status': 'success', 'message': 'ニュースを更新しました', 'updated_at': updated_at})
+        return jsonify({'status': 'success', 'message': message, 'updated_at': updated_at})
     except Exception as e:
         import traceback
         traceback.print_exc()
