@@ -1451,6 +1451,7 @@ class ArticleSchema(BaseModel):
 class OtherTopicSchema(BaseModel):
     title: str = Field(description="ニュースのタイトル（必ず日本語に翻訳してください）")
     url: str = Field(description="出典URL")
+    source: str = Field(description="出典メディア名（日本語翻訳、例: BBCニュース）")
 
 class NewsResponseSchema(BaseModel):
     articles: list[ArticleSchema] = Field(description="厳選された3つのニュース記事")
@@ -1544,7 +1545,7 @@ def update_world_news():
 
 **構成の指示:**
 1. **厳選記事 (articles)**: 最も重要なものを**厳密に3つ**選び、詳細な解説を作成してください。
-2. **その他の注目トピック (other_topics)**: 次点で興味深いものを**厳密に6つ**選び、タイトル、URL、出典メディア名をリストアップしてください。**特定のメディアに偏らず、できるだけ多様な出典（NHK, Nikkei, BBC, Guardian等）からバランスよく選出してください。**
+2. **その他の注目トピック (other_topics)**: 次点で興味深いものを**厳密に６個**選び、タイトル、URL、出典メディア名をリストアップしてください。**特定のメディアに偏らず、できるだけ多様な出典（NHK, Nikkei, BBC, Guardian等）からバランスよく選出してください。** **重要: 各トピックのsourceフィールドには必ず出典メディア名（例: BBCニュース、ガーディアン、NHK等）を含めてください。空にしないでください。**
 
 **選出・要約のガイドライン（最優先）:**
     1. **事実の正確性**: あなたの事前学習知識よりも、**提供されたニュースリストのテキスト内容を絶対的に優先**してください。人名、役職、現状について、リストと矛盾する推測や古い情報を入れないでください。
@@ -1553,7 +1554,8 @@ def update_world_news():
        - 過去3回の記事タイトル: {prev_articles_text}
        - 同じ問題（例：イラン情勢）に大きな進展がない限り、別の地域や異なる歴史テーマを優先してください。
     4. **翻訳の徹底**: 記事のタイトルは、日本の高校生が理解しやすい自然な日本語に必ず翻訳してください。
-    5. **地域の均衡**: 特定の地域（欧米など）に偏らず、グローバルな視点（中東、アフリカ、アジア等）を含めてください。
+    5. **現代社会の理解**: 単なるニュースではなく「教科書の知識が現在の世界を理解するレンズになる」ことが実感できる内容にしてください。
+    6. **地域バランス**: 欧米、アジア、中東、アフリカなど、地域が偏らないよう配慮してください。
 
 ニュースリスト:
 {news_text}
@@ -1581,6 +1583,14 @@ def update_world_news():
             os.makedirs(data_dir, exist_ok=True)
             file_path = os.path.join(data_dir, 'featured_article.json')
             with open(file_path, 'w', encoding='utf-8') as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+
+            # 日付別アーカイブとして保存
+            archive_dir = os.path.join(data_dir, 'news_archive')
+            os.makedirs(archive_dir, exist_ok=True)
+            archive_date = datetime.now(JST).strftime('%Y-%m-%d')
+            archive_path = os.path.join(archive_dir, f'{archive_date}.json')
+            with open(archive_path, 'w', encoding='utf-8') as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
 
             # 過去3回分の記事タイトル履歴を更新
@@ -7594,6 +7604,119 @@ def get_news_data_api():
         return jsonify(news_data)
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/news/archive')
+def news_archive_list():
+    """ニュースアーカイブ一覧（ページネーション付き）"""
+    context = get_template_context()
+    archive_dir = os.path.join(basedir, 'data', 'news_archive')
+
+    # アーカイブファイル一覧を取得（新しい順）
+    archives = []
+    if os.path.isdir(archive_dir):
+        for fname in sorted(os.listdir(archive_dir), reverse=True):
+            if fname.endswith('.json'):
+                date_str = fname.replace('.json', '')
+                try:
+                    d = datetime.strptime(date_str, '%Y-%m-%d').date()
+                    fpath = os.path.join(archive_dir, fname)
+                    with open(fpath, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                    archives.append({
+                        'date': d,
+                        'total_processed': data.get('total_processed', 0)
+                    })
+                except Exception:
+                    pass
+
+    # 簡易ページネーション
+    page = request.args.get('page', 1, type=int)
+    per_page = 20
+    total = len(archives)
+    total_pages = max(1, math.ceil(total / per_page))
+    page = max(1, min(page, total_pages))
+    start = (page - 1) * per_page
+    items = archives[start:start + per_page]
+
+    class Pagination:
+        pass
+    pagination = Pagination()
+    pagination.items = items
+    pagination.page = page
+    pagination.pages = total_pages
+    pagination.has_prev = page > 1
+    pagination.has_next = page < total_pages
+    pagination.prev_num = page - 1
+    pagination.next_num = page + 1
+
+    return render_template('news_archive_list.html', pagination=pagination, **context)
+
+
+@app.route('/news/archive/<date_str>')
+def news_archive_detail(date_str):
+    """特定日のニュースアーカイブ詳細"""
+    context = get_template_context()
+    archive_path = os.path.join(basedir, 'data', 'news_archive', f'{date_str}.json')
+    if not os.path.exists(archive_path):
+        return render_template('news_archive_detail.html', news_data=None, date_str=date_str, **context)
+
+    try:
+        with open(archive_path, 'r', encoding='utf-8') as f:
+            news_data = json.load(f)
+        if 'updated_at' in news_data:
+            dt = datetime.fromisoformat(news_data['updated_at'])
+            news_data['display_date'] = dt.strftime('%Y年%m月%d日 %H:%M')
+    except Exception:
+        news_data = None
+
+    return render_template('news_archive_detail.html', news_data=news_data, date_str=date_str, **context)
+
+
+@app.route('/news/archive/search')
+def news_archive_search():
+    """ニュースアーカイブのキーワード検索"""
+    context = get_template_context()
+    query = request.args.get('q', '').strip()
+    results = []
+
+    if query:
+        archive_dir = os.path.join(basedir, 'data', 'news_archive')
+        if os.path.isdir(archive_dir):
+            for fname in sorted(os.listdir(archive_dir), reverse=True):
+                if not fname.endswith('.json'):
+                    continue
+                date_str = fname.replace('.json', '')
+                try:
+                    fpath = os.path.join(archive_dir, fname)
+                    with open(fpath, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                    d = datetime.strptime(date_str, '%Y-%m-%d').date()
+                    dt = datetime.fromisoformat(data['updated_at']) if 'updated_at' in data else None
+                    display_date = dt.strftime('%Y年%m月%d日') if dt else date_str
+
+                    matched_articles = []
+                    for article in data.get('articles', []):
+                        searchable = ' '.join([
+                            article.get('title', ''),
+                            article.get('summary', ''),
+                            article.get('significance', ''),
+                            ' '.join(article.get('keywords', []))
+                        ]).lower()
+                        if query.lower() in searchable:
+                            matched_articles.append(article)
+
+                    if matched_articles:
+                        results.append({
+                            'date': d,
+                            'date_str': date_str,
+                            'display_date': display_date,
+                            'articles': matched_articles
+                        })
+                except Exception:
+                    pass
+
+    return render_template('news_archive_search.html', query=query, results=results, **context)
+
 
 @app.route('/admin/update_news_now', methods=['POST'])
 def admin_update_news():

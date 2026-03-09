@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{% block title %}{{ date_str }} のニュース - {{ app_name }}{% endblock %}
+
+{% block content %}
+<style>
+    html, body { overflow-x: hidden; }
+    .clickable-card { cursor: pointer; }
+    .accordion-content {
+        max-height: 0; overflow: hidden;
+        transition: max-height 0.4s cubic-bezier(0.4,0,0.2,1), opacity 0.3s ease;
+        opacity: 0;
+    }
+    .news-card.expanded .accordion-content { max-height: 1000px; opacity: 1; margin-top: 1rem; }
+    .accordion-hint { transition: opacity 0.3s ease; }
+    .news-card.expanded .accordion-hint { opacity: 0.7; }
+    .news-card {
+        background: #fff; border-radius: 1.25rem;
+        transition: transform 0.3s ease, box-shadow 0.3s ease, background-color 0.3s ease;
+    }
+    .news-card:hover { transform: translateY(-3px); box-shadow: 0 10px 25px rgba(0,0,0,0.06)!important; background-color: #fcfdfe; }
+    .news-card.expanded:hover { transform: none; }
+    .bg-soft-primary { background-color: rgba(59,130,246,0.1); }
+    .bg-light-blue { background-color: #f8fafc; }
+    .leading-relaxed { line-height: 1.7; }
+    .shadow-xs { box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+    .other-topic-card { transition: all 0.2s ease; }
+    .other-topic-card:hover { background-color: #f8fafc!important; border-color: #3b82f6!important; transform: translateX(5px); }
+</style>
+
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-10 col-lg-9">
+            <!-- ヘッダー -->
+            <div class="d-flex align-items-center justify-content-between mb-4">
+                <h1 class="h3 fw-bold mb-0 text-truncate me-2">
+                    <i class="fas fa-newspaper me-2 text-muted"></i>{{ date_str }}
+                </h1>
+                <a href="{{ url_for('news_archive_list') }}"
+                   class="btn btn-sm btn-outline-secondary rounded-pill px-3 flex-shrink-0">
+                    <i class="fas fa-arrow-left me-1 d-none d-md-inline"></i>一覧に戻る
+                </a>
+            </div>
+
+            {% if news_data and news_data.articles %}
+            <div class="header-meta mb-4 text-muted small d-flex align-items-center flex-wrap gap-2">
+                <span class="d-inline-flex align-items-center">
+                    <i class="far fa-clock me-1"></i>更新: {{ news_data.display_date if news_data.display_date else date_str }}
+                </span>
+                {% if news_data.total_processed %}
+                <span class="badge bg-light text-muted border fw-normal px-2 py-1 rounded-pill">
+                    {{ news_data.total_processed }}件の記事から厳選
+                </span>
+                {% endif %}
+            </div>
+
+            <!-- 厳選記事 -->
+            <div class="news-feed">
+                {% for article in news_data.articles %}
+                <div class="news-card mb-4 shadow-sm border-0 rounded-4 overflow-hidden clickable-card"
+                     onclick="toggleAccordion(this)">
+                    <div class="card-body p-4">
+                        <div class="d-flex align-items-center justify-content-between mb-3">
+                            <span class="badge bg-soft-primary text-primary px-3 py-2 rounded-pill fw-bold">
+                                {{ article.source or 'ニュース' }}
+                            </span>
+                            {% if article.created_at %}
+                            <small class="text-muted">
+                                <i class="far fa-calendar-alt me-1"></i>{{ article.created_at }}
+                            </small>
+                            {% endif %}
+                        </div>
+                        <h3 class="h4 fw-bold mb-2 text-dark">{{ article.title }}</h3>
+
+                        {% if article.keywords %}
+                        <div class="mb-3 px-1">
+                            {% for keyword in article.keywords %}
+                            <span class="badge bg-white text-muted border me-1 mb-1 fw-normal">#{{ keyword }}</span>
+                            {% endfor %}
+                            <span class="ms-2 text-primary small accordion-hint">
+                                <i class="fas fa-chevron-down ms-1"></i> 詳しく見る
+                            </span>
+                        </div>
+                        {% endif %}
+
+                        <div class="accordion-content">
+                            <div class="news-summary p-3 rounded-3 bg-light-blue mb-3 mt-3">
+                                <p class="mb-0 text-secondary leading-relaxed">{{ article.summary }}</p>
+                            </div>
+                            <div class="educational-insight p-3 border-start border-4 border-info bg-white shadow-xs rounded-end-3 mb-3">
+                                <h4 class="h6 fw-bold text-info mb-2">
+                                    <i class="fas fa-lightbulb me-2"></i>学びのポイント
+                                </h4>
+                                <p class="mb-0 text-muted small">{{ article.significance }}</p>
+                            </div>
+                            <div class="text-end">
+                                <a href="{{ article.url }}" target="_blank" rel="noopener noreferrer"
+                                   class="btn btn-link text-decoration-none p-0 fw-bold text-primary"
+                                   onclick="event.stopPropagation()">
+                                    元の記事を読む <i class="fas fa-external-link-alt ms-1 small"></i>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            {% if news_data.other_topics %}
+            <div class="other-topics-section mt-5">
+                <div class="d-flex align-items-center mb-3">
+                    <div class="flex-grow-1 border-bottom me-3"></div>
+                    <h4 class="h6 fw-bold text-muted mb-0 text-uppercase" style="letter-spacing:0.1em;">その他の注目トピック</h4>
+                    <div class="flex-grow-1 border-bottom ms-3"></div>
+                </div>
+                <div class="row g-3">
+                    {% for topic in news_data.other_topics %}
+                    <div class="col-md-6">
+                        <a href="{{ topic.url }}" target="_blank" rel="noopener noreferrer"
+                           class="other-topic-card d-flex flex-column align-items-start p-3 rounded-3 text-decoration-none bg-white border border-light shadow-xs h-100">
+                            <div class="d-flex align-items-center mb-2">
+                                <span class="badge bg-light text-muted px-2 py-1 rounded-pill me-2" style="font-size:0.7rem;">
+                                    {{ topic.source or 'ニュース' }}
+                                </span>
+                                <i class="fas fa-external-link-alt text-muted" style="font-size:0.75rem;"></i>
+                            </div>
+                            <span class="text-dark small fw-medium">{{ topic.title }}</span>
+                        </a>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            {% else %}
+            <div class="alert bg-white shadow-sm text-center py-5 border-0 rounded-4">
+                <div class="mb-4">
+                    <i class="fas fa-archive fa-3x text-muted opacity-50"></i>
+                </div>
+                <h4 class="text-dark fw-bold">この日のアーカイブはありません</h4>
+                <p class="text-muted">データが見つかりませんでした。</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+function toggleAccordion(card) {
+    card.classList.toggle('expanded');
+    const hint = card.querySelector('.accordion-hint');
+    if (hint) {
+        if (card.classList.contains('expanded')) {
+            hint.innerHTML = '<i class="fas fa-chevron-up ms-1"></i> 閉じる';
+        } else {
+            hint.innerHTML = '<i class="fas fa-chevron-down ms-1"></i> 詳しく見る';
+        }
+    }
+}
+</script>
+{% endblock %}
