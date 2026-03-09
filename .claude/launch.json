@@ -1,0 +1,13 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "flask-dev",
+      "runtimeExecutable": "/Users/kitsukaasaki/.pyenv/versions/3.10.4/bin/python3",
+      "runtimeArgs": ["app.py"],
+      "port": 5000,
+      "autoPort": true,
+      "cwd": "/Users/kitsukaasaki/Desktop/SSWordbook"
+    }
+  ]
+}

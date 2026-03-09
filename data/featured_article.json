@@ -1,0 +1,83 @@
+{
+  "updated_at": "2026-03-10T00:50:19.865721+09:00",
+  "total_processed": 397,
+  "articles": [
+    {
+      "title": "G7、エネルギー供給支援で協調、原油価格高騰に対応",
+      "summary": "イラン情勢の緊迫化で原油価格が急騰する中、G7財務相会議が開かれ、石油備蓄の協調放出を含む対応で合意しました。原油価格の高騰は、世界経済に大きな影響を与える可能性があり、過去のオイルショックのように、インフレや景気後退を引き起こす懸念が高まっています。",
+      "significance": "原油価格の変動は、世界の政治・経済に大きな影響を与えます。過去のオイルショック（1973年、1979年）は、中東戦争やイラン革命などが原因で発生し、世界経済に深刻な影響を与えました。今回の原油価格高騰も、同様のリスクを孕んでいます。エネルギー資源の安定確保は、国家の安全保障にも関わる重要な課題です。",
+      "keywords": [
+        "オイルショック",
+        "OPEC",
+        "エネルギー安全保障",
+        "インフレ",
+        "地政学リスク"
+      ],
+      "url": "http://www3.nhk.or.jp/news/html/20260309/k10015071241000.html",
+      "source": "NHK",
+      "created_at": "3月9日 23:41"
+    },
+    {
+      "title": "ジンバブエの英雄の子孫、略奪された頭蓋骨の返還を英国に要求",
+      "summary": "ジンバブエの独立戦争の英雄たちの頭蓋骨が、植民地時代のイギリス軍によって略奪され、ロンドンの博物館に保管されているとされています。子孫たちは、先祖の尊厳を取り戻すため、頭蓋骨の返還を強く求めています。植民地支配の歴史は、現代においても人種差別や文化的な不正義として、深刻な影響を与え続けています。",
+      "significance": "植民地支配は、多くの国々で文化の破壊や資源の略奪を引き起こしました。現在でも、植民地時代の遺産（人種差別、貧困、紛争など）が残っており、その影響は深刻です。過去の過ちを認識し、歴史から学び、未来に向けて公正な社会を築くことが重要です。",
+      "keywords": [
+        "植民地主義",
+        "文化遺産",
+        "人種差別",
+        "帝国主義",
+        "歴史認識"
+      ],
+      "url": "https://www.theguardian.com/world/2026/mar/07/descendants-of-zimbabwe-resistance-heroes-urge-uk-to-locate-looted-skulls",
+      "source": "ガーディアン",
+      "created_at": "3月8日 02:00"
+    },
+    {
+      "title": "ネパールの元ラッパー政治家、圧勝で首相に",
+      "summary": "ネパールで、元ラッパーの政治家バレン・シャー氏が率いる新党が、前回の政府を倒したZ世代主導の抗議運動後初の選挙で圧勝しました。シャー氏は汚職撲滅などを訴え、若者を中心に幅広い支持を集めています。既成政治への不満と新しいリーダーへの期待が、政治の潮流を変えつつあります。",
+      "significance": "若者世代が政治参加を積極的に行うことで、社会に大きな変化をもたらす可能性があります。近年、世界各地で若者による社会運動が活発化しており、気候変動、人種差別、貧困などの問題に対する意識が高まっています。若者の声に耳を傾け、政治に反映させることが、より良い社会を築く上で不可欠です。",
+      "keywords": [
+        "Z世代",
+        "ポピュリズム",
+        "社会運動",
+        "政治参加",
+        "民主主義"
+      ],
+      "url": "https://www.theguardian.com/world/2026/mar/08/ex-rapper-balendra-shah-nepal-pm-landslide-election-win",
+      "source": "ガーディアン",
+      "created_at": "3月8日 22:47"
+    }
+  ],
+  "other_topics": [
+    {
+      "title": "G7、エネルギー供給支援で協調、原油価格高騰に対応",
+      "url": "https://www.bbc.com/news/articles/c79542n0grwo",
+      "source": "BBCニュース"
+    },
+    {
+      "title": "イラン女子サッカーチームのメンバー5名がオーストラリアに亡命申請か",
+      "url": "https://www.theguardian.com/football/2026/mar/09/iran-women-football-team-australia-asian-cup",
+      "source": "ガーディアン"
+    },
+    {
+      "title": "イラン戦争で原油価格が1バレル100ドル以上に高騰",
+      "url": "https://www.theguardian.com/business/2026/mar/09/iran-war-drives-oil-price-above-100-a-barrel-for-first-time-since-2022",
+      "source": "ガーディアン"
+    },
+    {
+      "title": "米国、イランの学校の隣の基地をトマホークミサイルで攻撃",
+      "url": "https://www.theguardian.com/world/2026/mar/09/video-shows-us-tomahawk-missile-hit-base-next-bombed-iranian-school",
+      "source": "ガーディアン"
+    },
+    {
+      "title": "イランの最高指導者にアリ・ハメネイ師の息子モジタバ師が選出",
+      "url": "https://www.theguardian.com/world/2026/mar/08/ali-khameneis-son-mojtaba-chosen-as-irans-new-supreme-leader",
+      "source": "ガーディアン"
+    },
+    {
+      "title": "トランプ氏、ラテンアメリカの指導者と「アメリカの盾」サミットを開催",
+      "url": "https://www.theguardian.com/us-news/2026/mar/07/trump-shield-of-americas-summit",
+      "source": "ガーディアン"
+    }
+  ]
+}

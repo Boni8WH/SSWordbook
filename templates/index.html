@@ -1,0 +1,2389 @@
+{% extends "base.html" %}
+{% block title %}{{ app_name }}{% endblock %}
+
+{% block head_extra %}
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet">
+<style>
+    /* 共通タイポグラフィ＆高級感 */
+    .premium-title {
+        color: #1a1a2e;
+        letter-spacing: 0.1em;
+        text-shadow: 2px 2px 0px rgba(212, 175, 55, 0.1);
+    }
+
+    .premium-text {}
+
+    /* グローバル余白の調整 (Indexページ限定) */
+    @media (min-width: 992px) {
+        body>.container.mt-4 {
+            margin-top: 0.75rem !important;
+        }
+
+        .navbar.mb-4 {
+            margin-bottom: 0.5rem !important;
+            padding-top: 0.25rem !important;
+            padding-bottom: 0.25rem !important;
+        }
+
+        .footer.mt-5 {
+            margin-top: 0.75rem !important;
+            padding-top: 0.5rem !important;
+            padding-bottom: 0.5rem !important;
+        }
+    }
+
+    /* セレクションエリアのカード化 */
+    .controls-area {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        border-radius: 20px;
+        padding: 12px 25px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.8);
+        margin-bottom: 8px;
+    }
+
+    /* セクション見出し */
+    .section-header-styled {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        width: 100%;
+        border-bottom: 2px solid #f0f2f5;
+        margin-bottom: 12px;
+        padding-bottom: 6px;
+    }
+
+    .section-header-styled h3 {
+        margin: 0;
+        border: none;
+        padding: 0;
+        color: #2c3e50;
+        font-size: 1.4rem;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .section-header-styled h3 i {
+        color: #667eea;
+    }
+
+    /* 克服モード: 燃えるフォント＆アニメーション */
+    .overcome-title {
+        font-family: 'Dela Gothic One', 'Noto Sans JP', sans-serif;
+        background: linear-gradient(90deg,
+                #f5a623 0%, #e74c3c 30%, #c0392b 60%, #f5a623 100%);
+        background-size: 200% auto;
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        font-size: 1.5rem;
+        letter-spacing: 0.03em;
+        animation: overcomeShimmer 2.4s linear infinite,
+            overcomePopIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    }
+
+    @keyframes overcomeShimmer {
+        0% {
+            background-position: 0% center;
+        }
+
+        100% {
+            background-position: 200% center;
+        }
+    }
+
+    @keyframes overcomePopIn {
+        0% {
+            opacity: 0;
+            transform: scale(0.6) rotate(-4deg);
+        }
+
+        60% {
+            transform: scale(1.14) rotate(1.5deg);
+        }
+
+        100% {
+            opacity: 1;
+            transform: scale(1) rotate(0deg);
+        }
+    }
+
+
+
+    /* 出題数ボタン（ピル型） */
+    /* セグメンテッドコントロール */
+    .question-count-buttons {
+        display: flex;
+        align-items: stretch;
+        background: #f1f3f7;
+        border-radius: 12px;
+        padding: 4px;
+        margin-bottom: 12px;
+        gap: 2px;
+    }
+
+    .count-btn {
+        flex: 1;
+        padding: 7px 6px;
+        border-radius: 9px;
+        background: transparent;
+        border: none;
+        color: #718096;
+        font-weight: 600;
+        font-size: 0.85rem;
+        cursor: pointer;
+        transition: all 0.22s ease;
+        text-align: center;
+        white-space: nowrap;
+    }
+
+    .count-btn:hover {
+        background: rgba(255, 255, 255, 0.7);
+        color: #2d3748;
+    }
+
+    .count-btn.active {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+        box-shadow: 0 2px 8px rgba(102, 126, 234, 0.35);
+    }
+
+    /* フィルター（ボタンスタイル） */
+    .filter-buttons {
+        display: flex;
+        flex-wrap: nowrap;
+        /* 一段に並べる */
+        gap: 10px;
+        margin-bottom: 12px;
+        justify-content: center;
+        overflow-x: auto;
+        /* 画面が狭い場合はスクロール可能にする */
+        padding-bottom: 5px;
+        /* スクロールバー用の余白 */
+    }
+
+    .filter-toggle {
+        display: inline-block;
+    }
+
+    .filter-checkbox {
+        display: none;
+    }
+
+    .filter-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 16px;
+        border-radius: 25px;
+        background: #fff;
+        border: 1px solid #edf2f7;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        color: #4a5568;
+        font-size: 0.9rem;
+        /* 少し小さくして1行に収まりやすくする */
+        white-space: nowrap;
+        /* テキストの折り返しを防ぐ */
+        user-select: none;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.02);
+    }
+
+    .filter-btn:hover {
+        background: #fcfcfc;
+        border-color: #cbd5e0;
+    }
+
+    .filter-checkbox:checked+.filter-btn {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+        border-color: transparent;
+        box-shadow: 0 4px 10px rgba(102, 126, 234, 0.3);
+    }
+
+    .filter-checkbox:checked+.filter-btn i {
+        color: white !important;
+    }
+
+    .filter-btn.disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    /* 出題範囲の章リスト（カード型） */
+    .chapters-container {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+        max-height: 45vh;
+        /* スマホでボタンが押し出されないように制限 */
+        overflow-y: auto;
+        padding-right: 5px;
+        /* スクロールバー用の余白 */
+    }
+
+    .chapter-item {
+        background: white;
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+        overflow: hidden;
+        transition: all 0.3s ease;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+    }
+
+    .chapter-item:hover {
+        border-color: #a0aec0;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    }
+
+    /* 選択不可状態の視覚効果 */
+    .dimmed {
+        opacity: 0.35;
+        pointer-events: none;
+        filter: grayscale(0.5);
+        transition: all 0.4s ease;
+    }
+
+
+    .chapter-header {
+        padding: 10px 18px;
+        background: #fcfcfc;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        cursor: pointer;
+        border-bottom: 1px solid transparent;
+    }
+
+    .chapter-item.active .chapter-header {
+        border-bottom-color: #e2e8f0;
+        background: #f8f9fa;
+    }
+
+    .chapter-title {
+        font-weight: 700;
+        font-size: 1.1rem;
+        color: #2d3748;
+    }
+
+    .chapter-options {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+    }
+
+    .select-all-chapter-btn {
+        background: rgba(102, 126, 234, 0.1);
+        color: #667eea;
+        border: none;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .select-all-chapter-btn:hover {
+        background: rgba(102, 126, 234, 0.2);
+    }
+
+    .unit-list {
+        padding: 0 20px;
+        background: white;
+    }
+
+    .unit-item {
+        padding: 12px 0;
+        border-bottom: 1px solid #f0f2f5;
+        display: flex;
+        align-items: center;
+    }
+
+    .unit-item:last-child {
+        border-bottom: none;
+    }
+
+    .unit-item input[type="checkbox"] {
+        width: 18px;
+        height: 18px;
+        margin-right: 12px;
+        cursor: pointer;
+        accent-color: #667eea;
+    }
+
+    .unit-item label {
+        color: #4a5568;
+        cursor: pointer;
+        flex: 1;
+        font-size: 0.95rem;
+    }
+
+    /* 学習開始ボタン（左パネル下部配置用） */
+    .btn-start {
+        background: linear-gradient(135deg, #3498db, #2980b9);
+        color: white;
+        border: none;
+        border-radius: 16px;
+        padding: 14px 20px !important;
+        font-size: 1.05rem;
+        font-weight: 700;
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        box-shadow: 0 6px 18px rgba(52, 152, 219, 0.35);
+        letter-spacing: 0.04em;
+        transition: all 0.3s ease;
+    }
+
+    .btn-start:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 25px rgba(52, 152, 219, 0.45);
+        color: white;
+    }
+
+    /* ナビゲーションリンク群（グリッドカード型） */
+    .nav-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+        gap: 12px;
+        margin-top: 25px;
+        padding-top: 20px;
+        border-top: 1px solid #edf2f7;
+    }
+
+    .nav-card {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+        padding: 10px 8px;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: white;
+        text-decoration: none;
+        cursor: pointer;
+        border: none;
+        transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12);
+        letter-spacing: 0.02em;
+    }
+
+    .nav-card i {
+        font-size: 1.1rem;
+        opacity: 0.95;
+    }
+
+    .nav-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+        color: white;
+    }
+
+    .nav-card.daily {
+        background: linear-gradient(135deg, #2ecc71, #27ae60);
+        box-shadow: 0 4px 12px rgba(46, 204, 113, 0.35);
+    }
+
+    .nav-card.weak {
+        background: linear-gradient(135deg, #e74c3c, #c0392b);
+        box-shadow: 0 4px 12px rgba(231, 76, 60, 0.35);
+    }
+
+    .nav-card.essay {
+        background: linear-gradient(135deg, #3498db, #2980b9);
+        box-shadow: 0 4px 12px rgba(52, 152, 219, 0.35);
+    }
+
+    .nav-card.map {
+        background: linear-gradient(135deg, #00b894, #00cec9);
+        box-shadow: 0 4px 12px rgba(0, 184, 148, 0.35);
+    }
+
+    .nav-card.chrono {
+        background: linear-gradient(135deg, #f39c12, #e67e22, #d35400);
+        box-shadow: 0 4px 12px rgba(230, 126, 34, 0.35);
+    }
+
+    .nav-card.columns {
+        background: linear-gradient(135deg, #8e44ad, #9b59b6, #d980fa);
+        box-shadow: 0 4px 12px rgba(155, 89, 182, 0.35);
+    }
+
+    .nav-card.tips {
+        background: linear-gradient(135deg, #f1c40f, #f39c12, #e67e22);
+        box-shadow: 0 4px 12px rgba(241, 196, 15, 0.35);
+    }
+
+    /* ── カルーセル ── */
+    .nav-carousel {
+        position: relative;
+        margin-top: 20px;
+        padding-top: 20px;
+        border-top: 1px solid #edf2f7;
+        overflow: hidden;          /* トラックが親を押し広げないように */
+    }
+
+    /* グリッド子要素がオーバーフローで列を壊さないようにする */
+    .question-count-and-auth {
+        min-width: 0;
+    }
+
+    .nav-carousel-track {
+        display: flex;
+        overflow-x: auto;
+        scroll-snap-type: x mandatory;
+        gap: 14px;
+        padding: 18px calc(50% - 55px);
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        scroll-behavior: auto;
+    }
+
+    .nav-carousel-track::-webkit-scrollbar {
+        display: none;
+    }
+
+    .nav-carousel .nav-card {
+        flex-shrink: 0;
+        width: 110px;
+        min-height: 80px;
+        scroll-snap-align: center;
+        transition: transform 0.25s ease, opacity 0.25s ease, box-shadow 0.25s ease;
+        will-change: transform, opacity;
+    }
+
+    .nav-carousel-arrow {
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        border: none;
+        background: rgba(255, 255, 255, 0.85);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        font-size: 1.1rem;
+        color: #555;
+        cursor: pointer;
+        z-index: 2;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: opacity 0.2s, background 0.2s;
+        opacity: 0.7;
+    }
+
+    .nav-carousel-arrow:hover {
+        opacity: 1;
+        background: #fff;
+    }
+
+    .nav-carousel-arrow.left {
+        left: 4px;
+    }
+
+    .nav-carousel-arrow.right {
+        right: 4px;
+    }
+
+    /* カードのガラス風リデザイン */
+    .card {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        border-radius: 20px;
+        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.8);
+        padding: 40px 30px;
+        margin-bottom: 25px;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: linear-gradient(90deg, #667eea, #764ba2);
+    }
+
+    .question-content p {
+        font-size: 1.3rem;
+        color: #2d3748;
+        line-height: 1.6;
+    }
+
+    .answer-content p {
+        font-size: 1.4rem;
+        font-weight: 700;
+        color: #e74c3c;
+        margin-top: 20px;
+        padding-top: 20px;
+        border-top: 1px dashed #cbd5e0;
+        animation: fadeIn 0.5s ease;
+    }
+
+    /* 答えを隠す間も高さを確保してカードサイズを固定 */
+    #answer.hidden {
+        display: block !important;
+        visibility: hidden;
+        opacity: 0;
+    }
+
+    #answer {
+        transition: opacity 0.4s ease;
+    }
+
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    /* 解答ボタン群をスタイリッシュに */
+    .primary-button {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+        border: none;
+        border-radius: 30px;
+        padding: 12px 24px;
+        font-weight: 600;
+        letter-spacing: 0.1em;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        transition: all 0.3s ease;
+    }
+
+    .primary-button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(102, 126, 234, 0.6);
+    }
+
+    .correct-button {
+        background: linear-gradient(135deg, #2ecc71, #27ae60);
+        color: white;
+        border-radius: 30px;
+        border: none;
+        box-shadow: 0 4px 15px rgba(46, 204, 113, 0.4);
+    }
+
+    .incorrect-button {
+        background: linear-gradient(135deg, #e74c3c, #c0392b);
+        color: white;
+        border-radius: 30px;
+        border: none;
+        box-shadow: 0 4px 15px rgba(231, 76, 60, 0.4);
+    }
+
+    /* PC: 左カラムのカルーセルを表示、スマホ用は非表示 */
+    #navCarouselDesktop {
+        display: block;
+    }
+
+    #navCarouselMobile {
+        display: none;
+    }
+
+    /* スマホ: 左カラムのカルーセルを非表示、チャプター下を表示 */
+    @media (max-width: 767px) {
+        #navCarouselDesktop {
+            display: none;
+        }
+
+        #navCarouselMobile {
+            display: block;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="selection-area">
+    <!-- RPG Trigger Banner -->
+    <div id="rpgTriggerBanner" class="rpg-banner hidden">
+        <div class="rpg-banner-content" onclick="openRpgIntro()">
+            <div class="distortion-void">
+                <div class="pulse-ring"></div>
+                <div class="void-core"></div>
+                <div class="void-aura"></div>
+            </div>
+            <div class="text-container">
+                <span class="alert-label">WARNING</span>
+                <span class="distortion-text">時空の歪みを検知しました</span>
+            </div>
+            <button class="btn-rpg-start">修正ミッションへ</button>
+        </div>
+    </div>
+
+    <div class="controls-area">
+
+        <div class="question-count-and-auth">
+            <div class="question-count-selection">
+                <div class="section-header-styled">
+                    <h3><i class="fas fa-layer-group" id="rangeSelectionIcon"></i><span
+                            id="rangeSelectionTitleText">出題数を選択</span>
+                        <span id="selectionTotalCount"
+                            style="font-size: 0.6em; color: #7f8c8d; font-weight: normal; margin-left: 10px;"></span>
+                    </h3>
+                    <button id="resetSelectionButton"
+                        class="btn btn-sm btn-light text-secondary rounded-pill px-3 shadow-sm"
+                        style="font-size: 0.85rem; background: #fff; border: 1px solid #edf2f7;">
+                        <i class="fas fa-undo-alt"></i> リセット
+                    </button>
+                </div>
+                <!-- 出題数選択ボタン -->
+                <div class="question-count-buttons">
+                    <span class="count-btn active" data-value="0">10問</span>
+                    <span class="count-btn" data-value="1">20問</span>
+                    <span class="count-btn" data-value="2">50問</span>
+                    <span class="count-btn" data-value="3">全問</span>
+                </div>
+                <!-- オプションボタン -->
+                <div class="premium-filters">
+                    <div class="filter-toggle">
+                        <input type="checkbox" id="incorrectOnlyCheckbox2" class="filter-checkbox" {% if not
+                            session.get('user_id') %}disabled{% endif %}>
+                        <label for="incorrectOnlyCheckbox2"
+                            class="filter-btn {% if not session.get('user_id') %}disabled{% endif %}">
+                            <i class="fas fa-crosshairs text-danger"></i> 克服
+                        </label>
+                    </div>
+                    <div class="filter-toggle">
+                        <input type="checkbox" id="unsolvedOnlyCheckbox" class="filter-checkbox" {% if not
+                            session.get('user_id') %}disabled{% endif %}>
+                        <label for="unsolvedOnlyCheckbox"
+                            class="filter-btn {% if not session.get('user_id') %}disabled{% endif %}">
+                            <i class="fas fa-question-circle text-primary"></i> 未解答
+                        </label>
+                    </div>
+                    <div class="filter-toggle">
+                        <input type="checkbox" id="unmasteredOnlyCheckbox" class="filter-checkbox" {% if not
+                            session.get('user_id') %}disabled{% endif %}>
+                        <label for="unmasteredOnlyCheckbox"
+                            class="filter-btn {% if not session.get('user_id') %}disabled{% endif %}">
+                            <i class="fas fa-star-half-alt text-warning"></i> 未マスター
+                        </label>
+                    </div>
+                </div>
+                <!-- 隠しラジオ（既存JS互換用） -->
+                <div style="display: none;">
+                    <input type="radio" name="questionCount" value="10" id="qc10" checked>
+                    <input type="radio" name="questionCount" value="20" id="qc20">
+                    <input type="radio" name="questionCount" value="50" id="qc50">
+                    <input type="radio" name="questionCount" value="all" id="qcAll">
+                    <input type="radio" name="questionCount" value="incorrectOnly" id="incorrectOnlyRadio">
+                </div>
+            </div>
+
+            <!-- ナビカルーセル（PC: 左パネルのフィルター下に表示） -->
+            <div id="navCarouselDesktop" class="nav-carousel">
+                <div class="nav-carousel-track">
+                    <button id="dailyQuizButton" class="nav-card daily">
+                        <i class="fas fa-stopwatch"></i>
+                        <span>今日の10問</span>
+                    </button>
+                    <a href="{{ url_for('weak_problems_page') }}" class="nav-card weak" {% if not session.get('user_id') %}style="display: none;"{% endif %}>
+                        <i class="fas fa-crosshairs"></i>
+                        <span>苦手問題</span>
+                    </a>
+                    <a href="{{ url_for('essay_index') }}" class="nav-card essay">
+                        <i class="fas fa-edit"></i>
+                        <span>論述問題集</span>
+                    </a>
+                    <a href="{{ url_for('map_quiz_index') }}" class="nav-card map">
+                        <i class="fas fa-globe-americas"></i>
+                        <span>地図の深淵</span>
+                    </a>
+                    <a href="{{ url_for('chronological_index') }}" class="nav-card chrono">
+                        <i class="fas fa-hourglass-half"></i>
+                        <span>刻の系譜</span>
+                    </a>
+                    <a href="{{ url_for('columns_page') }}" class="nav-card columns">
+                        <i class="fas fa-book-open"></i>
+                        <span>コラム集</span>
+                    </a>
+                    <a href="{{ url_for('tips_page') }}" class="nav-card tips">
+                        <i class="fas fa-lightbulb"></i>
+                        <span>学習Tips</span>
+                    </a>
+                </div>
+                <button class="nav-carousel-arrow left" aria-label="前へ">&#8249;</button>
+                <button class="nav-carousel-arrow right" aria-label="次へ">&#8250;</button>
+            </div>
+        </div>
+
+        <div class="range-selection-area">
+            <div class="section-header-styled"
+                style="display: flex; justify-content: space-between; align-items: center;">
+                <h3 style="margin-bottom: 0;"><i class="fas fa-book-open"></i> 出題範囲</h3>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <button id="openSearchButton" class="btn btn-sm btn-light text-primary rounded-pill px-3 shadow-sm"
+                        style="background:#fff; border: 1px solid #edf2f7; white-space: nowrap;">
+                        <i class="fas fa-search"></i> 検索
+                    </button>
+                    <button id="startButton" class="btn btn-start"
+                        style="padding: 8px 20px !important; font-size: 1rem; border-radius: 20px; white-space: nowrap;">
+                        <i class="fas fa-play"></i> 開始
+                    </button>
+                </div>
+            </div>
+            <div class="chapters-container">
+                {% for chapter_num, chapter in chapter_data.items() %}
+                <div class="chapter-item" data-chapter-num="{{ chapter_num }}">
+                    <div class="chapter-header">
+                        <span class="chapter-title">{{ chapter.name }}</span>
+                        <div class="chapter-options">
+                            <button class="select-all-chapter-btn" data-chapter="{{ chapter_num }}"
+                                type="button">全て選択</button>
+                            <span class="toggle-icon">▶</span>
+                        </div>
+                    </div>
+                    <div class="unit-list">
+                        {% for unit_num, unit in chapter.units.items() %}
+                        {% if unit.enabled %}
+                        <div class="unit-item">
+                            <input type="checkbox" id="unit-{{ chapter_num }}-{{ unit_num }}" value="{{ unit_num }}"
+                                data-chapter="{{ chapter_num }}">
+                            <label for="unit-{{ chapter_num }}-{{ unit_num }}">
+                                {{ unit_num }}. {{ unit.categoryName }}
+                            </label>
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- ナビカルーセル（スマホ: チャプターリストの下に表示） -->
+    <div id="navCarouselMobile" class="nav-carousel">
+        <div class="nav-carousel-track">
+            <button id="dailyQuizButtonMobile" class="nav-card daily">
+                <i class="fas fa-stopwatch"></i>
+                <span>今日の10問</span>
+            </button>
+            <a href="{{ url_for('weak_problems_page') }}" class="nav-card weak" {% if not session.get('user_id') %}style="display: none;"{% endif %}>
+                <i class="fas fa-crosshairs"></i>
+                <span>苦手問題</span>
+            </a>
+            <a href="{{ url_for('essay_index') }}" class="nav-card essay">
+                <i class="fas fa-edit"></i>
+                <span>論述問題集</span>
+            </a>
+            <a href="{{ url_for('map_quiz_index') }}" class="nav-card map">
+                <i class="fas fa-globe-americas"></i>
+                <span>地図の深淵</span>
+            </a>
+            <a href="{{ url_for('chronological_index') }}" class="nav-card chrono">
+                <i class="fas fa-hourglass-half"></i>
+                <span>刻の系譜</span>
+            </a>
+            <a href="{{ url_for('columns_page') }}" class="nav-card columns">
+                <i class="fas fa-book-open"></i>
+                <span>コラム集</span>
+            </a>
+            <a href="{{ url_for('tips_page') }}" class="nav-card tips">
+                <i class="fas fa-lightbulb"></i>
+                <span>学習Tips</span>
+            </a>
+        </div>
+        <button class="nav-carousel-arrow left" aria-label="前へ">&#8249;</button>
+        <button class="nav-carousel-arrow right" aria-label="次へ">&#8250;</button>
+    </div>
+</section>
+
+<!-- 今日のコラム & AI厳選ニュース ウィジェット -->
+<div class="row g-3 mb-3 mt-1">
+    <!-- 今日のコラム -->
+    <div id="todaysColumnWidget" class="col-md-6" style="display:none;">
+        <a id="todaysColumnLink" href="/columns" class="text-decoration-none h-100" style="display:block;">
+            <div style="
+                background: linear-gradient(135deg, rgba(142,68,173,0.08) 0%, rgba(155,89,182,0.04) 100%);
+                border: 1px solid rgba(142,68,173,0.18);
+                border-radius: 16px;
+                padding: 16px 20px;
+                position: relative;
+                overflow: hidden;
+                height: 100%;
+                transition: box-shadow 0.2s, transform 0.2s;
+            " onmouseover="this.style.boxShadow='0 6px 20px rgba(142,68,173,0.15)'; this.style.transform='translateY(-2px)';"
+                onmouseout="this.style.boxShadow='none'; this.style.transform='none';">
+                <div
+                    style="position:absolute; top:0; left:0; right:0; height:3px; background:linear-gradient(90deg,#8e44ad,#d980fa);">
+                </div>
+                <div id="todaysColumnReadBadge"
+                    style="display:none; position:absolute; top:8px; right:12px; background:#95a5a6; color:#fff; font-size:0.6rem; font-weight:bold; padding:2px 8px; border-radius:4px; letter-spacing:0.1em;">
+                    READ</div>
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <div
+                        style="flex-shrink:0; width:36px; height:36px; background:linear-gradient(135deg,#8e44ad,#9b59b6); border-radius:10px; display:flex; align-items:center; justify-content:center;">
+                        <i class="fas fa-book-open" style="color:#fff; font-size:0.95rem;"></i>
+                    </div>
+                    <div style="flex:1; min-width:0;">
+                        <div style="display:flex; align-items:center; gap:6px; margin-bottom:2px;">
+                            <span
+                                style="font-size:0.65rem; font-weight:700; color:#8e44ad; letter-spacing:0.12em; text-transform:uppercase;">Today's
+                                Column</span>
+                            <span id="todaysColumnSubject"
+                                style="font-size:0.65rem; color:#9b59b6; background:rgba(155,89,182,0.1); padding:1px 6px; border-radius:10px;"></span>
+                        </div>
+                        <div id="todaysColumnTitle"
+                            style="font-weight:700; color:#1a1a2e; font-size:0.95rem; line-height:1.2; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </a>
+    </div>
+
+    <!-- AI厳選ニュース -->
+    <div id="dailyNewsWidget" class="col-md-6" style="display:none;">
+        <a href="/news" class="text-decoration-none h-100" style="display:block;">
+            <div style="
+                background: linear-gradient(135deg, rgba(30,58,138,0.08) 0%, rgba(59,130,246,0.04) 100%);
+                border: 1px solid rgba(30,58,138,0.15);
+                border-radius: 16px;
+                padding: 16px 20px;
+                position: relative;
+                overflow: hidden;
+                height: 100%;
+                transition: box-shadow 0.2s, transform 0.2s;
+            " onmouseover="this.style.boxShadow='0 6px 20px rgba(30,58,138,0.15)'; this.style.transform='translateY(-2px)';"
+                onmouseout="this.style.boxShadow='none'; this.style.transform='none';">
+                <div
+                    style="position:absolute; top:0; left:0; right:0; height:3px; background:linear-gradient(90deg,#1e3a8a,#3b82f6);">
+                </div>
+                <div id="dailyNewsBadge"
+                    style="display:none; position:absolute; top:8px; right:12px; background:rgba(30,58,138,0.1); color:#1e3a8a; font-size:0.6rem; font-weight:bold; padding:2px 8px; border-radius:4px;">
+                    毎朝7時更新</div>
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <div
+                        style="flex-shrink:0; width:36px; height:36px; background:linear-gradient(135deg,#1e3a8a,#3b82f6); border-radius:10px; display:flex; align-items:center; justify-content:center;">
+                        <i class="fas fa-globe-americas" style="color:#fff; font-size:0.95rem;"></i>
+                    </div>
+                    <div style="flex:1; min-width:0;">
+                        <div style="display:flex; align-items:center; gap:6px; margin-bottom:2px;">
+                            <span
+                                style="font-size:0.65rem; font-weight:700; color:#1e3a8a; letter-spacing:0.12em; text-transform:uppercase;">Daily
+                                News</span>
+                            <span id="newsProcessedCount"
+                                style="font-size:0.6rem; color:#3b82f6; border: 1px solid rgba(59,130,246,0.3); padding:0px 5px; border-radius:4px; font-weight:normal;"></span>
+                        </div>
+                        <div style="font-weight:700; color:#1a1a2e; font-size:0.95rem;">今日のニュース</div>
+                    </div>
+                </div>
+            </div>
+        </a>
+    </div>
+</div>
+
+<script>
+    (function () {
+        function getDailyColumnSeed() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const offset = parseInt(urlParams.get('date_offset') || '0');
+            const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
+            const RESET_HOUR = 7;
+            const nowUtc = Date.now() + (offset * 86400000);
+            const jstDate = new Date(nowUtc + JST_OFFSET_MS);
+            const jstHour = jstDate.getUTCHours();
+            const dayNum = Math.floor((nowUtc + JST_OFFSET_MS) / 86400000);
+            return jstHour < RESET_HOUR ? dayNum - 1 : dayNum;
+        }
+        function simpleHash(str) {
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                hash = ((hash << 5) - hash) + str.charCodeAt(i);
+                hash |= 0;
+            }
+            return (hash >>> 0);
+        }
+        function loadTodaysColumn() {
+            fetch('/api/columns_for_home')
+                .then(r => r.json())
+                .then(data => {
+                    if (data.status !== 'success' || !data.columns || !data.columns.length) return;
+                    const total = data.columns.length;
+                    const dayCount = getDailyColumnSeed(); // 基準日からの経過日数
+                    const round = Math.floor(dayCount / total);
+                    const dayInRound = dayCount % total;
+
+                    // 1. unique_id でソートして基礎順序を固定
+                    const baseList = data.columns.slice().sort((a, b) => a.unique_id.localeCompare(b.unique_id));
+
+                    // 2. Roundごとに異なる順序を作るためのランク付け
+                    // hash(ID + Round) を使うことで、Round内では安定し、Round間では順序が変わる
+                    const rankedList = baseList.map(col => {
+                        let hash = simpleHash(col.unique_id + "_round_" + round);
+                        let rand = Math.sin(hash) * 10000;
+                        return {
+                            col: col,
+                            rank: rand - Math.floor(rand)
+                        };
+                    }).sort((a, b) => a.rank - b.rank);
+
+                    const col = rankedList[dayInRound].col;
+
+                    let readColumns = [];
+                    try { readColumns = JSON.parse(localStorage.getItem('readColumnsCache') || '[]'); } catch (e) { }
+                    document.getElementById('todaysColumnTitle').textContent = col.title;
+                    document.getElementById('todaysColumnSubject').textContent = col.subject;
+                    // document.getElementById('todaysColumnPreview').textContent = (col.body || '').slice(0, 80); // 非表示
+                    if (readColumns.includes(col.unique_id)) document.getElementById('todaysColumnReadBadge').style.display = 'block';
+                    document.getElementById('todaysColumnLink').href = '/columns?open=' + encodeURIComponent(col.unique_id);
+                    // クイズ中は表示しない
+                    const selectionArea = document.querySelector('.selection-area');
+                    if (selectionArea && selectionArea.classList.contains('hidden')) {
+                        return;
+                    }
+                    document.getElementById('todaysColumnWidget').style.display = 'block';
+                })
+                .catch(function () { });
+        }
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', loadTodaysColumn);
+        } else {
+            loadTodaysColumn();
+        }
+    })();
+</script>
+
+<section class="card-area hidden">
+
+    <div class="progress-bar-container">
+        <div id="progressBar" class="progress-bar"></div>
+        <span id="questionNumberDisplay" class="question-number-display"></span>
+    </div>
+    <div class="card">
+        <div class="question-content">
+            <p id="question"></p>
+        </div>
+        <div class="answer-content">
+            <p id="answer" class="hidden"></p>
+        </div>
+    </div>
+    <div class="card-buttons">
+        <div style="display: flex; justify-content: space-between; align-items: flex-end; width: 100%;">
+            <div class="answer-buttons-container" style="flex-grow: 1; display: flex; gap: 10px; margin-right: 20px;">
+                <button id="showAnswerButton" class="primary-button">答えを見る</button>
+                <button id="correctButton" class="correct-button hidden">正解</button>
+                <button id="incorrectButton" class="incorrect-button hidden">不正解</button>
+            </div>
+            <!-- PC用マイクボタン (Mobileでは非表示) -->
+            <button id="voiceAnswerBtn" class="voice-button voice-btn-pc"
+                style="display: none; width: 60px !important; height: 60px !important; min-width: 60px !important; min-height: 60px !important; border-radius: 50% !important; background-color: #e74c3c; border: none; color: white; font-size: 1.5em; align-items: center; justify-content: center; box-shadow: 0 4px 8px rgba(0,0,0,0.2); flex-shrink: 0 !important; flex: 0 0 60px !important; padding: 0 !important; transition: transform 0.2s;">
+                <i class="fas fa-microphone"></i>
+            </button>
+        </div>
+    </div>
+    <div id="voiceFeedback" class="voice-feedback hidden" style="margin-top: 10px; text-align: center; color: #666;">
+    </div>
+    <div class="back-to-selection-container"
+        style="display: flex; justify-content: space-between; align-items: center; width: 100%; gap: 10px;">
+        <div style="display: flex; align-items: center; flex-grow: 0;">
+            <button id="backToSelectionFromCardButton" class="secondary-button" style="margin: 0;">選択画面に戻る</button>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <!-- Mobile Voice Button: Grouped with font controls for balance -->
+            <button id="voiceAnswerBtnMobile" class="voice-button voice-btn-mobile"
+                style="display: none; width: 44px !important; height: 44px !important; min-width: 44px !important; min-height: 44px !important; border-radius: 50%; background-color: #e74c3c; border: none; color: white; font-size: 1.1em; align-items: center; justify-content: center; box-shadow: 0 4px 8px rgba(0,0,0,0.2); flex-shrink: 0; z-index: 1000; pointer-events: auto; cursor: pointer;">
+                <i class="fas fa-microphone"></i>
+            </button>
+
+            <div class="font-size-controls" style="margin: 0;">
+                <span style="font-size: 0.8rem; color: #7f8c8d;">文字サイズ</span>
+                <div class="btn-group" role="group">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="decreaseFontSize"
+                        title="文字を小さくする"><i class="fas fa-minus"></i></button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="increaseFontSize"
+                        title="文字を大きくする"><i class="fas fa-plus"></i></button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</section>
+
+<section id="quizResult" class="quiz-result-area hidden">
+    <div id="quizResultContent">
+        <h2>学習結果</h2>
+
+        <!-- 正答率サークルガージ -->
+        <div class="result-gauge-wrap">
+            <div class="result-gauge">
+                <svg width="100%" height="100%" viewBox="0 0 160 160" style="display:block;">
+                    <defs>
+                        <linearGradient id="gaugeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" stop-color="#667eea" />
+                            <stop offset="100%" stop-color="#764ba2" />
+                        </linearGradient>
+                    </defs>
+                    <circle class="gauge-track" cx="80" cy="80" r="66" />
+                    <circle id="gaugeFill" class="gauge-fill" cx="80" cy="80" r="66" stroke-dasharray="414.69"
+                        stroke-dashoffset="414.69" />
+                </svg>
+                <div class="gauge-text">
+                    <span class="gauge-pct"><span id="accuracyRate">0</span>%</span>
+                    <span class="gauge-label">正答率</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 正解・不正解 ミニマル表示 -->
+        <!-- 出題数は非JS用に隠して持つ -->
+        <span id="totalQuestionsCount" style="display:none;">0</span>
+
+        <div class="result-score-row">
+            <div class="score-item correct">
+                <span class="score-icon">&#10003;</span>
+                <span class="score-num" id="correctCount">0</span>
+                <span class="score-sub">正解</span>
+            </div>
+            <div class="score-divider"></div>
+            <div class="score-item incorrect">
+                <span class="score-icon">&#10007;</span>
+                <span class="score-num" id="incorrectCount">0</span>
+                <span class="score-sub">不正解</span>
+            </div>
+        </div>
+
+        <p class="total-in-range">選択範囲の全問題数: <span id="selectedRangeTotalQuestions"></span>問</p>
+    </div>
+
+    <div id="incorrectWordList" class="incorrect-word-list hidden">
+        <h3><i class="fas fa-exclamation-triangle"></i> 今回の不正解問題</h3>
+        <ul id="incorrectWordsContainer">
+        </ul>
+    </div>
+
+    <div class="result-buttons">
+        <button id="backToSelectionButton" class="secondary-button"><i class="fas fa-undo"></i> 選択画面に戻る</button>
+        <button id="restartQuizButton" class="primary-button"><i class="fas fa-redo"></i> 同じ条件で再学習</button>
+        <button id="shareXButton" class="share-button" style="display: none;">Xでシェア</button>
+        <button id="downloadImageButton" class="share-button" style="display: none;">画像でシェア</button>
+    </div>
+
+    <div id="recommendedEssaysSection" class="incorrect-word-list hidden">
+        <h3>
+            <i class="fas fa-edit"></i> 論述チャレンジ！
+        </h3>
+        <ul id="recommendedEssaysContainer">
+        </ul>
+    </div>
+</section>
+
+<!-- 【師範の試練】シネマティック演出用要素 -->
+<div id="katanaSlash" class="katana-slash hidden"></div>
+<div id="inkSplashContainer" class="ink-splash-container hidden"></div>
+
+<!-- SVG Filter for Ink Bleed Effect -->
+<svg style="position: absolute; width: 0; height: 0;" aria-hidden="true" focusable="false">
+    <filter id="inkFilter">
+        <feTurbulence type="fractalNoise" baseFrequency="0.03" numOctaves="4" result="noise" />
+        <feDisplacementMap in="SourceGraphic" in2="noise" scale="35" />
+        <feGaussianBlur stdDeviation="1.5" result="blur" />
+        <feComposite in="SourceGraphic" in2="blur" operator="atop" />
+    </filter>
+</svg>
+
+<!-- 師範の試練（Master's Trial / Sumi-e Style）オーバーレイ -->
+<div id="strategicRetreatOverlay" class="strategic-retreat-overlay zen-mode hidden">
+    <div class="sakura-container" id="sakuraContainer"></div>
+    <div class="retreat-card zen-card">
+        <div class="retreat-icon zen-icon">
+            <i class="fas fa-scroll"></i>
+        </div>
+        <h2 class="retreat-title zen-title">研ぎ澄ます時</h2>
+        <div class="retreat-message zen-message">
+            <p class="main-msg">刃がこぼれておりますぞ</p>
+            <p class="sub-msg">連戦により、集中という名の刃が欠け始めています。一度砥石に向かい、心を整えるのが真の武士の嗜みです。</p>
+        </div>
+        <div class="retreat-advice zen-advice">
+            <i class="fas fa-seedling"></i>
+            <span>急がば回れ 今は一歩下がり技を磨くのが最善</span>
+        </div>
+        <button id="retreatToResultButton" class="retreat-confirm-btn zen-btn">
+            刃を研ぐ <i class="fas fa-leaf"></i>
+        </button>
+        <!-- 師範ペルの配置 -->
+        <div id="zenPerContainer" class="zen-per-container">
+            <img src="/static/pergamon/zen.png" alt="Zen Per">
+        </div>
+    </div>
+</div>
+
+<!-- 検索モーダル -->
+<div class="modal fade" id="searchModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-search"></i> 問題検索</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="input-group mb-3">
+                    <input type="text" id="searchInput" class="form-control" placeholder="キーワードを入力（例: アナーニ事件）">
+                    <button class="btn btn-primary" type="button" id="searchExecuteButton">検索</button>
+                </div>
+                <div id="searchResults" class="list-group" style="max-height: 400px; overflow-y: auto;">
+                    <!-- 検索結果がここに表示されます -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- RPG Modal -->
+<div id="rpgOverlay" class="rpg-overlay hidden">
+    <div class="rpg-modal-container">
+        <!-- Intro Screen -->
+        <div id="rpgIntroScreen" class="rpg-screen">
+            <div class="rpg-header">
+                <span class="mission-tag">MISSION</span>
+                <h2 class="rpg-title">時空の歪みを修正せよ</h2>
+            </div>
+
+            <div class="boss-preview-vertical">
+                <!-- 1. Name -->
+                <h3 id="rpgBossName" class="boss-name-large">BOSS NAME</h3>
+
+                <!-- 2. Visual -->
+                <div class="boss-visual">
+                    <!-- Boss Image Placeholder -->
+                    <img src="" id="rpgBossImage" alt="Boss" class="boss-img" onerror="this.style.display='none'">
+                    <!-- Fallback if no image -->
+                    <div class="boss-shadow">?</div>
+                </div>
+
+                <!-- 3. Difficulty Stars -->
+                <div class="difficulty-stars-container">
+                    <div id="rpgDifficultyStars" class="difficulty-stars">★★★★★</div>
+                </div>
+            </div>
+
+
+            <p id="rpgIntroDialog"
+                style="font-style: italic; color: #bdc3c7; margin-bottom: 20px; text-align: center; padding: 0 10px;">
+                "我は時空の覇者..."
+            </p>
+
+            <div class="mission-details">
+                <div class="rule-item">
+                    <i class="fas fa-stopwatch"></i>
+                    <span id="rpgRuleTime">制限時間 60秒</span>
+                </div>
+                <div class="rule-item">
+                    <i class="fas fa-bullseye"></i>
+                    <span id="rpgRuleCondition">合格ライン 10問正解</span>
+                </div>
+                <div class="rule-item warning" style="color: #e74c3c;">
+                    <i class="fas fa-heart-broken"></i>
+                    <span id="rpgRuleMistake">3ミスで即終了</span>
+                </div>
+            </div>
+
+            <div class="rpg-actions">
+                <button id="btnRpgStart" class="btn-rpg-primary">BATTLE START</button>
+                <button id="btnRpgCancel" class="btn-rpg-secondary">撤退する</button>
+            </div>
+        </div>
+
+        <!-- Battle Screen -->
+        <div id="rpgBattleScreen" class="rpg-screen hidden">
+            <div class="battle-hud">
+                <div class="timer-container">
+                    <div class="timer-icon">⏱</div>
+                    <div class="timer-bar-bg">
+                        <div id="rpgTimerBar" class="timer-bar-fill"></div>
+                    </div>
+                </div>
+                <div class="boss-hp-container">
+                    <span class="hp-label">BOSS HP</span>
+                    <div class="hp-bar-bg">
+                        <div id="rpgBossHpBar" class="hp-bar-fill"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="battle-main">
+                <div class="boss-avatar-battle">
+                    <img src="" id="rpgBattleBossImage" class="boss-img-small">
+                    <!-- Damage effect overlay -->
+                    <div id="rpgDamageEffect" class="damage-text hidden">-1</div>
+                </div>
+                <div class="rpg-question-box">
+                    <p id="rpgQuestionText">Question...</p>
+                </div>
+            </div>
+
+            <div id="rpgChoicesContainer" class="rpg-choices-grid">
+                <!-- Choices generated by JS -->
+            </div>
+        </div>
+
+        <!-- Result Screen -->
+        <div id="rpgResultScreen" class="rpg-screen hidden">
+            <div class="result-header">
+                <h2 id="rpgResultTitle">MISSION CLEAR</h2>
+            </div>
+
+            <div id="rpgWinContent" class="hidden">
+                <p id="rpgWinDialogue"
+                    style="font-style: italic; color: #f1c40f; margin-bottom: 20px; text-align: center; font-size: 1.1em;">
+                    "見事だ..."
+                </p>
+                <div class="reward-box">
+                    <h3>報酬獲得</h3>
+                    <div class="reward-row">
+                        <div class="reward-icon">🎖️</div>
+                        <div class="reward-info">
+                            <span class="reward-label">称号</span>
+                            <span class="reward-curr" id="rpgRewardBadgeName">Badge Name</span>
+                        </div>
+                    </div>
+                    <div class="reward-row">
+                        <span class="reward-icon">⚡</span>
+                        <div class="reward-info">
+                            <span class="reward-label">永続ボーナス</span>
+                            <span id="rpgRewardBonus" class="reward-value">Score +0.5%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="rpgLoseContent" class="hidden">
+                <div class="lose-message">
+                    <p>歴史の修正に失敗しました...</p>
+                    <p class="cooldown-notice">※エネルギー充填のため、翌朝7時まで再挑戦できません。</p>
+                </div>
+            </div>
+
+            <div class="rpg-actions">
+                <button id="btnRpgClose" class="btn-rpg-primary">戻る</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- RPG Story Overlay (Intro Event) -->
+<div id="rpgStoryOverlay" class="rpg-overlay hidden" style="z-index: 2000;">
+    <!-- Background Effects -->
+    <div id="storyNoiseLayer" class="noise-layer hidden"></div>
+    <div id="storyLightLayer" class="light-layer hidden"></div>
+
+    <!-- Character Area -->
+    <div class="story-stage">
+        <div id="storyEnemySilhouette" class="enemy-silhouette hidden">
+            <!-- Preload Alex.png. Parent has opacity: 0 so it's hidden until class 'show' is added. -->
+            <img src="/static/pergamon/alex.png" alt="Enemy Shadow">
+        </div>
+        <div id="storyCharacterContainer" class="character-container hidden">
+            <!-- Default to first frame to avoid pop-in, or transparent if logic handles it -->
+            <img id="storyPerImage" src="/static/pergamon/trouble.png" alt="Per" class="character-img">
+        </div>
+    </div>
+
+    <!-- Dialogue Box -->
+    <div id="storyDialogueBox" class="dialogue-box hidden">
+        <div class="dialogue-name-tag" id="storySpeakerName">ペル</div>
+        <div class="dialogue-text" id="storyText">...</div>
+        <div class="dialogue-arrow">▼</div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+    /* 苦手問題制限時のレイアウト調整 */
+    .weak-problem-warning {
+        animation: slideDown 0.4s ease-out;
+    }
+
+    @keyframes slideDown {
+        from {
+            opacity: 0;
+            transform: translateY(-20px);
+            max-height: 0;
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+            max-height: 300px;
+        }
+    }
+
+    /* 制限時のボタンエリア調整 */
+    .controls-area.restricted-mode {
+        padding-bottom: 20px;
+    }
+
+    .controls-area.restricted-mode .bottom-controls {
+        margin-top: 20px;
+        justify-content: center;
+    }
+
+    /* タブレット・モバイル対応 */
+    @media (max-width: 768px) {
+        .weak-problem-warning div {
+            padding: 15px !important;
+            margin: 15px 0 !important;
+            font-size: 0.95em;
+        }
+
+        .weak-problem-warning h4 {
+            font-size: 1.1em !important;
+        }
+
+        .weak-problem-warning p {
+            font-size: 1em !important;
+        }
+    }
+
+    /* クイズ中の通知用アニメーション */
+    @keyframes slideInRight {
+        from {
+            opacity: 0;
+            transform: translateX(100px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+
+    .quiz-time-notification {
+        transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+
+    /* Voice Button Responsive Visibility */
+    /* Default (PC): Show PC btn, Hide Mobile btn */
+    .voice-btn-pc {
+        display: flex !important;
+    }
+
+    .voice-btn-mobile {
+        display: none !important;
+    }
+
+    @media (max-width: 768px) {
+
+        /* Mobile: Hide PC btn, Show Mobile btn */
+        .voice-btn-pc {
+            display: none !important;
+        }
+
+        .voice-btn-mobile {
+            display: flex !important;
+        }
+
+        /* モバイルマイクボタンのアクティブ状態（タップフィードバック） */
+        .voice-btn-mobile:active {
+            transform: scale(0.9);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            background-color: #c0392b !important;
+        }
+
+        /* Adjust alignment for mobile container */
+        .back-to-selection-container {
+            align-items: center !important;
+        }
+
+        /* Mobile: Answer buttons vertical */
+        .answer-buttons-container {
+            flex-direction: column !important;
+        }
+
+        .answer-buttons-container button {
+            width: 100% !important;
+        }
+    }
+
+    /* PC/Tablet: Answer buttons horizontal */
+    .answer-buttons-container {
+        flex-direction: row;
+        align-items: center;
+    }
+
+    .answer-buttons-container button {
+        flex: 1;
+        /* Split width equally */
+    }
+
+    /* ===== リザルト画面のプレミアムスタイリング ===== */
+    .quiz-result-area {
+        max-width: 600px;
+        margin: 0 auto;
+        padding: 20px;
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        border-radius: 20px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.8);
+        text-align: center;
+        animation: fadeIn 0.5s ease;
+    }
+
+    #quizResultContent h2 {
+        font-size: 1.5rem;
+        color: #2c3e50;
+        margin-bottom: 20px;
+        font-weight: 700;
+        position: relative;
+        display: inline-block;
+    }
+
+    #quizResultContent h2::after {
+        content: '';
+        position: absolute;
+        bottom: -10px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 60px;
+        height: 3px;
+        background: linear-gradient(90deg, #667eea, #764ba2);
+        border-radius: 3px;
+    }
+
+    /* ============================================
+       リザルト画面 リデザイン
+    ============================================ */
+    .quiz-result-area {
+        animation: resultSlideIn 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+
+    @keyframes resultSlideIn {
+        from {
+            opacity: 0;
+            transform: translateY(30px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    /* 正答率サークルガージ */
+    .result-gauge-wrap {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        margin: 5px 0 15px;
+    }
+
+    .result-gauge {
+        position: relative;
+        width: 140px;
+        height: 140px;
+        margin-bottom: 5px;
+    }
+
+    .result-gauge svg {
+        transform: rotate(-90deg);
+    }
+
+    .gauge-track {
+        fill: none;
+        stroke: #edf2f7;
+        stroke-width: 12;
+    }
+
+    .gauge-fill {
+        fill: none;
+        stroke-width: 12;
+        stroke-linecap: round;
+        stroke: url(#gaugeGradient);
+        transition: stroke-dashoffset 1.4s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .gauge-text {
+        position: absolute;
+        inset: 15px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: rgba(255, 255, 255, 0.7);
+        backdrop-filter: blur(4px);
+        border-radius: 50%;
+        box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.05);
+        z-index: 2;
+        gap: 0;
+    }
+
+    .gauge-pct {
+        font-size: 1.6rem;
+        font-weight: 900;
+        color: #2c3e50;
+        line-height: 1.1;
+        text-align: center;
+        letter-spacing: -0.02em;
+    }
+
+    .gauge-label {
+        font-size: 0.65rem;
+        font-weight: 700;
+        color: #718096;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+    }
+
+    .gauge-fill {
+        fill: none;
+        stroke-width: 14;
+        stroke-linecap: round;
+        stroke: url(#gaugeGradient);
+        transition: stroke-dashoffset 1.4s cubic-bezier(0.22, 1, 0.36, 1);
+        filter: drop-shadow(0 0 4px rgba(102, 126, 234, 0.3));
+    }
+
+    .gauge-track {
+        fill: none;
+        stroke: #f1f5f9;
+        stroke-width: 14;
+    }
+
+    /* 正解・不正解 ミニマルスコア行 */
+    .result-score-row {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0;
+        margin: 0 0 10px;
+        background: #f8fafc;
+        padding: 10px;
+        border-radius: 12px;
+    }
+
+    .score-item {
+        display: flex;
+        align-items: baseline;
+        padding: 0 20px;
+        gap: 8px;
+        animation: fadeInUp 0.5s ease both;
+    }
+
+    .score-item.correct {
+        animation-delay: 0.25s;
+    }
+
+    .score-item.incorrect {
+        animation-delay: 0.38s;
+    }
+
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(12px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .score-icon {
+        font-size: 1rem;
+        font-weight: 700;
+        line-height: 1;
+    }
+
+    .score-item.correct .score-icon {
+        color: #48bb78;
+    }
+
+    .score-item.incorrect .score-icon {
+        color: #f56565;
+    }
+
+    .score-num {
+        font-size: 1.8rem;
+        font-weight: 800;
+        line-height: 1;
+    }
+
+    .score-item.correct .score-num {
+        color: #48bb78;
+    }
+
+    .score-item.incorrect .score-num {
+        color: #f56565;
+    }
+
+    .score-sub {
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: #718096;
+        letter-spacing: 0.04em;
+    }
+
+    .score-divider {
+        width: 1px;
+        height: 30px;
+        background: #e2e8f0;
+        flex-shrink: 0;
+    }
+
+
+    @media (max-width: 600px) {
+        .result-gauge {
+            width: 120px;
+            height: 120px;
+        }
+
+        .gauge-text {
+            inset: 12px;
+        }
+
+        .gauge-pct {
+            font-size: 1.4rem;
+        }
+
+        .score-num {
+            font-size: 1.4rem;
+        }
+
+        .score-item {
+            padding: 0 10px;
+        }
+    }
+
+    .total-in-range {
+        margin-top: 10px !important;
+        padding-top: 10px;
+        border-top: 1px dashed #e2e8f0;
+        font-size: 0.85rem !important;
+        color: #a0aec0 !important;
+    }
+
+    .incorrect-word-list,
+    #recommendedEssaysSection {
+        background: rgba(248, 249, 250, 0.8);
+        border-radius: 15px;
+        padding: 15px 20px;
+        margin: 15px 0;
+        border: 1px solid rgba(226, 232, 240, 0.8);
+        text-align: left;
+    }
+
+    .incorrect-word-list h3,
+    #recommendedEssaysSection h3 {
+        font-size: 1.1rem;
+        color: #e53e3e;
+        margin-bottom: 12px;
+        border-bottom: 2px solid #fed7d7;
+        padding-bottom: 8px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    #recommendedEssaysSection h3 {
+        color: #3182ce;
+        /* おすすめ論述は青系 */
+        border-color: #bee3f8;
+    }
+
+    .incorrect-word-list ul,
+    #recommendedEssaysSection ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+
+    .incorrect-word-list li,
+    #recommendedEssaysSection li {
+        padding: 12px 15px;
+        background: white;
+        border-radius: 8px;
+        margin-bottom: 10px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.02);
+        border: 1px solid #edf2f7;
+        transition: transform 0.2s ease;
+    }
+
+    .incorrect-word-list li:hover,
+    #recommendedEssaysSection li:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        border-color: #cbd5e1;
+        background: #fff;
+    }
+
+    .result-buttons {
+        display: flex;
+        justify-content: center;
+        gap: 12px;
+        margin-top: 15px;
+        flex-wrap: wrap;
+    }
+
+    .result-buttons button {
+        padding: 12px 25px;
+        border-radius: 30px;
+        font-size: 1rem;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        border: none;
+        cursor: pointer;
+    }
+
+    #backToSelectionButton {
+        background: #f1f5f9;
+        color: #475569;
+        border: 1px solid #cbd5e1;
+    }
+
+    #backToSelectionButton:hover {
+        background: #e2e8f0;
+        transform: translateY(-2px);
+    }
+
+    #restartQuizButton {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+    }
+
+    #restartQuizButton:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+    }
+
+    /* Mobile用マイクボタン (PCでは非表示) */
+    .voice-btn-mobile {
+        display: none !important;
+    }
+
+    @media (max-width: 768px) {
+        .voice-btn-mobile {
+            display: flex !important;
+        }
+
+        .quiz-result-area {
+            padding: 20px;
+            margin: 10px;
+        }
+
+        .result-buttons {
+            flex-direction: column;
+            align-items: stretch;
+        }
+    }
+
+    .hidden {
+        display: none !important;
+    }
+
+    /* ============================================
+       シネマティック演出：一閃（Katana Slash）
+    ============================================ */
+    .katana-slash {
+        position: fixed;
+        width: 150%;
+        height: 4px;
+        background: #fff;
+        top: 50%;
+        left: -25%;
+        z-index: 10001;
+        transform: rotate(-15deg) scaleX(0);
+        box-shadow: 0 0 20px 5px rgba(255, 255, 255, 0.8);
+        pointer-events: none;
+    }
+
+    .katana-slash.animate {
+        animation: slashAnim 0.3s cubic-bezier(0.19, 1, 0.22, 1) forwards;
+    }
+
+    @keyframes slashAnim {
+        0% {
+            transform: rotate(-15deg) scaleX(0);
+            opacity: 0;
+        }
+
+        20% {
+            opacity: 1;
+        }
+
+        70% {
+            transform: rotate(-15deg) scaleX(1);
+            opacity: 1;
+        }
+
+        100% {
+            transform: rotate(-15deg) scaleX(1);
+            opacity: 0;
+        }
+    }
+
+    .ink-splash-container {
+        position: fixed;
+        inset: 0;
+        z-index: 10000;
+        pointer-events: none;
+        overflow: hidden;
+        filter: url(#inkFilter);
+    }
+
+    .ink-blot {
+        position: absolute;
+        background: #1a1a1a;
+        border-radius: 50%;
+        transform: scale(0);
+        opacity: 0;
+        transition: transform 0.8s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.5s ease-out;
+    }
+
+    .ink-blot.active {
+        transform: scale(1);
+        opacity: 1;
+    }
+
+    .ink-blot.dissolve {
+        transform: scale(0.05);
+        /* より小さく収縮 */
+        opacity: 0;
+        filter: blur(5px);
+        /* 消える瞬間に和紙に滲むようなボケを追加 */
+        transition: transform 2.0s cubic-bezier(0.4, 0, 1, 1), opacity 1.8s ease-in-out, filter 1.5s ease-out;
+    }
+
+    /* スクリーンシェイク */
+    .screen-shake {
+        animation: shakeAnim 0.4s cubic-bezier(.36, .07, .19, .97) both;
+    }
+
+    @keyframes shakeAnim {
+
+        10%,
+        90% {
+            transform: translate3d(-2px, 0, 0);
+        }
+
+        20%,
+        80% {
+            transform: translate3d(4px, 0, 0);
+        }
+
+        30%,
+        50%,
+        70% {
+            transform: translate3d(-6px, 0, 0);
+        }
+
+        40%,
+        60% {
+            transform: translate3d(6px, 0, 0);
+        }
+    }
+
+    /* ============================================
+       師範の試練（Master's Trial / Sumi-e Style）
+    ============================================ */
+    .strategic-retreat-overlay.zen-mode {
+        position: fixed;
+        inset: 0;
+        background: rgba(245, 245, 240, 0);
+        /* 和紙のようなごく薄いクリーム色 */
+        backdrop-filter: blur(0px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        padding: 20px;
+        transition: all 1.2s cubic-bezier(0.23, 1, 0.32, 1);
+        pointer-events: none;
+        opacity: 0;
+    }
+
+    .strategic-retreat-overlay.zen-mode:not(.hidden) {
+        background: rgba(245, 245, 240, 0.94);
+        backdrop-filter: blur(20px);
+        pointer-events: auto;
+        opacity: 1;
+    }
+
+    .sakura-container {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        overflow: hidden;
+        z-index: 1;
+    }
+
+    .petal {
+        position: absolute;
+        background: #ffdbed;
+        border-radius: 150% 0 150% 0;
+        opacity: 0.7;
+        transform-origin: center;
+        animation: sakuraFall linear infinite;
+    }
+
+    @keyframes sakuraFall {
+        0% {
+            transform: translate(0, -10%) rotate(0deg);
+            opacity: 0;
+        }
+
+        10% {
+            opacity: 0.7;
+        }
+
+        90% {
+            opacity: 0.7;
+        }
+
+        100% {
+            transform: translate(150px, 110vh) rotate(720deg);
+            opacity: 0;
+        }
+    }
+
+    .retreat-card.zen-card {
+        background: #fff;
+        width: 100%;
+        max-width: 480px;
+        border: 1px solid #1a1a1a;
+        padding: 50px 40px;
+        text-align: center;
+        box-shadow:
+            0 40px 100px -20px rgba(0, 0, 0, 0.15),
+            10px 10px 0 rgba(0, 0, 0, 0.05);
+        transform: scale(0.95) translateY(20px);
+        opacity: 0;
+        transition: all 1s cubic-bezier(0.16, 1, 0.3, 1);
+        position: relative;
+        z-index: 2;
+    }
+
+    .strategic-retreat-overlay:not(.hidden) .retreat-card.zen-card {
+        transform: scale(1) translateY(0);
+        opacity: 1;
+    }
+
+    .retreat-icon.zen-icon {
+        width: 80px;
+        height: 80px;
+        background: #1a1a1a;
+        color: #fff;
+        font-size: 2.2rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 4px;
+        margin: 0 auto 30px;
+        box-shadow: 6px 6px 0 rgba(0, 0, 0, 0.1);
+    }
+
+    .retreat-title.zen-title {
+        font-size: 2.4rem;
+        font-weight: 900;
+        color: #1a1a1a;
+        margin-bottom: 24px;
+        letter-spacing: 0.1em;
+        font-family: 'Noto Serif JP', serif;
+    }
+
+    .retreat-message.zen-message {
+        margin-bottom: 40px;
+    }
+
+    .retreat-message.zen-message .main-msg {
+        font-size: 1.4rem;
+        font-weight: 800;
+        color: #1a1a1a;
+        margin-bottom: 12px;
+        display: block;
+        border-bottom: 1px solid #eee;
+        padding-bottom: 10px;
+    }
+
+    .retreat-message.zen-message .sub-msg {
+        font-size: 1.05rem;
+        color: #444;
+        line-height: 1.8;
+        font-style: italic;
+    }
+
+    .retreat-advice.zen-advice {
+        background: #fdfdfb;
+        padding: 16px 24px;
+        border-radius: 4px;
+        color: #555;
+        font-size: 0.95rem;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        margin-bottom: 44px;
+        border: 1px dashed #ccc;
+    }
+
+    .retreat-advice.zen-advice i {
+        color: #2d5a27;
+    }
+
+    .retreat-confirm-btn.zen-btn {
+        width: 100%;
+        background: #1a1a1a;
+        color: #fff;
+        border: 1px solid #1a1a1a;
+        padding: 20px;
+        border-radius: 4px;
+        font-size: 1.1rem;
+        font-weight: 800;
+        cursor: pointer;
+        transition: all 0.4s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+    }
+
+    .retreat-confirm-btn.zen-btn:hover {
+        background: #fff;
+        color: #1a1a1a;
+        box-shadow: 6px 6px 0 #1a1a1a;
+    }
+
+    /* 師範ペルの配置と演出 (左下 & ひょっこり演出) */
+    .zen-per-container {
+        position: absolute;
+        bottom: -40px;
+        left: -50px;
+        width: 180px;
+        /* 少し大きく */
+        height: auto;
+        z-index: 10;
+        opacity: 0;
+        pointer-events: none;
+        filter: drop-shadow(6px 6px 15px rgba(0, 0, 0, 0.2));
+    }
+
+    /* JavaScriptで .show が付与されたらアニメーション開始 */
+    .zen-per-container.show {
+        /* ひょっこり登場 + ぷかぷか浮遊を組み合わせ */
+        animation:
+            zenPerPopUp 1.2s cubic-bezier(0.34, 1.56, 0.64, 1) forwards,
+            zenPerFloat 3s ease-in-out 1.2s infinite;
+    }
+
+    @keyframes zenPerPopUp {
+        0% {
+            transform: translateY(120px) scale(0.6) rotate(-5deg);
+            opacity: 0;
+        }
+
+        20% {
+            opacity: 1;
+        }
+
+        100% {
+            transform: translateY(0) scale(1.1) rotate(0deg);
+            opacity: 1;
+        }
+    }
+
+    @keyframes zenPerFloat {
+
+        0%,
+        100% {
+            transform: translateY(0) scale(1.1);
+        }
+
+        50% {
+            transform: translateY(-10px) scale(1.12);
+        }
+    }
+
+    .zen-per-container img {
+        width: 100%;
+        height: auto;
+    }
+
+    @media (max-width: 480px) {
+        .retreat-card.zen-card {
+            padding: 40px 24px;
+        }
+
+        .retreat-title.zen-title {
+            font-size: 1.9rem;
+        }
+    }
+
+    @media (max-width: 480px) {
+        .retreat-card {
+            padding: 30px 20px;
+        }
+
+        .retreat-title {
+            font-size: 1.5rem;
+        }
+    }
+</style>
+<script>
+    // Flaskから渡された語彙データを設定
+    window.word_data = {{ vocab_data | tojson | safe if vocab_data else '[]' }};
+
+    document.addEventListener('DOMContentLoaded', function () {
+        const countBtns = document.querySelectorAll('.count-btn');
+        const radioMap = ['qc10', 'qc20', 'qc50', 'qcAll'];
+
+        // ニュースウィジェットの読み込み
+        fetch('/api/news_data')
+            .then(r => r.json())
+            .then(data => {
+                if (data && data.articles) {
+                    // クイズ中は表示しない
+                    const selectionArea = document.querySelector('.selection-area');
+                    if (selectionArea && selectionArea.classList.contains('hidden')) {
+                        return;
+                    }
+                    document.getElementById('dailyNewsWidget').style.display = 'block';
+                    if (data.total_processed) {
+                        document.getElementById('newsProcessedCount').textContent = `${data.total_processed}件から厳選`;
+                    }
+                    // 更新日が今日ならBADGE表示
+                    const now = new Date();
+                    const updateDate = new Date(data.updated_at);
+                    if (now.toDateString() === updateDate.toDateString()) {
+                        document.getElementById('dailyNewsBadge').style.display = 'block';
+                    }
+                }
+            })
+            .catch(e => console.error("News Widget Error:", e));
+        const weakCheckbox = document.getElementById('incorrectOnlyCheckbox2');
+        const incorrectOnlyRadio = document.getElementById('incorrectOnlyRadio');
+        const rangeSelectionArea = document.querySelector('.range-selection-area');
+        const rangeSelectionTitleText = document.getElementById('rangeSelectionTitleText');
+
+        function selectCount(value) {
+            // Update hidden radio and dispatch change event
+            const radioId = radioMap[value];
+            const radio = document.getElementById(radioId);
+            if (radio) {
+                radio.checked = true;
+                radio.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+
+            // Update button highlight
+            countBtns.forEach((btn, index) => {
+                btn.classList.toggle('active', index == value);
+            });
+        }
+
+        // Click on count buttons
+        countBtns.forEach((btn) => {
+            btn.addEventListener('click', function () {
+                const val = this.getAttribute('data-value');
+                selectCount(val);
+            });
+        });
+
+        // Weak problem toggle
+        const unsolvedCheckbox = document.getElementById('unsolvedOnlyCheckbox');
+        const unmasteredCheckbox = document.getElementById('unmasteredOnlyCheckbox');
+
+        function updateFilterCheckboxState(disabled) {
+            if (unsolvedCheckbox) {
+                unsolvedCheckbox.disabled = disabled;
+                if (unsolvedCheckbox.nextElementSibling) {
+                    unsolvedCheckbox.nextElementSibling.classList.toggle('disabled', disabled);
+                }
+                if (disabled) unsolvedCheckbox.checked = false;
+            }
+            if (unmasteredCheckbox) {
+                unmasteredCheckbox.disabled = disabled;
+                if (unmasteredCheckbox.nextElementSibling) {
+                    unmasteredCheckbox.nextElementSibling.classList.toggle('disabled', disabled);
+                }
+                if (disabled) unmasteredCheckbox.checked = false;
+            }
+        }
+
+        if (weakCheckbox) {
+            weakCheckbox.addEventListener('change', function () {
+                // 能動的にONにした場合、自動的に「全問(value=3)」を選択する
+                if (this.checked) {
+                    selectCount(3);
+                }
+
+                // Trigger update in script.js to handle all UI logic and state
+                if (typeof window.updateIncorrectOnlySelection === 'function') {
+                    window.updateIncorrectOnlySelection();
+                }
+                if (typeof window.updateSelectionTotalCount === 'function') {
+                    window.updateSelectionTotalCount();
+                }
+            });
+        }
+    });
+
+    /* ── ナビカルーセル初期化 ── */
+    function initNavCarousel(container) {
+        if (!container) return;
+        const track = container.querySelector('.nav-carousel-track');
+        if (!track) return;
+
+        // 表示中のカードだけ収集（display:none を除外）
+        const originals = Array.from(track.querySelectorAll('.nav-card'))
+            .filter(c => c.style.display !== 'none');
+        const count = originals.length;
+        if (count === 0) return;
+
+        const CLONE_COUNT = Math.min(3, count);
+        const CARD_W = 110;
+        const GAP = 14;
+        const STEP = CARD_W + GAP;
+
+        // クローンを作成して前後に配置
+        // 末尾クローン（先頭のカードを末尾に）
+        for (let i = 0; i < CLONE_COUNT; i++) {
+            const clone = originals[i % count].cloneNode(true);
+            clone.removeAttribute('id');
+            clone.classList.add('carousel-clone');
+            clone.setAttribute('data-clone-src', i % count);
+            track.appendChild(clone);
+        }
+        // 先頭クローン（末尾のカードを先頭に）
+        for (let i = CLONE_COUNT; i > 0; i--) {
+            const srcIdx = (count - i % count) % count;
+            const clone = originals[srcIdx].cloneNode(true);
+            clone.removeAttribute('id');
+            clone.classList.add('carousel-clone');
+            clone.setAttribute('data-clone-src', srcIdx);
+            track.insertBefore(clone, track.firstChild);
+        }
+
+        // クローンのクリックを本体に委譲
+        track.querySelectorAll('.carousel-clone').forEach(clone => {
+            clone.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const srcIdx = parseInt(clone.getAttribute('data-clone-src'));
+                const orig = originals[srcIdx];
+                if (orig.tagName === 'A') {
+                    window.location.href = orig.href;
+                } else {
+                    orig.click();
+                }
+            });
+        });
+
+        // 全カード（クローン含む）
+        const allCards = Array.from(track.querySelectorAll('.nav-card'))
+            .filter(c => c.style.display !== 'none');
+
+        // 中央拡大エフェクト
+        function updateScaleEffect() {
+            const trackRect = track.getBoundingClientRect();
+            const centerX = trackRect.left + trackRect.width / 2;
+
+            allCards.forEach(card => {
+                const cardRect = card.getBoundingClientRect();
+                const cardCenterX = cardRect.left + cardRect.width / 2;
+                const dist = Math.abs(centerX - cardCenterX);
+                const maxDist = trackRect.width / 2;
+                const ratio = Math.min(dist / maxDist, 1);
+
+                const scale = 1.18 - 0.35 * ratio;
+                const opacity = 1 - 0.45 * ratio;
+                card.style.transform = `scale(${scale})`;
+                card.style.opacity = opacity;
+            });
+        }
+
+        // 初期スクロール位置（最初の本物カードが中央に来るように）
+        function scrollToOriginalFirst() {
+            const firstOriginal = originals[0];
+            const cardLeft = firstOriginal.offsetLeft;
+            const cardCenter = cardLeft + CARD_W / 2;
+            track.scrollLeft = cardCenter - track.clientWidth / 2;
+        }
+
+        // ループ処理
+        let isJumping = false;
+        function checkLoop() {
+            if (isJumping) return;
+
+            const firstOrigLeft = originals[0].offsetLeft;
+            const lastOrigRight = originals[count - 1].offsetLeft + CARD_W;
+            const scrollLeft = track.scrollLeft;
+            const viewCenter = scrollLeft + track.clientWidth / 2;
+
+            // クローン末尾領域に入ったら先頭にジャンプ
+            if (viewCenter > lastOrigRight + STEP * 0.5) {
+                isJumping = true;
+                track.scrollLeft = scrollLeft - (count * STEP);
+                requestAnimationFrame(() => { isJumping = false; });
+            }
+            // クローン先頭領域に入ったら末尾にジャンプ
+            else if (viewCenter < firstOrigLeft - STEP * 0.5) {
+                isJumping = true;
+                track.scrollLeft = scrollLeft + (count * STEP);
+                requestAnimationFrame(() => { isJumping = false; });
+            }
+        }
+
+        track.addEventListener('scroll', () => {
+            updateScaleEffect();
+            checkLoop();
+        }, { passive: true });
+
+        // 矢印ボタン
+        const leftBtn = container.querySelector('.nav-carousel-arrow.left');
+        const rightBtn = container.querySelector('.nav-carousel-arrow.right');
+        if (leftBtn) {
+            leftBtn.addEventListener('click', () => {
+                track.scrollBy({ left: -STEP, behavior: 'smooth' });
+            });
+        }
+        if (rightBtn) {
+            rightBtn.addEventListener('click', () => {
+                track.scrollBy({ left: STEP, behavior: 'smooth' });
+            });
+        }
+
+        // 初期化
+        scrollToOriginalFirst();
+        requestAnimationFrame(updateScaleEffect);
+
+        // リサイズ時に再調整
+        let resizeTimer;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(() => {
+                updateScaleEffect();
+            }, 100);
+        });
+    }
+
+    // 両カルーセルを初期化
+    document.addEventListener('DOMContentLoaded', () => {
+        initNavCarousel(document.getElementById('navCarouselDesktop'));
+        initNavCarousel(document.getElementById('navCarouselMobile'));
+    });
+</script>
+{% endblock %}

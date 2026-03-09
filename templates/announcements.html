@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+
+{% block title %}お知らせ一覧 - {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-10 col-lg-8">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2 class="mb-0 border-start border-4 border-warning ps-3">
+                    <i class="fas fa-bullhorn text-warning me-2"></i>お知らせ一覧
+                </h2>
+                <a href="{{ url_for('index') }}" class="btn btn-outline-secondary btn-sm">
+                    <i class="fas fa-arrow-left me-1"></i>戻る
+                </a>
+            </div>
+
+            {% if announcements %}
+            <div class="accordion" id="announcementsAccordion">
+                {% for announcement in announcements %}
+                <div class="accordion-item mb-3 shadow-sm border-0 rounded overflow-hidden">
+                    <h2 class="accordion-header" id="heading{{ announcement.id }}">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                            data-bs-target="#collapse{{ announcement.id }}" aria-expanded="false"
+                            aria-controls="collapse{{ announcement.id }}">
+                            <div class="d-flex flex-column w-100">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <small class="text-muted d-flex align-items-center flex-wrap">
+                                        <i class="far fa-calendar-alt me-1"></i>{{ announcement.date }}
+                                        {% if announcement.is_new %}
+                                        {% if announcement.badge_type == 'update' %}
+                                        <span class="new-badge update">更新</span>
+                                        {% else %}
+                                        <span class="new-badge">NEW</span>
+                                        {% endif %}
+                                        {% endif %}
+                                        {% if announcement.updated_at %}
+                                        <div class="w-100"></div>
+                                        <span class="mt-1 badge bg-light text-secondary border">
+                                            <i class="fas fa-sync-alt me-1"></i>更新: {{ announcement.updated_at }}
+                                        </span>
+                                        {% endif %}
+                                    </small>
+                                </div>
+                                <span class="fw-bold text-dark text-break">
+                                    {{ announcement.title }}
+                                </span>
+                            </div>
+                        </button>
+                    </h2>
+                    <div id="collapse{{ announcement.id }}" class="accordion-collapse collapse"
+                        aria-labelledby="heading{{ announcement.id }}" data-bs-parent="#announcementsAccordion">
+                        <div class="accordion-body bg-white text-secondary" style="white-space: pre-wrap;">{{
+                            announcement.content | linkify_html | safe }}</div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Pagination -->
+            {% if total_pages > 1 %}
+            <nav aria-label="Page navigation" class="mt-5">
+                <ul class="pagination justify-content-center">
+                    <li class="page-item {% if current_page == 1 %}disabled{% endif %}">
+                        <a class="page-link" href="{{ url_for('announcements_page', page=current_page-1) }}"
+                            aria-label="Previous">
+                            <span aria-hidden="true">&laquo; 前へ</span>
+                        </a>
+                    </li>
+
+                    {% for p in range(1, total_pages + 1) %}
+                    <li class="page-item {% if p == current_page %}active{% endif %}">
+                        <a class="page-link" href="{{ url_for('announcements_page', page=p) }}">{{ p }}</a>
+                    </li>
+                    {% endfor %}
+
+                    <li class="page-item {% if current_page == total_pages %}disabled{% endif %}">
+                        <a class="page-link" href="{{ url_for('announcements_page', page=current_page+1) }}"
+                            aria-label="Next">
+                            <span aria-hidden="true">次へ &raquo;</span>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            {% endif %}
+
+            {% else %}
+            <div class="alert alert-info text-center py-5">
+                <i class="fas fa-info-circle fa-2x mb-3 text-info"></i>
+                <p class="mb-0">お知らせはありません。</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<style>
+    .accordion-button:not(.collapsed) {
+        color: #2c3e50;
+        background-color: #f8f9fa;
+        box-shadow: inset 0 -1px 0 rgba(0, 0, 0, .125);
+    }
+
+    .accordion-button:focus {
+        border-color: #f39c12;
+        box-shadow: 0 0 0 0.25rem rgba(243, 156, 18, 0.25);
+    }
+
+    .accordion-item {
+        transition: transform 0.2s;
+    }
+
+    .accordion-item:hover {
+        transform: translateY(-2px);
+    }
+
+    .page-link {
+        color: #e67e22;
+    }
+
+    .page-link:hover {
+        color: #d35400;
+        background-color: #fdf2e9;
+    }
+
+    .page-item.active .page-link {
+        background-color: #e67e22;
+        border-color: #e67e22;
+    }
+</style>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const accordionElement = document.getElementById('announcementsAccordion');
+        if (!accordionElement) return;
+
+        // 詳細を開いたら既読APIを叩く
+        const detailsButtons = accordionElement.querySelectorAll('.accordion-button');
+        detailsButtons.forEach(button => {
+            button.addEventListener('click', function () {
+                if (this.classList.contains('collapsed')) {
+                    // 閉じた状態（これから開く）ではなく、Bootstrapの処理後に判定すべきだが、
+                    // click時点ではまだ開いていない。collapsedクラスが外れるのを待つか、
+                    // Bootstrapのイベントを使うのが良い。
+                }
+            });
+        });
+
+        // BootstrapのCollapseイベントを使用
+        const collapseElements = document.querySelectorAll('.accordion-collapse');
+        collapseElements.forEach(collapseEl => {
+            collapseEl.addEventListener('show.bs.collapse', function () {
+                // 対応するヘッダー内のバッジを探して削除
+                const headerId = this.getAttribute('aria-labelledby');
+                const header = document.getElementById(headerId);
+                if (header) {
+                    const badge = header.querySelector('.new-badge');
+                    if (badge) {
+                        badge.remove();
+
+                        // data-id属性からID取得（追加が必要）
+                        // 簡易的にDOM構造から取得も可能だが、IDを仕込むのが確実
+                        const annId = this.id.replace('collapse', '');
+
+                        // API呼び出し
+                        fetch(`/api/announcements/${annId}/read`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            }
+                        }).then(res => res.json())
+                            .then(data => {
+                                if (data.status !== 'success') console.error('Failed to mark read', data);
+                            })
+                            .catch(err => console.error("Error marking announcement read:", err));
+                    }
+                }
+            });
+        });
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+
+{% block title %}論述添削依頼一覧 - 管理画面{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-inbox"></i> 論述添削依頼一覧</h2>
+        <a href="{{ url_for('admin_page') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> 管理画面へ戻る
+        </a>
+    </div>
+
+    <!-- フィルタ -->
+    <div class="mb-4">
+        <div class="btn-group" role="group">
+            <a href="{{ url_for('admin_essay_requests_list', status='pending') }}"
+                class="btn btn-{{ 'primary' if current_filter == 'pending' else 'outline-primary' }}">
+                未対応
+            </a>
+            <a href="{{ url_for('admin_essay_requests_list', status='replied') }}"
+                class="btn btn-{{ 'success' if current_filter == 'replied' else 'outline-success' }}">
+                対応済み
+            </a>
+            <a href="{{ url_for('admin_essay_requests_list', status='all') }}"
+                class="btn btn-{{ 'secondary' if current_filter == 'all' else 'outline-secondary' }}">
+                すべて
+            </a>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="bg-light">
+                        <tr>
+                            <th>ID</th>
+                            <th>送信日時</th>
+                            <th>ユーザー</th>
+                            <th>問題</th>
+                            <th>メッセージ</th>
+                            <th>ステータス</th>
+                            <th>アクション</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if requests %}
+                        {% for req in requests %}
+                        <tr>
+                            <td>#{{ req.id }}</td>
+                            <td>{{ req.created_at | to_jst }}</td>
+                            <td>
+                                {{ req.user.username }}
+                                <br>
+                                <span class="text-muted small">({{ req.user.room_number }})</span>
+                            </td>
+                            <td>
+                                <a href="{{ url_for('essay_problem', problem_id=req.problem_id) }}" target="_blank">
+                                    問題 #{{ req.problem_id }}
+                                </a>
+                            </td>
+                            <td>
+                                {{ req.student_message[:30] }}{% if req.student_message|length > 30 %}...{% endif %}
+                                {% set req_images = req.db_images | selectattr('image_type', 'equalto', 'request') |
+                                list %}
+                                {% if req_images %}
+                                <div class="mt-1"><span class="badge bg-info"><i class="fas fa-image"></i> 画像あり</span>
+                                </div>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if req.status == 'pending' %}
+                                <span class="badge bg-warning text-dark">未対応</span>
+                                {% else %}
+                                <span class="badge bg-success">対応済み</span>
+                                <div class="small text-muted mt-1">{{ req.replied_at | to_jst if
+                                    req.replied_at else '' }}</div>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="btn-group" role="group">
+                                    <a href="{{ url_for('admin_correction_request_detail', request_id=req.id) }}"
+                                        class="btn btn-sm btn-primary">
+                                        詳細 / 返信
+                                    </a>
+                                    <button type="button" class="btn btn-sm btn-danger"
+                                        onclick="confirmDelete({{ req.id }}, '{{ req.user.username }}', {{ req.problem_id }})">
+                                        <i class="fas fa-trash-alt"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        {% else %}
+                        <tr>
+                            <td colspan="7" class="text-center py-5">
+                                <p class="text-muted mb-0">依頼はありません。</p>
+                            </td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 削除確認モーダル -->
+<div class="modal fade" id="deleteConfirmModal" tabindex="-1" aria-labelledby="deleteConfirmModalLabel"
+    aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteConfirmModalLabel">
+                    <i class="fas fa-exclamation-triangle"></i> 削除の確認
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                    aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p id="deleteConfirmMessage">この添削依頼を削除しますか？</p>
+                <div class="alert alert-warning">
+                    <i class="fas fa-info-circle"></i> 削除すると元に戻せません。関連する画像や返信内容もすべて削除されます。
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+                <form id="deleteForm" method="POST" style="display: inline;">
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fas fa-trash-alt"></i> 削除する
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function confirmDelete(requestId, username, problemId) {
+        var msg = '添削依頼 #' + requestId + ' を削除しますか？\n\n';
+        msg += '・ユーザー: ' + username + '\n';
+        msg += '・問題ID: #' + problemId;
+        document.getElementById('deleteConfirmMessage').innerText = msg;
+        document.getElementById('deleteForm').action = '/api/admin/essay_request/' + requestId + '/delete';
+        var modal = new bootstrap.Modal(document.getElementById('deleteConfirmModal'));
+        modal.show();
+    }
+</script>
+{% endblock %}

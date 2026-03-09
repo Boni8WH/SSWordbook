@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% block title %}アーカイブ検索{% if query %} — {{ query }}{% endif %} - {{ app_name }}{% endblock %}
+
+{% block content %}
+<style>
+    html, body { overflow-x: hidden; }
+
+    .search-hit-card {
+        border-left: 3px solid #3b82f6;
+        transition: background-color 0.2s ease, transform 0.15s ease;
+        cursor: pointer;
+        text-decoration: none;
+        color: inherit;
+    }
+    .search-hit-card:hover {
+        background-color: #eef4ff;
+        color: inherit;
+        transform: translateX(3px);
+    }
+    mark {
+        background-color: rgba(59, 130, 246, 0.15);
+        color: inherit;
+        border-radius: 2px;
+        padding: 0 2px;
+    }
+</style>
+
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-7">
+
+            <!-- ヘッダー -->
+            <div class="d-flex align-items-center justify-content-between mb-4">
+                <h1 class="h3 fw-bold mb-0 text-truncate me-2">
+                    <i class="fas fa-search me-2 text-muted"></i>アーカイブ検索
+                </h1>
+                <a href="{{ url_for('news_archive_list') }}"
+                   class="btn btn-sm btn-outline-secondary rounded-pill px-3 flex-shrink-0">
+                    <i class="fas fa-arrow-left me-1 d-none d-md-inline"></i>一覧に戻る
+                </a>
+            </div>
+
+            <!-- 検索フォーム -->
+            <form method="get" action="{{ url_for('news_archive_search') }}" class="mb-4">
+                <div class="input-group shadow-sm rounded-4 overflow-hidden">
+                    <input type="search" name="q" value="{{ query }}"
+                           class="form-control border-0 py-3 ps-4"
+                           placeholder="キーワードで記事を検索..." autofocus
+                           style="font-size:1rem;">
+                    <button type="submit" class="btn btn-primary px-4">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </div>
+            </form>
+
+            {% if query %}
+                {% if results %}
+                <!-- 件数サマリー -->
+                <p class="text-muted small mb-3">
+                    <i class="fas fa-check-circle text-success me-1"></i>
+                    <strong>{{ query }}</strong> に一致する記事が
+                    {% set total_articles = namespace(count=0) %}
+                    {% for r in results %}{% set total_articles.count = total_articles.count + r.articles|length %}{% endfor %}
+                    <strong>{{ total_articles.count }}</strong> 件、
+                    <strong>{{ results|length }}</strong> 日分 見つかりました
+                </p>
+
+                {% for day in results %}
+                <div class="mb-4">
+                    <!-- 日付ヘッダー -->
+                    <a href="{{ url_for('news_archive_detail', date_str=day.date_str) }}"
+                       class="d-flex align-items-center text-decoration-none mb-2 gap-2">
+                        {% set weekdays = ['月', '火', '水', '木', '金', '土', '日'] %}
+                        <span class="fw-bold text-dark">{{ day.display_date }}<span class="fw-normal text-muted">（{{ weekdays[day.date.weekday()] }}）</span></span>
+                        <span class="text-muted small">{{ day.articles|length }} 件</span>
+                        <i class="fas fa-external-link-alt text-muted ms-1" style="font-size:0.7rem;"></i>
+                    </a>
+
+                    <!-- ヒット記事一覧 -->
+                    <div class="list-group shadow-sm rounded-4 overflow-hidden">
+                        {% for article in day.articles %}
+                        <a href="{{ url_for('news_archive_detail', date_str=day.date_str) }}"
+                           class="list-group-item search-hit-card py-3 px-4">
+                            <div class="d-flex align-items-start justify-content-between gap-2">
+                                <div class="flex-grow-1 min-w-0">
+                                    <div class="fw-bold text-dark mb-1 lh-sm">{{ article.title }}</div>
+                                    {% if article.keywords %}
+                                    <div class="mb-2">
+                                        {% for kw in article.keywords %}
+                                        <span class="badge bg-white text-muted border me-1 fw-normal"
+                                              style="font-size:0.75rem;">
+                                            {% if query.lower() in kw.lower() %}
+                                            <mark>#{{ kw }}</mark>
+                                            {% else %}
+                                            #{{ kw }}
+                                            {% endif %}
+                                        </span>
+                                        {% endfor %}
+                                    </div>
+                                    {% endif %}
+                                    <p class="text-muted small mb-0 lh-base" style="
+                                        display: -webkit-box;
+                                        -webkit-line-clamp: 2;
+                                        -webkit-box-orient: vertical;
+                                        overflow: hidden;">
+                                        {{ article.summary }}
+                                    </p>
+                                </div>
+                                {% if article.source %}
+                                <span class="badge bg-light text-muted border flex-shrink-0 fw-normal"
+                                      style="font-size:0.7rem;">{{ article.source }}</span>
+                                {% endif %}
+                            </div>
+                        </a>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+
+                {% else %}
+                <!-- 結果なし -->
+                <div class="text-center py-5 text-muted">
+                    <i class="fas fa-search fa-3x mb-3 opacity-25"></i>
+                    <p class="mb-1"><strong>{{ query }}</strong> に一致する記事は見つかりませんでした。</p>
+                    <p class="small">別のキーワードでお試しください。</p>
+                </div>
+                {% endif %}
+
+            {% else %}
+            <!-- 未検索状態 -->
+            <div class="text-center py-5 text-muted">
+                <i class="fas fa-keyboard fa-3x mb-3 opacity-25"></i>
+                <p>キーワードを入力して検索してください。</p>
+                <p class="small">記事のタイトル・要約・キーワードから検索できます。</p>
+            </div>
+            {% endif %}
+
+        </div>
+    </div>
+</div>
+{% endblock %}

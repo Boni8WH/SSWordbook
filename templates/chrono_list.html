@@ -1,0 +1,791 @@
+{% extends "base.html" %}
+{% block title %}刻の系譜 〜Chronos Lineage〜 - {{ app_name }}{% endblock %}
+
+{% block head_extra %}
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link
+    href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@700&family=Kaisei+Tokumin:wght@400;700&display=swap"
+    rel="stylesheet">
+<style>
+    .chrono-container {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 20px 15px;
+        position: relative;
+    }
+
+    /* Background subtle glow */
+    .chrono-container::after {
+        content: '';
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: radial-gradient(circle at top right, rgba(102, 126, 234, 0.05) 0%, transparent 60%);
+        pointer-events: none;
+        z-index: -1;
+    }
+
+    /* Compact Header */
+    .chrono-header {
+        display: flex;
+        align-items: baseline;
+        justify-content: flex-start;
+        margin-bottom: 2rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        background: transparent;
+        position: relative;
+        z-index: 2;
+        text-align: left;
+        flex-wrap: wrap;
+        gap: 15px;
+    }
+
+    .chrono-title {
+        font-family: 'Shippori Mincho', serif;
+        font-size: clamp(1.5rem, 4vw, 2rem);
+        font-weight: 700;
+        color: #1a1a2e;
+        letter-spacing: 0.1em;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        text-shadow: none;
+        padding: 0;
+    }
+
+    .chrono-title i {
+        color: #d4af37;
+        margin-right: 0.4em;
+        font-size: 0.9em;
+        filter: drop-shadow(0 0 5px rgba(212, 175, 55, 0.4));
+        animation: none;
+    }
+
+    .chrono-subtitle {
+        font-family: 'Kaisei Tokumin', serif;
+        color: #8c909e;
+        font-size: 0.8rem;
+        margin-left: 1rem;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        border-left: 2px solid #d4af37;
+        padding-left: 1rem;
+        margin-top: 0;
+    }
+
+    /* Rhythm Game Style List */
+    .chapter-list {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        position: relative;
+        margin-bottom: 60px;
+        align-items: stretch;
+        padding-top: 0;
+    }
+
+    /* Side line (Lineage visual) */
+    .chapter-list::before {
+        content: '';
+        position: absolute;
+        top: 10px;
+        bottom: 10px;
+        left: 30px;
+        width: 2px;
+        background: linear-gradient(to bottom, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.5) 50%, rgba(102, 126, 234, 0.1));
+        z-index: 0;
+        transform: none;
+        box-shadow: none;
+    }
+
+    .chapter-card-wrapper {
+        width: 100%;
+        max-width: 100%;
+        position: relative;
+        z-index: 1;
+        padding: 0;
+        padding-left: 60px;
+        /* Space for the line and node */
+    }
+
+    .chapter-card {
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(248, 249, 250, 0.98));
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        border-radius: 4px 16px 16px 4px;
+        padding: 15px 25px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.8);
+        border-left: 4px solid #667eea;
+        cursor: pointer;
+        transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        text-decoration: none;
+        color: inherit;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        position: relative;
+        overflow: hidden;
+        transform: translateX(0);
+    }
+
+    /* Subtle slanted background pattern */
+    .chapter-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        right: -20px;
+        bottom: 0;
+        width: 100px;
+        background: repeating-linear-gradient(45deg,
+                rgba(0, 0, 0, 0.02),
+                rgba(0, 0, 0, 0.02) 10px,
+                transparent 10px,
+                transparent 20px);
+        z-index: 0;
+        transform: none;
+        left: auto;
+        height: auto;
+    }
+
+    /* Node on the side line */
+    .chapter-card-wrapper::before {
+        content: '';
+        position: absolute;
+        left: 26px;
+        /* Centered on the 30px line (30 - 10/2 = 25, +1 for border = 26) */
+        top: 50%;
+        width: 10px;
+        height: 10px;
+        background: #fff;
+        border: 2px solid #667eea;
+        border-radius: 50%;
+        transform: translateY(-50%);
+        transition: all 0.3s ease;
+        z-index: 2;
+    }
+
+    /* Hover Effects - The "Slide out" */
+    .chapter-card-wrapper:hover .chapter-card {
+        transform: translateX(15px);
+        box-shadow: -5px 10px 20px rgba(102, 126, 234, 0.15);
+        border-left-color: #d4af37;
+        background: linear-gradient(135deg, rgba(255, 255, 255, 1), rgba(240, 244, 255, 0.95));
+        z-index: 10;
+        border-color: rgba(255, 255, 255, 0.8);
+        border-left: 4px solid #d4af37;
+    }
+
+    .chapter-card-wrapper:hover::before,
+    .chapter-card-wrapper:has(.chapter-card.is-complete):hover::before {
+        background: #d4af37 !important;
+        border-color: #d4af37 !important;
+        box-shadow: 0 0 10px rgba(212, 175, 55, 0.5) !important;
+        transform: translateY(-50%) scale(1.5) !important;
+    }
+
+    .chapter-card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        width: 100%;
+        position: relative;
+        z-index: 1;
+    }
+
+    .chapter-title {
+        margin: 0;
+        font-size: 1.15rem;
+        font-family: 'Kaisei Tokumin', serif;
+        font-weight: 700;
+        color: #2d3748;
+        letter-spacing: 0.05em;
+        transition: color 0.3s ease;
+    }
+
+    .chapter-title i {
+        color: #a0aec0;
+        margin-right: 12px;
+        font-size: 1em;
+        transition: all 0.3s ease;
+    }
+
+    .chapter-card-wrapper:hover .chapter-title {
+        color: #1a1a2e;
+    }
+
+    .chapter-card-wrapper:hover .chapter-title i {
+        color: #d4af37;
+        transform: scale(1.1);
+    }
+
+    .badge-count {
+        background: #f1f3f5;
+        color: #495057;
+        padding: 5px 15px;
+        border-radius: 20px;
+        font-weight: 700;
+        font-size: 0.85rem;
+        transition: all 0.3s ease;
+        letter-spacing: 0.05em;
+        border: 1px solid #dee2e6;
+        box-shadow: none;
+    }
+
+    .chapter-card-wrapper:hover .badge-count {
+        background: linear-gradient(135deg, #1a1a2e, #16213e);
+        color: white;
+        border-color: transparent;
+        box-shadow: 0 4px 10px rgba(26, 26, 46, 0.2);
+        transform: scale(1.05) translateY(0);
+    }
+
+    .chapter-card.is-complete {
+        border-left-color: #2ecc71;
+        border-left-width: 4px;
+    }
+
+    .chapter-card.is-complete .badge-count {
+        background: rgba(46, 204, 113, 0.1);
+        color: #27ae60;
+        border-color: #2ecc71;
+    }
+
+    .chapter-card-wrapper:hover .chapter-card.is-complete {
+        border-left-color: #2ecc71;
+    }
+
+    .chapter-card-wrapper:has(.chapter-card.is-complete)::before {
+        border-color: #2ecc71;
+    }
+
+    .no-problems {
+        text-align: center;
+        padding: 40px;
+        color: #8c909e;
+        background: rgba(255, 255, 255, 0.7);
+        border-radius: 12px;
+        margin-top: 20px;
+        border: 1px dashed #d1d5db;
+        margin-left: 60px;
+        /* Align with cards */
+    }
+
+    @media (max-width: 768px) {
+        .chrono-header {
+            justify-content: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.8rem;
+            padding-top: 5px;
+        }
+
+        .header-left {
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 0;
+            gap: 2px;
+        }
+
+        .chrono-title {
+            font-size: 1.3rem;
+        }
+
+        .chrono-subtitle {
+            margin-left: 0;
+            border-left: none;
+            padding-left: 0;
+            margin-top: 0;
+            border-top: none;
+            padding-top: 0;
+            font-size: 0.7rem;
+        }
+
+        .header-home-btn {
+            position: absolute;
+            left: 0;
+            top: 5px;
+            padding: 6px 12px !important;
+        }
+
+        .header-home-btn.ms-auto {
+            margin-left: 0 !important;
+        }
+
+        .chapter-card-wrapper {
+            padding-left: 40px;
+        }
+
+        .chapter-card-wrapper::before {
+            left: 11px;
+        }
+
+        .chapter-list::before {
+            left: 15px;
+        }
+    }
+
+    /* Modal Styling */
+    .stylish-modal-content {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(12px);
+        border-radius: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.8);
+        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+        overflow: hidden;
+        position: relative;
+    }
+
+    .stylish-modal-content::before {
+        content: '';
+        position: absolute;
+        top: -50%;
+        left: -50%;
+        width: 200%;
+        height: 200%;
+        background: radial-gradient(circle, rgba(0, 168, 255, 0.03) 0%, transparent 70%);
+        pointer-events: none;
+        animation: rotateGlow 30s linear infinite;
+        z-index: 0;
+    }
+
+    .stylish-modal-header {
+        border-bottom: none;
+        padding: 25px 25px 10px 25px;
+        position: relative;
+        z-index: 1;
+    }
+
+    .stylish-modal-title {
+        font-family: 'Shippori Mincho', serif;
+        font-size: 1.5rem;
+        color: #1e272e;
+        width: 100%;
+        text-align: center;
+        letter-spacing: 0.05em;
+    }
+
+    .stylish-modal-body {
+        padding: 10px 30px 30px 30px;
+        position: relative;
+        z-index: 1;
+    }
+
+    .difficulty-card-btn {
+        background: #fff;
+        border: 1px solid #edf2f7;
+        border-radius: 12px;
+        padding: 16px 20px;
+        margin-bottom: 15px;
+        text-align: left;
+        position: relative;
+        overflow: hidden;
+        cursor: pointer;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.02);
+        transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        display: block;
+        width: 100%;
+        color: #2d3748;
+        font-family: 'Kaisei Tokumin', serif;
+    }
+
+    .difficulty-card-btn:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 15px rgba(0, 0, 0, 0.05);
+    }
+
+    .difficulty-card-btn.diff-1 {
+        border-left: 5px solid #2ecc71;
+    }
+
+    .difficulty-card-btn.diff-2 {
+        border-left: 5px solid #3498db;
+    }
+
+    .difficulty-card-btn.diff-3 {
+        border-left: 5px solid #e74c3c;
+    }
+
+    .difficulty-card-btn.diff-4 {
+        border-left: 5px solid #9b59b6;
+    }
+
+    .difficulty-card-btn.diff-all {
+        border-left: 5px solid #34495e;
+    }
+
+    .difficulty-card-btn.diff-1:hover {
+        border-color: #2ecc71;
+    }
+
+    .difficulty-card-btn.diff-2:hover {
+        border-color: #3498db;
+    }
+
+    .difficulty-card-btn.diff-3:hover {
+        border-color: #e74c3c;
+    }
+
+    .difficulty-card-btn.diff-4:hover {
+        border-color: #9b59b6;
+    }
+
+    .difficulty-card-btn.diff-all:hover {
+        border-color: #34495e;
+    }
+
+    .diff-icon {
+        margin-right: 12px;
+        font-size: 1.2rem;
+        opacity: 0.9;
+    }
+
+    .diff-1 .diff-icon {
+        color: #2ecc71;
+    }
+
+    .diff-2 .diff-icon {
+        color: #3498db;
+    }
+
+    .diff-3 .diff-icon {
+        color: #e74c3c;
+    }
+
+    .diff-4 .diff-icon {
+        color: #9b59b6;
+    }
+
+    .diff-all .diff-icon {
+        color: #34495e;
+    }
+
+    .diff-content-wrapper {
+        position: relative;
+        z-index: 2;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .diff-name {
+        font-size: 1.1rem;
+        font-weight: 700;
+    }
+
+    .mastery-badge {
+        background: rgba(241, 242, 246, 0.8);
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: #57606f;
+        font-family: sans-serif;
+    }
+
+    .difficulty-progress-fill {
+        position: absolute;
+        top: 0;
+        left: 0;
+        height: 100%;
+        width: 0%;
+        z-index: 1;
+        transition: width 1s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .diff-1 .difficulty-progress-fill {
+        background: rgba(46, 204, 113, 0.08);
+    }
+
+    .diff-2 .difficulty-progress-fill {
+        background: rgba(52, 152, 219, 0.08);
+    }
+
+    .diff-3 .difficulty-progress-fill {
+        background: rgba(231, 76, 60, 0.08);
+    }
+
+    .diff-4 .difficulty-progress-fill {
+        background: rgba(155, 89, 182, 0.08);
+    }
+
+    .diff-all .difficulty-progress-fill {
+        background: rgba(52, 73, 94, 0.08);
+    }
+
+    @keyframes rotateGlow {
+        from {
+            transform: rotate(0deg);
+        }
+
+        to {
+            transform: rotate(360deg);
+        }
+    }
+
+    .styled-switch {
+        background: rgba(255, 255, 255, 0.6);
+        border-radius: 12px;
+        padding: 12px 15px;
+        margin-bottom: 20px;
+        border: 1px solid #edf2f7;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+        display: flex;
+        align-items: center;
+    }
+
+    .styled-switch .form-check-input {
+        margin-top: 0;
+        margin-right: 10px;
+    }
+
+    /* Toggle Button Style */
+    .filter-toggle-btn {
+        background: #f8f9fa;
+        border: 1px solid #edf2f7;
+        border-radius: 12px;
+        padding: 12px 15px;
+        margin-bottom: 20px;
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        color: #718096;
+        font-weight: 600;
+        font-size: 0.95rem;
+    }
+
+    .filter-toggle-btn.active {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+        border-color: transparent;
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    }
+
+    .filter-toggle-btn i {
+        margin-right: 10px;
+        font-size: 1.1rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="chrono-container">
+    <div class="chrono-header">
+        <div class="header-left d-flex flex-column align-items-center flex-md-row align-items-md-baseline gap-2">
+            <h1 class="chrono-title"><i class="fas fa-hourglass-half"></i>刻の系譜</h1>
+            <div class="chrono-subtitle">〜Chronos Lineage〜</div>
+        </div>
+        <a href="{{ url_for('index') }}"
+            class="header-home-btn btn btn-sm btn-outline-secondary rounded-pill px-3 shadow-sm d-none d-md-inline-flex ms-auto">
+            <i class="fas fa-arrow-left"></i><span class="ms-1">ホーム</span>
+        </a>
+        <a href="{{ url_for('index') }}"
+            class="header-home-btn btn btn-sm btn-outline-secondary rounded-pill px-3 shadow-sm d-md-none">
+            <i class="fas fa-arrow-left"></i>
+        </a>
+    </div>
+
+    <div class="chapter-list">
+        {% for chapter in chapters %}
+        <div class="chapter-card-wrapper">
+            <a href="javascript:void(0)" onclick="openDifficultyModal('{{ chapter.name }}')"
+                class="chapter-card {% if chapter.is_complete %}is-complete{% endif %}">
+                <div class="chapter-card-header">
+                    <h3 class="chapter-title">
+                        <i class="fas {% if chapter.name == 'com' %}fa-star{% else %}fa-book{% endif %}"></i>
+                        {{ chapter.name }} {% if chapter.name == 'com' %}(総合){% endif %}
+                    </h3>
+                    <span class="badge-count">{{ chapter.total }}問</span>
+                </div>
+            </a>
+        </div>
+        {% endfor %}
+
+        {% if not chapters %}
+        <div class="no-problems w-100">
+            <i class="fas fa-info-circle fa-3x mb-3 text-muted"></i>
+            <h4>現在公開されている問題はありません</h4>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Difficulty Selection Modal -->
+<div class="modal fade" id="difficultyModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content stylish-modal-content">
+            <div class="modal-header stylish-modal-header">
+                <h5 class="modal-title stylish-modal-title"><i class="fas fa-gamepad pb-1"></i> 難易度を選択</h5>
+                <button type="button" class="btn-close position-absolute top-0 end-0 m-3" data-bs-dismiss="modal"
+                    aria-label="Close"></button>
+            </div>
+            <div class="modal-body stylish-modal-body text-center">
+                <p class="mb-4 text-muted" style="font-size: 0.95rem;">「<span id="selectedSectionName"
+                        class="fw-bold text-dark"></span>」に挑戦します。<br>難易度を選んでください。</p>
+
+                <div id="difficultyLoading" class="py-3">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="text-muted mt-2 small">問題を読み込み中...</p>
+                </div>
+
+                <div id="difficultyButtons" class="text-start" style="display: none;">
+                    <button type="button" id="unsolvedOnlyBtn" class="filter-toggle-btn"
+                        onclick="toggleUnsolvedFilter()">
+                        <i class="fas fa-filter"></i> 未正解のみ出題する？
+                    </button>
+
+                    <button id="difficulty-btn-1" class="difficulty-card-btn diff-1" onclick="startChronoQuiz(1)">
+                        <div class="diff-content-wrapper">
+                            <div><i class="fas fa-seedling diff-icon"></i><span class="diff-name">易</span></div>
+                            <span class="mastery-badge"><span class="mastery-text">0/0</span></span>
+                        </div>
+                        <div class="difficulty-progress-fill" id="difficulty-progress-1"></div>
+                    </button>
+
+                    <button id="difficulty-btn-2" class="difficulty-card-btn diff-2" onclick="startChronoQuiz(2)">
+                        <div class="diff-content-wrapper">
+                            <div><i class="fas fa-walking diff-icon"></i><span class="diff-name">標準</span></div>
+                            <span class="mastery-badge"><span class="mastery-text">0/0</span></span>
+                        </div>
+                        <div class="difficulty-progress-fill" id="difficulty-progress-2"></div>
+                    </button>
+
+                    <button id="difficulty-btn-3" class="difficulty-card-btn diff-3" onclick="startChronoQuiz(3)">
+                        <div class="diff-content-wrapper">
+                            <div><i class="fas fa-skull diff-icon"></i><span class="diff-name">難</span></div>
+                            <span class="mastery-badge"><span class="mastery-text">0/0</span></span>
+                        </div>
+                        <div class="difficulty-progress-fill" id="difficulty-progress-3"></div>
+                    </button>
+
+                    <button id="difficulty-btn-4" class="difficulty-card-btn diff-4" onclick="startChronoQuiz(4)">
+                        <div class="diff-content-wrapper">
+                            <div><i class="fas fa-crown diff-icon"></i><span class="diff-name">最難関</span></div>
+                            <span class="mastery-badge"><span class="mastery-text">0/0</span></span>
+                        </div>
+                        <div class="difficulty-progress-fill" id="difficulty-progress-4"></div>
+                    </button>
+
+                    <button id="difficulty-btn-all" class="difficulty-card-btn diff-all" onclick="startChronoQuiz(0)">
+                        <div class="diff-content-wrapper">
+                            <div><i class="fas fa-layer-group diff-icon"></i><span class="diff-name">すべて</span></div>
+                            <span class="mastery-badge"><span class="mastery-text">0/0</span></span>
+                        </div>
+                        <div class="difficulty-progress-fill" id="difficulty-progress-0"></div>
+                    </button>
+                </div>
+
+                <div id="noProblemsMessage" class="py-3 text-muted" style="display: none;">
+                    <i class="fas fa-exclamation-circle fa-2x mb-2"></i>
+                    <p>このセクションには問題が登録されていません。</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let currentChapter = null;
+
+    async function openDifficultyModal(chapter) {
+        currentChapter = chapter;
+        let displayName = chapter;
+        if (chapter === 'com') displayName += ' (総合)';
+        document.getElementById('selectedSectionName').innerText = displayName;
+
+        const modalEl = document.getElementById('difficultyModal');
+        const modal = new bootstrap.Modal(modalEl);
+
+        // Reset UI
+        document.getElementById('difficultyLoading').style.display = 'block';
+        document.getElementById('difficultyButtons').style.display = 'none';
+        document.getElementById('noProblemsMessage').style.display = 'none';
+
+        modal.show();
+
+        try {
+            const response = await fetch(`/api/chronological/section/${chapter}/difficulty_counts`);
+            const data = await response.json();
+
+            document.getElementById('difficultyLoading').style.display = 'none';
+
+            if (data.status === 'success') {
+                const counts = data.counts;
+
+                if (counts.total.total === 0) {
+                    document.getElementById('noProblemsMessage').style.display = 'block';
+                } else {
+                    document.getElementById('difficultyButtons').style.display = 'grid';
+
+                    const mappings = [
+                        { key: 'easy', id: '1' },
+                        { key: 'standard', id: '2' },
+                        { key: 'hard', id: '3' },
+                        { key: 'master', id: '4' },
+                        { key: 'total', id: 'all' }
+                    ];
+
+                    mappings.forEach(m => {
+                        const countObj = counts[m.key];
+                        const btnId = m.id === 'all' ? 'difficulty-btn-all' : `difficulty-btn-${m.id}`;
+                        const progressId = m.id === 'all' ? '0' : m.id;
+                        const btn = document.getElementById(btnId);
+
+                        if (btn && countObj && countObj.total > 0) {
+                            btn.style.display = 'block';
+                            const masteryText = btn.querySelector('.mastery-text');
+                            const progressBg = document.getElementById(`difficulty-progress-${progressId}`);
+
+                            if (masteryText) masteryText.innerText = `正解: ${countObj.mastered}/${countObj.total}`;
+                            if (progressBg) {
+                                const percent = Math.round((countObj.mastered / countObj.total) * 100);
+                                progressBg.style.width = `${percent}%`;
+                            }
+                        } else if (btn) {
+                            btn.style.display = 'none';
+                        }
+                    });
+                }
+            } else {
+                alert('データ取得エラー: ' + (data.message || ''));
+            }
+        } catch (e) {
+            console.error(e);
+            document.getElementById('difficultyLoading').innerText = '通信エラーが発生しました';
+        }
+    }
+
+    function toggleUnsolvedFilter() {
+        const btn = document.getElementById('unsolvedOnlyBtn');
+        const isActive = btn.classList.toggle('active');
+        btn.innerHTML = `<i class="fas fa-filter"></i> 未正解のみ出題${isActive ? '！' : 'する？'}`;
+    }
+
+    function startChronoQuiz(difficulty) {
+        if (!currentChapter) return;
+        const unsolvedOnly = document.getElementById('unsolvedOnlyBtn').classList.contains('active');
+        let url = "{{ url_for('chronological_solve', chapter='__CHAPTER__') }}".replace('__CHAPTER__', currentChapter);
+
+        const params = new URLSearchParams();
+        if (difficulty > 0) {
+            params.append('difficulty', difficulty);
+        }
+        if (unsolvedOnly) {
+            params.append('unsolved', 'true');
+        }
+
+        if (params.toString()) {
+            url += '?' + params.toString();
+        }
+        window.location.href = url;
+    }
+</script>
+{% endblock %}

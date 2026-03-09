@@ -1,0 +1,482 @@
+{% extends "base.html" %}
+
+{% block title %}添削依頼履歴 - 論述問題{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+        <h2><i class="fas fa-history"></i> 添削依頼履歴</h2>
+        <a href="{{ url_for('essay_index') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> 論述問題へ戻る
+        </a>
+    </div>
+
+    <!-- 統計カード -->
+    <div class="d-flex flex-wrap gap-2 mb-3">
+        <a href="{{ url_for('my_corrections', status='all') }}"
+            class="btn btn-sm {{ 'btn-primary' if current_filter == 'all' else 'btn-outline-primary' }}">
+            すべて <span class="badge bg-white text-primary">{{ stats.total }}</span>
+        </a>
+        <a href="{{ url_for('my_corrections', status='pending') }}"
+            class="btn btn-sm {{ 'btn-warning' if current_filter == 'pending' else 'btn-outline-warning' }}">
+            添削待ち <span class="badge bg-white text-warning">{{ stats.pending }}</span>
+        </a>
+        <a href="{{ url_for('my_corrections', status='unread') }}"
+            class="btn btn-sm {{ 'btn-danger' if current_filter == 'unread' else 'btn-outline-danger' }}">
+            返信未読 <span class="badge bg-white text-danger">{{ stats.unread }}</span>
+        </a>
+        <a href="{{ url_for('my_corrections', status='resolved') }}"
+            class="btn btn-sm {{ 'btn-success' if current_filter == 'resolved' else 'btn-outline-success' }}">
+            解決済み <span class="badge bg-white text-success">{{ stats.resolved }}</span>
+        </a>
+    </div>
+
+    <!-- 依頼一覧 -->
+    <div class="card shadow-sm">
+        <div class="card-body p-0">
+            {% if requests %}
+            <div class="list-group list-group-flush">
+                {% for req in requests %}
+                <div
+                    class="list-group-item list-group-item-action p-3 {{ 'bg-light' if req.status == 'replied' and not req.is_read_by_user else '' }}">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div class="flex-grow-1">
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                                {% if req.status == 'pending' %}
+                                <span class="badge bg-warning text-dark"><i class="fas fa-clock"></i> 添削待ち</span>
+                                {% elif req.status == 'replied' and not req.is_read_by_user %}
+                                <span class="badge bg-danger"><i class="fas fa-bell"></i> 返信未読</span>
+                                {% else %}
+                                <span class="badge bg-success"><i class="fas fa-check"></i> 解決済み</span>
+                                {% endif %}
+                                <small class="text-muted">{{ req.created_at | to_jst }}</small>
+                            </div>
+
+                            <h6 class="mb-1">
+                                <a href="{{ url_for('essay_problem', problem_id=req.problem_id) }}"
+                                    class="text-decoration-none">
+                                    問題 #{{ req.problem_id }}
+                                    {% if req.problem %}
+                                    - {{ req.problem.university }} {{ req.problem.year }}年
+                                    {% endif %}
+                                </a>
+                            </h6>
+
+                            {% if req.student_message %}
+                            <p class="text-muted small mb-1">
+                                <i class="fas fa-comment"></i> {{ req.student_message[:50] }}{% if
+                                req.student_message|length > 50 %}...{% endif %}
+                            </p>
+                            {% endif %}
+
+                            {% if req.status == 'replied' %}
+                            <div class="mt-2 p-2 bg-white border rounded">
+                                <small class="text-success fw-bold"><i class="fas fa-chalkboard-teacher"></i>
+                                    先生からの返信:</small>
+                                <p class="mb-0 small" style="white-space: pre-wrap;">{{ req.reply_text | striptags |
+                                    truncate(100) }}</p>
+                                {% set reply_imgs = req.db_images | selectattr('image_type', 'equalto', 'reply') | list
+                                %}
+                                {% if reply_imgs %}
+                                <span class="badge bg-info mt-1"><i class="fas fa-image"></i> 添削画像あり</span>
+                                {% endif %}
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="ms-3 d-flex flex-column gap-2 align-items-end flex-shrink-0">
+                            <button class="btn btn-sm btn-primary detail-modal-btn" style="white-space: nowrap;"
+                                data-id="{{ req.id }}" data-problem-id="{{ req.problem_id }}"
+                                data-problem-info="{{ req.problem.university if req.problem else '' }} {{ req.problem.year if req.problem else '' }}年"
+                                data-status="{{ req.status }}" data-created="{{ req.created_at | to_jst }}"
+                                data-replied="{{ req.replied_at | to_jst if req.replied_at else '' }}"
+                                data-message="{{ req.student_message or '' }}"
+                                data-request-text="{{ req.request_text or '' }}" {% set req_imgs=req.db_images |
+                                selectattr('image_type', 'equalto' , 'request' ) | list %} {% set request_image_url=''
+                                %} {% if req_imgs %} {% set request_image_url=url_for('serve_correction_image',
+                                image_id=req_imgs[0].id) %} {% elif req.request_image_path %} {% if
+                                req.request_image_path.startswith('http') %} {% set
+                                request_image_url=req.request_image_path %} {% else %} {% set
+                                request_image_url=url_for('static', filename='uploads/essay_images/' +
+                                req.request_image_path) %} {% endif %} {% endif %}
+                                data-request-image="{{ request_image_url }}"
+                                data-reply-text="{{ req.reply_text or '' }}" {% set rpl_imgs=req.db_images |
+                                selectattr('image_type', 'equalto' , 'reply' ) | list %}
+                                data-reply-image="{{ url_for('serve_correction_image', image_id=rpl_imgs[0].id) if rpl_imgs else '' }}">
+                                <i class="fas fa-eye"></i> 詳細
+                            </button>
+                            {% if req.status == 'replied' and not req.is_read_by_user %}
+                            <button class="btn btn-sm btn-outline-success mark-read-btn" data-request-id="{{ req.id }}">
+                                <i class="fas fa-check"></i> 既読
+                            </button>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-center py-5">
+                <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                <p class="text-muted mb-0">
+                    {% if current_filter == 'pending' %}
+                    添削待ちの依頼はありません
+                    {% elif current_filter == 'unread' %}
+                    未読の返信はありません
+                    {% elif current_filter == 'resolved' %}
+                    解決済みの依頼はありません
+                    {% else %}
+                    添削依頼はまだありません
+                    {% endif %}
+                </p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- 詳細モーダル -->
+<div class="modal fade" id="correctionDetailModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-chalkboard-teacher"></i> 添削依頼詳細</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row mb-3">
+                    <div class="col-6">
+                        <small class="text-muted">問題</small>
+                        <p id="modalProblemInfo" class="mb-0 fw-bold"></p>
+                    </div>
+                    <div class="col-6">
+                        <small class="text-muted">送信日時</small>
+                        <p id="modalCreated" class="mb-0"></p>
+                    </div>
+                </div>
+
+                <div class="mb-3" id="modalRequestTextContainer">
+                    <label class="fw-bold small text-muted">提出した回答</label>
+                    <div id="modalRequestText" class="p-2 border rounded bg-white font-monospace"
+                        style="white-space: pre-wrap; max-height: 150px; overflow-y: auto;"></div>
+                </div>
+
+                <!-- 提出画像 -->
+                <div id="modalRequestImageContainer" class="mb-3 text-center" style="display: none;">
+                    <label class="fw-bold small text-muted d-block mb-2">提出画像</label>
+                    <img id="modalRequestImage" src="" class="img-fluid rounded border" alt="提出画像"
+                        style="max-height: 300px; cursor: pointer;" onclick="window.open(this.src)">
+                </div>
+
+                <hr>
+
+                <!-- チャット形式の会話履歴 -->
+                <div id="chatContainer" class="mb-3"
+                    style="max-height: 400px; overflow-y: auto; background: #f5f5f5; border-radius: 8px; padding: 15px;">
+                    <!-- JSで動的に生成 -->
+                </div>
+
+                <!-- ステータス表示 -->
+                <div id="modalStatusAlert" class="mb-3"></div>
+
+                <!-- 添削画像 -->
+                <div id="modalReplyImageContainer" class="text-center mb-3" style="display: none;">
+                    <label class="fw-bold small text-success d-block mb-2">添削画像</label>
+                    <img id="modalReplyImage" src="" class="img-fluid rounded border" alt="添削画像"
+                        style="max-height: 400px;">
+                </div>
+
+                <!-- フォローアップ返信フォーム -->
+                <div class="p-3 bg-light rounded border">
+                    <label class="fw-bold small"><i class="fas fa-reply"></i> 追加質問・返信</label>
+                    <textarea id="followUpMessage" class="form-control mt-2" rows="2"
+                        placeholder="先生への追加質問などを入力..."></textarea>
+                    <button type="button" id="sendFollowUpBtn" class="btn btn-primary btn-sm mt-2">
+                        <i class="fas fa-paper-plane"></i> 送信する
+                    </button>
+                    <small class="d-block text-muted mt-1">※送信すると再び「添削待ち」状態になります</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <a id="modalProblemLink" href="#" class="btn btn-outline-primary" target="_blank">
+                    <i class="fas fa-external-link-alt"></i> 問題ページへ
+                </a>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // チャットバブル生成関数
+        function createChatBubble(message, isStudent, timestamp) {
+            const bubble = document.createElement('div');
+            bubble.style.cssText = `
+                max-width: 85%;
+                margin-bottom: 12px;
+                ${isStudent ? 'margin-left: auto;' : 'margin-right: auto;'}
+            `;
+
+            const inner = document.createElement('div');
+            inner.style.cssText = `
+                padding: 10px 14px;
+                border-radius: 16px;
+                ${isStudent
+                    ? 'background: #007bff; color: white; border-bottom-right-radius: 4px;'
+                    : 'background: white; color: #333; border: 1px solid #ddd; border-bottom-left-radius: 4px;'
+                }
+            `;
+            var contentHtml = '';
+            if (!isStudent) {
+                // 先生の返信はHTMLとして扱う
+                // <p>タグなどで囲まれている場合はそのまま、そうでない場合（過去データ）は改行を<br>に
+                if (!message.includes('<') && !message.includes('>')) {
+                    contentHtml = escapeHtml(message).replace(/\n/g, '<br>');
+                } else {
+                    contentHtml = message;
+                }
+            } else {
+                // 生徒のメッセージも下線などのタグが含まれるためHTMLとして扱う
+                if (!message.includes('<') && !message.includes('>')) {
+                    contentHtml = escapeHtml(message).replace(/\n/g, '<br>');
+                } else {
+                    contentHtml = message;
+                }
+            }
+
+            inner.innerHTML = `
+                <div style="font-size: 0.75rem; opacity: 0.7; margin-bottom: 4px;">
+                    ${isStudent ? '👤 あなた' : '👨‍🏫 先生'} ${timestamp || ''}
+                </div>
+                <div style="line-height: 1.5; word-break: break-word;" class="chat-content">${contentHtml}</div>
+            `;
+            bubble.appendChild(inner);
+            return bubble;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // メッセージをパースして会話配列に変換
+        function parseConversation(studentMessage, replyText, created, replied) {
+            let messages = [];
+
+            // --- 生徒のメッセージ ---
+            if (studentMessage) {
+                const parts = studentMessage.split(/\n\n--- 追加質問 \(([^)]+)\) ---\n/);
+
+                // 最初のメッセージ
+                if (parts[0].trim()) {
+                    messages.push({
+                        text: parts[0].trim(),
+                        isStudent: true,
+                        time: created,
+                        timestamp: new Date(created).getTime() // ソート用
+                    });
+                }
+
+                // 追加質問群
+                for (let i = 1; i < parts.length; i += 2) {
+                    const timeStr = parts[i];
+                    const text = parts[i + 1];
+                    if (text && text.trim()) {
+                        messages.push({
+                            text: text.trim(),
+                            isStudent: true,
+                            time: timeStr,
+                            timestamp: new Date(timeStr).getTime()
+                        });
+                    }
+                }
+            }
+
+            // --- 先生の返信 ---
+            if (replyText) {
+                // 新しい形式: \n\n--- 返信 (YYYY/MM/DD HH:MM) ---\n
+                // 後方互換性のため古い形式（単なる区切り）も考慮する必要があるが、
+                // 古い形式のデータは区切りがないか、単に追記されているだけなので
+                // 既存の replyText 全体を「replied」の時間として扱うしかない場合も多い。
+                // ただし、アプリの改修履歴からして、これまでは単に追記されていた（区切り文字なし、または改行のみ）可能性が高い。
+                // ここでは、今回導入した区切り文字で分割を試みる。
+
+                const replyParts = replyText.split(/\n\n--- 返信 \(([^)]+)\) ---\n/);
+
+                // 最初の返信 (replied_at の時間)
+                if (replyParts[0].trim()) {
+                    messages.push({
+                        text: replyParts[0].trim(),
+                        isStudent: false,
+                        time: replied,
+                        timestamp: new Date(replied).getTime()
+                    });
+                }
+
+                // 追加返信群
+                for (let i = 1; i < replyParts.length; i += 2) {
+                    const timeStr = replyParts[i];
+                    const text = replyParts[i + 1];
+                    if (text && text.trim()) {
+                        messages.push({
+                            text: text.trim(),
+                            isStudent: false,
+                            time: timeStr,
+                            timestamp: new Date(timeStr).getTime()
+                        });
+                    }
+                }
+            }
+
+            // 時間順にソート (古い順)
+            messages.sort((a, b) => a.timestamp - b.timestamp);
+
+            return messages;
+        }
+
+        // 詳細モーダル
+        document.querySelectorAll('.detail-modal-btn').forEach(btn => {
+            btn.addEventListener('click', function () {
+                const data = this.dataset;
+
+                // リクエストIDを保存（フォローアップ用）
+                window.currentCorrectionRequestId = data.id;
+
+                // フォローアップフォームをリセット
+                document.getElementById('followUpMessage').value = '';
+
+                // 基本情報
+                document.getElementById('modalProblemInfo').textContent = `問題 #${data.problemId} - ${data.problemInfo}`;
+                document.getElementById('modalCreated').textContent = data.created;
+
+                // 提出テキスト
+                const requestTextContainer = document.getElementById('modalRequestTextContainer');
+                if (data.requestText) {
+                    document.getElementById('modalRequestText').innerHTML = data.requestText;
+                    requestTextContainer.style.display = 'block';
+                } else {
+                    requestTextContainer.style.display = 'none';
+                }
+
+                // 問題リンク
+                document.getElementById('modalProblemLink').href = `/essay/problem/${data.problemId}`;
+
+                // チャット履歴を生成
+                const chatContainer = document.getElementById('chatContainer');
+                chatContainer.innerHTML = '';
+
+                const conversation = parseConversation(
+                    data.message,
+                    data.replyText,
+                    data.created,
+                    data.replied
+                );
+
+                // 提出画像
+                const requestImageContainer = document.getElementById('modalRequestImageContainer');
+                if (data.requestImage) {
+                    document.getElementById('modalRequestImage').src = data.requestImage;
+                    requestImageContainer.style.display = 'block';
+                } else {
+                    requestImageContainer.style.display = 'none';
+                }
+
+                if (conversation.length === 0) {
+                    chatContainer.innerHTML = '<p class="text-muted text-center">メッセージはありません</p>';
+                } else {
+                    conversation.forEach(msg => {
+                        chatContainer.appendChild(createChatBubble(msg.text, msg.isStudent, msg.time));
+                    });
+                }
+
+                // スクロールを最下部に
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+
+                // ステータス表示
+                const statusAlert = document.getElementById('modalStatusAlert');
+                if (data.status === 'pending') {
+                    statusAlert.innerHTML = '<div class="alert alert-warning mb-0"><i class="fas fa-clock"></i> 現在、先生が確認・添削中です。</div>';
+                } else {
+                    statusAlert.innerHTML = '<div class="alert alert-success mb-0"><i class="fas fa-check-circle"></i> 添削が完了しました。追加の質問があれば下のフォームからどうぞ。</div>';
+                }
+
+                // 返信画像
+                const replyImageContainer = document.getElementById('modalReplyImageContainer');
+                if (data.replyImage) {
+                    document.getElementById('modalReplyImage').src = data.replyImage;
+                    replyImageContainer.style.display = 'block';
+                } else {
+                    replyImageContainer.style.display = 'none';
+                }
+
+                // モーダル表示
+                var modal = new bootstrap.Modal(document.getElementById('correctionDetailModal'));
+                modal.show();
+            });
+        });
+
+        // 既読ボタン
+        document.querySelectorAll('.mark-read-btn').forEach(btn => {
+            btn.addEventListener('click', async function () {
+                const requestId = this.dataset.requestId;
+                try {
+                    const resp = await fetch(`/essay/correction/${requestId}/mark_read`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+                    if (resp.ok) {
+                        location.reload();
+                    }
+                } catch (e) {
+                    console.error('Error marking as read:', e);
+                }
+            });
+        });
+
+        // フォローアップ返信送信
+        document.getElementById('sendFollowUpBtn').addEventListener('click', async function () {
+            const message = document.getElementById('followUpMessage').value.trim();
+            const requestId = window.currentCorrectionRequestId;
+
+            if (!message) {
+                alert('メッセージを入力してください');
+                return;
+            }
+
+            if (!requestId) {
+                alert('エラーが発生しました。ページを再読み込みしてください。');
+                return;
+            }
+
+            this.disabled = true;
+            this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 送信中...';
+
+            try {
+                const resp = await fetch(`/essay/correction/${requestId}/follow_up`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: message })
+                });
+
+                const data = await resp.json();
+
+                if (resp.ok && data.status === 'success') {
+                    alert('追加質問を送信しました');
+                    location.reload();
+                } else {
+                    alert(data.message || '送信に失敗しました');
+                    this.disabled = false;
+                    this.innerHTML = '<i class="fas fa-paper-plane"></i> 送信する';
+                }
+            } catch (e) {
+                console.error('Error sending follow-up:', e);
+                alert('送信中にエラーが発生しました');
+                this.disabled = false;
+                this.innerHTML = '<i class="fas fa-paper-plane"></i> 送信する';
+            }
+        });
+    });
+</script>
+{% endblock %}

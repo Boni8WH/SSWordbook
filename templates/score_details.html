@@ -1,0 +1,460 @@
+{% extends "base.html" %}
+{% block title %}スコア算出方法 - {{ app_name }}{% endblock %}
+
+{% block content %}
+<section class="score-details-section">
+    <div class="header-section">
+        <h2>📐 スコア算出方法</h2>
+        <p class="subtitle">信頼性重視の総合学習評価システムの詳細</p>
+        <div class="back-link">
+            <a href="{{ url_for('progress_page') }}" class="btn btn-outline-primary btn-sm">
+                <i class="fas fa-arrow-left"></i> 進捗ページに戻る
+            </a>
+        </div>
+    </div>
+
+    <!-- 基本式セクション -->
+    <div class="formula-container">
+        <h3>🔢 基本式</h3>
+        <div class="formula-box">
+            <div class="formula-main">
+                総合スコア = <span class="condition">マスタースコア + 正答率スコア + 継続性スコア + 精度ボーナス</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 各要素の詳細 -->
+    <div class="components-section">
+        <h3>📊 各要素の計算</h3>
+
+        <!-- 1. マスタースコア -->
+        <div class="component-card mastery-card">
+            <div class="component-header">
+                <h4><span class="component-label">1</span> マスタースコア（段階的評価）</h4>
+                <span class="weight-badge">段階式</span>
+            </div>
+            <div class="formula-detail">
+                <code>マスタースコア = floor(マスター数 ÷ 100) × 250 + (マスター数 % 100 ÷ 100) × 125</code>
+            </div>
+            <ul class="explanation-list">
+                <li><strong>マスター数</strong> = 正答率80%以上の問題数</li>
+                <li><strong>段階評価</strong>：100問達成ごとに250点の大幅アップ</li>
+                <li><strong>連続評価</strong>：途中進捗も125点満点で評価</li>
+            </ul>
+            <div class="example-box">
+                <strong>例：</strong> 350問マスター → floor(350÷100)×250 + (50÷100)×125 = 750 + 62.5 = <strong>812.5点</strong>
+            </div>
+        </div>
+
+        <!-- 2. 正答率スコア -->
+        <div class="component-card accuracy-card">
+            <div class="component-header">
+                <h4><span class="component-label">2</span> 正答率スコア（段階的連続計算）</h4>
+                <span class="feature-badge">急上昇式</span>
+            </div>
+            <div class="formula-detail">
+                <code>90%以上: 500 + (正答率 - 0.9) × 800</code><br>
+                <code>80-89%: 350 + (正答率 - 0.8) × 1500</code><br>
+                <code>70-79%: 200 + (正答率 - 0.7) × 1500</code><br>
+                <code>60-69%: 100 + (正答率 - 0.6) × 1000</code><br>
+                <code>60%未満: 正答率 × 166.67</code>
+            </div>
+            <ul class="explanation-list">
+                <li><strong>段階設定</strong>：正答率の区間ごとに異なる傾斜</li>
+                <li><strong>80%の壁</strong>：80%以上で大幅スコアアップ</li>
+                <li><strong>連続計算</strong>：区間内でも細かく評価</li>
+            </ul>
+            <div class="example-box">
+                <strong>例：</strong> 正答率85% → 350 + (0.85 - 0.8) × 1500 = 350 + 75 = <strong>425点</strong>
+            </div>
+        </div>
+
+        <!-- 3. 継続性スコア -->
+        <div class="component-card effort-card">
+            <div class="component-header">
+                <h4><span class="component-label">3</span> 継続性スコア（活動量評価）</h4>
+                <span class="balance-badge">積み上げ式</span>
+            </div>
+            <div class="formula-detail">
+                <code>継続性スコア = √(総回答数) × 3</code>
+            </div>
+            <ul class="explanation-list">
+                <li><strong>平方根関数</strong>：回答数が増えるほど緩やかに上昇</li>
+                <li><strong>継続重視</strong>：コツコツ学習を着実に評価</li>
+                <li><strong>適度な評価</strong>：過度な量産を抑制</li>
+            </ul>
+            <div class="example-box">
+                <strong>例：</strong> 400回答 → √400 × 3 = 20 × 3 = <strong>60点</strong>
+            </div>
+        </div>
+
+        <!-- 4. 精度ボーナス -->
+        <div class="component-card" style="border-left-color: #e74c3c;">
+            <div class="component-header">
+                <h4><span class="component-label">4</span> 精度ボーナス（高正答率への追加評価）</h4>
+                <span class="feature-badge" style="background: #e74c3c;">ボーナス</span>
+            </div>
+            <div class="formula-detail">
+                <code>95%以上: 150 + (正答率 - 0.95) × 1000</code><br>
+                <code>90-94%: 100 + (正答率 - 0.9) × 1000</code><br>
+                <code>85-89%: 50 + (正答率 - 0.85) × 1000</code><br>
+                <code>80-84%: (正答率 - 0.8) × 1000</code><br>
+                <code>80%未満: 0</code>
+            </div>
+            <ul class="explanation-list">
+                <li><strong>高精度報酬</strong>：80%以上の正答率で発動</li>
+                <li><strong>段階ボーナス</strong>：95%以上で最大ボーナス</li>
+                <li><strong>品質重視</strong>：正確性への特別評価</li>
+            </ul>
+            <div class="example-box">
+                <strong>例：</strong> 正答率92% → 100 + (0.92 - 0.9) × 1000 = 100 + 20 = <strong>120点</strong>
+            </div>
+        </div>
+    </div>
+
+    <!-- 具体例セクション -->
+    <div class="example-section">
+        <h3>🎯 具体的な計算例</h3>
+        <div class="calculation-example">
+            <div class="example-title">マスター250問、正解850回/1000回答の学習者の場合</div>
+            <div class="calculation-steps">
+                <div class="step">
+                    <span class="step-label">1</span>
+                    <span class="step-calc">マスタースコア: floor(250÷100)×250 + (50÷100)×125 = 500 + 62.5 =
+                        <strong>562.5点</strong></span>
+                </div>
+                <div class="step">
+                    <span class="step-label">2</span>
+                    <span class="step-calc">正答率スコア: 350 + (0.85-0.8)×1500 = 350 + 75 = <strong>425点</strong></span>
+                </div>
+                <div class="step">
+                    <span class="step-label">3</span>
+                    <span class="step-calc">継続性スコア: √1000 × 3 = 31.6 × 3 = <strong>94.8点</strong></span>
+                </div>
+                <div class="step">
+                    <span class="step-label">4</span>
+                    <span class="step-calc">精度ボーナス: 50 + (0.85-0.85)×1000 = <strong>50点</strong></span>
+                </div>
+                <div class="final-result">
+                    <span class="result-label">総合スコア</span>
+                    <span class="result-calc">562.5 + 425 + 94.8 + 50 = <strong>1132.3点</strong></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 設計思想セクション -->
+    <div class="philosophy-section">
+        <h3>⚖️ 設計思想</h3>
+        <div class="philosophy-content">
+            <p class="philosophy-main">
+                学習行動に応じてリアルタイムで変動する動的評価システム。<br>
+                段階的評価により明確な目標設定を促し、継続的な学習と高い正答率を両立して評価
+            </p>
+            <div class="fairness-features">
+                <div class="feature-item">
+                    <i class="fas fa-chart-line text-success"></i>
+                    <span>100問マスターごとの段階的大幅スコアアップ</span>
+                </div>
+                <div class="feature-item">
+                    <i class="fas fa-rocket text-warning"></i>
+                    <span>80%以上の正答率で急激なスコア上昇</span>
+                </div>
+                <div class="feature-item">
+                    <i class="fas fa-award text-primary"></i>
+                    <span>高精度学習にボーナス付与</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 戻るボタン -->
+    <div class="back-section">
+        <a href="{{ url_for('progress_page') }}" class="btn btn-primary">
+            <i class="fas fa-arrow-left"></i> 進捗ページに戻る
+        </a>
+    </div>
+</section>
+
+<style>
+    .score-details-section {
+        max-width: 1000px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+
+    .header-section {
+        text-align: center;
+        margin-bottom: 30px;
+        padding-bottom: 20px;
+        border-bottom: 3px solid #007bff;
+    }
+
+    .subtitle {
+        color: #6c757d;
+        font-size: 1.1rem;
+        margin-bottom: 15px;
+    }
+
+    .back-link {
+        margin-top: 15px;
+    }
+
+    .formula-container {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        border-radius: 10px;
+        padding: 25px;
+        margin-bottom: 30px;
+        border-left: 5px solid #007bff;
+    }
+
+    .formula-box {
+        text-align: center;
+    }
+
+    .formula-main {
+        font-size: 1.2rem;
+        font-weight: 600;
+        color: #2c3e50;
+        background: white;
+        padding: 15px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .condition {
+        color: #007bff;
+    }
+
+    .components-section {
+        margin-bottom: 30px;
+    }
+
+    .component-card {
+        background: white;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        border-left: 5px solid;
+    }
+
+    .mastery-card {
+        border-left-color: #28a745;
+    }
+
+    .accuracy-card {
+        border-left-color: #ffc107;
+    }
+
+    .effort-card {
+        border-left-color: #17a2b8;
+    }
+
+    .component-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+    }
+
+    .component-label {
+        background: #007bff;
+        color: white;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-weight: bold;
+        margin-right: 10px;
+    }
+
+    .weight-badge {
+        background: #28a745;
+    }
+
+    .feature-badge {
+        background: #ffc107;
+        color: #000;
+    }
+
+    .balance-badge {
+        background: #17a2b8;
+    }
+
+    .weight-badge,
+    .feature-badge,
+    .balance-badge {
+        color: white;
+        padding: 3px 8px;
+        border-radius: 12px;
+        font-size: 0.8rem;
+        font-weight: 500;
+    }
+
+    .formula-detail {
+        background: #f8f9fa;
+        padding: 10px 15px;
+        border-radius: 6px;
+        margin-bottom: 15px;
+        font-family: 'Courier New', monospace;
+        border: 1px solid #dee2e6;
+    }
+
+    .explanation-list {
+        margin-bottom: 15px;
+        padding-left: 20px;
+    }
+
+    .explanation-list li {
+        margin-bottom: 5px;
+        color: #495057;
+    }
+
+    .example-box {
+        background: #e7f3ff;
+        padding: 10px 15px;
+        border-radius: 6px;
+        border: 1px solid #b8daff;
+        color: #004085;
+    }
+
+    .example-section {
+        background: #f8f9fa;
+        border-radius: 10px;
+        padding: 25px;
+        margin-bottom: 30px;
+    }
+
+    .calculation-example {
+        background: white;
+        border-radius: 8px;
+        padding: 20px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .example-title {
+        font-weight: 600;
+        color: #2c3e50;
+        margin-bottom: 20px;
+        text-align: center;
+        font-size: 1.1rem;
+    }
+
+    .calculation-steps {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .step {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        padding: 10px;
+        background: #f8f9fa;
+        border-radius: 6px;
+    }
+
+    .step-label {
+        background: #007bff;
+        color: white;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-weight: bold;
+        min-width: 25px;
+        text-align: center;
+    }
+
+    .final-result {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        padding: 15px;
+        background: linear-gradient(135deg, #28a745, #20c997);
+        color: white;
+        border-radius: 6px;
+        font-weight: 600;
+        margin-top: 10px;
+    }
+
+    .result-label {
+        background: rgba(255, 255, 255, 0.2);
+        padding: 4px 8px;
+        border-radius: 4px;
+        min-width: 80px;
+        text-align: center;
+    }
+
+    .philosophy-section {
+        background: linear-gradient(135deg, #6f42c1, #007bff);
+        color: white;
+        border-radius: 10px;
+        padding: 25px;
+        margin-bottom: 30px;
+    }
+
+    .philosophy-main {
+        font-size: 1.1rem;
+        line-height: 1.6;
+        margin-bottom: 20px;
+        text-align: left;
+    }
+
+    .fairness-features {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 15px;
+    }
+
+    .feature-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        background: rgba(255, 255, 255, 0.1);
+        padding: 12px;
+        border-radius: 6px;
+    }
+
+    .comparison-section {
+        margin-bottom: 30px;
+    }
+
+    .back-section {
+        text-align: center;
+        padding-top: 20px;
+        border-top: 2px solid #e9ecef;
+    }
+
+    /* レスポンシブ対応 */
+    @media (max-width: 768px) {
+        .score-details-section {
+            padding: 15px;
+        }
+
+        .component-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 10px;
+        }
+
+        .step {
+            flex-direction: column;
+            align-items: flex-start;
+            text-align: left;
+        }
+
+        .final-result {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .fairness-features {
+            grid-template-columns: 1fr;
+        }
+
+        .formula-main {
+            font-size: 1rem;
+            line-height: 1.4;
+        }
+    }
+</style>
+{% endblock %}

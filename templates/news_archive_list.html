@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}ニュースアーカイブ - {{ app_name }}{% endblock %}
+
+{% block content %}
+<style>
+    html, body { overflow-x: hidden; }
+</style>
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-7">
+
+            <div class="d-flex align-items-center justify-content-between mb-3">
+                <h1 class="h3 fw-bold mb-0 text-truncate me-2">
+                    <i class="fas fa-archive me-2 text-muted"></i>ニュースアーカイブ
+                </h1>
+                <!-- PC: テキストあり / モバイル: アイコンのみ -->
+                <a href="{{ url_for('news_page') }}" class="btn btn-sm btn-outline-secondary rounded-pill px-3 flex-shrink-0 d-none d-md-inline-flex">
+                    <i class="fas fa-arrow-left me-1"></i>今日のニュース
+                </a>
+                <a href="{{ url_for('news_page') }}" class="btn btn-sm btn-outline-secondary rounded-pill px-3 flex-shrink-0 d-md-none">
+                    <i class="fas fa-arrow-left"></i>
+                </a>
+            </div>
+
+            <!-- キーワード検索フォーム -->
+            <form method="get" action="{{ url_for('news_archive_search') }}" class="mb-4">
+                <div class="input-group shadow-sm rounded-4 overflow-hidden">
+                    <input type="search" name="q"
+                           class="form-control border-0 py-2 ps-4"
+                           placeholder="キーワードで過去記事を検索...">
+                    <button type="submit" class="btn btn-primary px-4">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </div>
+            </form>
+
+            {% if pagination.items %}
+            <div class="list-group shadow-sm rounded-4 overflow-hidden">
+                {% for archive in pagination.items %}
+                <a href="{{ url_for('news_archive_detail', date_str=archive.date.strftime('%Y-%m-%d')) }}"
+                   class="list-group-item list-group-item-action d-flex align-items-center justify-content-between py-3 px-4">
+                    <div>
+                        <div class="fw-bold text-dark">
+                            {{ archive.date.strftime('%Y年%m月%d日') }}
+                            {% set weekdays = ['月', '火', '水', '木', '金', '土', '日'] %}
+                            <span class="text-muted fw-normal">（{{ weekdays[archive.date.weekday()] }}）</span>
+                        </div>
+                        <div class="text-muted small mt-1">
+                            <i class="fas fa-newspaper me-1"></i>{{ archive.total_processed }}件から厳選
+                        </div>
+                    </div>
+                    <i class="fas fa-chevron-right text-muted"></i>
+                </a>
+                {% endfor %}
+            </div>
+
+            <!-- ページネーション -->
+            {% if pagination.pages > 1 %}
+            <nav class="mt-4">
+                <ul class="pagination justify-content-center">
+                    {% if pagination.has_prev %}
+                    <li class="page-item">
+                        <a class="page-link rounded-pill me-1" href="{{ url_for('news_archive_list', page=pagination.prev_num) }}">
+                            <i class="fas fa-chevron-left"></i>
+                        </a>
+                    </li>
+                    {% endif %}
+                    <li class="page-item disabled">
+                        <span class="page-link">{{ pagination.page }} / {{ pagination.pages }}</span>
+                    </li>
+                    {% if pagination.has_next %}
+                    <li class="page-item">
+                        <a class="page-link rounded-pill ms-1" href="{{ url_for('news_archive_list', page=pagination.next_num) }}">
+                            <i class="fas fa-chevron-right"></i>
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+
+            {% else %}
+            <div class="text-center py-5 text-muted">
+                <i class="fas fa-archive fa-3x mb-3 opacity-25"></i>
+                <p>まだアーカイブがありません。<br>ニュースを更新すると自動的に保存されます。</p>
+            </div>
+            {% endif %}
+
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,1756 @@
+{% extends "base.html" %}
+{% block title %}コラム - {{ app_name }}{% endblock %}
+
+{% block content %}
+<link
+    href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@700&family=Kaisei+Tokumin:wght@400;700&display=swap"
+    rel="stylesheet">
+<style>
+    /* Map Abyss Style Header -> Standarized Flexbox Style */
+    .column-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 2rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        background: transparent;
+        position: relative;
+        z-index: 2;
+        text-align: left;
+    }
+
+    .header-left {
+        display: flex;
+        align-items: center;
+    }
+
+    .column-title {
+        font-family: 'Shippori Mincho', serif;
+        font-size: clamp(1.5rem, 4vw, 2rem);
+        font-weight: 700;
+        color: #1a1a2e;
+        letter-spacing: 0.1em;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        text-shadow: none;
+        padding: 0;
+    }
+
+    .column-title i {
+        color: #d4af37;
+        margin-right: 0.4em;
+        font-size: 0.9em;
+        filter: drop-shadow(0 0 5px rgba(212, 175, 55, 0.4));
+    }
+
+    .column-subtitle {
+        font-family: 'Kaisei Tokumin', serif;
+        color: #8c909e;
+        font-size: 0.8rem;
+        margin-left: 1rem;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        border-left: 2px solid #d4af37;
+        padding-left: 1rem;
+        margin-top: 0;
+    }
+
+    @media (max-width: 768px) {
+        .column-header {
+            justify-content: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.8rem;
+            padding-top: 5px;
+        }
+
+        .header-left {
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 0;
+            gap: 2px;
+        }
+
+        .column-title {
+            font-size: 1.3rem;
+        }
+
+        .column-subtitle {
+            margin-left: 0;
+            border-left: none;
+            padding-left: 0;
+            margin-top: 0;
+            border-top: none;
+            padding-top: 0;
+            font-size: 0.7rem;
+        }
+
+        .header-home-btn {
+            position: absolute;
+            left: 0;
+            top: 5px;
+            padding: 6px 12px !important;
+        }
+
+        .header-home-btn.ms-auto {
+            margin-left: 0 !important;
+        }
+    }
+
+    .subject-title {
+        /* Removed old border style as we now use accordion */
+        display: none;
+    }
+
+    .accordion-button {
+        font-weight: bold;
+        color: #2c3e50;
+        background-color: #fff;
+    }
+
+    .accordion-button:not(.collapsed) {
+        color: #3498db;
+        background-color: #e8f6f3;
+        box-shadow: inset 0 -1px 0 rgba(0, 0, 0, .125);
+    }
+
+    .accordion-button:focus {
+        box-shadow: 0 0 0 0.25rem rgba(52, 152, 219, 0.25);
+        border-color: #3498db;
+    }
+
+    .accordion-item {
+        border: 1px solid #e1e8ed;
+        margin-bottom: 1rem;
+        border-radius: 8px !important;
+        overflow: hidden;
+    }
+
+    /* Card Styles */
+    .column-card {
+        background: #fff;
+        border: 1px solid #e1e8ed;
+        border-radius: 8px;
+        padding: 10px;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        transition: all 0.2s ease;
+        position: relative;
+        overflow: hidden;
+        cursor: pointer;
+        /* Add pointer cursor */
+    }
+
+    .column-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        border-color: #3498db;
+    }
+
+    .column-card.read {
+        background-color: #f8f9fa;
+        border-color: #ecf0f1;
+        opacity: 0.8;
+    }
+
+    .column-card.read::after {
+        content: "READ";
+        position: absolute;
+        top: 5px;
+        right: -25px;
+        background: #95a5a6;
+        color: white;
+        padding: 2px 30px;
+        transform: rotate(45deg);
+        font-size: 0.6em;
+        font-weight: bold;
+    }
+
+    .card-meta {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 5px;
+        color: #7f8c8d;
+        font-size: 0.8em;
+    }
+
+    .column-number {
+        background: #ecf0f1;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-weight: bold;
+    }
+
+    .card-title {
+        font-size: 0.95em;
+        font-weight: bold;
+        color: #2c3e50;
+        margin-bottom: 0;
+        line-height: 1.3;
+        flex-grow: 1;
+        display: flex;
+        align-items: center;
+        white-space: nowrap;
+        /* Prevent wrapping */
+        overflow: hidden;
+        /* Hide overflow until resized */
+    }
+
+    .card-footer-action {
+        margin-top: 8px;
+        display: flex;
+        justify-content: flex-end;
+        /* Align button to right */
+        align-items: center;
+        padding-top: 0;
+        border-top: none;
+        /* Remove border for cleaner look */
+    }
+
+    /* Read Checkbox Style */
+    .read-check-wrapper {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        cursor: pointer;
+        font-size: 0.9em;
+        color: #7f8c8d;
+    }
+
+    .read-check-wrapper:hover {
+        color: #2ecc71;
+    }
+
+    .read-check-input {
+        cursor: pointer;
+    }
+
+    /* Modal Text */
+    .modal-column-content {
+        line-height: 2.2;
+        color: #2c3e50;
+        white-space: pre-wrap;
+        font-size: 1.2em;
+        letter-spacing: 0.08em;
+        padding: 20px;
+        max-width: 800px;
+        margin: 0 auto;
+        font-feature-settings: "palt";
+    }
+
+    .modal-subtitle {
+        text-align: center;
+        color: #7f8c8d;
+        font-size: 1.3em;
+        margin-bottom: 30px;
+        border-bottom: 1px solid #eee;
+        padding-bottom: 15px;
+        font-feature-settings: "palt";
+    }
+
+    #columnReaderModal .modal-content {
+        background-color: #fdfdfd;
+        border: none;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    }
+
+    #modalColumnTitle {
+        font-size: 1.6em;
+        letter-spacing: 0.05em;
+    }
+
+    /* Reading Themes */
+    .modal-content.theme-sepia {
+        background-color: #f4ecd8 !important;
+        color: #5b4636 !important;
+    }
+
+    .theme-sepia .modal-column-content,
+    .theme-sepia .modal-title,
+    .theme-sepia .modal-subtitle {
+        color: #5b4636 !important;
+    }
+
+    .theme-sepia .btn-close {
+        filter: sepia(1);
+    }
+
+    .modal-content.theme-dark {
+        background-color: #2c3e50 !important;
+        color: #ecf0f1 !important;
+    }
+
+    .theme-dark .modal-column-content,
+    .theme-dark .modal-title,
+    .theme-dark .modal-subtitle {
+        color: #ecf0f1 !important;
+    }
+
+    .theme-dark .btn-close {
+        filter: invert(1);
+    }
+
+    .theme-dark .border-bottom {
+        border-color: #34495e !important;
+    }
+
+    /* Font Families */
+    .font-mincho .modal-column-content,
+    .font-mincho .modal-title,
+    .font-mincho .modal-subtitle {
+        font-family: "Yu Mincho", "YuMincho", "Hiragino Mincho ProN", serif;
+    }
+
+    /* Vertical Writing Mode */
+    .writing-vertical .modal-body {
+        overflow-x: auto;
+        overflow-y: hidden;
+        width: 100%;
+        /* Force scroll to start at right (visual alignment) */
+        direction: rtl;
+        text-align: left;
+        /* Reset text align inside rtl container */
+    }
+
+    .writing-vertical .modal-body-content-wrapper {
+        display: inline-flex;
+        flex-direction: column;
+        /* Stacks items vertically in logical sense, but horizontally in vertical-rl? No. */
+        /* vertical-rl rotates the axis.
+           In vertical-rl:
+           block-axis goes Right to Left.
+           inline-axis goes Top to Bottom.
+           Normal block flow: Element 1 (Right), Element 2 (Left of 1).
+        */
+        writing-mode: vertical-rl;
+        text-orientation: mixed;
+        height: 65vh;
+        padding: 20px;
+        gap: 3rem;
+        /* Space between Title and Body */
+        align-items: flex-start;
+        /* Aligns to Top */
+
+        /* CRITICAL FIX: Reset direction to ltr to ensure Top-to-Bottom flow in vertical mode */
+        /* The parent .modal-body has direction: rtl for scrollbar positioning, but we must reset text flow */
+        direction: ltr;
+    }
+
+    .writing-vertical .modal-column-content {
+        /* Remove writing-mode here as propergated from wrapper or set directly */
+        writing-mode: vertical-rl;
+        text-orientation: mixed;
+        height: 100%;
+        max-width: none;
+        margin: 0;
+        padding: 0;
+        line-height: 2.0;
+        /* Slightly tighter for vertical */
+        padding: 20px 40px;
+        /* More horizontal padding */
+        column-gap: 2rem;
+
+        /* Fix alignment issues: Disable proportional metrics for vertical text */
+        font-feature-settings: normal;
+        /* Align text to a grid */
+        text-align: justify;
+    }
+
+    .writing-vertical .modal-subtitle {
+        writing-mode: vertical-rl;
+        text-orientation: mixed;
+        border-bottom: none;
+        border-left: 1px solid #eee;
+        margin: 0;
+        padding: 0 0 0 15px;
+        /* Padding on Left (bottom of line in horizontal) */
+        height: 100%;
+        font-size: 1.1em;
+        /* Position styling */
+        white-space: normal;
+        text-align: left;
+        /* Default Top (Left in vertical-rl) */
+        line-break: strict;
+        font-feature-settings: normal;
+    }
+
+    .writing-vertical .modal-subtitle.is-multiline {
+        text-align: right;
+        /* Bottom (Right in vertical-rl) */
+    }
+
+    /* Tate-chu-yoko: Horizontal text inside vertical line */
+    .tcy {
+        text-combine-upright: all;
+        /* font-feature-settings: "hwid" 1; -- Optional: use proportional glyphs */
+    }
+
+    /* Fix scrollbars for vertical mode */
+    .writing-vertical .modal-body::-webkit-scrollbar {
+        height: 12px;
+        width: 12px;
+    }
+
+    .nav-tabs .nav-link {
+        font-weight: bold;
+        color: #555;
+    }
+
+    .nav-tabs .nav-link.active {
+        color: #3498db;
+        border-bottom-color: #3498db;
+    }
+
+    #readingSettingsPanel .btn.active {
+        border: 2px solid #3498db !important;
+        position: relative;
+        z-index: 10;
+        font-weight: bold;
+    }
+
+    /* Like Animation */
+    @keyframes like-bounce {
+        0% {
+            transform: scale(1);
+        }
+
+        50% {
+            transform: scale(1.4);
+        }
+
+        100% {
+            transform: scale(1);
+        }
+    }
+
+    .like-anim {
+        animation: like-bounce 0.4s ease-in-out;
+    }
+
+    #modalLikeButton {
+        border: none;
+        background: none;
+        padding: 0 10px;
+        color: #dc3545;
+        /* Bootstrap danger color */
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        transition: transform 0.1s;
+    }
+
+    #modalLikeButton:active {
+        transform: scale(0.95);
+    }
+
+    #modalLikeButton i {
+        font-size: 1.8rem;
+    }
+
+    #modalLikeCount {
+        font-size: 1.2rem;
+        font-weight: bold;
+        color: #6c757d;
+        /* Muted text for number */
+    }
+
+    /* View Count Style */
+    #modalViewCount,
+    .view-count-badge {
+        font-size: 1.1rem;
+        color: #6c757d;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .view-count-badge {
+        font-size: 0.85em;
+    }
+</style>
+
+<div class="container py-4">
+    <!-- Header -->
+    <div class="column-header">
+        <div class="header-left">
+            <h1 class="column-title"><i class="fas fa-book-open"></i>コラム集</h1>
+            <div class="column-subtitle">Trace the Legacy</div>
+        </div>
+        <a href="{{ url_for('index') }}"
+            class="header-home-btn btn btn-sm btn-outline-secondary rounded-pill px-3 shadow-sm ms-auto">
+            <i class="fas fa-arrow-left"></i><span class="d-none d-md-inline ms-1">ホーム</span>
+        </a>
+    </div>
+
+    <!-- 今日のオススメバナー -->
+    <div id="featuredColumnBanner" style="display:none; margin-bottom: 1.5rem;"
+        data-read-columns="{{ read_columns | tojson | safe }}">
+        <div style="
+            background: linear-gradient(135deg, #1a1a2e 0%, #2c1654 100%);
+            border-radius: 16px;
+            padding: 20px 24px;
+            position: relative;
+            overflow: hidden;
+            cursor: pointer;
+        " onclick="openFeaturedColumn()" id="featuredColumnInner">
+            <!-- 背景装飾 -->
+            <div
+                style="position:absolute;top:50%;right:-20px;transform:translateY(-50%);width:140px;height:140px;border-radius:50%;background:radial-gradient(circle,rgba(212,175,55,0.18),transparent);pointer-events:none;">
+            </div>
+            <div
+                style="position:absolute;bottom:-30px;left:10%;width:200px;height:200px;border-radius:50%;background:radial-gradient(circle,rgba(155,89,182,0.1),transparent);pointer-events:none;">
+            </div>
+            <!-- 既読バッジ -->
+            <div id="featuredReadBadge"
+                style="display:none;position:absolute;top:12px;right:16px;background:rgba(149,165,166,0.85);color:#fff;font-size:0.6rem;font-weight:bold;padding:2px 10px;border-radius:4px;letter-spacing:0.1em;backdrop-filter:blur(4px);">
+                READ</div>
+            <div style="display:flex;gap:16px;align-items:flex-start;">
+                <div style="flex-shrink:0;">
+                    <div
+                        style="background:linear-gradient(135deg,#d4af37,#f0c040);width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(212,175,55,0.4);">
+                        <i class="fas fa-star" style="color:#1a1a2e;font-size:1.1rem;"></i>
+                    </div>
+                </div>
+                <div style="flex:1;min-width:0;">
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                        <span
+                            style="font-size:0.6rem;font-weight:700;color:#d4af37;letter-spacing:0.18em;text-transform:uppercase;">Today's
+                            Pick</span>
+                        <span id="featuredColumnSubject"
+                            style="font-size:0.62rem;color:rgba(255,255,255,0.6);background:rgba(255,255,255,0.08);padding:1px 8px;border-radius:10px;"></span>
+                    </div>
+                    <div id="featuredColumnTitle"
+                        style="font-weight:700;color:#fff;font-size:1.05rem;margin-bottom:8px;line-height:1.3;"></div>
+                    <div id="featuredColumnSubtitle"
+                        style="font-size:0.78rem;color:rgba(255,255,255,0.55);margin-bottom:8px;font-style:italic;">
+                    </div>
+                    <div id="featuredColumnPreview"
+                        style="font-size:0.82rem;color:rgba(255,255,255,0.7);line-height:1.6;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">
+                    </div>
+                </div>
+                <div style="flex-shrink:0;align-self:center;">
+                    <span style="font-size:0.8rem;color:#d4af37;font-weight:700;white-space:nowrap;">読む <i
+                            class="fas fa-chevron-right" style="font-size:0.7rem;"></i></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter Toolbar -->
+    <div class="d-flex justify-content-end mb-3 align-items-center gap-3">
+        <div class="d-flex align-items-center">
+            <label class="me-2 text-muted small"><i class="fas fa-sort"></i> 並び順</label>
+            <select class="form-select form-select-sm" id="columnSort" onchange="sortColumns()" style="width: auto;">
+                <option value="number">No.順</option>
+                <option value="likes">いいね順</option>
+                <option value="views">閲覧数順</option>
+            </select>
+        </div>
+        <div class="form-check form-switch m-0">
+            <input class="form-check-input" type="checkbox" id="unreadFilter" onchange="toggleUnreadFilter()">
+            <label class="form-check-label user-select-none" for="unreadFilter" style="cursor: pointer;">
+                <i class="fas fa-filter text-muted me-1"></i> 未読のみ
+            </label>
+        </div>
+    </div>
+
+
+    <!-- Main Tabs for School Type -->
+    <ul class="nav nav-tabs nav-fill mb-4" id="schoolTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="middle-tab" data-bs-toggle="tab" data-bs-target="#middle" type="button"
+                role="tab" aria-controls="middle" aria-selected="true">
+                <i class="fas fa-graduation-cap"></i> 中学
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="high-tab" data-bs-toggle="tab" data-bs-target="#high" type="button" role="tab"
+                aria-controls="high" aria-selected="false">
+                <i class="fas fa-university"></i> 高校
+            </button>
+        </li>
+    </ul>
+
+    <div class="tab-content" id="schoolTabsContent">
+        {% for school_type, data in [('middle', columns_data.middle), ('high', columns_data.high)] %}
+        <div class="tab-pane fade {% if school_type == 'middle' %}show active{% endif %}" id="{{ school_type }}"
+            role="tabpanel">
+            {% if data %}
+            <div class="accordion" id="accordion-{{ school_type }}">
+                {% for subject, columns in data.items() %}
+                <div class="accordion-item">
+                    <h2 class="accordion-header" id="heading-{{ school_type }}-{{ loop.index }}">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                            data-bs-target="#collapse-{{ school_type }}-{{ loop.index }}" aria-expanded="false"
+                            aria-controls="collapse-{{ school_type }}-{{ loop.index }}">
+                            <i class="fas fa-bookmark me-2 text-primary"></i> {{ subject }}
+                            <span class="badge bg-light text-dark ms-2">{{ columns|length }}本</span>
+                        </button>
+                    </h2>
+                    <div id="collapse-{{ school_type }}-{{ loop.index }}" class="accordion-collapse collapse"
+                        aria-labelledby="heading-{{ school_type }}-{{ loop.index }}">
+                        <div class="accordion-body bg-light p-2">
+                            <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-2">
+                                {% for col in columns %}
+                                {% set col_id = (1 if school_type == 'middle' else 2)|string + '-' + loop.index|string +
+                                '-' +
+                                col.numbering|string %}
+                                <!-- Generate unique ID for Logic and Safe ID for DOM -->
+                                {% set unique_id = school_type + '-' + subject + '-' + col.numbering|string %}
+                                {% set safe_id = unique_id|replace(' ', '_')|replace("'", "")|replace('"', "") %}
+                                {% set is_read = unique_id in read_columns %}
+
+                                <div class="col" data-id="{{ unique_id }}" data-number="{{ col.numbering }}"
+                                    data-likes="{{ col.like_count }}" data-views="{{ col.view_count }}">
+                                    <!-- Data Block for Safe Retrieval -->
+                                    <script id="data-{{ safe_id }}" type="application/json">
+                                        {
+                                            "title": {{ col.title|tojson|safe }},
+                                            "subtitle": {{ col.subtitle|tojson|safe }},
+                                            "body": {{ col.body|tojson|safe }}
+                                        }
+                                    </script>
+                                    <div class="column-card {% if is_read %}read{% endif %}" id="card-{{ safe_id }}"
+                                        data-unique-id="{{ unique_id }}" data-safe-id="{{ safe_id }}"
+                                        onclick="openColumnModal(this.dataset.uniqueId, this.dataset.safeId)">
+                                        <div class="card-meta">
+                                            <span class="column-number">No. {{ col.numbering }}</span>
+                                            <div class="d-flex align-items-center gap-2">
+                                                <span class="view-count-badge text-muted"
+                                                    id="list-view-count-{{ safe_id }}">
+                                                    <i class="fas fa-chart-line"></i> {{ col.view_count }}
+                                                </span>
+                                                <span class="like-count-badge text-muted"
+                                                    id="list-like-count-{{ safe_id }}">
+                                                    <i
+                                                        class="{{ 'fas' if col.is_liked else 'far' }} fa-heart text-danger"></i>
+                                                    {{ col.like_count }}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div class="card-title">{{ col.title }}
+                                            <i class="fas fa-chevron-right ms-auto text-muted"
+                                                style="font-size: 0.8em;"></i>
+                                        </div>
+                                        <!-- Subtitle hidden for compact view -->
+                                        <!-- Footer removed, whole card is clickable -->
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="alert alert-light text-center py-5">
+                <p class="text-muted"><i class="fas fa-search"></i> 現在公開されているコラムはありません。</p>
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Column Reading Modal -->
+<div class="modal fade" id="columnReaderModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title fw-bold" id="modalColumnTitle"></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <!-- Settings Panel Removed -->
+            <div class="modal-body pt-2">
+                <div id="modalColumnSubtitle" class="modal-subtitle"></div>
+                <div id="modalColumnBody" class="modal-column-content"></div>
+            </div>
+            <div class="modal-footer" style="flex-wrap: wrap; gap: 6px 12px; padding: 10px 16px;">
+                <!-- 1行目: 既読スイッチ（左） ＋ 閲覧数・いいね（右） -->
+                <div class="d-flex align-items-center justify-content-between w-100">
+                    {% if current_user and current_user.is_authenticated %}
+                    <div class="form-check form-switch m-0">
+                        <input class="form-check-input" type="checkbox" id="modalReadSwitch">
+                        <label class="form-check-label" for="modalReadSwitch">既読にする</label>
+                    </div>
+                    {% else %}
+                    <div></div>
+                    {% endif %}
+                    <div class="d-flex align-items-center gap-3">
+                        <span id="modalViewCount" class="text-muted small">
+                            <i class="fas fa-chart-line"></i> <span></span>
+                        </span>
+                        <button type="button" class="btn p-0" id="modalLikeButton" onclick="toggleLikeFromModal()">
+                            <i class="far fa-heart"></i>
+                            <span id="modalLikeCount"></span>
+                        </button>
+                    </div>
+                </div>
+                <!-- 2行目: 表示設定（左） ＋ 次を読む（右） -->
+                <div class="d-flex align-items-center justify-content-between w-100">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="toggleSettingsPanel()">
+                        <i class="fas fa-font"></i> 表示設定
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3" id="nextColumnButton"
+                        onclick="openNextColumn()" style="display:none; font-size:0.8rem;">
+                        次を読む <i class="fas fa-arrow-right ms-1" style="font-size:0.7rem;"></i>
+                    </button>
+                </div>
+            </div>
+
+
+        </div>
+    </div>
+</div>
+
+<!-- Reading Settings Floating Panel (Custom, not Bootstrap Modal) -->
+<div id="readingSettingsPanel" class="card shadow-lg"
+    style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 300px; z-index: 2000; background-color: rgba(255, 255, 255, 0.5); backdrop-filter: blur(2px);">
+    <div class="card-header d-flex justify-content-between align-items-center bg-transparent" style="cursor: move;">
+        <h6 class="mb-0 fw-bold">表示設定</h6>
+        <button type="button" class="btn-close" onclick="toggleSettingsPanel()" aria-label="Close"></button>
+    </div>
+    <div class="card-body">
+        <div class="d-flex flex-column gap-3">
+            <!-- Theme -->
+            <div>
+                <label class="form-label small text-muted mb-1">テーマ</label>
+                <div class="btn-group w-100" role="group">
+                    <button type="button" class="btn btn-outline-secondary btn-sm active" onclick="setTheme('light')"
+                        id="btn-theme-light">明</button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setTheme('sepia')"
+                        id="btn-theme-sepia" style="background-color: #f4ecd8; color: #5b4636;">セピア</button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setTheme('dark')"
+                        id="btn-theme-dark" style="background-color: #2c3e50; color: #fff;">暗</button>
+                </div>
+            </div>
+            <!-- Font -->
+            <div>
+                <label class="form-label small text-muted mb-1">フォント</label>
+                <div class="btn-group w-100" role="group">
+                    <button type="button" class="btn btn-outline-secondary btn-sm active" onclick="setFont('gothic')"
+                        id="btn-font-gothic">ゴシック</button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setFont('mincho')"
+                        id="btn-font-mincho" style="font-family: 'Yu Mincho', serif;">明朝</button>
+                </div>
+            </div>
+            <!-- Writing Mode -->
+            <div>
+                <label class="form-label small text-muted mb-1">文字の向き</label>
+                <div class="btn-group w-100" role="group">
+                    <button type="button" class="btn btn-outline-secondary btn-sm active"
+                        onclick="setWritingMode('horizontal')" id="btn-mode-horizontal">横書き</button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setWritingMode('vertical')"
+                        id="btn-mode-vertical">縦書き</button>
+                </div>
+            </div>
+            <!-- Font Size -->
+            <div>
+                <label class="form-label small text-muted mb-1">文字サイズ</label>
+                <div class="input-group input-group-sm">
+                    <button class="btn btn-outline-secondary" type="button" onclick="changeFontSize(-0.1)">-</button>
+                    <span class="input-group-text bg-white flex-grow-1 text-center" id="fontSizeDisplay">100%</span>
+                    <button class="btn btn-outline-secondary" type="button" onclick="changeFontSize(0.1)">+</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function toggleUnreadFilter() {
+        const isUnreadOnly = document.getElementById('unreadFilter').checked;
+        const cards = document.querySelectorAll('.column-card');
+
+        cards.forEach(card => {
+            const colContainer = card.closest('.col');
+            if (isUnreadOnly && card.classList.contains('read')) {
+                colContainer.style.display = 'none';
+            } else {
+                colContainer.style.display = 'block';
+            }
+        });
+
+    }
+
+    function sortColumns() {
+        const sortType = document.getElementById('columnSort').value;
+        const accordions = document.querySelectorAll('.accordion');
+
+        accordions.forEach(acc => {
+            const bodies = acc.querySelectorAll('.accordion-body');
+            bodies.forEach(body => {
+                const row = body.querySelector('.row');
+                const cols = Array.from(row.children);
+
+                cols.sort((a, b) => {
+                    if (sortType === 'number') {
+                        return parseInt(a.dataset.number) - parseInt(b.dataset.number);
+                    } else if (sortType === 'likes') {
+                        const likesA = parseInt(a.dataset.likes) || 0;
+                        const likesB = parseInt(b.dataset.likes) || 0;
+                        // Sort descending by likes, then ascending by number
+                        if (likesB !== likesA) return likesB - likesA;
+                        return parseInt(a.dataset.number) - parseInt(b.dataset.number);
+                    } else if (sortType === 'views') {
+                        const viewsA = parseInt(a.dataset.views) || 0;
+                        const viewsB = parseInt(b.dataset.views) || 0;
+                        // Sort descending by views, then ascending by number
+                        if (viewsB !== viewsA) return viewsB - viewsA;
+                        return parseInt(a.dataset.number) - parseInt(b.dataset.number);
+                    }
+                });
+
+                cols.forEach(col => row.appendChild(col));
+            });
+        });
+    }
+
+    // Tab Persistence Logic
+    document.addEventListener('DOMContentLoaded', function () {
+        // Restore last active tab
+        const lastTab = localStorage.getItem('lastActiveColumnTab');
+        if (lastTab) {
+            const tabButton = document.querySelector(`#schoolTabs button[data-bs-target="${lastTab}"]`);
+            if (tabButton) {
+                const tab = new bootstrap.Tab(tabButton);
+                tab.show();
+            }
+        }
+
+        // Save tab on change
+        const tabEls = document.querySelectorAll('button[data-bs-toggle="tab"]');
+        tabEls.forEach(tabEl => {
+            tabEl.addEventListener('shown.bs.tab', function (event) {
+                const targetId = event.target.getAttribute('data-bs-target');
+                localStorage.setItem('lastActiveColumnTab', targetId);
+            });
+        });
+    });
+
+    // Dynamic Font Scaling
+    function adjustTitleFontSizes() {
+        const titles = document.querySelectorAll('.card-title');
+        titles.forEach(title => {
+            // Reset font size to base value before measuring
+            title.style.fontSize = '0.95em';
+            title.style.whiteSpace = 'nowrap';
+
+            let parentWidth = title.parentElement.clientWidth;
+            // Account for the icon and padding if needed, though parent.clientWidth usually suffices
+            // We need to check if scrollWidth > clientWidth
+
+            let fontSize = 0.95;
+            const minFontSize = 0.6; // Minimum legible size
+
+            while (title.scrollWidth > title.clientWidth && fontSize > minFontSize) {
+                fontSize -= 0.05;
+                title.style.fontSize = fontSize + 'em';
+            }
+        });
+    }
+
+    // Call on load and resize
+    window.addEventListener('load', adjustTitleFontSizes);
+    window.addEventListener('resize', adjustTitleFontSizes);
+    // Also call when switching tabs as visibility changes might affect measurement
+    const tabElsForResize = document.querySelectorAll('button[data-bs-toggle="tab"]');
+    tabElsForResize.forEach(tabEl => {
+        tabEl.addEventListener('shown.bs.tab', function (event) {
+            adjustTitleFontSizes();
+        });
+    });
+    // Also call when accordion expands
+    const accordionEls = document.querySelectorAll('.accordion-collapse');
+    accordionEls.forEach(acc => {
+        acc.addEventListener('shown.bs.collapse', adjustTitleFontSizes);
+    });
+
+    // Reading Settings Logic
+    const defaultSettings = {
+        theme: 'light',
+        font: 'gothic',
+        writingMode: 'horizontal',
+        fontSize: 1.2
+    };
+
+    let currentSettings = { ...defaultSettings };
+
+    function toggleSettingsPanel() {
+        const panel = document.getElementById('readingSettingsPanel');
+        if (panel.style.display === 'none') {
+            panel.style.display = 'block';
+        } else {
+            panel.style.display = 'none';
+        }
+    }
+
+    function loadSettings() {
+        const saved = localStorage.getItem('columnReadingSettings');
+        if (saved) {
+            currentSettings = { ...defaultSettings, ...JSON.parse(saved) };
+        }
+        applySettings();
+        updateSettingsUI();
+    }
+
+    function saveSettings() {
+        localStorage.setItem('columnReadingSettings', JSON.stringify(currentSettings));
+    }
+
+    function setTheme(theme) {
+        currentSettings.theme = theme;
+        applySettings();
+        updateSettingsUI();
+        saveSettings();
+    }
+
+    function setFont(font) {
+        currentSettings.font = font;
+        applySettings();
+        updateSettingsUI();
+        saveSettings();
+    }
+
+    function setWritingMode(mode) {
+        currentSettings.writingMode = mode;
+        applySettings();
+        updateSettingsUI();
+        saveSettings();
+    }
+
+    function changeFontSize(delta) {
+        let newSize = parseFloat((currentSettings.fontSize + delta).toFixed(1));
+        if (newSize < 0.5) newSize = 0.5;
+        if (newSize > 3.0) newSize = 3.0;
+        currentSettings.fontSize = newSize;
+        applySettings();
+        updateSettingsUI();
+        saveSettings();
+    }
+
+    function applySettings() {
+        const modalContent = document.querySelector('#columnReaderModal .modal-content');
+        const modalBody = document.querySelector('#columnReaderModal .modal-body');
+
+        // --- Theme & Font ---
+        // Clear old classes
+        modalContent.classList.remove('theme-sepia', 'theme-dark', 'font-mincho', 'writing-vertical');
+
+        // Apply Theme
+        if (currentSettings.theme !== 'light') {
+            modalContent.classList.add('theme-' + currentSettings.theme);
+        }
+
+        // Apply Font
+        if (currentSettings.font === 'mincho') {
+            modalContent.classList.add('font-mincho');
+        }
+
+        // --- Writing Mode (Layout Changes) ---
+        // Element caching
+        const subtitleEl = document.getElementById('modalColumnSubtitle');
+        const contentEl = document.getElementById('modalColumnBody');
+        let wrapper = document.querySelector('.modal-body-content-wrapper');
+
+        if (currentSettings.writingMode === 'vertical') {
+            modalContent.classList.add('writing-vertical');
+
+            // Create wrapper if not exists
+            if (!wrapper) {
+                wrapper = document.createElement('div');
+                wrapper.className = 'modal-body-content-wrapper';
+                // Move elements into wrapper
+                // Check if they are already inside (unlikely if !wrapper)
+                if (subtitleEl.parentNode === modalBody) modalBody.removeChild(subtitleEl);
+                if (contentEl.parentNode === modalBody) modalBody.removeChild(contentEl);
+
+                wrapper.appendChild(subtitleEl);
+                wrapper.appendChild(contentEl);
+                modalBody.appendChild(wrapper);
+            }
+        } else {
+            // Horizontal Mode: Unwrap if wrapped
+            if (wrapper) {
+                // Move elements back to modalBody
+                modalBody.appendChild(subtitleEl);
+                modalBody.appendChild(contentEl);
+                // Remove wrapper
+                modalBody.removeChild(wrapper);
+            }
+        }
+
+        // Apply Font Size
+        contentEl.style.fontSize = currentSettings.fontSize + 'em';
+
+        // Re-check subtitle alignment after applying settings
+        checkSubtitleMultiline();
+    }
+
+    function checkSubtitleMultiline() {
+        if (currentSettings.writingMode !== 'vertical') return;
+
+        const subtitleEl = document.getElementById('modalColumnSubtitle');
+        if (!subtitleEl || !subtitleEl.textContent) return;
+
+        // Reset class to measure correctly
+        subtitleEl.classList.remove('is-multiline');
+
+        // In vertical-rl: 
+        // offsetWidth is the "height" of the text block (how many lines * line-height)
+        // clientHeight is the length of the longest line (viewport height effectively)
+
+        // However, we want to know if it wrapped.
+        // A single line's width is approximately 1em * lineHeight.
+        // Let's compare offsetWidth (total width of block) vs computed font-size.
+
+        const style = window.getComputedStyle(subtitleEl);
+        const fontSize = parseFloat(style.fontSize);
+        const padding = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
+
+        // Logical text width (in vertical mode, this is physical width occupied by lines)
+        const contentWidth = subtitleEl.offsetWidth - padding;
+
+        // One line width is approx fontSize * lineHeight.
+        // Assuming loose line-height of ~2.0 for safety.
+        // If contentWidth > fontSize * 2.5, it's definitely 2+ lines.
+        // Example: 1 line (font 18px * 2.0) = 36px.
+        // Threshold: 18 * 2.5 = 45px.
+        // 36 < 45 -> Single Line.
+        // 2 lines = 72px. 72 > 45 -> Multiline.
+
+        if (contentWidth > fontSize * 2.5) {
+            subtitleEl.classList.add('is-multiline');
+        }
+    }
+
+    function updateSettingsUI() {
+        // Update Theme Buttons
+        document.querySelectorAll('[onclick^="setTheme"]').forEach(btn => btn.classList.remove('active'));
+        document.getElementById('btn-theme-' + currentSettings.theme).classList.add('active');
+
+        // Update Font Buttons
+        document.querySelectorAll('[onclick^="setFont"]').forEach(btn => btn.classList.remove('active'));
+        document.getElementById('btn-font-' + currentSettings.font).classList.add('active');
+
+        // Update Mode Buttons
+        document.querySelectorAll('[onclick^="setWritingMode"]').forEach(btn => btn.classList.remove('active'));
+        document.getElementById('btn-mode-' + currentSettings.writingMode).classList.add('active');
+
+        // Update Font Size Display
+        document.getElementById('fontSizeDisplay').textContent = Math.round(currentSettings.fontSize / 1.2 * 100) + '%';
+    }
+
+    let currentLikeState = false;
+    let currentLikeCount = 0;
+    let currentModalId = null;
+    let currentSafeId = null;
+    let originalBodyText = ''; // Initialize globally
+    let viewCountTimer = null; // Timer for delayed view count
+
+    function openColumnModal(uniqueId, safeId) {
+        // Retrieve Data from Script Block using Safe ID
+        const dataScript = document.getElementById('data-' + safeId);
+        let columnData = { title: '', subtitle: '', body: '' };
+
+        if (dataScript) {
+            try {
+                columnData = JSON.parse(dataScript.textContent);
+            } catch (e) {
+                console.error('Failed to parse column data', e);
+                alert('データの読み込みに失敗しました。');
+                return;
+            }
+        }
+
+        const title = columnData.title;
+        const subtitle = columnData.subtitle;
+        const body = columnData.body;
+
+        originalBodyText = body;
+
+        // Load settings AFTER setting content so applySettings works correctly
+        loadSettings();
+
+        document.getElementById('modalColumnTitle').textContent = title;
+        document.getElementById('modalColumnSubtitle').textContent = subtitle || '';
+
+        currentModalId = uniqueId;
+        currentSafeId = safeId;
+
+        // Resolve Live State from DOM
+        // Use getElementById with SAFE ID
+        const badgeElement = document.getElementById('list-like-count-' + safeId);
+        const cardElement = document.getElementById('card-' + safeId);
+        const colEl = cardElement ? cardElement.closest('.col') : null;
+
+        let liveLiked = false;
+        let liveCount = 0;
+
+        if (badgeElement && colEl) {
+            const icon = badgeElement.querySelector('i');
+            if (icon) {
+                liveLiked = icon.classList.contains('fas');
+            }
+            liveCount = parseInt(colEl.dataset.likes) || 0;
+        }
+
+        currentLikeState = liveLiked;
+        currentLikeCount = liveCount;
+
+        updateLikeButtonState();
+
+        // View Count Logic (Delayed by 20 seconds as per case 1)
+        const listViewBadge = document.getElementById('list-view-count-' + safeId);
+        const modalViewCount = document.getElementById('modalViewCount').querySelector('span');
+
+        // Initial modal view count sync (from current list state)
+        if (listViewBadge) {
+            const currentViewsMatch = listViewBadge.textContent.match(/\d+/);
+            modalViewCount.textContent = currentViewsMatch ? currentViewsMatch[0] : '0';
+        }
+
+        // Clear existing timer if any
+        if (viewCountTimer) clearTimeout(viewCountTimer);
+
+        // Set 20-second timer for incrementing view count
+        viewCountTimer = setTimeout(() => {
+            // API Call to increment view count
+            fetch('/api/increment_column_view', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ column_unique_id: uniqueId })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        // Sync with server source of truth
+                        if (listViewBadge) listViewBadge.innerHTML = `<i class="fas fa-chart-line"></i> ${data.view_count}`;
+                        modalViewCount.textContent = data.view_count;
+
+                        // Update data attribute for sorting
+                        const card = document.getElementById('card-' + safeId);
+                        const colContainer = card ? card.closest('.col') : null;
+                        if (colContainer) {
+                            colContainer.dataset.views = data.view_count;
+                        }
+                    }
+                })
+                .catch(err => console.error('View increment error:', err));
+        }, 20000); // 20 seconds
+
+        {% if current_user and current_user.is_authenticated %}
+        const switchEl = document.getElementById('modalReadSwitch');
+
+        // Check live status from the card element class (Safe ID)
+        const cardEl = document.getElementById('card-' + safeId);
+        const currentIsRead = cardEl ? cardEl.classList.contains('read') : false;
+
+        switchEl.checked = currentIsRead;
+        switchEl.onchange = function () {
+            updateReadStatus(uniqueId, safeId, this.checked);
+        };
+        {% endif %}
+
+        // Ensure settings are applied (which sets the body text)
+        applySettings();
+
+        const modalElement = document.getElementById('columnReaderModal');
+        const modal = new bootstrap.Modal(modalElement);
+        modal.show();
+
+        // Check after modal is shown to ensure rendering dimensions are correct
+        modalElement.addEventListener('shown.bs.modal', function () {
+            checkSubtitleMultiline();
+            // Reset scroll position after modal is fully shown and layout is computed
+            const modalBodyElement = modalElement.querySelector('.modal-body');
+            if (modalBodyElement) {
+                modalBodyElement.scrollTop = 0;
+                modalBodyElement.scrollLeft = 0;
+                // Make content visible after reset
+                modalBodyElement.style.opacity = '1';
+            }
+        }, { once: true });
+    }
+
+    function updateLikeButtonState() {
+        const btn = document.getElementById('modalLikeButton');
+        const icon = btn.querySelector('i');
+        const countSpan = document.getElementById('modalLikeCount');
+
+        // Update Count
+        countSpan.textContent = currentLikeCount;
+
+        if (currentLikeState) {
+            // Liked: Filled Heart
+            icon.classList.remove('far');
+            icon.classList.add('fas');
+
+            // Add animation class if not already present (triggering reflow to restart if needed?)
+            // For simple toggle, just adding it is enough. We can remove it later or on unlike.
+            // To replay animation on re-like, we remove it on unlike.
+            icon.classList.add('like-anim');
+        } else {
+            // Unliked: Outline Heart
+            icon.classList.remove('fas');
+            icon.classList.add('far');
+
+            icon.classList.remove('like-anim');
+        }
+    }
+
+    function toggleLikeFromModal() {
+        if (!window.appInfoFromFlask || !window.appInfoFromFlask.isLoggedIn) {
+            alert('いいね機能を利用するためにはログインしてください');
+            return;
+        }
+
+        if (!currentModalId) return;
+
+        // Optimistic UI Update
+        currentLikeState = !currentLikeState;
+        if (currentLikeState) {
+            currentLikeCount++;
+        } else {
+            currentLikeCount--;
+        }
+        updateLikeButtonState();
+
+        // Update List View immediately
+        updateListLikeDisplay(currentSafeId, currentLikeState, currentLikeCount);
+
+        // API Call
+        fetch('/api/toggle_column_like', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ column_unique_id: currentModalId }),
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    // Sync with server source of truth
+                    currentLikeState = data.liked;
+                    currentLikeCount = data.count;
+                    updateLikeButtonState();
+                    updateListLikeDisplay(currentSafeId, currentLikeState, currentLikeCount);
+                } else {
+                    // Revert on error
+                    alert('エラーが発生しました: ' + data.message);
+                    currentLikeState = !currentLikeState;
+                    if (currentLikeState) currentLikeCount++; else currentLikeCount--;
+                    updateLikeButtonState();
+                    updateListLikeDisplay(currentSafeId, currentLikeState, currentLikeCount);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                // Revert on error
+                currentLikeState = !currentLikeState;
+                if (currentLikeState) currentLikeCount++; else currentLikeCount--;
+                updateLikeButtonState();
+                updateListLikeDisplay(currentSafeId, currentLikeState, currentLikeCount);
+            });
+    }
+
+    function updateListLikeDisplay(safeId, isLiked, count) {
+        // Update Badge
+        const badge = document.getElementById('list-like-count-' + safeId);
+        if (badge) {
+            badge.innerHTML = `<i class="${isLiked ? 'fas' : 'far'} fa-heart text-danger"></i> ${count}`;
+        }
+
+        // Update Data Attribute for sorting
+        // Note: For sorting we used data-id which is currently unique_id. 
+        // We can look up by ID using safeId card to find wrapper col.
+        const card = document.getElementById('card-' + safeId);
+        const colContainer = card ? card.closest('.col') : null;
+
+        if (colContainer) {
+            colContainer.dataset.likes = count;
+        }
+    }
+
+    // Patch openColumnModal to prefer reading updated state from DOM if available?
+    // No, that's complex.
+    // Let's just update the onclick attribute.
+    // Actually, simpler: Since we have `updateListLikeDisplay`, let's also update the onclick string.
+    // Regex: openColumnModal(..., ..., ..., "uniqueId", isRead, isLiked, count)
+    // The last two args are what changed.
+    // It's getting complicated to regex replace the onclick.
+    // ALTERNATIVE: Don't pass isLiked/Count in onclick. Pass ID, and read from dataset of the element!
+
+    // Changing openColumnModal signature in the ReplacementChunk above to:
+    // onclick='openColumnModal(..., ..., ..., "uniqueId", ...)'
+
+    // I will slightly adjust the `openColumnModal` logic in the replacement below to read from DOM if not passed or override.
+
+    // Helper to escape HTML characters
+    function escapeHtml(text) {
+        if (!text) return '';
+        return text
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    function formatForVertical(text) {
+        let safeText = escapeHtml(text);
+
+        // Helper to convert half-width numbers to full-width (Zenkaku)
+        const toZenkaku = (str) => {
+            return str.replace(/[0-9]/g, function (s) {
+                return String.fromCharCode(s.charCodeAt(0) + 0xFEE0);
+            });
+        };
+
+        // Strategy:
+        // 1. Identify tokens that MUST be TCY (Double punctuation, List markers).
+        // 2. Identify remaining number sequences.
+        //    - If 1-2 digits: Make TCY.
+        //    - If 3+ digits: Convert to Zenkaku (displays stacked upright).
+
+        // Regex Explanation:
+        // Group 1: Double Punctuation (!? or ！？)
+        // Group 2: List Markers (1-2 digits + dot, not followed by digit)
+        // Group 3: Generic Number sequences (\d+)
+        const regex = /([!?！？]{2})|(\b\d{1,2}\.(?!\d))|(\d+)/g;
+
+        return safeText.replace(regex, function (match, p1, p2, p3) {
+            // Case 1: Double Punctuation (Always TCY)
+            if (p1) return '<span class="tcy">' + p1 + '</span>';
+
+            // Case 2: List Marker (Always TCY)
+            if (p2) return '<span class="tcy">' + p2 + '</span>';
+
+            // Case 3: Numbers
+            if (p3) {
+                if (p3.length <= 2) {
+                    // 1-2 digits -> TCY (Side-by-side / Upright)
+                    return '<span class="tcy">' + p3 + '</span>';
+                } else {
+                    // 3+ digits -> Zenkaku (Stacked Vertical Upright)
+                    // e.g. 1940 -> １９４０
+                    return toZenkaku(p3);
+                }
+            }
+            return match;
+        });
+    }
+
+    function applySettings() {
+        const modalContent = document.querySelector('#columnReaderModal .modal-content');
+        const modalBody = document.querySelector('#columnReaderModal .modal-body');
+        const contentEl = document.getElementById('modalColumnBody');
+
+        // --- Theme & Font ---
+        // Clear old classes
+        modalContent.classList.remove('theme-sepia', 'theme-dark', 'font-mincho', 'writing-vertical');
+
+        // Apply Theme
+        if (currentSettings.theme !== 'light') {
+            modalContent.classList.add('theme-' + currentSettings.theme);
+        }
+
+        // Apply Font
+        if (currentSettings.font === 'mincho') {
+            modalContent.classList.add('font-mincho');
+        }
+
+        // --- Writing Mode (Layout Changes) ---
+        const subtitleEl = document.getElementById('modalColumnSubtitle');
+        let wrapper = document.querySelector('.modal-body-content-wrapper');
+
+        if (currentSettings.writingMode === 'vertical') {
+            modalContent.classList.add('writing-vertical');
+
+            // Set text content with TCY formatting
+            // Use innerHTML because we inserted spans
+            contentEl.innerHTML = formatForVertical(originalBodyText);
+
+            // Create wrapper if not exists
+            if (!wrapper) {
+                wrapper = document.createElement('div');
+                wrapper.className = 'modal-body-content-wrapper';
+                // Move elements into wrapper
+                if (subtitleEl.parentNode === modalBody) modalBody.removeChild(subtitleEl);
+                if (contentEl.parentNode === modalBody) modalBody.removeChild(contentEl);
+
+                wrapper.appendChild(subtitleEl);
+                wrapper.appendChild(contentEl);
+                modalBody.appendChild(wrapper);
+            }
+        } else {
+            // Horizontal Mode
+
+            // Restore raw text
+            contentEl.textContent = originalBodyText;
+
+            // Unwrap if wrapped
+            if (wrapper) {
+                modalBody.appendChild(subtitleEl);
+                modalBody.appendChild(contentEl);
+                modalBody.removeChild(wrapper);
+            }
+        }
+
+        // Apply Font Size
+        contentEl.style.fontSize = currentSettings.fontSize + 'em';
+    }
+
+    function toggleReadStatus(uniqueId, safeId, event) {
+        // Prevent button click from triggering card click if we had that, but here it's separate
+        if (event) event.stopPropagation();
+
+        const checkbox = document.getElementById('check-' + safeId);
+        // ...
+
+        // Note: The UI for checkbox toggle in list might need update to use safeId too if it exists?
+        // Wait, the checkbox logic is separate. Let's assume it uses safeId logic or original?
+        // Actually, I haven't updated the list-view checkbox HTML to use safeId.
+        // I should stick to the modal logic for now. Use updateReadStatus params accordingly.
+        if (event.target !== checkbox && checkbox) {
+            checkbox.checked = !checkbox.checked;
+        }
+
+        updateReadStatus(uniqueId, safeId, checkbox ? checkbox.checked : false);
+    }
+
+    function updateReadStatus(uniqueId, safeId, isRead) {
+        // Optimistic UI update
+        const card = document.getElementById('card-' + safeId);
+        const checkbox = document.getElementById('check-' + safeId); // This might break if check-ID is not updated
+        const modalSwitch = document.getElementById('modalReadSwitch');
+
+        if (isRead) {
+            if (card) card.classList.add('read');
+            if (checkbox) checkbox.checked = true;
+            if (modalSwitch && currentModalId === uniqueId) modalSwitch.checked = true;
+        } else {
+            if (card) card.classList.remove('read');
+            if (checkbox) checkbox.checked = false;
+            if (modalSwitch && currentModalId === uniqueId) modalSwitch.checked = false;
+        }
+
+        // API Call
+        fetch('/api/mark_column_read', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                column_id: uniqueId,
+                read: isRead
+            })
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status !== 'success') {
+                    console.error('Failed to update read status:', data.message);
+                    // Revert UI on failure?
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            });
+    }
+
+    // Draggable Logic for Custom Panel
+    document.addEventListener('DOMContentLoaded', function () {
+        const panel = document.getElementById('readingSettingsPanel');
+        const header = panel.querySelector('.card-header');
+
+        let isDragging = false;
+        let startX, startY, initialLeft, initialTop;
+
+        header.addEventListener('mousedown', dragStart);
+
+        function dragStart(e) {
+            // Prevent default if clicking buttons inside header
+            if (e.target.closest('button')) return;
+
+            const rect = panel.getBoundingClientRect();
+            // Store offset relative to VIEWPORT (fixed position)
+            initialLeft = rect.left;
+            initialTop = rect.top;
+            startX = e.clientX;
+            startY = e.clientY;
+
+            isDragging = true;
+
+            // Remove transform centering to allow manual positioning
+            panel.style.transform = 'none';
+            panel.style.left = initialLeft + 'px';
+            panel.style.top = initialTop + 'px';
+
+            document.addEventListener('mousemove', drag);
+            document.addEventListener('mouseup', dragEnd);
+        }
+
+        function drag(e) {
+            if (!isDragging) return;
+            e.preventDefault();
+
+            const currentX = e.clientX - startX;
+            const currentY = e.clientY - startY;
+
+            panel.style.left = (initialLeft + currentX) + 'px';
+            panel.style.top = (initialTop + currentY) + 'px';
+        }
+
+        function dragEnd(e) {
+            isDragging = false;
+            document.removeEventListener('mousemove', drag);
+            document.removeEventListener('mouseup', dragEnd);
+        }
+    });
+
+    // Handle view count timer cleanup and scroll reset on modal events
+    const columnModal = document.getElementById('columnReaderModal');
+
+    columnModal.addEventListener('show.bs.modal', function () {
+        const modalBody = this.querySelector('.modal-body');
+        if (modalBody) {
+            // Hide content during transition to prevent flicker
+            modalBody.style.opacity = '0';
+            modalBody.style.transition = 'opacity 0.2s';
+            // Early reset
+            modalBody.scrollTop = 0;
+            modalBody.scrollLeft = 0;
+        }
+    });
+
+    columnModal.addEventListener('hide.bs.modal', function () {
+        if (viewCountTimer) {
+            clearTimeout(viewCountTimer);
+            viewCountTimer = null;
+        }
+        // Reset scroll position on close so it's fresh for next open
+        const modalBody = this.querySelector('.modal-body');
+        if (modalBody) {
+            modalBody.scrollTop = 0;
+            modalBody.scrollLeft = 0;
+        }
+    });
+
+    // ================================================================
+    // 今日のオススメ バナー ロジック
+    // ================================================================
+    (function initFeaturedBanner() {
+        function getDailyColumnSeed() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const offset = parseInt(urlParams.get('date_offset') || '0');
+            const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
+            const RESET_HOUR = 7;
+            const nowUtc = Date.now() + (offset * 86400000);
+            const jstDate = new Date(nowUtc + JST_OFFSET_MS);
+            const jstHour = jstDate.getUTCHours();
+            const dayNum = Math.floor((nowUtc + JST_OFFSET_MS) / 86400000);
+            return jstHour < RESET_HOUR ? dayNum - 1 : dayNum;
+        }
+        let featuredCol = null;
+
+        window.openFeaturedColumn = function () {
+            if (!featuredCol) return;
+            // safe_id compatible encoding
+            const safeId = featuredCol.unique_id.replace(/[\s'"]/g, '_');
+            openColumnModal(featuredCol.unique_id, safeId);
+        };
+
+        function simpleHash(str) {
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                hash = ((hash << 5) - hash) + str.charCodeAt(i);
+                hash |= 0;
+            }
+            return (hash >>> 0);
+        }
+        function loadFeaturedBanner() {
+            fetch('/api/columns_for_home')
+                .then(r => r.json())
+                .then(data => {
+                    if (data.status !== 'success' || !data.columns || !data.columns.length) return;
+                    const total = data.columns.length;
+                    const dayCount = getDailyColumnSeed();
+                    const round = Math.floor(dayCount / total);
+                    const dayInRound = dayCount % total;
+
+                    const baseList = data.columns.slice().sort((a, b) => a.unique_id.localeCompare(b.unique_id));
+                    const rankedList = baseList.map(col => {
+                        let hash = simpleHash(col.unique_id + "_round_" + round);
+                        let rand = Math.sin(hash) * 10000;
+                        return {
+                            col: col,
+                            rank: rand - Math.floor(rand)
+                        };
+                    }).sort((a, b) => a.rank - b.rank);
+
+                    featuredCol = rankedList[dayInRound].col;
+
+                    document.getElementById('featuredColumnTitle').textContent = featuredCol.title;
+                    document.getElementById('featuredColumnSubject').textContent = featuredCol.subject;
+                    document.getElementById('featuredColumnSubtitle').textContent = featuredCol.subtitle || '';
+                    document.getElementById('featuredColumnPreview').textContent = (featuredCol.body || '').slice(0, 100);
+
+                    // 既読チェック
+                    let readCols = [];
+                    try { readCols = JSON.parse(document.getElementById('featuredColumnBanner').dataset.readColumns || '[]'); } catch (e) { }
+                    if (readCols.includes(featuredCol.unique_id)) {
+                        document.getElementById('featuredReadBadge').style.display = 'block';
+                    }
+
+                    document.getElementById('featuredColumnBanner').style.display = 'block';
+                })
+                .catch(function () { });
+        }
+        loadFeaturedBanner();
+    })();
+
+    // ================================================================
+    // 次のコラムを読む ロジック
+    // ================================================================
+    let allCardsData = null; // lazy cache
+
+    function buildCardsData() {
+        // DOM から全カードを収集してリスト化
+        const cards = document.querySelectorAll('.column-card');
+        const result = [];
+        cards.forEach(card => {
+            const col = card.closest('.col');
+            if (!col) return;
+            // accordion グループ（科目）を取得
+            const accordionBody = card.closest('.accordion-body');
+            const accordionItem = accordionBody ? accordionBody.closest('.accordion-item') : null;
+            const subjectEl = accordionItem ? accordionItem.querySelector('.accordion-button') : null;
+            const subject = subjectEl ? subjectEl.textContent.trim().replace(/\s*\d+本\s*$/, '').trim() : '';
+            result.push({
+                uniqueId: card.dataset.uniqueId,
+                safeId: card.dataset.safeId,
+                isRead: card.classList.contains('read'),
+                number: parseInt(col.dataset.number) || 0,
+                subject: subject,
+                card: card
+            });
+        });
+        return result;
+    }
+
+    function updateNextColumnButton() {
+        if (!currentModalId) return;
+        if (!allCardsData) allCardsData = buildCardsData();
+
+        const current = allCardsData.find(c => c.uniqueId === currentModalId);
+        if (!current) { document.getElementById('nextColumnButton').style.display = 'none'; return; }
+
+        // 同じ科目の次の番号（未読優先）
+        const sameSubject = allCardsData
+            .filter(c => c.subject === current.subject && c.uniqueId !== current.uniqueId)
+            .sort((a, b) => a.number - b.number);
+
+        // 現在より番号が大きいもの優先
+        const afterCurrent = sameSubject.filter(c => c.number > current.number);
+        const unreadAfter = afterCurrent.filter(c => !c.isRead);
+        const next = unreadAfter[0] || afterCurrent[0] || sameSubject.filter(c => !c.isRead)[0] || sameSubject[0];
+
+        const btn = document.getElementById('nextColumnButton');
+        if (next) {
+            btn.style.display = 'inline-flex';
+            btn._nextUniqueId = next.uniqueId;
+            btn._nextSafeId = next.safeId;
+        } else {
+            btn.style.display = 'none';
+        }
+    }
+
+    window.openNextColumn = function () {
+        const btn = document.getElementById('nextColumnButton');
+        const nextId = btn._nextUniqueId;
+        const nextSafeId = btn._nextSafeId;
+        if (!nextId || !nextSafeId) return;
+
+        // 現在のモーダルを閉じてから次を開く
+        const modalEl = document.getElementById('columnReaderModal');
+        const modal = bootstrap.Modal.getInstance(modalEl);
+        if (modal) {
+            modalEl.addEventListener('hidden.bs.modal', function handler() {
+                modalEl.removeEventListener('hidden.bs.modal', handler);
+                openColumnModal(nextId, nextSafeId);
+            });
+            modal.hide();
+        } else {
+            openColumnModal(nextId, nextSafeId);
+        }
+    };
+
+    // openColumnModal を拡張して nextColumnButton を更新
+    const _origOpenColumnModal = openColumnModal;
+    openColumnModal = function (uniqueId, safeId) {
+        _origOpenColumnModal(uniqueId, safeId);
+        // モーダル表示後に更新（shown.bs.modal は openColumnModal 内で一度のみ登録）
+        document.getElementById('columnReaderModal').addEventListener('shown.bs.modal', function onShown() {
+            document.getElementById('columnReaderModal').removeEventListener('shown.bs.modal', onShown);
+            allCardsData = null; // リセットして再収集（既読状態が変化する可能性）
+            updateNextColumnButton();
+        });
+        // localStorage に既読キャッシュを同期（ホーム画面ウィジェット用）
+        try {
+            const readColsRaw = document.getElementById('featuredColumnBanner').dataset.readColumns || '[]';
+            localStorage.setItem('readColumnsCache', readColsRaw);
+        } catch (e) { }
+    };
+
+
+    // ================================================================
+    // ?open= クエリパラメータによる自動モーダルオープン
+    // ================================================================
+    document.addEventListener('DOMContentLoaded', function () {
+        const params = new URLSearchParams(window.location.search);
+        const openId = params.get('open');
+        if (!openId) return;
+
+        // カードを探す
+        const targetCard = document.querySelector(`.column-card[data-unique-id="${CSS.escape(openId)}"]`);
+        if (targetCard) {
+            const safeId = targetCard.dataset.safeId;
+            // アコーディオンを開いてからモーダルを表示
+            const accordionCollapse = targetCard.closest('.accordion-collapse');
+            if (accordionCollapse && !accordionCollapse.classList.contains('show')) {
+                const collapseInstance = new bootstrap.Collapse(accordionCollapse, { toggle: false });
+                accordionCollapse.addEventListener('shown.bs.collapse', function handler() {
+                    accordionCollapse.removeEventListener('shown.bs.collapse', handler);
+                    // タブも切り替える（高校タブの場合）
+                    const tabPane = targetCard.closest('.tab-pane');
+                    if (tabPane && !tabPane.classList.contains('active')) {
+                        const tabId = tabPane.id;
+                        const tabBtn = document.querySelector(`#schoolTabs button[data-bs-target="#${tabId}"]`);
+                        if (tabBtn) new bootstrap.Tab(tabBtn).show();
+                    }
+                    setTimeout(() => openColumnModal(openId, safeId), 200);
+                }, { once: true });
+                // タブを先に切り替え
+                const tabPane = targetCard.closest('.tab-pane');
+                if (tabPane && !tabPane.classList.contains('active')) {
+                    const tabId = tabPane.id;
+                    const tabBtn = document.querySelector(`#schoolTabs button[data-bs-target="#${tabId}"]`);
+                    if (tabBtn) new bootstrap.Tab(tabBtn).show();
+                }
+                collapseInstance.show();
+            } else {
+                setTimeout(() => openColumnModal(openId, safeId), 300);
+            }
+        }
+    });
+</script>
+
+{% endblock %}
+
+{% block footer %}{% endblock %}
+{% block info_icon %}{% endblock %}

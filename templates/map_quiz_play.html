@@ -1,0 +1,991 @@
+{% extends "base.html" %}
+{% block title %}地図の深淵- {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid p-0" style="height: calc(100vh - 56px); display: flex; flex-direction: column;">
+    <!-- Quiz Header / Question Area -->
+    <div class="py-2 px-3 shadow-sm"
+        style="flex-shrink: 0; z-index: 1000; background-color: #ffffff !important; color: #212529 !important; border-bottom: 1px solid #dee2e6;">
+        <div class="container-fluid d-flex justify-content-between align-items-center">
+            <div style="flex: 1;">
+                <span class="badge bg-secondary mb-1" id="progressBadge">Question 1</span>
+                <h5 id="questionText" class="mb-0 fw-bold">Loading...</h5>
+                <div id="explanationText" class="mt-2 text-danger fw-bold" style="display: none;"></div>
+            </div>
+            <div class="text-end ms-3">
+                <a href="{{ url_for('map_quiz_index') }}" class="btn btn-sm btn-outline-secondary">終了</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Map Area -->
+    <div class="position-relative flex-grow-1 bg-secondary overflow-hidden" id="gameArea"
+        style="cursor: grab; touch-action: none;">
+        <div id="mapWrapper" style="transform-origin: 0 0; position: absolute; top: 0; left: 0;">
+            <img id="gameMapImage" src="" style="display: block; max-width: none;" draggable="false">
+            <div id="gamePinsContainer"></div>
+        </div>
+
+        <!-- Zoom Controls -->
+        <div class="position-absolute bottom-0 end-0 mb-4 me-3 d-flex flex-column gap-2" style="z-index: 500;">
+            <button class="btn btn-light shadow rounded-circle p-0 d-flex align-items-center justify-content-center"
+                style="width: 40px; height: 40px;" onclick="zoomMap(1.2)" title="拡大">
+                <i class="fas fa-plus"></i>
+            </button>
+            <button class="btn btn-light shadow rounded-circle p-0 d-flex align-items-center justify-content-center"
+                style="width: 40px; height: 40px;" onclick="zoomMap(0.8)" title="縮小">
+                <i class="fas fa-minus"></i>
+            </button>
+        </div>
+
+        <!-- Next Button Overlay -->
+        <div id="nextButtonContainer" class="position-absolute bottom-0 start-50 translate-middle-x mb-5"
+            style="display: none; z-index: 9999; padding-bottom: 20px;">
+            <button class="btn btn-lg btn-primary rounded-pill px-5 shadow" onclick="nextQuestion()"
+                style="border: 2px solid #fff;">
+                次の問題へ <i class="fas fa-arrow-right"></i>
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Game State (Renamed to prevent collision with script.js)
+    const MAP_ID = {{ map_id }};
+    let mqQuizData = null;
+    let mqQuestions = []; // List of problems
+    let mqCurrentIndex = 0;
+    let mqCurrentQuestion = null;
+    // let showLabels = false; // Removed toggle logic
+
+    // Lock for multi-click prevention
+    let mqIsAnswered = false;
+
+    // Result Tracking
+    let mqCorrectCount = 0;
+    let mqIncorrectQuestions = []; // objects { question, correctName, explanation }
+
+    // Zoom/Pan State (Simple implementation)
+    let scale = 1;
+    let panning = false;
+    let pointX = 0;
+    let pointY = 0;
+    let startX = 0;
+    let startY = 0;
+
+    const gameArea = document.getElementById('gameArea');
+    const mapWrapper = document.getElementById('mapWrapper');
+
+    document.addEventListener('DOMContentLoaded', function () {
+        initGame();
+        initPanZoom();
+    });
+
+    async function initGame() {
+        try {
+            console.log("Fetching quiz data for map " + MAP_ID);
+            // Get difficulty from URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const difficulty = urlParams.get('difficulty');
+            let apiUrl = `/api/map_quiz/map/${MAP_ID}/play_data`;
+            if (difficulty) {
+                apiUrl += `?difficulty=${difficulty}`;
+            }
+
+            const response = await fetch(apiUrl);
+            const data = await response.json();
+            console.log("Quiz Data:", data);
+
+            if (data.status === 'error') throw new Error(data.message);
+
+            mqQuizData = data;
+
+            // Set Map Image
+            // Set Map Image
+            const gameMapImage = document.getElementById('gameMapImage');
+
+            // Define load handler
+            const onMapLoad = () => {
+                console.log("Map image loaded. Fitting to screen.");
+                fitMapToScreen();
+                renderPins(); // Re-render to correctly size regions
+            };
+
+            gameMapImage.onload = onMapLoad;
+
+            // Error handling
+            gameMapImage.onerror = () => {
+                console.error("Failed to load map image");
+            };
+
+            // Set src AFTER defining handlers
+            gameMapImage.src = `/serve_map_image/${data.map.filename}`;
+
+            // Check if already complete (e.g. from cache)
+            if (gameMapImage.complete && gameMapImage.naturalWidth !== 0) {
+                onMapLoad();
+            }
+
+            // Handle Resize / Orientation Change
+            window.addEventListener('resize', () => {
+                // Debounce or just call efficiently
+                requestAnimationFrame(() => fitMapToScreen());
+            });
+
+            // Render Pins
+            renderPins();
+
+            // Prepare Questions (Shuffle)
+            mqQuestions = shuffle(data.problems);
+
+            if (mqQuestions.length === 0) {
+                document.getElementById('questionText').innerText = '問題がありません';
+            } else {
+                showQuestion(0);
+            }
+
+        } catch (e) {
+            alert('ロードエラー: ' + e.message);
+        }
+    }
+
+    function renderPins() {
+        const container = document.getElementById('gamePinsContainer');
+        container.innerHTML = '';
+
+        const img = document.getElementById('gameMapImage');
+        const mapNaturalW = img.naturalWidth || 1000; // default to avoid zero if not loaded (though re-render handles it)
+
+        mqQuizData.locations.forEach(loc => {
+            const pinBtn = document.createElement('div');
+            pinBtn.className = 'game-pin';
+            pinBtn.id = `pin-${loc.id}`;
+            pinBtn.style.position = 'absolute';
+            pinBtn.style.left = `${loc.x}%`;
+            pinBtn.style.top = `${loc.y}%`;
+            // Wrapper 0 size
+            pinBtn.style.width = '0';
+            pinBtn.style.height = '0';
+            pinBtn.style.overflow = 'visible';
+            pinBtn.style.cursor = 'pointer';
+            pinBtn.onclick = (e) => onPinClick(e, loc.id);
+
+            // Icon: anchor bottom-center (Only for points)
+            let iconHtml = '';
+            if (loc.shape_type !== 'circle') {
+                iconHtml = `<i class="fas fa-map-marker-alt text-danger fa-lg" style="position: absolute; left: 0; top: 0; transform: translate(-50%, -100%); filter: drop-shadow(0 2px 3px rgba(0,0,0,0.5)); transition: all 0.2s; z-index: 2;"></i>`;
+            }
+
+            // Circle/Ellipse Region
+            let regionHtml = '';
+            if ((loc.shape_type === 'circle' || loc.shape_type === 'ellipse') && (loc.radius > 0 || loc.radius_x > 0)) {
+                // Calculate px size based on natural width
+                const rx = loc.radius_x || loc.radius || 0;
+                const ry = loc.radius_y || loc.radius || 0;
+                const rot = loc.rotation || 0;
+
+                if (rx > 0 || ry > 0) {
+                    const finalRx = rx > 0 ? rx : ry;
+                    const finalRy = ry > 0 ? ry : rx;
+
+                    const width = (finalRx / 100) * mapNaturalW * 2;
+                    const height = (finalRy / 100) * mapNaturalW * 2;
+
+                    regionHtml = `<div class="pin-region" data-rotation="${rot}" style="
+                        position: absolute; 
+                        left: 50%; top: 50%; 
+                        width: ${width}px; height: ${height}px; 
+                        transform: translate(-50%, -50%) rotate(${rot}deg);
+                        border-radius: 50%; 
+                        background-color: rgba(220, 53, 69, 0.2); 
+                        border: 1px solid rgba(220, 53, 69, 0.5);
+                        z-index: 1;
+                        pointer-events: auto;
+                     "></div>`;
+                }
+            }
+
+            // Label (Only if name is not empty)
+            let labelHtml = '';
+            if (loc.name && loc.name.trim() !== "") {
+                const isRegion = (loc.shape_type === 'circle' || loc.shape_type === 'ellipse');
+                // Centered for regions, offset for points
+                const labelStyle = isRegion
+                    ? 'position: absolute; left: 0; top: 0; transform: translate(-50%, -50%);'
+                    : 'position: absolute; left: 15px; top: -35px;';
+
+                labelHtml = `<div class="pin-label badge bg-light text-dark border shadow-sm" id="label-${loc.id}" style="${labelStyle} font-size: 14px; white-space: nowrap; display: none; z-index: 10;">${loc.name}</div>`;
+            }
+
+            pinBtn.innerHTML = regionHtml + `<div class="pin-marker-wrapper" style="position: absolute; left: 0; top: 0; z-index: 10;">${iconHtml + labelHtml}</div>`;
+            container.appendChild(pinBtn);
+        });
+
+        // Ensure new pins are correctly scaled according to current zoom
+        setTransform();
+    }
+
+    function showQuestion(index) {
+        mqCurrentIndex = index;
+        mqCurrentQuestion = mqQuestions[index];
+        mqIsAnswered = false; // Reset lock
+
+        document.getElementById('progressBadge').innerText = `Q ${index + 1} / ${mqQuestions.length}`;
+
+        // Debug/Fallback for empty question
+        let qText = mqCurrentQuestion.question;
+        if (!qText) {
+            console.warn("Question text is empty for ID:", mqCurrentQuestion.id);
+            qText = "(問題文が読み込めませんでした)";
+        }
+
+        const qTextEl = document.getElementById('questionText');
+        qTextEl.innerText = qText;
+
+        // Force text visibility style if needed
+        qTextEl.style.color = '#212529'; // Ensure dark on white
+
+        document.getElementById('explanationText').style.display = 'none';
+        document.getElementById('nextButtonContainer').style.display = 'none';
+
+        // Reset Pin Styles & Visibility
+        document.querySelectorAll('.game-pin').forEach(pin => {
+            pin.style.display = 'block'; // Ensure visible
+            // Reset icon inside
+            const icon = pin.querySelector('i');
+            if (icon) {
+                icon.className = 'fas fa-map-marker-alt text-danger fa-lg';
+                icon.classList.remove('fa-bounce');
+            }
+            // Reset region color/shadow
+            const region = pin.querySelector('.pin-region');
+            if (region) {
+                region.style.backgroundColor = 'rgba(220, 53, 69, 0.2)';
+                region.style.borderColor = 'rgba(220, 53, 69, 0.5)';
+                region.style.boxShadow = 'none';
+            }
+        });
+
+        // Reset Labels (Hide all)
+        document.querySelectorAll('.pin-label').forEach(label => {
+            label.style.display = 'none';
+        });
+
+        document.getElementById('gameArea').classList.remove('disable-clicks');
+
+        // Reset Map View
+        fitMapToScreen();
+    }
+
+    function onPinClick(e, locId) {
+        e.stopPropagation();
+        if (!mqCurrentQuestion) return;
+        if (mqIsAnswered) return; // Prevent multi click
+
+        mqIsAnswered = true; // Lock
+
+        // Check Answer
+        const isCorrect = (locId === mqCurrentQuestion.location_id);
+        const correctLocId = mqCurrentQuestion.location_id;
+        const correctLoc = mqQuizData.locations.find(l => l.id === correctLocId);
+
+        if (!correctLoc) {
+            console.error("Critical Error: Correct location not found for ID:", correctLocId);
+            return;
+        }
+
+        // Visual Feedback
+        // Show Correct Label
+        const correctLabel = document.getElementById(`label-${correctLocId}`);
+        if (correctLabel) {
+            correctLabel.style.display = 'block';
+        }
+
+        const clickedPinEl = document.getElementById(`pin-${locId}`);
+        const correctPinEl = document.getElementById(`pin-${correctLocId}`);
+
+        // Helper function for visual feedback
+        const setPinVisual = (el, status) => {
+            if (!el) return;
+            const icon = el.querySelector('i');
+            // Region is a div that is NOT the label
+            const region = el.querySelector('div:not(.pin-label)');
+
+            if (status === 'correct') {
+                if (icon) icon.className = 'fas fa-map-marker-alt text-success fa-3x';
+                if (region) {
+                    region.style.backgroundColor = 'rgba(25, 135, 84, 0.6)'; // Success Green
+                    region.style.borderColor = '#198754';
+                    region.style.boxShadow = '0 0 10px #198754';
+                }
+            } else if (status === 'wrong') {
+                if (icon) icon.className = 'fas fa-map-marker-alt text-secondary fa-lg';
+                if (region) {
+                    region.style.backgroundColor = 'rgba(108, 117, 125, 0.4)'; // Grey
+                    region.style.borderColor = '#6c757d';
+                }
+            } else if (status === 'bounce') {
+                if (icon) icon.classList.add('fa-bounce');
+                if (region) {
+                    const rot = region.getAttribute('data-rotation') || 0;
+                    // Add a simple pulse effect if desired, or just highlight
+                    // CRITICAL: Must include rotation in the animation to avoid reset
+                    region.animate([
+                        { transform: `translate(-50%, -50%) rotate(${rot}deg) scale(1)` },
+                        { transform: `translate(-50%, -50%) rotate(${rot}deg) scale(1.1)` },
+                        { transform: `translate(-50%, -50%) rotate(${rot}deg) scale(1)` }
+                    ], { duration: 500, iterations: 3 });
+                }
+            }
+        };
+
+        if (isCorrect) {
+            setPinVisual(clickedPinEl, 'correct');
+            playAudio('correct');
+            mqCorrectCount++;
+        } else {
+            // Incorrect Logic
+            setPinVisual(clickedPinEl, 'wrong');
+            setPinVisual(correctPinEl, 'correct');
+            setPinVisual(correctPinEl, 'bounce');
+
+            playAudio('wrong');
+
+            // Find clicked location name for feedback
+            const clickedLoc = mqQuizData.locations.find(l => l.id === locId);
+            const clickedName = clickedLoc ? clickedLoc.name : "不明な地点";
+
+            // Record incorrect answer
+            mqIncorrectQuestions.push({
+                question: mqCurrentQuestion.question || "(問題文なし)",
+                correctName: correctLoc.name || "",
+                explanation: mqCurrentQuestion.explanation || ""
+            });
+        }
+
+        // --- Unified Feedback (Hide other pins and show full map) ---
+
+        // Filter Pins: Hide all except clicked and correct
+        document.querySelectorAll('.game-pin').forEach(pin => {
+            const pid = pin.id;
+            if (pid !== `pin-${locId}` && pid !== `pin-${correctLocId}`) {
+                pin.style.display = 'none';
+            }
+        });
+
+        // Reset View to Full Map (Smoothly but quickly to keep tempo)
+        mapWrapper.style.transition = "transform 0.6s ease-in-out";
+        fitMapToScreen();
+        setTimeout(() => {
+            mapWrapper.style.transition = "";
+        }, 600);
+
+        // Show Explanation
+        const explain = document.getElementById('explanationText');
+
+        let feedbackHtml = "";
+        let explanationContent = mqCurrentQuestion.explanation || "";
+
+        if (isCorrect) {
+            feedbackHtml = `<i class="fas fa-check-circle"></i> 正解！ ${explanationContent}`;
+        } else {
+            const clickedLoc = mqQuizData.locations.find(l => l.id === locId);
+            const clickedName = clickedLoc ? clickedLoc.name : "不明な地点";
+
+            // If location name is empty, don't show "Correct is XX"
+            if (correctLoc.name && correctLoc.name.trim() !== "") {
+                feedbackHtml = `<div class="mb-1"><i class="fas fa-times-circle"></i> 不正解... </div>`;
+                feedbackHtml += `<div class="mb-2 small text-muted">あなたが選択したのは「${clickedName}」です。</div>`;
+                feedbackHtml += explanationContent;
+            } else {
+                feedbackHtml = `<i class="fas fa-times-circle"></i> 不正解... <br>${explanationContent}`;
+            }
+        }
+
+        explain.innerHTML = feedbackHtml;
+        explain.style.display = 'block';
+
+        // Show Next Button
+        document.getElementById('nextButtonContainer').style.display = 'block';
+
+        // Record Result to Server
+        fetch('/api/map_quiz/record_result', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                location_id: mqCurrentQuestion.location_id,
+                problem_id: mqCurrentQuestion.id, // 🆕 追加
+                is_correct: isCorrect
+            })
+        }).catch(err => console.error("Failed to record result:", err));
+    }
+
+
+    function nextQuestion() {
+        if (mqCurrentIndex < mqQuestions.length - 1) {
+            showQuestion(mqCurrentIndex + 1);
+        } else {
+            showResult();
+        }
+    }
+
+    function showResult() {
+        const total = mqQuestions.length;
+        const correct = mqCorrectCount;
+        const percentage = total === 0 ? 0 : Math.round((correct / total) * 100);
+        const offset = total === 0 ? 439.6 : 439.6 - (439.6 * (correct / total));
+
+        document.getElementById('scoreValue').innerText = correct;
+        document.getElementById('scoreTotal').innerText = `/ ${total}`;
+
+        let message = "";
+        if (percentage === 100) {
+            message = "Perfect!! 素晴らしい！ 深淵を完全に理解しています。";
+
+            // Record success
+            const urlParams = new URLSearchParams(window.location.search);
+            const diff = urlParams.get('difficulty');
+            if (!diff || diff === '0') {
+                fetch('/api/map_quiz/record_perfect', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ map_id: MAP_ID })
+                }).catch(err => console.error("Failed to record perfect:", err));
+            }
+        } else if (percentage >= 80) {
+            message = "Great Job! あと少しで完全制覇です！";
+        } else if (percentage >= 60) {
+            message = "Good! その調子で地理をマスターしましょう！";
+        } else {
+            message = "Fight! この地図で復習を重ねましょう。";
+        }
+
+        document.getElementById('resultMessageText').innerText = message;
+
+        const wrongList = document.getElementById('wrongAnswersList');
+        const wrongSection = document.getElementById('wrongAnswersSection');
+
+        wrongList.innerHTML = '';
+
+        if (mqIncorrectQuestions.length > 0) {
+            mqIncorrectQuestions.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'list-group-item bg-transparent border-bottom px-0 py-3';
+
+                let titleHtml = '';
+                let correctInfo = '';
+
+                if (item.question === item.correctName) {
+                    // 問題文と正解の地点名が完全に一致する場合は地点名のみ表示
+                    titleHtml = `<div class="fw-bold text-primary mb-1" style="font-size: 1.05rem;"><span class="badge bg-info text-dark shadow-sm me-2">正解</span>${item.correctName}</div>`;
+                } else {
+                    titleHtml = `<div class="fw-bold text-dark mb-1" style="font-size: 1.05rem;">${item.question}</div>`;
+                    if (item.correctName) {
+                        correctInfo = `<div class="mt-1"><span class="badge bg-info text-dark shadow-sm">正解</span> <span class="fw-bold text-primary">${item.correctName}</span></div>`;
+                    }
+                }
+
+                let explanation = '';
+                if (item.explanation) {
+                    explanation = `<div class="mt-2 small text-muted"><i class="fas fa-compass text-info me-1"></i>${item.explanation}</div>`;
+                }
+
+                div.innerHTML = `
+                    ${titleHtml}
+                    ${correctInfo}
+                    ${explanation}
+                `;
+                wrongList.appendChild(div);
+            });
+            wrongSection.style.display = 'block';
+        } else {
+            wrongSection.style.display = 'none';
+        }
+
+        const overlay = document.getElementById('resultOverlay');
+        overlay.style.display = 'flex';
+
+        // Trigger circular animation after render
+        setTimeout(() => {
+            const circle = document.getElementById('scoreProgressCircle');
+            if (circle) circle.style.strokeDashoffset = offset;
+        }, 100);
+    }
+
+    // Toggle Labels Removed
+
+    // Helper: Shuffle Array
+    function shuffle(array) {
+        let currentIndex = array.length, randomIndex;
+        while (currentIndex != 0) {
+            randomIndex = Math.floor(Math.random() * currentIndex);
+            currentIndex--;
+            [array[currentIndex], array[randomIndex]] = [
+                array[randomIndex], array[currentIndex]];
+        }
+        return array;
+    }
+
+    // Helper: Audio (Placeholder)
+    function playAudio(type) {
+        // Implement audio if available
+    }
+
+    // Zoom/Pan Implementation
+    function calculateFitState() {
+        const img = document.getElementById('gameMapImage');
+        const container = document.getElementById('gameArea');
+
+        if (!img.naturalWidth) return null;
+
+        const containerW = container.clientWidth;
+        const containerH = container.clientHeight;
+        const imgW = img.naturalWidth;
+        const imgH = img.naturalHeight;
+
+        // Calculate scale to "contain" the image
+        // Use 0.95 factor to leave a small margin
+        const scaleX = (containerW * 0.95) / imgW;
+        const scaleY = (containerH * 0.95) / imgH;
+        const targetScale = Math.min(scaleX, scaleY); // Fit entirely visible
+
+        // Initial centering
+        // Because transform-origin is 0 0, we calculate the top-left offset
+        const scaledW = imgW * targetScale;
+        const scaledH = imgH * targetScale;
+
+        const targetPointX = (containerW - scaledW) / 2;
+        const targetPointY = (containerH - scaledH) / 2;
+
+        return {
+            scale: targetScale,
+            pointX: targetPointX,
+            pointY: targetPointY
+        };
+    }
+
+    function fitMapToScreen() {
+        const state = calculateFitState();
+        if (!state) return;
+
+        scale = state.scale;
+        pointX = state.pointX;
+        pointY = state.pointY;
+
+        // Reset pan limits or start positions if needed
+        startX = 0;
+        startY = 0;
+
+        setTransform();
+    }
+
+    function initPanZoom() {
+        // Mouse Events
+        gameArea.onmousedown = function (e) {
+            e.preventDefault();
+            startX = e.clientX - pointX;
+            startY = e.clientY - pointY;
+            panning = true;
+            gameArea.style.cursor = 'grabbing';
+        };
+
+        gameArea.onmouseup = function (e) {
+            panning = false;
+            gameArea.style.cursor = 'grab';
+        };
+
+        gameArea.onmousemove = function (e) {
+            e.preventDefault();
+            if (!panning) return;
+            pointX = e.clientX - startX;
+            pointY = e.clientY - startY;
+            setTransform();
+        };
+
+        gameArea.onwheel = function (e) {
+            e.preventDefault();
+            const xs = (e.clientX - pointX) / scale,
+                ys = (e.clientY - pointY) / scale,
+                delta = -e.deltaY;
+
+            (delta > 0) ? (scale *= 1.2) : (scale /= 1.2);
+
+            if (scale < 0.1) scale = 0.1;
+            if (scale > 5) scale = 5;
+
+            pointX = e.clientX - xs * scale;
+            pointY = e.clientY - ys * scale;
+
+            setTransform();
+        };
+
+        // Touch Events (Mobile Support)
+        gameArea.addEventListener('touchstart', handleTouchStart, { passive: false });
+        gameArea.addEventListener('touchmove', handleTouchMove, { passive: false });
+        gameArea.addEventListener('touchend', handleTouchEnd);
+    }
+
+    // Touch State
+    let lastTouchX = 0;
+    let lastTouchY = 0;
+    let initialPinchDistance = null;
+    let initialScale = 1;
+
+    function handleTouchStart(e) {
+        if (e.touches.length === 1) {
+            // Single touch - Pan
+            const touch = e.touches[0];
+            startX = touch.clientX - pointX;
+            startY = touch.clientY - pointY;
+            panning = true;
+        } else if (e.touches.length === 2) {
+            // key: Multi touch - Pinch Zoom
+            panning = false;
+            initialPinchDistance = getDistance(e.touches);
+            initialScale = scale;
+        }
+    }
+
+    function handleTouchMove(e) {
+        e.preventDefault(); // Prevent scrolling
+
+        if (e.touches.length === 1 && panning) {
+            // Pan
+            const touch = e.touches[0];
+            pointX = touch.clientX - startX;
+            pointY = touch.clientY - startY;
+            setTransform();
+        } else if (e.touches.length === 2 && initialPinchDistance) {
+            // Pinch Zoom
+            const currentDistance = getDistance(e.touches);
+            const zoomFactor = currentDistance / initialPinchDistance;
+
+            // Calculate center point between two fingers
+            const center = getCenter(e.touches);
+            const cx = center.x;
+            const cy = center.y;
+
+            // Calculate world coordinates of that center
+            const wx = (cx - pointX) / scale;
+            const wy = (cy - pointY) / scale;
+
+            // Apply new scale
+            let newScale = initialScale * zoomFactor;
+
+            // Limits
+            if (newScale < 0.1) newScale = 0.1;
+            if (newScale > 5) newScale = 5;
+
+            scale = newScale;
+
+            // Adjust pointX/Y to keep world center at screen center
+            pointX = cx - wx * scale;
+            pointY = cy - wy * scale;
+
+            setTransform();
+        }
+    }
+
+    function handleTouchEnd(e) {
+        if (e.touches.length < 2) {
+            initialPinchDistance = null;
+        }
+        if (e.touches.length === 0) {
+            panning = false;
+        }
+    }
+
+    // Helper: Distance between two touch points
+    function getDistance(touches) {
+        const dx = touches[0].clientX - touches[1].clientX;
+        const dy = touches[0].clientY - touches[1].clientY;
+        return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    // Helper: Center point between two touch points
+    function getCenter(touches) {
+        return {
+            x: (touches[0].clientX + touches[1].clientX) / 2,
+            y: (touches[0].clientY + touches[1].clientY) / 2
+        };
+    }
+
+    function setTransform() {
+        mapWrapper.style.transform = "translate(" + pointX + "px, " + pointY + "px) scale(" + scale + ")";
+
+        // Counter-scale ONLY the visual markers (icons and labels)
+        // Map regions (circles/ellipses) will scale naturally with the map
+        const invScale = 1 / scale;
+        document.querySelectorAll('.pin-marker-wrapper').forEach(wrapper => {
+            wrapper.style.transform = `scale(${invScale})`;
+        });
+    }
+
+    function zoomMap(factor) {
+        const container = document.getElementById('gameArea');
+        const cx = container.clientWidth / 2;
+        const cy = container.clientHeight / 2;
+
+        // Calculate world coordinates of center
+        const wx = (cx - pointX) / scale;
+        const wy = (cy - pointY) / scale;
+
+        scale *= factor;
+
+        // Limits
+        if (scale < 0.1) scale = 0.1;
+        if (scale > 5) scale = 5;
+
+        // Adjust pointX/Y to keep world center at screen center
+        pointX = cx - wx * scale;
+        pointY = cy - wy * scale;
+
+        setTransform();
+    }
+
+    function goBackToDifficultySelect() {
+        // Redirect to index with open_map_id parameter
+        window.location.href = "{{ url_for('map_quiz_index') }}?open_map_id=" + MAP_ID;
+    }
+</script>
+
+<!-- Result Overlay (Redesigned) -->
+<div id="resultOverlay" class="position-absolute top-0 start-0 w-100 h-100 justify-content-center align-items-center"
+    style="display: none; z-index: 10000; background-color: rgba(240, 248, 255, 0.85); backdrop-filter: blur(8px);">
+
+    <div class="map-result-card text-center d-flex flex-column" style="max-height: 90vh;">
+        <svg style="width:0;height:0;position:absolute;">
+            <defs>
+                <linearGradient id="scoreGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#00a8ff" />
+                    <stop offset="100%" stop-color="#0097e6" />
+                </linearGradient>
+            </defs>
+        </svg>
+
+        <h2 class="results-map-title"><i class="fas fa-compass pb-1 me-2" style="opacity: 0.8;"></i> 結果発表</h2>
+
+        <div class="overflow-auto scrollbar-hidden flex-grow-1 px-2" style="padding-bottom: 20px;">
+            <div class="score-visualization">
+                <svg class="score-circle-svg" viewBox="0 0 160 160">
+                    <circle class="score-circle-bg" cx="80" cy="80" r="70" />
+                    <circle id="scoreProgressCircle" class="score-circle-progress" cx="80" cy="80" r="70" />
+                </svg>
+                <div class="score-text-container">
+                    <div class="score-value" id="scoreValue">0</div>
+                    <div class="score-total" id="scoreTotal">/ 0</div>
+                </div>
+            </div>
+
+            <p class="result-message" id="resultMessageText"></p>
+
+            <!-- Wrong Answers Section -->
+            <div id="wrongAnswersSection" class="text-start map-wrong-section mx-auto"
+                style="display: none; max-width: 500px;">
+                <h5 class="text-primary fw-bold mb-3 border-bottom border-primary border-opacity-25 pb-2 font-monospace"
+                    style="font-size: 1.1rem;">
+                    <i class="fas fa-book-open me-2"></i> 探究の記録
+                </h5>
+                <div id="wrongAnswersList" class="list-group list-group-flush bg-transparent">
+                    <!-- Wrong answers injected here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Buttons -->
+        <div
+            class="d-grid gap-3 d-sm-flex justify-content-center pt-3 border-top border-secondary border-opacity-10 mt-2">
+            <button class="btn-map-control" onclick="location.reload()" title="もう一度">
+                <i class="fas fa-redo"></i>
+            </button>
+            <button class="btn-map-control" onclick="goBackToDifficultySelect()" title="難易度選択へ">
+                <i class="fas fa-layer-group"></i>
+            </button>
+            <a href="{{ url_for('map_quiz_index') }}" class="btn-map-control" title="他のマップへ">
+                <i class="fas fa-map"></i>
+            </a>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Override base container to allow full screen */
+    body>.container {
+        max-width: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        width: 100% !important;
+    }
+
+    .disable-clicks {
+        pointer-events: none;
+    }
+
+    /* Secret/Premium Result Screen Design */
+    .map-result-card {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(12px);
+        border-radius: 24px;
+        box-shadow: 0 25px 50px rgba(0, 48, 86, 0.15);
+        padding: 50px 30px;
+        width: 90%;
+        max-width: 600px;
+        border: 1px solid rgba(255, 255, 255, 0.8);
+        position: relative;
+        overflow: hidden;
+        animation: resultFadeUp 0.8s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    }
+
+    .map-result-card::before {
+        content: '';
+        position: absolute;
+        top: -50%;
+        left: -50%;
+        width: 200%;
+        height: 200%;
+        background: radial-gradient(circle, rgba(0, 168, 255, 0.05) 0%, transparent 70%);
+        pointer-events: none;
+        animation: rotateGlow 30s linear infinite;
+        z-index: 0;
+    }
+
+    .map-result-card>* {
+        position: relative;
+        z-index: 1;
+    }
+
+    @keyframes rotateGlow {
+        from {
+            transform: rotate(0deg);
+        }
+
+        to {
+            transform: rotate(360deg);
+        }
+    }
+
+    @keyframes resultFadeUp {
+        from {
+            opacity: 0;
+            transform: translateY(40px) scale(0.95);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+    }
+
+    .results-map-title {
+        font-family: 'Shippori Mincho', serif;
+        font-size: 2.2rem;
+        color: #1e272e;
+        margin-bottom: 30px;
+        letter-spacing: 0.1em;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    }
+
+    .score-visualization {
+        position: relative;
+        width: 160px;
+        height: 160px;
+        margin: 0 auto 30px auto;
+    }
+
+    .score-circle-svg {
+        transform: rotate(-90deg);
+        width: 100%;
+        height: 100%;
+    }
+
+    .score-circle-bg {
+        fill: none;
+        stroke: #f1f2f6;
+        stroke-width: 8;
+    }
+
+    .score-circle-progress {
+        fill: none;
+        stroke: url(#scoreGradient);
+        stroke-width: 10;
+        stroke-linecap: round;
+        stroke-dasharray: 439.6;
+        /* 2 * PI * 70 */
+        stroke-dashoffset: 439.6;
+        transition: stroke-dashoffset 1.5s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .score-text-container {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        text-align: center;
+    }
+
+    .score-value {
+        font-family: 'Kaisei Tokumin', serif;
+        font-size: 3rem;
+        font-weight: 700;
+        color: #2f3542;
+        line-height: 1;
+    }
+
+    .score-total {
+        font-size: 1.2rem;
+        color: #747d8c;
+        margin-top: 5px;
+    }
+
+    .result-message {
+        font-size: 1.15rem;
+        color: #57606f;
+        margin-bottom: 30px;
+        font-weight: 500;
+        line-height: 1.6;
+    }
+
+    .map-wrong-section {
+        background: rgba(241, 242, 246, 0.6);
+        border: 1px solid rgba(223, 228, 234, 0.8);
+        border-radius: 16px;
+        padding: 20px;
+        box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.02);
+    }
+
+    .btn-map-control {
+        background: #ffffff;
+        color: #2f3542;
+        border: 1px solid #dfe4ea;
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        font-size: 1.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+        transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        text-decoration: none;
+    }
+
+    .btn-map-control:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 20px rgba(0, 168, 255, 0.2);
+        color: #00a8ff;
+        border-color: #00a8ff;
+    }
+
+    .scrollbar-hidden::-webkit-scrollbar {
+        display: none;
+    }
+
+    .scrollbar-hidden {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+    }
+</style>
+
+{% block footer %}{% endblock %}
+{% block info_icon %}{% endblock %}
+{% endblock %}

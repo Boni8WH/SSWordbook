@@ -1,0 +1,1065 @@
+{% extends "base.html" %}
+{% block title %}刻の系譜 ({{ chapter }}) - {{ app_name }}{% endblock %}
+
+{% block head_extra %}
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+<style>
+    body {
+        background-color: #f4f7f6;
+    }
+
+    .solve-container {
+        max-width: 800px;
+        margin: 20px auto;
+        padding: 0 15px;
+    }
+
+    .problem-card {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+        padding: 25px;
+        margin-bottom: 20px;
+        position: relative;
+        overflow: hidden;
+        /* For watermark containment */
+    }
+
+    .problem-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 2px solid #f0f0f0;
+        padding-bottom: 15px;
+        margin-bottom: 20px;
+    }
+
+    .problem-meta {
+        font-size: 0.9rem;
+        color: #7f8c8d;
+    }
+
+    .problem-progress {
+        font-weight: bold;
+        color: #3498db;
+    }
+
+    .question-text {
+        font-size: 1.2rem;
+        font-weight: 600;
+        color: #2c3e50;
+        margin-bottom: 20px;
+        line-height: 1.5;
+    }
+
+    /* Sortable List Styles */
+    .sortable-list {
+        list-style: none;
+        padding: 0;
+        margin: 0 0 25px 0;
+    }
+
+    .sortable-item {
+        background: white;
+        border: none;
+        border-left: 4px solid #3498db;
+        border-radius: 8px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+        padding: 15px 20px;
+        margin-bottom: 12px;
+        cursor: grab;
+        display: flex;
+        align-items: center;
+        font-size: 1.15rem;
+        font-weight: 500;
+        color: #2c3e50;
+        transition: all 0.2s ease;
+        touch-action: none;
+        /* Important for touch devices */
+    }
+
+    .sortable-item:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+        background: #fdfdfd;
+    }
+
+    .sortable-item:active {
+        cursor: grabbing;
+    }
+
+    .sortable-item i.drag-handle {
+        color: #cbd5e1;
+        margin-right: 18px;
+        font-size: 1.3rem;
+        transition: color 0.2s ease;
+    }
+
+    .sortable-item:hover i.drag-handle {
+        color: #94a3b8;
+    }
+
+    .sortable-item.sortable-ghost {
+        opacity: 0.5;
+        background-color: #f1f5f9;
+        border: 2px dashed #cbd5e1;
+        border-left: 4px solid #cbd5e1;
+        box-shadow: none;
+    }
+
+    .sortable-item.sortable-drag {
+        background-color: #fff;
+        box-shadow: 0 15px 30px rgba(0, 0, 0, 0.15);
+        transform: scale(1.03);
+        z-index: 1000;
+    }
+
+    .btn-submit {
+        width: 100%;
+        padding: 15px;
+        font-size: 1.2rem;
+        font-weight: bold;
+        border-radius: 8px;
+        transition: all 0.3s;
+    }
+
+    .nav-buttons {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 20px;
+        gap: 15px;
+    }
+
+    .nav-buttons button {
+        flex: 1;
+    }
+
+    .result-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        min-height: 100%;
+        height: auto;
+        background: rgba(255, 255, 255, 0.98);
+        display: none;
+        flex-direction: column;
+        justify-content: flex-start;
+        align-items: center;
+        border-radius: 12px;
+        z-index: 10;
+        text-align: center;
+        padding: 40px 20px 20px 20px;
+        box-sizing: border-box;
+    }
+
+    /* New Visual Effect for Correct Answer */
+    .result-overlay.correct-glow {
+        animation: timeGlow 2s infinite alternate, timeWarpIn 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        box-shadow: inset 0 0 20px rgba(46, 204, 113, 0.2), 0 0 15px rgba(26, 188, 156, 0.3);
+        border: 1px solid rgba(46, 204, 113, 0.3);
+    }
+
+    @keyframes timeGlow {
+        from {
+            box-shadow: inset 0 0 10px rgba(46, 204, 113, 0.1), 0 0 5px rgba(26, 188, 156, 0.2);
+        }
+
+        to {
+            box-shadow: inset 0 0 30px rgba(46, 204, 113, 0.3), 0 0 25px rgba(26, 188, 156, 0.5);
+        }
+    }
+
+    .result-icon {
+        font-size: 5rem;
+        margin-bottom: 15px;
+    }
+
+    .result-icon.correct {
+        color: #2ecc71;
+        animation: successBurst 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    }
+
+    @keyframes successBurst {
+        0% {
+            transform: scale(0);
+            opacity: 0;
+            text-shadow: 0 0 0 rgba(46, 204, 113, 0);
+        }
+
+        50% {
+            transform: scale(1.2);
+            opacity: 1;
+            text-shadow: 0 0 20px rgba(46, 204, 113, 0.6);
+        }
+
+        100% {
+            transform: scale(1);
+            opacity: 1;
+            text-shadow: 0 0 10px rgba(46, 204, 113, 0.2);
+        }
+    }
+
+    .result-icon.incorrect {
+        color: #e74c3c;
+    }
+
+    .result-text {
+        font-size: 1.5rem;
+        font-weight: bold;
+        color: #2c3e50;
+        margin-bottom: 20px;
+    }
+
+    .correct-order-list {
+        text-align: left;
+        background: #f8f9fa;
+        padding: 15px 25px;
+        border-radius: 8px;
+        margin: 0 auto 20px auto;
+        width: fit-content;
+        max-width: 100%;
+        border: 1px solid #e9ecef;
+    }
+
+    .correct-order-list div {
+        margin-bottom: 8px;
+        color: #34495e;
+        display: flex;
+        align-items: flex-start;
+        font-size: 0.95rem;
+    }
+
+    .correct-order-list span.badge {
+        margin-top: 3px;
+        min-width: 24px;
+        padding: 5px;
+    }
+
+    /* Phase 7: Timeline Styles */
+    .timeline-container {
+        position: relative;
+        padding: 20px 0;
+        margin: 20px auto;
+        width: 100%;
+        max-width: 500px;
+        text-align: left;
+    }
+
+    .timeline-line {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 20px;
+        width: 3px;
+        background: linear-gradient(to bottom, #f1c40f, #2ecc71);
+        border-radius: 3px;
+        transform-origin: top;
+        animation: drawTimelineLine 1.5s ease-in-out forwards;
+        overflow: hidden;
+        /* For the pulse effect */
+    }
+
+    /* The moving light pulse along the timeline */
+    .timeline-line::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 30px;
+        background: rgba(255, 255, 255, 0.8);
+        box-shadow: 0 0 10px 3px rgba(255, 255, 255, 0.8);
+        border-radius: 5px;
+        animation: movePulse 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+        opacity: 0;
+    }
+
+    @keyframes drawTimelineLine {
+        from {
+            transform: scaleY(0);
+        }
+
+        to {
+            transform: scaleY(1);
+        }
+    }
+
+    @keyframes movePulse {
+        0% {
+            top: -30px;
+            opacity: 0;
+        }
+
+        10% {
+            opacity: 1;
+        }
+
+        90% {
+            opacity: 1;
+        }
+
+        100% {
+            top: 100%;
+            opacity: 0;
+        }
+    }
+
+    .timeline-node {
+        position: relative;
+        padding-left: 50px;
+        margin-bottom: 25px;
+        min-height: 40px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+
+    .timeline-node::before {
+        content: '';
+        position: absolute;
+        left: 14px;
+        top: 50%;
+        margin-top: -7.5px;
+        width: 15px;
+        height: 15px;
+        background: white;
+        border: 3px solid #bdc3c7;
+        border-radius: 50%;
+        z-index: 2;
+        opacity: 0;
+        transform: scale(0);
+        animation: popInNode 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    }
+
+    .timeline-node-text {
+        background: white;
+        padding: 12px 18px;
+        border: none;
+        border-left: 4px solid #3498db;
+        border-radius: 8px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+        color: #2c3e50;
+        font-size: 1.1rem;
+        font-weight: 500;
+        opacity: 0;
+        transform: translateX(10px);
+        animation: glowRevealText 0.5s ease-out forwards;
+    }
+
+    /* Animation stagger for timeline nodes - perfectly timed with the 1.5s line draw */
+    .timeline-node:nth-child(2)::before,
+    .timeline-node:nth-child(2) .timeline-node-text {
+        animation-delay: 0.3s;
+    }
+
+    .timeline-node:nth-child(3)::before,
+    .timeline-node:nth-child(3) .timeline-node-text {
+        animation-delay: 0.6s;
+    }
+
+    .timeline-node:nth-child(4)::before,
+    .timeline-node:nth-child(4) .timeline-node-text {
+        animation-delay: 0.9s;
+    }
+
+    .timeline-node:nth-child(5)::before,
+    .timeline-node:nth-child(5) .timeline-node-text {
+        animation-delay: 1.2s;
+    }
+
+    .timeline-node:nth-child(6)::before,
+    .timeline-node:nth-child(6) .timeline-node-text {
+        animation-delay: 1.5s;
+    }
+
+    .timeline-node:nth-child(7)::before,
+    .timeline-node:nth-child(7) .timeline-node-text {
+        animation-delay: 1.8s;
+    }
+
+    @keyframes popInNode {
+        0% {
+            transform: scale(0);
+            opacity: 0;
+            border-color: #f1c40f;
+            box-shadow: 0 0 0 rgba(241, 196, 15, 0);
+        }
+
+        70% {
+            transform: scale(1.3);
+            opacity: 1;
+            border-color: #f1c40f;
+            box-shadow: 0 0 10px rgba(241, 196, 15, 0.8);
+        }
+
+        100% {
+            transform: scale(1);
+            opacity: 1;
+            border-color: #2ecc71;
+            box-shadow: 0 0 5px rgba(46, 204, 113, 0.4);
+        }
+    }
+
+    @keyframes glowRevealText {
+        0% {
+            opacity: 0;
+            transform: translateX(20px);
+            filter: brightness(1.5);
+        }
+
+        100% {
+            opacity: 1;
+            transform: translateX(0);
+            filter: brightness(1);
+        }
+    }
+
+    /* Phase 7: Error Highlighting & Comparison Table */
+    .comparison-table {
+        margin: 0 auto 20px auto;
+        width: 100%;
+        max-width: 600px;
+        background: #fff;
+        font-size: 0.95rem;
+    }
+
+    .comparison-table th {
+        background-color: #f8f9fa;
+        text-align: center;
+        width: 50%;
+    }
+
+    .comparison-table td {
+        vertical-align: middle;
+        padding: 12px;
+        text-align: left;
+        /* Explicitly align text to the left */
+    }
+
+    .bg-light-success {
+        background-color: #d4edda !important;
+        color: #155724 !important;
+    }
+
+    .bg-light-danger {
+        background-color: #f8d7da !important;
+        color: #721c24 !important;
+    }
+
+    @keyframes pulseRed {
+        0% {
+            box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.4);
+        }
+
+        70% {
+            box-shadow: 0 0 0 6px rgba(231, 76, 60, 0);
+        }
+
+        100% {
+            box-shadow: 0 0 0 0 rgba(231, 76, 60, 0);
+        }
+    }
+
+    /* Phase 7: Time Effect Background */
+    .problem-card {
+        position: relative;
+        /* Added for .result-overlay to cover it */
+    }
+
+    /* Removed .problem-card::after and @keyframes slowSpin */
+
+    .problem-header,
+    .question-text,
+    .sortable-list,
+    .btn-submit,
+    .result-overlay {
+        position: relative;
+        z-index: 1;
+    }
+
+    .result-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(255, 255, 255, 0.98);
+        display: none;
+        flex-direction: column;
+        justify-content: flex-start;
+        align-items: center;
+        text-align: center;
+        padding: 40px 20px 20px 20px;
+        border-radius: 8px;
+        box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+        opacity: 0;
+        z-index: 10;
+        overflow-y: auto;
+        /* Allow internal scrolling if content is large */
+    }
+
+    .result-overlay.time-warp-in {
+        animation: timeWarpIn 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    }
+
+    @keyframes timeWarpIn {
+        from {
+            opacity: 0;
+            transform: scale(0.8) translateY(40px);
+            filter: blur(10px);
+        }
+
+        to {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+            filter: blur(0);
+        }
+    }
+
+    /* Subtle pulse and glow on dragged item */
+    .sortable-drag {
+        animation: dragPulse 1s infinite alternate;
+        background: linear-gradient(to right, #ffffff, #f0f8ff);
+        /* Hint of theme color */
+        box-shadow: 0 15px 30px rgba(52, 152, 219, 0.25);
+        border-left: 5px solid #2980b9;
+        transform: scale(1.04);
+    }
+
+    /* Animation for when item is dropped (added via JS later) */
+    .item-dropped {
+        animation: dropFeedback 0.3s ease-out;
+    }
+
+    @keyframes dragPulse {
+        from {
+            box-shadow: 0 10px 20px rgba(52, 152, 219, 0.2);
+        }
+
+        to {
+            box-shadow: 0 15px 35px rgba(52, 152, 219, 0.4);
+            background: linear-gradient(to right, #ffffff, #e1f0fa);
+        }
+    }
+
+    @keyframes dropFeedback {
+        0% {
+            transform: scale(1.04);
+            background-color: #f0f8ff;
+        }
+
+        50% {
+            transform: scale(0.98);
+        }
+
+        100% {
+            transform: scale(1);
+            background-color: #ffffff;
+        }
+    }
+
+    /* Phase 11: Premium Result Screen */
+    .final-result-card {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        border-radius: 20px;
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.15);
+        padding: 60px 40px;
+        max-width: 600px;
+        margin: 40px auto;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        position: relative;
+        overflow: hidden;
+        animation: resultFadeUp 0.8s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    }
+
+    .final-result-card::before {
+        content: '';
+        position: absolute;
+        top: -50%;
+        left: -50%;
+        width: 200%;
+        height: 200%;
+        background: radial-gradient(circle, rgba(212, 175, 55, 0.05) 0%, transparent 70%);
+        pointer-events: none;
+        animation: rotateGlow 20s linear infinite;
+    }
+
+    /* Perfect Clear Intensity Glow */
+    .final-result-card.perfect-clear {
+        border: 2px solid rgba(241, 196, 15, 0.6);
+        box-shadow: 0 20px 50px rgba(241, 196, 15, 0.2), inset 0 0 40px rgba(241, 196, 15, 0.1);
+        animation: resultFadeUp 0.8s cubic-bezier(0.22, 1, 0.36, 1) forwards, intenseAuraGlow 3s infinite alternate;
+    }
+
+    .final-result-card.perfect-clear::before {
+        background: radial-gradient(circle, rgba(241, 196, 15, 0.15) 0%, rgba(212, 175, 55, 0.05) 40%, transparent 80%);
+        animation: rotateGlow 15s linear infinite;
+        /* Faster rotation for perfect clear */
+    }
+
+    @keyframes intenseAuraGlow {
+        0% {
+            box-shadow: 0 20px 50px rgba(241, 196, 15, 0.2), inset 0 0 20px rgba(241, 196, 15, 0.05);
+        }
+
+        100% {
+            box-shadow: 0 25px 60px rgba(241, 196, 15, 0.4), 0 0 30px rgba(255, 215, 0, 0.3), inset 0 0 60px rgba(241, 196, 15, 0.2);
+            border-color: rgba(241, 196, 15, 0.9);
+        }
+    }
+
+    @keyframes rotateGlow {
+        from {
+            transform: rotate(0deg);
+        }
+
+        to {
+            transform: rotate(360deg);
+        }
+    }
+
+    @keyframes resultFadeUp {
+        from {
+            opacity: 0;
+            transform: translateY(40px) scale(0.95);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+    }
+
+    .results-majestic-title {
+        font-family: 'Shippori Mincho', serif;
+        font-size: 2.2rem;
+        color: #1a1a2e;
+        margin-bottom: 30px;
+        letter-spacing: 0.1em;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    }
+
+    .score-visualization {
+        position: relative;
+        width: 180px;
+        height: 180px;
+        margin: 0 auto 30px auto;
+    }
+
+    .score-circle-svg {
+        transform: rotate(-90deg);
+        width: 100%;
+        height: 100%;
+    }
+
+    .score-circle-bg {
+        fill: none;
+        stroke: #edf2f7;
+        stroke-width: 8;
+    }
+
+    .score-circle-progress {
+        fill: none;
+        stroke: url(#scoreGradient);
+        stroke-width: 10;
+        stroke-linecap: round;
+        stroke-dasharray: 439.6;
+        /* 2 * PI * 70 */
+        stroke-dashoffset: 439.6;
+        transition: stroke-dashoffset 1.5s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .score-text-container {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        text-align: center;
+    }
+
+    .score-value {
+        font-family: 'Kaisei Tokumin', serif;
+        font-size: 3rem;
+        font-weight: 700;
+        color: #2c3e50;
+        line-height: 1;
+    }
+
+    .score-total {
+        font-size: 1.2rem;
+        color: #94a3b8;
+        margin-top: 5px;
+    }
+
+    .result-message {
+        font-size: 1.1rem;
+        color: #64748b;
+        margin-bottom: 40px;
+        font-weight: 500;
+        line-height: 1.6;
+    }
+
+    .btn-majestic {
+        background: linear-gradient(135deg, #1a1a2e, #16213e);
+        color: white;
+        border: none;
+        padding: 16px 40px;
+        border-radius: 50px;
+        font-size: 1.1rem;
+        font-weight: 600;
+        letter-spacing: 0.05em;
+        box-shadow: 0 10px 20px rgba(26, 26, 46, 0.2);
+        transition: all 0.3s ease;
+        text-decoration: none;
+        display: inline-block;
+    }
+
+    .btn-majestic:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 15px 30px rgba(26, 26, 46, 0.3);
+        color: #fff;
+        background: linear-gradient(135deg, #24243e, #1a1a2e);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="solve-container">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <a href="{{ url_for('chronological_index') }}" class="btn btn-outline-secondary btn-sm">
+            <i class="fas fa-arrow-left"></i>
+        </a>
+        <h4 class="mb-0 text-secondary"><i class="fas fa-history"></i> {{ chapter }} {% if chapter == 'com'
+            %}(総合){%
+            endif %}</h4>
+    </div>
+
+    <div id="problemArea">
+        <!-- JS will render problem here -->
+    </div>
+</div>
+
+<script>
+    const chronoProblems = {{ problems | tojson }};
+    const chapterName = "{{ chapter }}";
+    let currentIndex = 0;
+    let sortableInstance = null;
+    let chronoCorrectCount = 0;
+    let answeredProblems = new Set();
+
+    function renderProblem() {
+        if (chronoProblems.length === 0) {
+            document.getElementById('problemArea').innerHTML = `
+                <div class="alert alert-warning text-center">このセクションには対応する問題がありません。</div>
+            `;
+            return;
+        }
+
+        if (currentIndex >= chronoProblems.length) {
+            const percentage = Math.round((chronoCorrectCount / chronoProblems.length) * 100);
+            const offset = 439.6 - (439.6 * (chronoCorrectCount / chronoProblems.length));
+
+            let message = "お疲れ様でした！";
+            let resultCardClass = "final-result-card text-center";
+            if (percentage === 100) {
+                message = "完全制覇！あなたは歴史の真理に到達しました。";
+                resultCardClass += " perfect-clear";
+            }
+            else if (percentage >= 80) message = "素晴らしい洞察力です。歴史の流れを掴んでいますね。";
+            else if (percentage >= 50) message = "着実に知識が定着しています。さらなる高みを目指しましょう。";
+
+            document.getElementById('problemArea').innerHTML = `
+                <div class="${resultCardClass}">
+                    <svg style="width:0;height:0;position:absolute;">
+                        <defs>
+                            <linearGradient id="scoreGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stop-color="#3498db" />
+                                <stop offset="100%" stop-color="#2ecc71" />
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                    
+                    <h2 class="results-majestic-title">全問終了</h2>
+                    
+                    <div class="score-visualization">
+                        <svg class="score-circle-svg" viewBox="0 0 160 160">
+                            <circle class="score-circle-bg" cx="80" cy="80" r="70" />
+                            <circle id="scoreProgressCircle" class="score-circle-progress" cx="80" cy="80" r="70" />
+                        </svg>
+                        <div class="score-text-container">
+                            <div class="score-value">${chronoCorrectCount}</div>
+                            <div class="score-total">/ ${chronoProblems.length}</div>
+                        </div>
+                    </div>
+                    
+                    <p class="result-message">${message}</p>
+                    
+                    <div class="mt-2">
+                        <a href="{{ url_for('chronological_index') }}" class="btn-majestic">
+                            <i class="fas fa-arrow-left me-2"></i> セクション一覧へ
+                        </a>
+                    </div>
+                </div>
+            `;
+
+            // Trigger circular animation after render
+            setTimeout(() => {
+                const circle = document.getElementById('scoreProgressCircle');
+                if (circle) circle.style.strokeDashoffset = offset;
+            }, 100);
+
+            return;
+        }
+
+        const p = chronoProblems[currentIndex];
+        const container = document.getElementById('problemArea');
+
+        let itemsHtml = '';
+        p.items.forEach(item => {
+            itemsHtml += `
+                <li class="sortable-item" data-id="${item.id}">
+                    <i class="fas fa-grip-lines drag-handle"></i>
+                    ${item.text}
+                </li>
+            `;
+        });
+
+        const metaText = `
+            ${p.university ? `<span class="badge bg-secondary me-1">${p.university}</span>` : ''}
+            ${p.year ? `<span class="badge bg-light text-dark me-1">${p.year}年</span>` : ''}
+            <span class="badge bg-info text-dark" title="この問題の全ユーザー正答率">正答率: ${p.accuracy_rate}%</span>
+        `;
+
+        container.innerHTML = `
+            <div class="problem-card" id="card-${p.id}">
+                <div class="problem-header">
+                    <div class="problem-meta">${metaText}</div>
+                    <div class="problem-progress">問 ${currentIndex + 1} / ${chronoProblems.length}</div>
+                </div>
+                
+                <div class="question-text">
+                    ${p.question}
+                </div>
+                
+                <ul id="itemsList" class="sortable-list">
+                    ${itemsHtml}
+                </ul>
+                
+                <button type="button" class="btn btn-primary btn-submit" id="submitBtn" onclick="submitAnswer()">
+                    <i class="fas fa-paper-plane"></i> 解答する
+                </button>
+
+                <div class="result-overlay" id="resultOverlay">
+                    <div id="resultContent"></div>
+                </div>
+            </div>
+        `;
+
+        // Initialize SortableJS
+        const listEl = document.getElementById('itemsList');
+        sortableInstance = new Sortable(listEl, {
+            animation: 150,
+            ghostClass: 'sortable-ghost',
+            dragClass: 'sortable-drag',
+            handle: '.sortable-item', // Whole item is draggable
+            onEnd: function (evt) {
+                // Add snap feedback animation
+                const itemEl = evt.item;
+                itemEl.classList.add('item-dropped');
+                setTimeout(() => {
+                    itemEl.classList.remove('item-dropped');
+                }, 300);
+            }
+        });
+    }
+
+    function submitAnswer() {
+        const p = chronoProblems[currentIndex];
+        const btn = document.getElementById('submitBtn');
+        const listEl = document.getElementById('itemsList');
+
+        // Get current order
+        const orderedIds = Array.from(listEl.children).map(li => parseInt(li.getAttribute('data-id')));
+
+        btn.disabled = true;
+
+        fetch(`/chronological/${encodeURIComponent(chapterName)}/answer`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                problem_id: p.id,
+                ordered_ids: orderedIds
+            })
+        })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    showResult(data.is_correct, data.correct_order, data.exp_gained, data.leveled_up, data.new_level, p.items, orderedIds);
+                } else {
+                    alert(data.message || '通信エラー');
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-paper-plane"></i> 解答する';
+                }
+            })
+            .catch(e => {
+                console.error(e);
+                alert('通信エラー');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-paper-plane"></i> 解答する';
+            });
+    }
+
+    function showResult(isCorrect, correctOrderIds, exp, leveledUp, newLevel, originalItems, submittedIds) {
+        const overlay = document.getElementById('resultOverlay');
+        const content = document.getElementById('resultContent');
+        const p = chronoProblems[currentIndex]; // current problem context
+
+        let explanationHtml = '';
+        if (p.explanation) {
+            explanationHtml = `<div class="mt-3 text-start alert alert-info p-3 mb-4" style="font-size: 0.95rem;"><strong><i class="fas fa-lightbulb"></i> 解説:</strong><br>${p.explanation.replace(/\\n/g, '<br>')}</div>`;
+        }
+
+        if (isCorrect) {
+            if (!answeredProblems.has(p.id)) {
+                chronoCorrectCount++;
+                answeredProblems.add(p.id);
+            }
+
+            let levelUpHtml = leveledUp ? `<div class="text-warning fw-bold fs-5 mt-2"><i class="fas fa-level-up-alt"></i> レベルアップ！ (Lv. ${newLevel})</div>` : '';
+            let expHtml = exp > 0 ? `<div class="text-success fw-bold mt-2">+${exp} EXP</div>` : '';
+
+            // Phase 7: Timeline Rendering
+            let timelineNodesHtml = '';
+            if (correctOrderIds && correctOrderIds.length > 0) {
+                correctOrderIds.forEach(id => {
+                    const item = originalItems.find(i => i.id === id);
+                    if (item) {
+                        timelineNodesHtml += `
+                            <div class="timeline-node">
+                                <div class="timeline-node-text">${item.text}</div>
+                            </div>
+                        `;
+                    }
+                });
+            }
+
+            const timelineHtml = `
+                <div class="timeline-container">
+                    <div class="timeline-line"></div>
+                    ${timelineNodesHtml}
+                </div>
+            `;
+
+            content.innerHTML = `
+                <i class="fas fa-check-circle result-icon correct"></i>
+                <div class="result-text text-success">正解！</div>
+                ${expHtml}
+                ${levelUpHtml}
+                ${timelineHtml}
+                ${explanationHtml}
+                <button class="btn btn-success btn-lg mt-4 px-5" onclick="nextProblem()">次へ進む <i class="fas fa-arrow-right"></i></button>
+            `;
+        } else {
+            // Create side-by-side comparison table
+            let comparisonRows = '';
+            if (correctOrderIds && correctOrderIds.length > 0) {
+                correctOrderIds.forEach((id, idx) => {
+                    const correctItem = originalItems.find(i => i.id === id);
+                    const userItemId = submittedIds[idx];
+                    const userItem = originalItems.find(i => i.id === userItemId);
+
+                    if (correctItem && userItem) {
+                        const isWrongPosition = id !== userItemId;
+                        const userCellClass = isWrongPosition ? 'bg-light-danger fw-bold' : 'bg-light-success fw-bold';
+                        const userIcon = isWrongPosition ? '<i class="fas fa-times me-1"></i>' : '<i class="fas fa-check me-1"></i>';
+
+                        comparisonRows += `
+                            <tr>
+                                <td><span class="badge bg-secondary me-2">${idx + 1}</span> ${correctItem.text}</td>
+                                <td class="${userCellClass}">${userIcon}${userItem.text}</td>
+                            </tr>
+                        `;
+                    }
+                });
+            }
+
+            content.innerHTML = `
+                <i class="fas fa-times-circle result-icon incorrect"></i>
+                <div class="result-text text-danger">不正解...</div>
+                
+                <table class="table table-bordered comparison-table">
+                    <thead>
+                        <tr class="text-center">
+                            <th class="text-success"><i class="fas fa-check-circle"></i> 正しい順序</th>
+                            <th class="text-primary"><i class="fas fa-user-edit"></i> あなたの解答</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${comparisonRows}
+                    </tbody>
+                </table>
+                
+                ${explanationHtml}
+                
+                <div class="d-flex gap-2 justify-content-center mt-3">
+                    ${currentIndex < chronoProblems.length - 1 ?
+                    `<button class="btn btn-primary" onclick="nextProblem()">次へ進む <i class="fas fa-arrow-right"></i></button>` :
+                    `<button class="btn btn-primary" onclick="nextProblem()">結果をみる <i class="fas fa-arrow-right"></i></button>`}
+                </div>
+            `;
+        }
+
+        // Add warp animation class. Add glow if correct.
+        overlay.className = 'result-overlay'; // Reset classes
+        if (isCorrect) {
+            overlay.classList.add('correct-glow');
+        } else {
+            overlay.classList.add('time-warp-in');
+        }
+
+        // Remove the animation class after it completes so it triggers again next time
+        setTimeout(() => {
+            overlay.classList.remove('time-warp-in');
+            overlay.classList.remove('correct-glow');
+        }, 800);
+
+        // Reset scroll position before displaying
+        overlay.scrollTop = 0;
+        overlay.style.display = 'flex';
+
+        // Ensure opacity is instantly set (removing old manual fade)
+        overlay.style.opacity = 1;
+
+        // Auto-scroll to the top of the problem card
+        setTimeout(() => {
+            const currentCard = document.getElementById(`card-${chronoProblems[currentIndex].id}`);
+            if (currentCard) {
+                const yOffset = -70; // Nav bar offset
+                const y = currentCard.getBoundingClientRect().top + window.pageYOffset + yOffset;
+                window.scrollTo({ top: y, behavior: 'smooth' });
+            }
+        }, 50);
+    }
+
+    function nextProblem() {
+        currentIndex++;
+        renderProblem();
+        window.scrollTo(0, 0);
+    }
+
+    function prevProblem() {
+        if (currentIndex > 0) {
+            currentIndex--;
+            renderProblem();
+            window.scrollTo(0, 0);
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        renderProblem();
+    });
+</script>
+{% endblock %}
