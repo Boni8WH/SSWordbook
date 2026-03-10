@@ -513,45 +513,37 @@
                 <i class="fas fa-file-csv me-2"></i> 問題CSV管理
             </a>
 
-            <a class="sidebar-link" id="tab-link-column-management" data-bs-toggle="pill"
-                href="#section-column-management" role="tab">
-                <i class="fas fa-columns me-2"></i> コラム管理
-            </a>
-
             <a class="sidebar-link" id="tab-link-room-settings" data-bs-toggle="pill" href="#section-room-settings"
                 role="tab">
                 <i class="fas fa-cogs me-2"></i> 部屋設定
             </a>
 
             {% if not is_manager %}
-            <a class="sidebar-link" id="tab-link-rpg-management" data-bs-toggle="pill" href="#section-rpg-management"
-                role="tab">
-                <i class="fas fa-gamepad me-2"></i> RPG敵キャラ
+            <a class="sidebar-link" id="tab-link-essay-management" data-bs-toggle="pill"
+                href="#section-essay-management" role="tab">
+                <i class="fas fa-book me-2"></i> 論述問題集
             </a>
 
             <a class="sidebar-link" id="tab-link-essay-visibility" data-bs-toggle="pill"
                 href="#section-essay-visibility" role="tab">
                 <i class="fas fa-eye me-2"></i> 論述公開設定
             </a>
-
-            <a class="sidebar-link" id="tab-link-essay-management" data-bs-toggle="pill"
-                href="#section-essay-management" role="tab">
-                <i class="fas fa-book me-2"></i> 論述問題集
-            </a>
-
-            <a class="sidebar-link" id="tab-link-chrono-management" data-bs-toggle="pill"
-                href="#section-chrono-management" role="tab">
-                <i class="fas fa-hourglass-half me-2"></i> 刻の系譜
-            </a>
-
-            <a class="sidebar-link" id="tab-link-user-stats" data-bs-toggle="pill" href="#section-user-stats"
-                role="tab">
-                <i class="fas fa-chart-bar me-2"></i> ユーザー統計
-            </a>
             {% endif %}
 
             <a class="sidebar-link" id="tab-link-map-quiz" data-bs-toggle="pill" href="#section-map-quiz" role="tab">
                 <i class="fas fa-map-marked-alt me-2"></i> 地図クイズ管理
+            </a>
+
+            {% if not is_manager %}
+            <a class="sidebar-link" id="tab-link-chrono-management" data-bs-toggle="pill"
+                href="#section-chrono-management" role="tab">
+                <i class="fas fa-hourglass-half me-2"></i> 刻の系譜
+            </a>
+            {% endif %}
+
+            <a class="sidebar-link" id="tab-link-column-management" data-bs-toggle="pill"
+                href="#section-column-management" role="tab">
+                <i class="fas fa-columns me-2"></i> コラム管理
             </a>
 
             <a class="sidebar-link" id="tab-link-tips-moderation" data-bs-toggle="pill"
@@ -562,6 +554,18 @@
             <a class="sidebar-link" id="tab-link-news-management" data-bs-toggle="pill" href="#section-news-management" role="tab">
                 <i class="fas fa-newspaper me-2"></i> ニュース管理
             </a>
+
+            {% if not is_manager %}
+            <a class="sidebar-link" id="tab-link-rpg-management" data-bs-toggle="pill" href="#section-rpg-management"
+                role="tab">
+                <i class="fas fa-gamepad me-2"></i> RPG敵キャラ
+            </a>
+
+            <a class="sidebar-link" id="tab-link-user-stats" data-bs-toggle="pill" href="#section-user-stats"
+                role="tab">
+                <i class="fas fa-chart-bar me-2"></i> ユーザー統計
+            </a>
+            {% endif %}
 
             {% if not is_manager %}
             <div class="sidebar-heading">システム</div>
@@ -2500,9 +2504,14 @@
                 <div class="card shadow-sm mb-4">
                     <div class="card-header bg-white d-flex justify-content-between align-items-center">
                         <h5 class="mb-0"><i class="fas fa-tags text-info"></i> タグ管理</h5>
-                        <button class="btn btn-info btn-sm" onclick="openCreateTagPrompt()">
-                            <i class="fas fa-plus"></i> 新規タグ
-                        </button>
+                        <div class="d-flex gap-2">
+                            <button id="saveTagsOrderBtn" class="btn btn-primary btn-sm" onclick="saveTagsOrder()" style="display:none;">
+                                <i class="fas fa-save"></i> 順番を保存
+                            </button>
+                            <button class="btn btn-info btn-sm" onclick="openCreateTagPrompt()">
+                                <i class="fas fa-plus"></i> 新規タグ
+                            </button>
+                        </div>
                     </div>
                     <div class="card-body">
                         <div class="text-muted small mb-2">Tipsの分類に使うタグを管理できます。名前の変更や削除も可能です。</div>
@@ -9285,6 +9294,8 @@
         }
 
         // ── タグ管理 ──
+        let sortableTags = null;
+
         function loadTags() {
             fetch('/api/admin/tips/tags')
                 .then(r => r.json())
@@ -9293,10 +9304,20 @@
                     const container = document.getElementById('tagsList');
                     if (data.tags.length === 0) {
                         container.innerHTML = '<div class="text-muted text-center py-2">タグがまだありません。「新規タグ」で作成してください。</div>';
+                        document.getElementById('saveTagsOrderBtn').style.display = 'none';
                         return;
                     }
+
+                    // SortableJSの初期化が終わっていたら破棄
+                    if (sortableTags) {
+                        sortableTags.destroy();
+                    }
+
                     container.innerHTML = data.tags.map(tag => `
-                        <div class="d-flex align-items-center gap-2 mb-2 p-2 border rounded" id="tag-row-${tag.id}">
+                        <div class="d-flex align-items-center gap-2 mb-2 p-2 border rounded bg-white" id="tag-row-${tag.id}" data-id="${tag.id}">
+                            <div class="drag-handle px-1" style="cursor: move; color: #ccc;">
+                                <i class="fas fa-grip-vertical"></i>
+                            </div>
                             <span class="badge bg-info text-dark">${escapeHtmlAdmin(tag.name)}</span>
                             <span class="text-muted small">(${tag.tip_count}件)</span>
                             <div class="ms-auto d-flex gap-1">
@@ -9309,8 +9330,49 @@
                             </div>
                         </div>
                     `).join('');
+
+                    // SortableJSの初期化
+                    sortableTags = new Sortable(container, {
+                        handle: '.drag-handle',
+                        animation: 150,
+                        onEnd: function() {
+                            document.getElementById('saveTagsOrderBtn').style.display = 'block';
+                        }
+                    });
                 });
         }
+
+        window.saveTagsOrder = async function() {
+            const container = document.getElementById('tagsList');
+            const tagIds = Array.from(container.children).map(el => el.dataset.id).filter(id => id);
+            
+            const btn = document.getElementById('saveTagsOrderBtn');
+            const originalHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 保存中...';
+
+            try {
+                const res = await fetch('/api/admin/tips/tags/reorder', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ tag_ids: tagIds.map(Number) })
+                });
+                const data = await res.json();
+                if (data.status === 'success') {
+                    btn.style.display = 'none';
+                    // 再読み込みして順番を確定
+                    loadTags();
+                    loadPendingTips(); // 承認画面の選択肢順も更新されるように
+                } else {
+                    alert(data.message);
+                }
+            } catch (e) {
+                alert('通信エラーが発生しました');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+            }
+        };
 
         window.openCreateTagPrompt = async function() {
             const name = prompt('新しいタグ名を入力:');

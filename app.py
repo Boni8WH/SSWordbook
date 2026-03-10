@@ -19553,6 +19553,17 @@ def api_tips_create():
         )
         db.session.add(tip)
         db.session.commit()
+
+        # 管理者へ通知
+        try:
+            user = User.query.get(session['user_id'])
+            author_name = user.username if user else "不明"
+            subject = f"新しい学習Tipsが投稿されました: {title}"
+            body = f"投稿者: {author_name}\nタイトル: {title}\n\n内容:\n{body}\n\n管理画面で承認を行ってください。"
+            send_admin_notification_email(subject, body)
+        except Exception as email_err:
+            print(f"⚠️ 通知メール送信失敗: {email_err}")
+
         return jsonify({'status': 'success', 'message': '投稿しました。管理者の承認後に公開されます。', 'tip_id': tip.id})
     except Exception as e:
         db.session.rollback()
@@ -19668,6 +19679,17 @@ def api_tips_resubmit(tip_id):
         tip.tag_id = None
         tip.updated_at = datetime.now(JST)
         db.session.commit()
+
+        # 管理者へ通知
+        try:
+            user = User.query.get(session['user_id'])
+            author_name = user.username if user else "不明"
+            subject = f"学習Tipsが再投稿されました: {title}"
+            body = f"投稿者: {author_name}\nタイトル: {title}\n\n内容:\n{body}\n\n管理画面で承認を行ってください。"
+            send_admin_notification_email(subject, body)
+        except Exception as email_err:
+            print(f"⚠️ 通知メール送信失敗: {email_err}")
+
         return jsonify({'status': 'success', 'message': '再投稿しました。管理者の承認後に公開されます。'})
     except Exception as e:
         db.session.rollback()
@@ -19905,6 +19927,29 @@ def api_admin_tips_tags_update(tag_id):
         tag.display_order = int(data['display_order'])
     db.session.commit()
     return jsonify({'status': 'success', 'message': 'タグを更新しました'})
+
+@app.route('/api/admin/tips/tags/reorder', methods=['POST'])
+def api_admin_tips_tags_reorder():
+    """タグの並び替え"""
+    if not session.get('admin_logged_in') and not session.get('manager_logged_in'):
+        return jsonify({'status': 'error', 'message': '権限がありません'}), 403
+
+    data = request.get_json() or {}
+    tag_ids = data.get('tag_ids', [])
+    if not tag_ids:
+        return jsonify({'status': 'error', 'message': 'タグリストが空です'}), 400
+
+    try:
+        # tag_idsの順番通りにdisplay_orderを更新
+        for index, tag_id in enumerate(tag_ids):
+            tag = StudyTipTag.query.get(tag_id)
+            if tag:
+                tag.display_order = index
+        db.session.commit()
+        return jsonify({'status': 'success', 'message': '並び替えを保存しました'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/api/admin/tips/tags/<int:tag_id>/delete', methods=['POST'])
 def api_admin_tips_tags_delete(tag_id):
