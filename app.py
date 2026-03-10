@@ -21711,6 +21711,7 @@ def check_daily_quiz_answer():
     if index is None:
         return jsonify({'status': 'error', 'message': '問題インデックスが必要です'}), 400
         
+    today = (datetime.now(JST) - timedelta(hours=7)).date()
     daily_quiz = DailyQuiz.query.filter_by(date=today, room_number=user.room_number).first()
     if not daily_quiz:
         return jsonify({'status': 'error', 'message': '今日のクイズが見つかりません'}), 404
