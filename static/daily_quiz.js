@@ -98,7 +98,7 @@ async function initializeDailyQuiz() {
  */
 function runQuiz(questions) {
     let currentQuestionIndex = 0;
-    let score = 0;
+    const userAnswers = []; // 回答内容を記録する配列
 
     const quizContainer = document.getElementById('dailyQuizContainer');
     const modalElement = document.getElementById('dailyQuizModal');
@@ -114,7 +114,7 @@ function runQuiz(questions) {
             // クイズ終了
             const timeTaken = Date.now() - startTime;
             clearInterval(quizTimerInterval);
-            submitQuizResult(score, timeTaken);
+            submitQuizResult(userAnswers, timeTaken);
             return;
         }
 
@@ -136,39 +136,73 @@ function runQuiz(questions) {
         });
     }
 
-    function handleAnswer(event) {
+    async function handleAnswer(event) {
         const selectedButton = event.target;
         const selectedChoice = selectedButton.textContent;
-        const correctAnswer = questions[currentQuestionIndex].answer;
+        const currentQuestion = questions[currentQuestionIndex];
 
         // 全てのボタンを無効化
         quizContainer.querySelectorAll('.choice-btn').forEach(btn => btn.disabled = true);
 
-        if (selectedChoice === correctAnswer) {
-            score++;
-            selectedButton.classList.add('correct');
-            selectedButton.innerHTML += ' <i class="fas fa-check-circle feedback-icon"></i>';
-        } else {
-            selectedButton.classList.add('incorrect');
-            selectedButton.innerHTML += ' <i class="fas fa-times-circle feedback-icon"></i>';
-            // 正解の選択肢をハイライト
-            quizContainer.querySelectorAll('.choice-btn').forEach(btn => {
-                if (btn.textContent === correctAnswer) {
-                    btn.classList.add('correct');
-                }
+        try {
+            // サーバーに正誤確認を問い合わせる
+            const response = await fetch('/api/daily_quiz/check', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    problem_id: currentQuestion.id,
+                    choice: selectedChoice
+                })
+            });
+            const data = await response.json();
+
+            if (data.status !== 'success') throw new Error(data.message);
+
+            const isCorrect = data.is_correct;
+            const correctAnswer = data.correct_answer;
+
+            // 回答を記録
+            userAnswers.push({
+                id: currentQuestion.id,
+                choice: selectedChoice
+            });
+
+            if (isCorrect) {
+                score++;
+                selectedButton.classList.add('correct');
+                selectedButton.innerHTML += ' <i class="fas fa-check-circle feedback-icon"></i>';
+            } else {
+                selectedButton.classList.add('incorrect');
+                selectedButton.innerHTML += ' <i class="fas fa-times-circle feedback-icon"></i>';
+                // 正解の選択肢をハイライト
+                quizContainer.querySelectorAll('.choice-btn').forEach(btn => {
+                    if (btn.textContent === correctAnswer) {
+                        btn.classList.add('correct');
+                    }
+                });
+            }
+        } catch (error) {
+            console.error('Answer check error:', error);
+            // エラー時も一応次に進める（回答は失敗扱い）
+            userAnswers.push({
+                id: currentQuestion.id,
+                choice: null
             });
         }
 
-        // 1.5秒後に次の問題へ
+        // 1.2秒後に次の問題へ
         setTimeout(() => {
             currentQuestionIndex++;
             showQuestion();
-        }, 1500);
+        }, 1200);
     }
 
     function updateTimer() {
         const elapsed = (Date.now() - startTime) / 1000;
-        document.getElementById('quizTimer').textContent = `${elapsed.toFixed(2)}秒`;
+        const timerElement = document.getElementById('quizTimer');
+        if (timerElement) {
+            timerElement.textContent = `${elapsed.toFixed(2)}秒`;
+        }
     }
 
     // クイズ開始
@@ -179,10 +213,10 @@ function runQuiz(questions) {
 
 /**
  * クイズの結果をサーバーに送信
- * @param {number} score - 正解数
+ * @param {Array} answers - 回答リスト [{id, choice}, ...]
  * @param {number} time - かかった時間（ミリ秒）
  */
-async function submitQuizResult(score, time) {
+async function submitQuizResult(answers, time) {
     const quizContainer = document.getElementById('dailyQuizContainer');
     quizContainer.innerHTML = `<div class="text-center"><p>結果を送信中...</p></div>`;
 
@@ -200,7 +234,7 @@ async function submitQuizResult(score, time) {
         const response = await fetch('/api/daily_quiz/submit', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ score, time }),
+            body: JSON.stringify({ answers, time }),
         });
 
         const data = await response.json();

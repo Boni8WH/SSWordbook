@@ -162,6 +162,70 @@ def upload_image_to_s3(file, filename, folder='essay_images', content_type='imag
 # ====================================================================
 # Helper: MLStripper (Robust HTML Tag Stripper)
 # ====================================================================
+def upload_json_to_s3(data, s3_path):
+    """辞書データをJSONとしてS3にアップロード"""
+    s3_client = get_s3_client()
+    if not s3_client:
+        return False
+    try:
+        json_data = json.dumps(data, ensure_ascii=False, indent=2)
+        s3_client.put_object(
+            Bucket=S3_BUCKET,
+            Key=s3_path,
+            Body=json_data,
+            ContentType='application/json'
+        )
+        return True
+    except Exception as e:
+        print(f"⚠️ S3 JSONアップロードエラー ({s3_path}): {e}")
+        return False
+
+def download_json_from_s3(s3_path, local_fallback_path=None):
+    """S3からJSONをダウンロード。失敗時はローカルから読み込む"""
+    s3_client = get_s3_client()
+    data = None
+    
+    if s3_client:
+        try:
+            response = s3_client.get_object(Bucket=S3_BUCKET, Key=s3_path)
+            content = response['Body'].read().decode('utf-8')
+            data = json.loads(content)
+            # ローカルにもキャッシュ（バックアップ）しておく
+            if local_fallback_path:
+                os.makedirs(os.path.dirname(local_fallback_path), exist_ok=True)
+                with open(local_fallback_path, 'w', encoding='utf-8') as f:
+                    f.write(content)
+            return data
+        except Exception as e:
+            print(f"ℹ️ S3からのダウンロードに失敗 (path: {s3_path}): {e}")
+
+    # S3失敗時、もしくはクライアントなし時はローカルから
+    if local_fallback_path and os.path.exists(local_fallback_path):
+        try:
+            with open(local_fallback_path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"⚠️ ローカルファイルの読み込み失敗: {e}")
+    
+    return None
+
+def list_s3_news_archives():
+    """S3のnews_archiveフォルダ内のファイルをリストアップ"""
+    s3_client = get_s3_client()
+    s3_files = []
+    if s3_client:
+        try:
+            response = s3_client.list_objects_v2(Bucket=S3_BUCKET, Prefix='data/news_archive/')
+            if 'Contents' in response:
+                for obj in response['Contents']:
+                    key = obj['Key']
+                    if key.endswith('.json'):
+                        filename = os.path.basename(key)
+                        s3_files.append(filename)
+        except Exception as e:
+            print(f"⚠️ S3アーカイブ一覧取得エラー: {e}")
+    return s3_files
+
 class MLStripper(HTMLParser):
     def __init__(self):
         super().__init__()
@@ -1163,7 +1227,9 @@ class StudyTip(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False)
     body = db.Column(db.Text, nullable=False)
+    title = db.Column(db.String(100), nullable=True)
     tag_id = db.Column(db.Integer, db.ForeignKey('study_tip_tag.id', ondelete='SET NULL'), nullable=True)
+    title = db.Column(db.String(100), nullable=True)
     author_name = db.Column(db.String(100), nullable=True)  # 管理者投稿時の投稿者名
     is_anonymous = db.Column(db.Boolean, default=False, nullable=False)
     status = db.Column(db.String(20), default='pending', nullable=False)  # pending/approved/rejected
@@ -1462,7 +1528,7 @@ class OtherTopicSchema(BaseModel):
 
 class NewsResponseSchema(BaseModel):
     articles: list[ArticleSchema] = Field(description="厳選された3つのニュース記事")
-    other_topics: list[OtherTopicSchema] = Field(description="その他の注目トピック（5〜7個）")
+    other_topics: list[OtherTopicSchema] = Field(description="その他の注目トピック（6個）")
 # -------------------------------------
 
 def update_world_news():
@@ -1621,6 +1687,14 @@ def update_world_news():
                 json.dump(history, f, ensure_ascii=False, indent=2)
 
             print(f"✅ ニュースを更新しました: {file_path}")
+            
+            # --- S3への永続化処理を追加 ---
+            if S3_AVAILABLE:
+                upload_json_to_s3(data, 'data/featured_article.json')
+                upload_json_to_s3(data, f'data/news_archive/{archive_date}.json')
+                upload_json_to_s3(history, 'data/news_history.json')
+                print("☁️ S3へのバックアップが完了しました")
+            
             return True, "ニュースを更新しました"
         except Exception as e:
             print(f"⚠️ Gemini News Update Error: {e}")
@@ -7598,17 +7672,20 @@ def news_page():
     """時事ニュースページ"""
     context = get_template_context()
     try:
-        file_path = os.path.join(basedir, 'data', 'featured_article.json')
-        if not os.path.exists(file_path):
-            return render_template('news.html', news_data=None, **context)
+        local_path = os.path.join(basedir, 'data', 'featured_article.json')
+        # S3から優先的に読み込み（ローカルフォールバック付き）
+        news_data = download_json_from_s3('data/featured_article.json', local_path)
 
-        with open(file_path, 'r', encoding='utf-8') as f:
-            news_data = json.load(f)
+        if not news_data:
+            return render_template('news.html', news_data=None, **context)
 
         # updated_at をパースしてフォーマット
         if 'updated_at' in news_data:
-            dt = datetime.fromisoformat(news_data['updated_at'])
-            news_data['display_date'] = dt.strftime('%Y年%m月%d日 %H:%M')
+            try:
+                dt = datetime.fromisoformat(news_data['updated_at'])
+                news_data['display_date'] = dt.strftime('%Y年%m月%d日 %H:%M')
+            except Exception:
+                news_data['display_date'] = news_data.get('updated_at', '')
 
         return render_template('news.html', news_data=news_data, **context)
     except Exception as e:
@@ -7619,12 +7696,13 @@ def news_page():
 def get_news_data_api():
     """ニュースデータをJSONで返すAPI"""
     try:
-        file_path = os.path.join(basedir, 'data', 'featured_article.json')
-        if not os.path.exists(file_path):
+        local_path = os.path.join(basedir, 'data', 'featured_article.json')
+        # S3から優先的に読み込み（ローカルフォールバック付き）
+        news_data = download_json_from_s3('data/featured_article.json', local_path)
+
+        if not news_data:
             return jsonify({'status': 'no_data'})
             
-        with open(file_path, 'r', encoding='utf-8') as f:
-            news_data = json.load(f)
         return jsonify(news_data)
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
@@ -7636,22 +7714,32 @@ def news_archive_list():
     archive_dir = os.path.join(basedir, 'data', 'news_archive')
 
     # アーカイブファイル一覧を取得（新しい順）
+    local_archive_dir = os.path.join(basedir, 'data', 'news_archive')
+    local_files = []
+    if os.path.exists(local_archive_dir):
+        local_files = [f for f in os.listdir(local_archive_dir) if f.endswith('.json')]
+    
+    # S3のアーカイブ一覧
+    s3_files = list_s3_news_archives()
+    
+    # 両方を統合して重複排除
+    all_filenames = sorted(list(set(local_files + s3_files)), reverse=True)
+    
     archives = []
-    if os.path.isdir(archive_dir):
-        for fname in sorted(os.listdir(archive_dir), reverse=True):
-            if fname.endswith('.json'):
-                date_str = fname.replace('.json', '')
-                try:
-                    d = datetime.strptime(date_str, '%Y-%m-%d').date()
-                    fpath = os.path.join(archive_dir, fname)
-                    with open(fpath, 'r', encoding='utf-8') as f:
-                        data = json.load(f)
-                    archives.append({
-                        'date': d,
-                        'total_processed': data.get('total_processed', 0)
-                    })
-                except Exception:
-                    pass
+    for fname in all_filenames:
+        date_str = fname.replace('.json', '')
+        try:
+            d = datetime.strptime(date_str, '%Y-%m-%d').date()
+            local_path = os.path.join(local_archive_dir, fname)
+            # S3から優先的に読み込み（ローカルフォールバック付き）
+            data = download_json_from_s3(f'data/news_archive/{fname}', local_path)
+            if data:
+                archives.append({
+                    'date': d,
+                    'total_processed': data.get('total_processed', 0)
+                })
+        except Exception:
+            pass
 
     # 簡易ページネーション
     page = request.args.get('page', 1, type=int)
@@ -7680,13 +7768,14 @@ def news_archive_list():
 def news_archive_detail(date_str):
     """特定日のニュースアーカイブ詳細"""
     context = get_template_context()
-    archive_path = os.path.join(basedir, 'data', 'news_archive', f'{date_str}.json')
-    if not os.path.exists(archive_path):
-        return render_template('news_archive_detail.html', news_data=None, date_str=date_str, **context)
-
     try:
-        with open(archive_path, 'r', encoding='utf-8') as f:
-            news_data = json.load(f)
+        local_path = os.path.join(basedir, 'data', 'news_archive', f'{date_str}.json')
+        # S3から優先的に読み込み（ローカルフォールバック付き）
+        news_data = download_json_from_s3(f'data/news_archive/{date_str}.json', local_path)
+
+        if not news_data:
+            return render_template('news_archive_detail.html', news_data=None, date_str=date_str, **context)
+
         if 'updated_at' in news_data:
             dt = datetime.fromisoformat(news_data['updated_at'])
             news_data['display_date'] = dt.strftime('%Y年%m月%d日 %H:%M')
@@ -19308,11 +19397,23 @@ def api_tips_list():
     """承認済みTips一覧（タグごとグループ化）"""
     try:
         sort = request.args.get('sort', 'newest')
+        query_str = request.args.get('q', '').strip()
+        tag_id_filter = request.args.get('tag_id')
 
         query = StudyTip.query.options(
             db.joinedload(StudyTip.user),
             db.joinedload(StudyTip.tag)
         ).filter_by(status='approved')
+
+        if tag_id_filter and tag_id_filter.isdigit():
+            query = query.filter_by(tag_id=int(tag_id_filter))
+        
+        if query_str:
+            # タイトルまたは本文で検索
+            query = query.filter(db.or_(
+                StudyTip.title.ilike(f'%{query_str}%'),
+                StudyTip.body.ilike(f'%{query_str}%')
+            ))
 
         if sort == 'popular':
             query = query.order_by(StudyTip.likes_count.desc(), StudyTip.created_at.desc())
@@ -19320,6 +19421,10 @@ def api_tips_list():
             query = query.order_by(StudyTip.created_at.desc())
 
         tips = query.all()
+
+        # 最近の投稿（3日以内）を特定
+        three_days_ago = (datetime.now(JST) - timedelta(days=3)).replace(tzinfo=None)
+        recent_tips_data = []
 
         # いいね状態
         user_likes = set()
@@ -19330,16 +19435,8 @@ def api_tips_list():
             ).all()
             user_likes = {l.tip_id for l in user_like_rows}
 
-        # タグごとにグループ化
-        grouped = {}
-        for t in tips:
-            tag_name = t.tag.name if t.tag else 'その他'
-            tag_order = t.tag.display_order if t.tag else 999999
-            tag_id = t.tag.id if t.tag else 0
-            key = (tag_order, tag_id, tag_name)
-            if key not in grouped:
-                grouped[key] = []
-            # 投稿者名の決定
+        # データ整形と最近の投稿の抽出
+        def format_tip(t, likes_set, tag_name, tag_id):
             if t.is_anonymous:
                 author_display = '匿名'
             elif t.author_name:
@@ -19350,19 +19447,48 @@ def api_tips_list():
                 author_display = t.user.username
             else:
                 author_display = 'Unknown'
-
-            grouped[key].append({
+            
+            return {
                 'id': t.id,
+                'title': t.title,
                 'body': t.body,
                 'tag_name': tag_name,
                 'tag_id': tag_id,
                 'likes_count': t.likes_count,
                 'author': author_display,
                 'created_at': t.created_at.strftime('%m/%d') if t.created_at else '',
-                'is_liked': t.id in user_likes
-            })
+                'is_liked': t.id in likes_set
+            }
+
+        # タグごとにグループ化
+        grouped = {}
+        for t in tips:
+            tag_name = t.tag.name if t.tag else 'その他'
+            tag_order = t.tag.display_order if t.tag else 999999
+            tag_id = t.tag.id if t.tag else 0
+            
+            tip_data = format_tip(t, user_likes, tag_name, tag_id)
+            
+            # 3日以内の投稿を「最近」に追加
+            # Note: 検索やフィルタが効いている状態でも、その中で「最近」なものを出す
+            if t.approved_at and t.approved_at >= three_days_ago:
+                recent_tips_data.append(tip_data)
+            elif not t.approved_at and t.created_at and t.created_at >= three_days_ago:
+                recent_tips_data.append(tip_data)
+
+            key = (tag_order, tag_id, tag_name)
+            if key not in grouped:
+                grouped[key] = []
+            grouped[key].append(tip_data)
 
         sorted_groups = []
+        if recent_tips_data:
+            sorted_groups.append({
+                'tag_id': 'recent',
+                'tag_name': '最近の投稿',
+                'tips': recent_tips_data
+            })
+
         for key in sorted(grouped.keys()):
             sorted_groups.append({
                 'tag_id': key[1],
@@ -19385,6 +19511,7 @@ def api_tips_create():
         return jsonify({'status': 'error', 'message': 'スコア1000以上で投稿できます'}), 403
 
     data = request.get_json()
+    title = (data.get('title') or '').strip()
     body = (data.get('body') or '').strip()
     is_anonymous = bool(data.get('is_anonymous', False))
 
@@ -19392,6 +19519,8 @@ def api_tips_create():
         return jsonify({'status': 'error', 'message': '本文を入力してください'}), 400
     if len(body) > 1000:
         return jsonify({'status': 'error', 'message': '本文は1000文字以内で入力してください'}), 400
+    if len(title) > 100:
+        return jsonify({'status': 'error', 'message': 'タイトルは100文字以内で入力してください'}), 400
 
     pending_count = StudyTip.query.filter_by(user_id=session['user_id'], status='pending').count()
     if pending_count >= 5:
@@ -19400,6 +19529,7 @@ def api_tips_create():
     try:
         tip = StudyTip(
             user_id=session['user_id'],
+            title=title,
             body=body,
             is_anonymous=is_anonymous,
             status='pending'
@@ -19450,6 +19580,7 @@ def api_tips_my():
         'status': 'success',
         'tips': [{
             'id': t.id,
+            'title': t.title,
             'body': t.body,
             'tag_name': t.tag.name if t.tag else None,
             'status': t.status,
@@ -19498,11 +19629,14 @@ def api_tips_resubmit(tip_id):
         return jsonify({'status': 'error', 'message': '却下された投稿のみ再投稿できます'}), 400
 
     data = request.get_json() or {}
+    title = (data.get('title') or '').strip()
     body = (data.get('body') or '').strip()
     if not body:
         return jsonify({'status': 'error', 'message': '本文を入力してください'}), 400
     if len(body) > 1000:
         return jsonify({'status': 'error', 'message': '本文は1000文字以内で入力してください'}), 400
+    if len(title) > 100:
+        return jsonify({'status': 'error', 'message': 'タイトルは100文字以内で入力してください'}), 400
 
     # 承認待ち上限チェック
     pending_count = StudyTip.query.filter_by(user_id=session['user_id'], status='pending').count()
@@ -19511,6 +19645,7 @@ def api_tips_resubmit(tip_id):
 
     try:
         tip.body = body
+        tip.title = title
         tip.status = 'pending'
         tip.reject_reason = None
         tip.tag_id = None
@@ -19539,6 +19674,7 @@ def api_admin_tips_pending():
         'status': 'success',
         'tips': [{
             'id': t.id,
+            'title': t.title,
             'body': t.body,
             'is_anonymous': t.is_anonymous,
             'author': t.user.username if t.user else 'Unknown',
@@ -19593,6 +19729,7 @@ def api_admin_tips_post():
         return jsonify({'status': 'error', 'message': '権限がありません'}), 403
 
     data = request.get_json() or {}
+    title = (data.get('title') or '').strip()
     body = (data.get('body') or '').strip()
     author_name = (data.get('author_name') or '').strip()
     tag_id = data.get('tag_id')
@@ -19616,6 +19753,7 @@ def api_admin_tips_post():
     try:
         tip = StudyTip(
             user_id=admin_user.id,
+            title=title,
             body=body,
             author_name=author_name if author_name else None,
             tag_id=tag_id,
@@ -21463,8 +21601,7 @@ def get_daily_quiz():
             quiz_questions.append({
                 'id': problem_id,
                 'question': question_word['question'],
-                'choices': choices,
-                'answer': correct_answer
+                'choices': choices
             })
 
     return jsonify({
@@ -21476,6 +21613,36 @@ def get_daily_quiz():
         'monthly_participants': monthly_participants
     })
 
+
+@app.route('/api/daily_quiz/check', methods=['POST'])
+def check_daily_quiz_answer():
+    """クイズの回答をサーバー側で検証し、正解を返す"""
+    if 'user_id' not in session:
+        return jsonify({'status': 'error', 'message': 'ログインが必要です'}), 401
+    
+    user = User.query.get(session['user_id'])
+    data = request.get_json()
+    problem_id = data.get('problem_id')
+    user_choice = data.get('choice')
+    
+    if not problem_id:
+        return jsonify({'status': 'error', 'message': '問題IDが必要です'}), 400
+        
+    all_words = load_word_data_for_room(user.room_number)
+    question_word = next((w for w in all_words if generate_problem_id(w) == problem_id), None)
+    
+    if not question_word:
+        return jsonify({'status': 'error', 'message': '問題が見つかりません'}), 404
+        
+    correct_answer = question_word['answer']
+    is_correct = (user_choice == correct_answer)
+    
+    return jsonify({
+        'status': 'success',
+        'is_correct': is_correct,
+        'correct_answer': correct_answer
+    })
+
 @app.route('/api/daily_quiz/submit', methods=['POST'])
 def submit_daily_quiz():
     """今日の10問の結果を保存し、その場でランキングを返すAPI (月間ランキング対応版)"""
@@ -21485,6 +21652,8 @@ def submit_daily_quiz():
     user = User.query.get(session['user_id'])
     today = (datetime.now(JST) - timedelta(hours=7)).date()
     data = request.get_json()
+    user_answers = data.get('answers') # クライアントからの回答リストを受け取る
+    time_taken = data.get('time')
 
     daily_quiz = DailyQuiz.query.filter_by(date=today, room_number=user.room_number).first()
     if not daily_quiz:
@@ -21494,11 +21663,25 @@ def submit_daily_quiz():
         return jsonify({'status': 'error', 'message': '既に回答済みです。'}), 409
 
     try:
+        # サーバー側でスコアを計算 (クライアントからのスコアを信用しない)
+        server_calculated_score = 0
+        problem_ids = daily_quiz.get_problem_ids()
+        all_words = load_word_data_for_room(user.room_number)
+        
+        for problem_id in problem_ids:
+            question_word = next((w for w in all_words if generate_problem_id(w) == problem_id), None)
+            if question_word:
+                correct_answer = question_word['answer']
+                # ユーザーの回答リストからこの問題への回答を探す
+                user_answer_obj = next((a for a in user_answers if a.get('id') == problem_id), None)
+                if user_answer_obj and user_answer_obj.get('choice') == correct_answer:
+                    server_calculated_score += 1
+
         new_result = DailyQuizResult(
             user_id=user.id,
             quiz_id=daily_quiz.id,
-            score=data.get('score'),
-            time_taken_ms=data.get('time')
+            score=server_calculated_score,
+            time_taken_ms=time_taken
         )
         db.session.add(new_result)
         db.session.commit()
