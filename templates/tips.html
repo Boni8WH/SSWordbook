@@ -725,8 +725,8 @@
         const displayTitle = tip.title ? escapeHtml(tip.title) : '(タイトル未設定)';
 
         return `
-            <div class="tip-card" id="tip-${tip.id}" data-id="${tip.id}">
-                <div class="tip-card-header" onclick="toggleTipExpand(${tip.id})">
+            <div class="tip-card" data-id="${tip.id}">
+                <div class="tip-card-header" onclick="toggleTipExpand(this)">
                     <div class="tip-title-text">${displayTitle}</div>
                     <div class="d-flex align-items-center gap-1 ms-2">
                         <span class="text-danger" style="font-size: 0.7rem;"><i class="${likedClass} fa-heart"></i> <span class="tip-like-count">${tip.likes_count}</span></span>
@@ -752,8 +752,8 @@
             </div>`;
     }
 
-    function toggleTipExpand(tipId) {
-        const card = document.getElementById(`tip-${tipId}`);
+    function toggleTipExpand(header) {
+        const card = header.closest('.tip-card');
         card.classList.toggle('expanded');
     }
 
@@ -778,7 +778,7 @@
                 const tagLabel = tip.tag_name || '未設定';
                 const displayTitle = tip.title || '(タイトルなし)';
                 html += `
-                    <div class="tip-card my-tip-card" id="tip-${tip.id}" data-id="${tip.id}">
+            <div class="tip-card my-tip-card" data-id="${tip.id}">
                         <div class="border-bottom bg-light d-flex justify-content-between align-items-center" style="font-size: 0.7rem; padding: 4px 10px;">
                             <div class="d-flex flex-wrap gap-1 align-items-center">
                                 <span class="tip-status-badge ${tip.status} mb-0" style="font-size:0.65rem; padding: 0px 4px;">${statusLabel}</span>
@@ -795,7 +795,7 @@
                                 </span>
                             </div>
                         </div>
-                        <div class="tip-card-header" onclick="toggleTipExpand(${tip.id})" style="padding: 4px 10px;">
+                        <div class="tip-card-header" onclick="toggleTipExpand(this)" style="padding: 4px 10px;">
                             <div class="tip-title-text" style="font-size: 0.88rem;">${escapeHtml(displayTitle)}</div>
                             <div class="d-flex align-items-center gap-1">
                                 <span class="text-muted" style="font-size: 0.65rem;"><i class="far fa-heart"></i> <span class="tip-like-count">${tip.likes_count}</span></span>
@@ -822,26 +822,34 @@
     // ── Like Toggle ──
     async function toggleLike(tipId, btn) {
         if (!isLoggedIn) return;
-        const card = document.getElementById(`tip-${tipId}`);
-        if (!card) return;
+        
+        // 全ての同一TipIDのカードを取得
+        const cards = document.querySelectorAll(`.tip-card[data-id="${tipId}"]`);
+        if (cards.length === 0) return;
 
-        const countEls = card.querySelectorAll('.tip-like-count');
-        const icons = card.querySelectorAll('i.fa-heart');
+        const firstCard = cards[0];
+        const icons = firstCard.querySelectorAll('i.fa-heart');
         if (icons.length === 0) return;
 
         const wasLiked = icons[0].classList.contains('fas');
+        const countEls = firstCard.querySelectorAll('.tip-like-count');
         let currentCount = parseInt(countEls[0].textContent);
 
-        // Optimistic update
-        icons.forEach(icon => {
-            icon.classList.toggle('fas', !wasLiked);
-            icon.classList.toggle('far', wasLiked);
-            icon.classList.add('like-anim');
-            setTimeout(() => icon.classList.remove('like-anim'), 400);
+        // Optimistic update for all instances
+        cards.forEach(card => {
+            const cardIcons = card.querySelectorAll('i.fa-heart');
+            const cardCounts = card.querySelectorAll('.tip-like-count');
+            
+            cardIcons.forEach(icon => {
+                icon.classList.toggle('fas', !wasLiked);
+                icon.classList.toggle('far', wasLiked);
+                icon.classList.add('like-anim');
+                setTimeout(() => icon.classList.remove('like-anim'), 400);
+            });
+            
+            const nextCount = wasLiked ? currentCount - 1 : currentCount + 1;
+            cardCounts.forEach(el => el.textContent = nextCount);
         });
-
-        const nextCount = wasLiked ? currentCount - 1 : currentCount + 1;
-        countEls.forEach(el => el.textContent = nextCount);
 
         try {
             const res = await fetch(`/api/tips/${tipId}/like`, {
@@ -850,19 +858,30 @@
             });
             const data = await res.json();
             if (data.status === 'success') {
-                countEls.forEach(el => el.textContent = data.count);
-                icons.forEach(icon => {
-                    icon.classList.toggle('fas', data.liked);
-                    icon.classList.toggle('far', !data.liked);
+                // Update all instances with actual data
+                document.querySelectorAll(`.tip-card[data-id="${tipId}"]`).forEach(card => {
+                    const cardCounts = card.querySelectorAll('.tip-like-count');
+                    const cardIcons = card.querySelectorAll('i.fa-heart');
+                    
+                    cardCounts.forEach(el => el.textContent = data.count);
+                    cardIcons.forEach(icon => {
+                        icon.classList.toggle('fas', data.liked);
+                        icon.classList.toggle('far', !data.liked);
+                    });
                 });
             }
         } catch (e) {
-            // Revert
-            icons.forEach(icon => {
-                icon.classList.toggle('fas', wasLiked);
-                icon.classList.toggle('far', !wasLiked);
+            // Revert all instances
+            document.querySelectorAll(`.tip-card[data-id="${tipId}"]`).forEach(card => {
+                const cardCounts = card.querySelectorAll('.tip-like-count');
+                const cardIcons = card.querySelectorAll('i.fa-heart');
+                
+                cardIcons.forEach(icon => {
+                    icon.classList.toggle('fas', wasLiked);
+                    icon.classList.toggle('far', !wasLiked);
+                });
+                cardCounts.forEach(el => el.textContent = currentCount);
             });
-            countEls.forEach(el => el.textContent = currentCount);
         }
     }
 
