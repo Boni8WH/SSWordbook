@@ -1229,7 +1229,6 @@ class StudyTip(db.Model):
     body = db.Column(db.Text, nullable=False)
     title = db.Column(db.String(100), nullable=True)
     tag_id = db.Column(db.Integer, db.ForeignKey('study_tip_tag.id', ondelete='SET NULL'), nullable=True)
-    title = db.Column(db.String(100), nullable=True)
     author_name = db.Column(db.String(100), nullable=True)  # 管理者投稿時の投稿者名
     is_anonymous = db.Column(db.Boolean, default=False, nullable=False)
     status = db.Column(db.String(20), default='pending', nullable=False)  # pending/approved/rejected
@@ -3760,12 +3759,23 @@ def migrate_database():
                         print("✅ suspended_atカラムを追加しました")
                     except Exception as e:
                         print(f"⚠️ suspended_atカラム追加エラー: {e}")
-                else:
-                    pass # print("✅ suspended_atカラムは既に存在します")
-            
-            # print("✅ RoomSetting一時停止機能のマイグレーション完了")
 
-            # 7. EssayProblemテーブルのimage_urlカラム追加
+            # 7. StudyTipテーブルのタイトル機能用カラム追加
+            if inspector.has_table('study_tip'):
+                columns = [col['name'] for col in inspector.get_columns('study_tip')]
+                if 'title' not in columns:
+                    print("🔧 study_tipテーブルにtitleカラムを追加します...")
+                    try:
+                        with db.engine.connect() as conn:
+                            conn.execute(text('ALTER TABLE study_tip ADD COLUMN title VARCHAR(100)'))
+                            conn.commit()
+                        print("✅ titleカラムを追加しました")
+                    except Exception as e:
+                        print(f"⚠️ titleカラム追加エラー: {e}")
+            
+            fix_foreign_key_constraints()
+
+            # 8. EssayProblemテーブルのimage_urlカラム追加
             if inspector.has_table('essay_problems'):
                 columns = [col['name'] for col in inspector.get_columns('essay_problems')]
                 # print(f"📋 既存のEssayProblemsテーブルカラム: {columns}")
