@@ -4266,59 +4266,90 @@ function showNextRpgQuestion() {
         const btn = document.createElement('button');
         btn.className = 'rpg-choice-btn';
         btn.textContent = choice;
-        btn.onclick = () => handleRpgAnswer(choice === problem.answer, btn);
+        btn.onclick = () => handleRpgAnswer(choice, btn);
         container.appendChild(btn);
     });
 }
 
-function handleRpgAnswer(isCorrect, btnElement) {
+async function handleRpgAnswer(selectedChoice, btnElement) {
     // Disable buttons
     const btns = document.querySelectorAll('.rpg-choice-btn');
     btns.forEach(b => b.disabled = true);
 
-    if (isCorrect) {
-        btnElement.classList.add('correct');
-        rpgCorrectCount++;
+    try {
+        // サーバーに正誤確認を問い合わせる
+        const response = await fetch('/api/rpg/check', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                index: rpgCurrentIndex,
+                choice: selectedChoice
+            })
+        });
+        const data = await response.json();
 
-        // Damage effect
-        const dmg = document.getElementById('rpgDamageEffect');
-        if (dmg) {
-            dmg.classList.remove('hidden');
-            dmg.classList.add('damage-text'); // restart anim (needs re-trigger hack if repetitive)
-            // Hack to restart animation: remove class, void offsetWidth, add class
-            dmg.classList.remove('damage-text');
-            void dmg.offsetWidth;
-            dmg.classList.add('damage-text');
+        if (data.status !== 'success') throw new Error(data.message);
 
-            setTimeout(() => dmg.classList.add('hidden'), 800);
+        const isCorrect = data.is_correct;
+        const correctAnswer = data.correct_answer;
+
+        if (isCorrect) {
+            btnElement.classList.add('correct');
+            rpgCorrectCount++;
+
+            // Damage effect
+            const dmg = document.getElementById('rpgDamageEffect');
+            if (dmg) {
+                dmg.classList.remove('hidden');
+                dmg.classList.add('damage-text');
+                dmg.classList.remove('damage-text');
+                void dmg.offsetWidth;
+                dmg.classList.add('damage-text');
+                setTimeout(() => dmg.classList.add('hidden'), 800);
+            }
+
+            // Shake boss
+            const boss = document.getElementById('rpgBattleBossImage');
+            if (boss) {
+                boss.classList.add('shake-anim');
+                setTimeout(() => boss.classList.remove('shake-anim'), 500);
+            }
+
+            updateRpgHud();
+
+            // Win Condition Check
+            if (rpgCorrectCount >= rpgPassScore) {
+                setTimeout(() => finishRpgGame(true), 1000);
+                return;
+            }
+
+        } else {
+            btnElement.classList.add('incorrect');
+            rpgIncorrectCount++;
+
+            // 正解の選択肢をハイライト（DailyQuizと同様の親切設計）
+            document.querySelectorAll('.rpg-choice-btn').forEach(btn => {
+                if (btn.textContent === correctAnswer) {
+                    btn.classList.add('correct');
+                }
+            });
+
+            // Screen shake
+            document.body.classList.add('shake-anim');
+            setTimeout(() => document.body.classList.remove('shake-anim'), 500);
+
+            // Lose Condition Check
+            if (rpgIncorrectCount > rpgMaxMistakes) {
+                setTimeout(() => finishRpgGame(false), 1000);
+                return;
+            }
         }
-
-        // Shake boss
-        const boss = document.getElementById('rpgBattleBossImage');
-        if (boss) {
-            boss.classList.add('shake-anim');
-            setTimeout(() => boss.classList.remove('shake-anim'), 500);
-        }
-
-        updateRpgHud();
-
-        // Win Condition Check
-        if (rpgCorrectCount >= rpgPassScore) {
-            setTimeout(() => finishRpgGame(true), 1000);
-            return;
-        }
-
-    } else {
-        btnElement.classList.add('incorrect');
+    } catch (error) {
+        console.error('Answer check error:', error);
+        // エラー時は不正解扱いとして次に進める
         rpgIncorrectCount++;
-
-        // Screen shake or visual feedback
-        document.body.classList.add('shake-anim');
-        setTimeout(() => document.body.classList.remove('shake-anim'), 500);
-
-        // Lose Condition Check: Mistakes > Max
         if (rpgIncorrectCount > rpgMaxMistakes) {
-            setTimeout(() => finishRpgGame(false), 1000);
+            finishRpgGame(false);
             return;
         }
     }

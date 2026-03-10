@@ -2914,9 +2914,9 @@ def load_word_data_for_room(room_number):
         db.session.rollback()
         return []
 
-def generate_problem_id(word):
+def generate_raw_id(word):
     """
-    問題IDを生成するヘルパー関数（JavaScript側とロジックを統一）
+    問題IDの元となる文字列を生成する（旧形式）
     """
     try:
         chapter = str(word.get('chapter', '0')).zfill(3)
@@ -2928,13 +2928,21 @@ def generate_problem_id(word):
         question_clean = re.sub(r'[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]', '', question[:15])
         answer_clean = re.sub(r'[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]', '', answer[:10])
         
-        problem_id = f"{chapter}-{number}-{question_clean}-{answer_clean}"
+        return f"{chapter}-{number}-{question_clean}-{answer_clean}"
+    except Exception:
+        return f"error-{id(word)}"
+
+def generate_problem_id(word):
+    """
+    問題IDを生成するヘルパー関数（ハッシュ化版）
+    """
+    try:
+        raw_id = generate_raw_id(word)
+        # 回答が推測されないようにIDをハッシュ化 (16文字)
+        problem_id = hashlib.sha256(raw_id.encode()).hexdigest()[:16]
         return problem_id
-        
-    except Exception as e:
-        chapter = str(word.get('chapter', '0')).zfill(3)
-        number = str(word.get('number', '0')).zfill(3)
-        return f"{chapter}-{number}-error"
+    except Exception:
+        return "error-hash"
 
 def levenshtein_distance(s1, s2):
     """2つの文字列のレーベンシュタイン距離を計算する"""
@@ -18996,7 +19004,6 @@ def get_sample_quiz():
             
             sample_questions.append({
                 'question': problem['question'],
-                'answer': correct_answer,
                 'choices': choices,
                 'category': problem['category']
             })
@@ -20801,11 +20808,16 @@ def start_rpg_battle():
         random.shuffle(choices)
         
         final_problems.append({
-            'id': get_problem_id(problem),
+            'index': i, # インデックスを追加
             'question': problem['question'],
-            'answer': correct_answer,
             'choices': choices
         })
+    
+    # サーバー側で正解を照合できるように、選ばれた問題のIDリストをセッションに保存
+    session['rpg_battle_pids'] = [get_problem_id(p) for p in selected_problems_data]
+    session['rpg_correct_count'] = 0
+    session['rpg_incorrect_count'] = 0
+    session['rpg_battle_stage_id'] = target_boss.id
     
     # ボス決定
     rpg_state = RpgState.query.filter_by(user_id=user_id).first()
@@ -20879,6 +20891,54 @@ def start_rpg_battle():
         'is_rematch': is_rematch
     })
 
+@app.route('/api/rpg/check', methods=['POST'])
+def check_rpg_answer():
+    """RPGボス戦中の1問ごとの正誤判定（インデックス方式）"""
+    if 'user_id' not in session:
+        return jsonify({'status': 'error', 'message': 'Not logged in'}), 401
+    
+    data = request.get_json()
+    index = data.get('index')
+    user_choice = data.get('choice')
+    
+    if index is None:
+        return jsonify({'status': 'error', 'message': '問題インデックスが必要です'}), 400
+        
+    # セッションから現在の戦闘の問題リストを取得
+    battle_pids = session.get('rpg_battle_pids')
+    if not battle_pids or index < 0 or index >= len(battle_pids):
+        return jsonify({'status': 'error', 'message': '不正なインデックスまたは戦闘データが見つかりません'}), 400
+        
+    problem_id = battle_pids[index]
+    
+    # 単語データをロードして正解を確認
+    user = User.query.get(session['user_id'])
+    all_words = load_word_data_for_room(user.room_number)
+    
+    # 生IDとハッシュIDの両方で引けるようにマップ化 (DailyQuizと同様)
+    word_by_id = {}
+    for w in all_words:
+        word_by_id[generate_raw_id(w)] = w
+        word_by_id[generate_problem_id(w)] = w
+        
+    question_word = word_by_id.get(problem_id)
+    if not question_word:
+         return jsonify({'status': 'error', 'message': '問題データが見つかりません'}), 404
+         
+    correct_answer = question_word['answer']
+    is_correct = (user_choice == correct_answer)
+    
+    if is_correct:
+        session['rpg_correct_count'] = session.get('rpg_correct_count', 0) + 1
+    else:
+        session['rpg_incorrect_count'] = session.get('rpg_incorrect_count', 0) + 1
+    
+    return jsonify({
+        'status': 'success',
+        'is_correct': is_correct,
+        'correct_answer': correct_answer # 判定後に正解を教える
+    })
+
 @app.route('/api/rpg/result', methods=['POST'])
 def submit_rpg_result():
     if 'user_id' not in session:
@@ -20893,6 +20953,24 @@ def submit_rpg_result():
         print("❌ Error: stage_id missing in request")
         return jsonify({'status': 'error', 'message': 'Stage ID is required'}), 400
     
+    # サーバー側での勝利判定バリデーション (Win Forgery対策)
+    session_stage_id = session.get('rpg_battle_stage_id')
+    if is_win:
+        if session_stage_id != stage_id:
+             return jsonify({'status': 'error', 'message': '不正なステージIDです'}), 403
+             
+        enemy = RpgEnemy.query.get(stage_id)
+        if not enemy:
+             return jsonify({'status': 'error', 'message': 'ボスが見つかりません'}), 404
+             
+        server_correct = session.get('rpg_correct_count', 0)
+        server_incorrect = session.get('rpg_incorrect_count', 0)
+        
+        # 合格条件の照合
+        if server_correct < enemy.clear_correct_count or server_incorrect > enemy.clear_max_mistakes:
+             print(f"⚠️ Win Forge detected for user {user_id}: Client claimed win, but Server has {server_correct} correct / {server_incorrect} incorrect")
+             return jsonify({'status': 'error', 'message': 'スコアが合格基準に達していません'}), 403
+
     # RpgState取得または作成
     rpg_state = RpgState.query.filter_by(user_id=user_id).first()
     if not rpg_state:
@@ -21552,64 +21630,59 @@ def get_daily_quiz():
         public_words = []
         for word in all_words:
             chapter = str(word.get('chapter', ''))
-            
-            # S章の場合は 'S' で判定、それ以外は従来通り number で判定
             unit_to_check = 'S' if chapter == 'S' else word.get('number')
-            is_enabled_in_room = is_unit_enabled_by_room_setting(unit_to_check, room_setting)
-            is_not_z_problem = str(word.get('number')).strip().upper() != 'Z'
-            
-            if is_enabled_in_room and is_not_z_problem: # CSVの有効化チェック(is_enabled_in_csv)を削除
+            if is_unit_enabled_by_room_setting(unit_to_check, room_setting) and str(word.get('number')).strip().upper() != 'Z':
                 public_words.append(word)
 
-        if len(public_words) < 10: # 10問未満の場合はエラー
+        if len(public_words) < 10:
             return jsonify({'status': 'error', 'message': f'クイズを作成するには公開問題(Z以外)が10問以上必要です (現在 {len(public_words)}問)'})
         
         selected_problems = random.sample(public_words, 10)
+        # DBにはハッシュ化したIDを保存するように変更
         problem_ids = [generate_problem_id(p) for p in selected_problems]
         daily_quiz = DailyQuiz(date=today, room_number=user.room_number, problem_ids_json=json.dumps(problem_ids), monthly_score_processed=False)
         db.session.add(daily_quiz)
         db.session.commit()
 
-    problem_ids = daily_quiz.get_problem_ids()
+    # --- クイズデータの構築 (高速化版) ---
+    problem_ids_in_db = daily_quiz.get_problem_ids()
     all_words = load_word_data_for_room(user.room_number)
-    quiz_questions = []
-    all_answers = list(set(w['answer'] for w in all_words if w.get('answer')))
     
-    for problem_id in problem_ids:
-        question_word = next((w for w in all_words if generate_problem_id(w) == problem_id), None)
+    # 単語データをIDで逆引きできるようにマップ化 (O(N))
+    # 移行期間のため、生IDとハッシュIDの両方で引けるようにする
+    word_by_id = {}
+    for w in all_words:
+        rid = generate_raw_id(w)
+        hid = generate_problem_id(w) # これは内部でhashlibを使用
+        word_by_id[rid] = w
+        word_by_id[hid] = w
+    
+    quiz_questions = []
+    all_answers = [w['answer'] for w in all_words if w.get('answer')]
+    
+    for i, db_pid in enumerate(problem_ids_in_db):
+        question_word = word_by_id.get(db_pid)
         if question_word:
             correct_answer = question_word['answer']
             
-            # --- 誤答選択肢の生成ロジック (改良版) ---
-            # 1. CSVのG列 (incorrect) に指定がある場合はそれを使用
+            # --- 誤答選択肢の生成ロジック ---
             manual_incorrect_str = question_word.get('incorrect', '')
-            
             if manual_incorrect_str and manual_incorrect_str.strip():
-                # カンマ区切りで分割し、空白を除去
                 manual_candidates = [x.strip() for x in manual_incorrect_str.split(',') if x.strip()]
-                
-                # ランダムに最大3つ選ぶ
-                if len(manual_candidates) > 3:
-                    distractors = random.sample(manual_candidates, 3)
-                else:
-                    distractors = manual_candidates
+                distractors = random.sample(manual_candidates, min(len(manual_candidates), 3))
             else:
-                # 2. 指定がない場合は従来通りレーベンシュタイン距離で類似語を探す
                 distractor_pool = [ans for ans in all_answers if ans != correct_answer]
-                distractors_with_distance = [(levenshtein_distance(correct_answer, ans), ans) for ans in distractor_pool]
-                distractors_with_distance.sort(key=lambda x: x[0])
-                distractors = [ans for distance, ans in distractors_with_distance[:3]]
-                # 候補が足りない場合はランダムに補充 (念のため)
-                if len(distractors) < 3 and len(distractor_pool) >= 3:
-                    remaining = [ans for ans in distractor_pool if ans not in distractors]
-                    distractors.extend(random.sample(remaining, 3 - len(distractors)))
+                if len(distractor_pool) >= 3:
+                    distractors = random.sample(distractor_pool, 3)
+                else:
+                    distractors = distractor_pool
 
             # 正解と誤答を合わせてシャッフル
             choices = distractors + [correct_answer]
             random.shuffle(choices)
             
             quiz_questions.append({
-                'id': problem_id,
+                'index': i,
                 'question': question_word['question'],
                 'choices': choices
             })
@@ -21618,7 +21691,7 @@ def get_daily_quiz():
         'status': 'success',
         'completed': False,
         'questions': quiz_questions,
-        'monthly_top_5': monthly_top_5, # 未回答時も月間ランクは渡す
+        'monthly_top_5': monthly_top_5,
         'monthly_user_rank': monthly_user_rank,
         'monthly_participants': monthly_participants
     })
@@ -21632,14 +21705,29 @@ def check_daily_quiz_answer():
     
     user = User.query.get(session['user_id'])
     data = request.get_json()
-    problem_id = data.get('problem_id')
+    index = data.get('index')
     user_choice = data.get('choice')
     
-    if not problem_id:
-        return jsonify({'status': 'error', 'message': '問題IDが必要です'}), 400
+    if index is None:
+        return jsonify({'status': 'error', 'message': '問題インデックスが必要です'}), 400
         
+    daily_quiz = DailyQuiz.query.filter_by(date=today, room_number=user.room_number).first()
+    if not daily_quiz:
+        return jsonify({'status': 'error', 'message': '今日のクイズが見つかりません'}), 404
+        
+    problem_ids = daily_quiz.get_problem_ids()
+    if index < 0 or index >= len(problem_ids):
+        return jsonify({'status': 'error', 'message': '不正なインデックスです'}), 400
+        
+    problem_id = problem_ids[index]
     all_words = load_word_data_for_room(user.room_number)
-    question_word = next((w for w in all_words if generate_problem_id(w) == problem_id), None)
+    # 生IDとハッシュIDの両方で引けるようにマップ化
+    word_by_id = {}
+    for w in all_words:
+        word_by_id[generate_raw_id(w)] = w
+        word_by_id[generate_problem_id(w)] = w
+        
+    question_word = word_by_id.get(problem_id)
     
     if not question_word:
         return jsonify({'status': 'error', 'message': '問題が見つかりません'}), 404
@@ -21675,15 +21763,24 @@ def submit_daily_quiz():
     try:
         # サーバー側でスコアを計算 (クライアントからのスコアを信用しない)
         server_calculated_score = 0
-        problem_ids = daily_quiz.get_problem_ids()
+        problem_ids_in_db = daily_quiz.get_problem_ids()
         all_words = load_word_data_for_room(user.room_number)
         
-        for problem_id in problem_ids:
-            question_word = next((w for w in all_words if generate_problem_id(w) == problem_id), None)
+        # 生IDとハッシュIDの両方で引けるようにマップ化 (辞書1回作成で済ませる)
+        word_by_id = {}
+        for w in all_words:
+            word_by_id[generate_raw_id(w)] = w
+            word_by_id[generate_problem_id(w)] = w
+        
+        for i, db_pid in enumerate(problem_ids_in_db):
+            # DBに保存されているIDで単語を特定
+            question_word = word_by_id.get(db_pid)
             if question_word:
                 correct_answer = question_word['answer']
-                # ユーザーの回答リストからこの問題への回答を探す
-                user_answer_obj = next((a for a in user_answers if a.get('id') == problem_id), None)
+                
+                # インデックスでユーザーの回答を検索
+                user_answer_obj = next((a for a in user_answers if a.get('index') == i), None)
+
                 if user_answer_obj and user_answer_obj.get('choice') == correct_answer:
                     server_calculated_score += 1
 

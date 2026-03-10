@@ -98,6 +98,7 @@ async function initializeDailyQuiz() {
  */
 function runQuiz(questions) {
     let currentQuestionIndex = 0;
+    let score = 0; // スコア追跡用
     const userAnswers = []; // 回答内容を記録する配列
 
     const quizContainer = document.getElementById('dailyQuizContainer');
@@ -150,7 +151,7 @@ function runQuiz(questions) {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    problem_id: currentQuestion.id,
+                    index: currentQuestionIndex,
                     choice: selectedChoice
                 })
             });
@@ -163,7 +164,7 @@ function runQuiz(questions) {
 
             // 回答を記録
             userAnswers.push({
-                id: currentQuestion.id,
+                index: currentQuestionIndex,
                 choice: selectedChoice
             });
 
@@ -185,7 +186,7 @@ function runQuiz(questions) {
             console.error('Answer check error:', error);
             // エラー時も一応次に進める（回答は失敗扱い）
             userAnswers.push({
-                id: currentQuestion.id,
+                index: currentQuestionIndex,
                 choice: null
             });
         }
