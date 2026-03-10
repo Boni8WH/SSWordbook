@@ -2517,6 +2517,10 @@
                     <div class="card-body">
                         <div class="text-muted small mb-3">管理者として直接Tipsを投稿できます（承認不要で即公開）。</div>
                         <div class="mb-3">
+                            <label class="form-label fw-bold small">タイトル</label>
+                            <input type="text" id="adminTipTitle" class="form-control form-control-sm" placeholder="覚え方のタイトルなど" maxlength="100">
+                        </div>
+                        <div class="mb-3">
                             <label class="form-label fw-bold small">投稿者名</label>
                             <input type="text" id="adminTipAuthorName" class="form-control form-control-sm" placeholder="例: 山田先生（空欄の場合「管理者」と表示）" maxlength="100">
                         </div>
@@ -9401,6 +9405,7 @@
                                 </div>
                                 <small class="text-muted">${escapeHtmlAdmin(tip.created_at)}</small>
                             </div>
+                            ${tip.title ? `<div class="mb-2 fw-bold" style="font-size:0.95rem; border-bottom: 2px solid #f1c40f; display: inline-block;">${escapeHtmlAdmin(tip.title)}</div>` : ''}
                             <div class="mb-3 p-2 bg-light rounded" style="white-space: pre-wrap; font-size: 0.9rem;">${escapeHtmlAdmin(tip.body)}</div>
                             <div class="d-flex gap-2 align-items-center flex-wrap">
                                 <select class="form-select form-select-sm" style="max-width:200px;" id="tag-select-${tip.id}">
@@ -9580,6 +9585,7 @@
         }
 
         window.adminPostTip = async function() {
+            const title = (document.getElementById('adminTipTitle').value || '').trim();
             const body = (document.getElementById('adminTipBody').value || '').trim();
             const authorName = (document.getElementById('adminTipAuthorName').value || '').trim();
             const tagId = document.getElementById('adminTipTagSelect').value;
@@ -9591,7 +9597,7 @@
                 const res = await fetch('/api/admin/tips/post', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ body: body, author_name: authorName, tag_id: parseInt(tagId) })
+                    body: JSON.stringify({ title: title, body: body, author_name: authorName, tag_id: parseInt(tagId) })
                 });
                 const data = await res.json();
                 if (data.status === 'success') {

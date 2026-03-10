@@ -96,10 +96,11 @@
     }
 
     /* ── Tab / Filter ──────────────────────────────────── */
-    .tips-tabs {
+    .filter-ctrl {
         display: flex;
         gap: 8px;
-        margin-bottom: 1rem;
+        margin-bottom: 12px;
+        flex-wrap: wrap;
     }
 
     .tips-tab-btn {
@@ -123,61 +124,162 @@
 
     .tips-filter-bar {
         display: flex;
-        justify-content: flex-end;
-        gap: 8px;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
         margin-bottom: 1.5rem;
+        background: #f8f9fa;
+        padding: 12px;
+        border-radius: 12px;
+        border: 1px solid #eef0f2;
     }
 
-    .sort-select {
-        padding: 4px 12px;
+    .search-inputs {
+        display: flex;
+        gap: 8px;
+        flex-grow: 1;
+    }
+
+    .search-ctrl {
+        padding: 6px 12px;
         border-radius: 8px;
         border: 1px solid #dee2e6;
-        font-size: 0.8rem;
-        color: #555;
-        background: #fff;
-        cursor: pointer;
+        font-size: 0.85rem;
+    }
+
+    .search-keyword {
+        flex-grow: 1;
+    }
+
+    .filter-actions {
+        display: flex;
+        gap: 8px;
     }
 
     /* ── Chapter Section ───────────────────────────────── */
     .chapter-section {
-        margin-bottom: 2rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .chapter-section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 6px 12px;
+        background: linear-gradient(90deg, rgba(241, 196, 15, 0.12), transparent);
+        border-left: 2px solid #f1c40f;
+        border-radius: 4px 10px 10px 4px;
+        margin-bottom: 4px;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+
+    .chapter-section-header:hover {
+        background: linear-gradient(90deg, rgba(241, 196, 15, 0.18), transparent);
     }
 
     .chapter-section-title {
         font-family: 'Kaisei Tokumin', serif;
-        font-size: 1rem;
+        font-size: 0.9rem;
         font-weight: 700;
         color: #2c3e50;
-        padding: 8px 16px;
-        background: linear-gradient(90deg, rgba(241, 196, 15, 0.12), transparent);
-        border-left: 3px solid #f1c40f;
-        border-radius: 0 8px 8px 0;
-        margin-bottom: 12px;
+        margin: 0;
+        border: none;
+        background: none;
+        padding: 0;
+    }
+
+    .chapter-collapse-icon {
+        font-size: 0.8rem;
+        color: #8c909e;
+        transition: transform 0.3s;
+    }
+
+    .collapsed .chapter-collapse-icon {
+        transform: rotate(-90deg);
+    }
+
+    .chapter-tips-list {
+        transition: all 0.3s ease;
+        overflow: hidden;
+    }
+
+    .collapsed+.chapter-tips-list {
+        max-height: 0;
+        margin-bottom: 0;
     }
 
     /* ── Tip Card ──────────────────────────────────────── */
     .tip-card {
         background: #fff;
         border: 1px solid #e8ecf1;
-        border-radius: 12px;
-        padding: 16px;
-        margin-bottom: 10px;
-        transition: all 0.2s ease;
+        border-radius: 6px;
+        padding: 0;
+        margin-bottom: 4px;
+        width: 100%;
+        display: block !important;
+        height: auto !important;
+        min-height: 0 !important;
         position: relative;
+        overflow: hidden;
     }
 
-    .tip-card:hover {
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
-        border-color: #d0d7de;
+    .tip-card-header {
+        padding: 8px 12px;
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: #fff;
+        transition: background 0.2s;
+    }
+
+    .tip-card-header:hover {
+        background: #fcfcfc;
+    }
+
+    .tip-title-text {
+        font-weight: 700;
+        color: #1a1a2e;
+        font-size: 0.88rem;
+        flex-grow: 1;
+        line-height: 1.2;
+    }
+
+    .tip-expand-icon {
+        font-size: 0.8rem;
+        color: #cbd5e0;
+        margin-left: 10px;
+        transition: transform 0.3s;
+    }
+
+    .tip-card.expanded .tip-expand-icon {
+        transform: rotate(180deg);
+        color: #f1c40f;
     }
 
     .tip-card-body {
-        font-size: 0.95rem;
-        line-height: 1.7;
-        color: #2d3748;
+        font-size: 0.88rem;
+        line-height: 1.35;
+        color: #333;
+        padding: 2px 10px 4px 10px;
+        display: none;
+        background: #fff;
+        border-top: 1px solid #f0f0f0;
+        height: auto !important;
+        min-height: 0 !important;
+    }
+
+    .tip-body-content {
         white-space: pre-wrap;
         word-break: break-word;
-        margin-bottom: 10px;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    .tip-card.expanded .tip-card-body {
+        display: block;
     }
 
     .tip-card-footer {
@@ -217,15 +319,23 @@
     }
 
     .tip-like-btn .tip-like-count {
-        font-weight: 600;
-        color: #6c757d;
-        font-size: 0.85rem;
+        font-weight: 700;
+        color: #e74c3c;
+        font-size: 0.8rem;
     }
 
     @keyframes like-bounce {
-        0% { transform: scale(1); }
-        50% { transform: scale(1.4); }
-        100% { transform: scale(1); }
+        0% {
+            transform: scale(1);
+        }
+
+        50% {
+            transform: scale(1.4);
+        }
+
+        100% {
+            transform: scale(1);
+        }
     }
 
     .like-anim {
@@ -341,7 +451,7 @@
     /* ── Empty State ───────────────────────────────────── */
     .empty-state {
         text-align: center;
-        padding: 60px 20px;
+        padding: 20px 10px;
         color: #8c909e;
     }
 
@@ -395,11 +505,24 @@
     </div>
 
     <!-- Filter Bar (all tips view) -->
-    <div class="tips-filter-bar" id="filterBar">
-        <select class="sort-select" id="sortSelect" onchange="loadAllTips()">
-            <option value="newest">新しい順</option>
-            <option value="popular">人気順</option>
-        </select>
+    <div class="tips-filter-bar shadow-sm" id="filterBar">
+        <div class="search-inputs">
+            <input type="text" id="keywordInput" class="search-ctrl search-keyword" placeholder="キーワードで検索..."
+                onkeypress="if(event.key === 'Enter') loadAllTips()">
+            <select id="tagSelect" class="search-ctrl" onchange="loadAllTips()">
+                <option value="">全てのタグ</option>
+                <!-- Tags filled by JS -->
+            </select>
+        </div>
+        <div class="filter-actions">
+            <select class="search-ctrl" id="sortSelect" onchange="loadAllTips()">
+                <option value="newest">新しい順</option>
+                <option value="popular">人気順</option>
+            </select>
+            <button class="btn btn-warning btn-sm rounded-8" onclick="loadAllTips()">
+                <i class="fas fa-search"></i>
+            </button>
+        </div>
     </div>
 
     <!-- Tips Container -->
@@ -438,6 +561,12 @@
             </div>
             <div class="modal-body">
                 <div class="mb-3">
+                    <label class="form-label fw-bold" style="font-size: 0.85rem;">タイトル <span
+                            class="text-danger">*</span></label>
+                    <input type="text" class="form-control form-control-sm" id="tipTitle" maxlength="100"
+                        placeholder="覚え方のタイトルなど（必須）">
+                </div>
+                <div class="mb-3">
                     <label class="form-label fw-bold">本文 <span class="text-danger">*</span></label>
                     <textarea class="form-control" id="tipBody" rows="5" maxlength="1000"
                         placeholder="暗記のコツ、覚え方、ゴロ合わせなど..." oninput="updateCharCount()"></textarea>
@@ -470,6 +599,12 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label fw-bold" style="font-size: 0.85rem;">タイトル <span
+                            class="text-danger">*</span></label>
+                    <input type="text" class="form-control form-control-sm" id="resubmitTitle" maxlength="100"
+                        placeholder="タイトルを入力（必須）">
+                </div>
                 <div class="mb-3">
                     <label class="form-label fw-bold">本文 <span class="text-danger">*</span></label>
                     <textarea class="form-control" id="resubmitBody" rows="5" maxlength="1000"
@@ -526,23 +661,40 @@
 
         try {
             const sort = document.getElementById('sortSelect').value;
-            const res = await fetch(`/api/tips?sort=${sort}`);
+            const q = document.getElementById('keywordInput').value.trim();
+            const tag_id = document.getElementById('tagSelect').value;
+
+            const url = new URL('/api/tips', window.location.origin);
+            url.searchParams.set('sort', sort);
+            if (q) url.searchParams.set('q', q);
+            if (tag_id) url.searchParams.set('tag_id', tag_id);
+
+            const res = await fetch(url);
             const data = await res.json();
             if (data.status !== 'success') throw new Error(data.message);
 
+            updateTagSelect(data.groups);
+
             if (!data.groups || data.groups.length === 0) {
-                container.innerHTML = '<div class="empty-state"><i class="fas fa-lightbulb d-block"></i><p>まだTipsがありません</p></div>';
+                container.innerHTML = '<div class="empty-state"><i class="fas fa-lightbulb d-block"></i><p>該当するTipsがありません</p></div>';
                 return;
             }
 
             let html = '';
             for (const group of data.groups) {
-                html += `<div class="chapter-section">`;
-                html += `<div class="chapter-section-title">${escapeHtml(group.tag_name)}</div>`;
-                for (const tip of group.tips) {
-                    html += renderTipCard(tip);
-                }
-                html += `</div>`;
+                // By default, only "Recent Posts" (tag_id === 'recent') might be expanded, 
+                // but the user said "閉じた状態にしてください" so all should be collapsed.
+                const isCollapsed = true;
+                html += `
+                    <div class="chapter-section" id="tag-section-${group.tag_id}">
+                        <div class="chapter-section-header ${isCollapsed ? 'collapsed' : ''}" onclick="toggleTagCollapse('${group.tag_id}')">
+                            <h2 class="chapter-section-title">${escapeHtml(group.tag_name)} (${group.tips.length})</h2>
+                            <i class="fas fa-chevron-down chapter-collapse-icon"></i>
+                        </div>
+                        <div class="chapter-tips-list" id="tag-list-${group.tag_id}">
+                            ${group.tips.map(tip => renderTipCard(tip)).join('')}
+                        </div>
+                    </div>`;
             }
             container.innerHTML = html;
         } catch (e) {
@@ -551,29 +703,58 @@
         }
     }
 
+    function updateTagSelect(groups) {
+        const select = document.getElementById('tagSelect');
+        const currentVal = select.value;
+        let html = '<option value="">全てのタグ</option>';
+        if (groups) {
+            groups.forEach(g => {
+                html += `<option value="${g.tag_id}" ${currentVal == g.tag_id ? 'selected' : ''}>${escapeHtml(g.tag_name)}</option>`;
+            });
+        }
+        select.innerHTML = html;
+    }
+
+    function toggleTagCollapse(tagId) {
+        const header = document.querySelector(`#tag-section-${tagId} .chapter-section-header`);
+        header.classList.toggle('collapsed');
+    }
+
     function renderTipCard(tip) {
         const likedClass = tip.is_liked ? 'fas' : 'far';
+        const displayTitle = tip.title ? escapeHtml(tip.title) : '(タイトル未設定)';
+
         return `
-            <div class="tip-card" data-tip-id="${tip.id}">
-                <div class="tip-card-body">${escapeHtml(tip.body)}</div>
-                <div class="tip-card-footer">
-                    <div>
-                        <span class="tip-author"><i class="fas fa-user-circle"></i> ${escapeHtml(tip.author)}</span>
-                        <span class="tip-date">${escapeHtml(tip.created_at)}</span>
+            <div class="tip-card" id="tip-${tip.id}" data-id="${tip.id}">
+                <div class="tip-card-header" onclick="toggleTipExpand(${tip.id})">
+                    <div class="tip-title-text">${displayTitle}</div>
+                    <div class="d-flex align-items-center gap-1 ms-2">
+                        <span class="text-danger" style="font-size: 0.7rem;"><i class="${likedClass} fa-heart"></i> <span class="tip-like-count">${tip.likes_count}</span></span>
+                        <i class="fas fa-chevron-down tip-expand-icon" style="font-size: 0.6rem;"></i>
                     </div>
-                    ${isLoggedIn ? `
-                    <button class="tip-like-btn" onclick="toggleLike(${tip.id}, this)">
-                        <i class="${likedClass} fa-heart"></i>
-                        <span class="tip-like-count">${tip.likes_count}</span>
-                    </button>
-                    ` : `
-                    <span class="tip-like-btn" style="cursor:default;">
-                        <i class="far fa-heart"></i>
-                        <span class="tip-like-count">${tip.likes_count}</span>
-                    </span>
-                    `}
+                </div>
+                <div class="tip-card-body">
+                    <div class="tip-body-content">${escapeHtml(tip.body).trim()}</div>
+                    <div class="tip-card-footer-inner d-flex justify-content-between align-items-center text-muted" style="font-size: 0.75rem; border-top: 1px solid #f8f8f8; margin-top: 3px; padding-top: 1px; line-height: 1.1;">
+                        <div class="d-flex align-items-center gap-2">
+                             <span><i class="fas fa-user-circle"></i> ${escapeHtml(tip.author)}</span>
+                             <span>${escapeHtml(tip.created_at)}</span>
+                        </div>
+                        ${isLoggedIn ? `
+                        <div onclick="event.stopPropagation()" style="margin-left: auto;">
+                            <span class="text-danger cursor-pointer" style="font-size:0.95rem; cursor:pointer; font-weight: bold;" onclick="toggleLike(${tip.id}, this)">
+                                 <i class="${likedClass} fa-heart"></i>
+                            </span>
+                        </div>
+                        ` : ''}
+                    </div>
                 </div>
             </div>`;
+    }
+
+    function toggleTipExpand(tipId) {
+        const card = document.getElementById(`tip-${tipId}`);
+        card.classList.toggle('expanded');
     }
 
     // ── Load My Tips ──
@@ -595,23 +776,40 @@
             for (const tip of data.tips) {
                 const statusLabel = tip.status === 'pending' ? '承認待ち' : tip.status === 'approved' ? '承認済み' : '却下';
                 const tagLabel = tip.tag_name || '未設定';
+                const displayTitle = tip.title || '(タイトルなし)';
                 html += `
-                    <div class="tip-card" data-tip-id="${tip.id}">
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                            <div>
-                                <span class="tip-status-badge ${tip.status}">${statusLabel}</span>
-                                <span class="badge bg-light text-dark border" style="font-size:0.7rem;">${escapeHtml(tagLabel)}</span>
-                                ${tip.is_anonymous ? '<span class="badge bg-light text-muted border" style="font-size:0.65rem;"><i class="fas fa-user-secret"></i> 匿名</span>' : ''}
+                    <div class="tip-card my-tip-card" id="tip-${tip.id}" data-id="${tip.id}">
+                        <div class="border-bottom bg-light d-flex justify-content-between align-items-center" style="font-size: 0.7rem; padding: 4px 10px;">
+                            <div class="d-flex flex-wrap gap-1 align-items-center">
+                                <span class="tip-status-badge ${tip.status} mb-0" style="font-size:0.65rem; padding: 0px 4px;">${statusLabel}</span>
+                                <span class="badge bg-white text-dark border small" style="font-size:0.65rem; padding: 0px 4px;">${escapeHtml(tagLabel)}</span>
                             </div>
-                            <div style="display:flex; align-items:center; gap:8px;">
-                                <span style="font-size:0.75rem; color:#8c909e;">${escapeHtml(tip.created_at)}</span>
-                                ${tip.status === 'rejected' ? `<button class="tip-resubmit-btn" data-tip-id="${tip.id}" data-tip-body="${escapeHtml(tip.body)}" onclick="openResubmitModal(this)"><i class="fas fa-edit"></i> 編集・再投稿</button>` : ''}
-                                <button class="tip-delete-btn" onclick="deleteTip(${tip.id})"><i class="fas fa-trash-alt"></i></button>
+                            <div class="d-flex align-items-center gap-1">
+                                <small class="text-muted" style="font-size:0.7rem;">${escapeHtml(tip.created_at)}</small>
+                                ${tip.status === 'rejected' ? `
+                                    <span class="text-warning cursor-pointer" style="font-size:0.7rem;" onclick="openResubmitModal(${tip.id}, \`${escapeHtml(tip.title || '')}\`, \`${escapeHtml(tip.body)}\`)">
+                                        <i class="fas fa-edit"></i> 編集
+                                    </span>` : ''}
+                                <span class="text-danger cursor-pointer" style="font-size:0.7rem;" onclick="deleteTip(${tip.id})">
+                                    <i class="fas fa-trash-alt"></i>
+                                </span>
                             </div>
                         </div>
-                        <div class="tip-card-body">${escapeHtml(tip.body)}</div>
-                        ${tip.status === 'approved' ? `<div class="tip-card-footer"><span></span><span style="color:#8c909e; font-size:0.78rem;"><i class="far fa-heart"></i> ${tip.likes_count}</span></div>` : ''}
-                        ${tip.status === 'rejected' && tip.reject_reason ? `<div class="tip-reject-reason"><i class="fas fa-comment-alt"></i> ${escapeHtml(tip.reject_reason)}</div>` : ''}
+                        <div class="tip-card-header" onclick="toggleTipExpand(${tip.id})" style="padding: 4px 10px;">
+                            <div class="tip-title-text" style="font-size: 0.88rem;">${escapeHtml(displayTitle)}</div>
+                            <div class="d-flex align-items-center gap-1">
+                                <span class="text-muted" style="font-size: 0.65rem;"><i class="far fa-heart"></i> <span class="tip-like-count">${tip.likes_count}</span></span>
+                                <i class="fas fa-chevron-down tip-expand-icon" style="font-size: 0.58rem;"></i>
+                            </div>
+                        </div>
+                        <div class="tip-card-body">
+                            <div class="tip-body-content">${escapeHtml(tip.body)}</div>
+                            ${tip.status === 'rejected' && tip.reject_reason ? `
+                                <div class="tip-reject-reason" style="font-size:0.6rem; padding: 2px 6px; margin-top: 2px;">
+                                    <i class="fas fa-exclamation-triangle me-1"></i>却下理由: ${escapeHtml(tip.reject_reason)}
+                                </div>
+                            ` : ''}
+                        </div>
                     </div>`;
             }
             container.innerHTML = html;
@@ -624,17 +822,26 @@
     // ── Like Toggle ──
     async function toggleLike(tipId, btn) {
         if (!isLoggedIn) return;
-        const icon = btn.querySelector('i');
-        const countEl = btn.querySelector('.tip-like-count');
-        const wasLiked = icon.classList.contains('fas');
-        let count = parseInt(countEl.textContent);
+        const card = document.getElementById(`tip-${tipId}`);
+        if (!card) return;
+
+        const countEls = card.querySelectorAll('.tip-like-count');
+        const icons = card.querySelectorAll('i.fa-heart');
+        if (icons.length === 0) return;
+
+        const wasLiked = icons[0].classList.contains('fas');
+        let currentCount = parseInt(countEls[0].textContent);
 
         // Optimistic update
-        icon.classList.toggle('fas');
-        icon.classList.toggle('far');
-        countEl.textContent = wasLiked ? count - 1 : count + 1;
-        icon.classList.add('like-anim');
-        setTimeout(() => icon.classList.remove('like-anim'), 400);
+        icons.forEach(icon => {
+            icon.classList.toggle('fas', !wasLiked);
+            icon.classList.toggle('far', wasLiked);
+            icon.classList.add('like-anim');
+            setTimeout(() => icon.classList.remove('like-anim'), 400);
+        });
+
+        const nextCount = wasLiked ? currentCount - 1 : currentCount + 1;
+        countEls.forEach(el => el.textContent = nextCount);
 
         try {
             const res = await fetch(`/api/tips/${tipId}/like`, {
@@ -643,20 +850,25 @@
             });
             const data = await res.json();
             if (data.status === 'success') {
-                countEl.textContent = data.count;
-                icon.classList.toggle('fas', data.liked);
-                icon.classList.toggle('far', !data.liked);
+                countEls.forEach(el => el.textContent = data.count);
+                icons.forEach(icon => {
+                    icon.classList.toggle('fas', data.liked);
+                    icon.classList.toggle('far', !data.liked);
+                });
             }
         } catch (e) {
             // Revert
-            icon.classList.toggle('fas');
-            icon.classList.toggle('far');
-            countEl.textContent = count;
+            icons.forEach(icon => {
+                icon.classList.toggle('fas', wasLiked);
+                icon.classList.toggle('far', !wasLiked);
+            });
+            countEls.forEach(el => el.textContent = currentCount);
         }
     }
 
     // ── Post Tip ──
     function openPostModal() {
+        document.getElementById('tipTitle').value = '';
         document.getElementById('tipBody').value = '';
         document.getElementById('tipAnonymous').checked = false;
         updateCharCount();
@@ -671,9 +883,14 @@
     }
 
     async function submitTip() {
+        const title = document.getElementById('tipTitle').value.trim();
         const body = document.getElementById('tipBody').value.trim();
         const isAnonymous = document.getElementById('tipAnonymous').checked;
 
+        if (!title) {
+            alert('タイトルを入力してください');
+            return;
+        }
         if (!body) {
             alert('本文を入力してください');
             return;
@@ -691,7 +908,7 @@
             const res = await fetch('/api/tips', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ body, is_anonymous: isAnonymous })
+                body: JSON.stringify({ title, body, is_anonymous: isAnonymous })
             });
             const data = await res.json();
             if (data.status === 'success') {
@@ -729,14 +946,10 @@
     }
 
     // ── Resubmit Rejected Tip ──
-    function openResubmitModal(btn) {
-        const tipId = btn.getAttribute('data-tip-id');
-        const bodyEncoded = btn.getAttribute('data-tip-body');
+    function openResubmitModal(tipId, title, body) {
         document.getElementById('resubmitTipId').value = tipId;
-        // data属性のescapeHtml済みテキストをデコード
-        const tmp = document.createElement('textarea');
-        tmp.innerHTML = bodyEncoded;
-        document.getElementById('resubmitBody').value = tmp.value;
+        document.getElementById('resubmitTitle').value = title;
+        document.getElementById('resubmitBody').value = body;
         updateResubmitCharCount();
         resubmitModal.show();
     }
@@ -750,8 +963,13 @@
 
     async function submitResubmit() {
         const tipId = document.getElementById('resubmitTipId').value;
+        const title = document.getElementById('resubmitTitle').value.trim();
         const body = document.getElementById('resubmitBody').value.trim();
 
+        if (!title) {
+            alert('タイトルを入力してください');
+            return;
+        }
         if (!body) {
             alert('本文を入力してください');
             return;
@@ -769,7 +987,7 @@
             const res = await fetch(`/api/tips/${tipId}/resubmit`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ body })
+                body: JSON.stringify({ title, body })
             });
             const data = await res.json();
             if (data.status === 'success') {

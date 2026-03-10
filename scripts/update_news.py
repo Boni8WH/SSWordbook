@@ -17,6 +17,47 @@ load_dotenv(os.path.join(basedir, '.env'))
 
 JST = pytz.timezone('Asia/Tokyo')
 
+# AWS S3設定
+S3_BUCKET = os.environ.get('S3_BUCKET')
+S3_KEY = os.environ.get('AWS_ACCESS_KEY_ID')
+S3_SECRET = os.environ.get('AWS_SECRET_ACCESS_KEY')
+S3_REGION = os.environ.get('S3_REGION', 'ap-northeast-1')
+S3_AVAILABLE = all([S3_KEY, S3_SECRET, S3_BUCKET])
+
+def get_s3_client():
+    """Boto3を遅延インポートしてS3クライアントを取得"""
+    if not S3_AVAILABLE:
+        return None
+    try:
+        import boto3
+        return boto3.client(
+            's3',
+            aws_access_key_id=S3_KEY,
+            aws_secret_access_key=S3_SECRET,
+            region_name=S3_REGION
+        )
+    except Exception as e:
+        print(f"⚠️ S3クライアント初期化失敗: {e}")
+        return None
+
+def upload_json_to_s3(data, s3_path):
+    """辞書データをJSONとしてS3にアップロード"""
+    s3_client = get_s3_client()
+    if not s3_client:
+        return False
+    try:
+        json_data = json.dumps(data, ensure_ascii=False, indent=2)
+        s3_client.put_object(
+            Bucket=S3_BUCKET,
+            Key=s3_path,
+            Body=json_data,
+            ContentType='application/json'
+        )
+        return True
+    except Exception as e:
+        print(f"⚠️ S3 JSONアップロードエラー ({s3_path}): {e}")
+        return False
+
 # URLドメインから出典メディア名を推定するマッピング
 DOMAIN_SOURCE_MAP = {
     'nhk.or.jp': 'NHK',
@@ -70,7 +111,7 @@ class OtherTopic(BaseModel):
 
 class NewsResponse(BaseModel):
     articles: list[Article] = Field(description="厳選された3つのニュース記事")
-    other_topics: list[OtherTopic] = Field(description="その他の注目トピック（5〜7個）")
+    other_topics: list[OtherTopic] = Field(description="その他の注目トピック（6個）")
 # --------------------------------------------------
 
 def get_gemini_summary(news_items):
@@ -109,7 +150,7 @@ def get_gemini_summary(news_items):
 
 **構成の指示:**
 1. **厳選記事 (articles)**: 最も重要なものを**厳密に3つ**選び、詳細な解説を作成してください。
-2. **その他の注目トピック (other_topics)**: 次点で興味深いものを**5〜7個**選び、タイトル、URL、出典メディア名をリストアップしてください。**特定のメディアに偏らず、できるだけ多様な出典（NHK, Nikkei, BBC, Guardian等）からバランスよく選出してください。** **重要: 各トピックのsourceフィールドには必ず出典メディア名（例: BBCニュース、ガーディアン、NHK等）を含めてください。空にしないでください。**
+2. **その他の注目トピック (other_topics)**: 次点で興味深いものを**厳密に6個**選び、タイトル、URL、出典メディア名をリストアップしてください。**特定のメディアに偏らず、できるだけ多様な出典（NHK, Nikkei, BBC, Guardian等）からバランスよく選出してください。** **重要: 各トピックのsourceフィールドには必ず出典メディア名（例: BBCニュース、ガーディアン、NHK等）を含めてください。空にしないでください。**
 
 **選出・要約のガイドライン（最優先）:**
 1. **事実の正確性**: あなたの事前学習知識よりも、**提供されたニュースリストのテキスト内容を絶対的に優先**してください。人名、役職、現状について、リストと矛盾する推測や古い情報を入れないでください。
@@ -228,8 +269,23 @@ def update_news():
         file_path = os.path.join(data_dir, 'featured_article.json')
         with open(file_path, 'w', encoding='utf-8') as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
+            
+        # 日付別アーカイブとして保存
+        archive_dir = os.path.join(data_dir, 'news_archive')
+        os.makedirs(archive_dir, exist_ok=True)
+        archive_date = datetime.now(JST).strftime("%Y-%m-%d")
+        archive_path = os.path.join(archive_dir, f'{archive_date}.json')
+        with open(archive_path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+
+        print(f"✅ News updated and saved locally: {file_path}")
         
-        print(f"✅ News updated and saved to {file_path}")
+        # S3への永続化
+        if S3_AVAILABLE:
+            archive_date = datetime.now(JST).strftime("%Y-%m-%d")
+            upload_json_to_s3(data, 'data/featured_article.json')
+            upload_json_to_s3(data, f'data/news_archive/{archive_date}.json')
+            print("☁️ S3へのバックアップが完了しました")
     else:
         print("❌ Failed to get news summaries.")
 
