@@ -22867,20 +22867,17 @@ def check_and_migrate_news_archive():
             if not inspector.has_table('news_archive'):
                 db.create_all()
                 return
+            # 現行スキーマに必要なカラムがすべて揃っているか確認
             columns = [c['name'] for c in inspector.get_columns('news_archive')]
-            with db.engine.connect() as conn:
-                if 'data_json' not in columns:
-                    conn.execute(text("ALTER TABLE news_archive ADD COLUMN data_json TEXT"))
+            required = {'id', 'date', 'data_json', 'updated_at'}
+            if not required.issubset(set(columns)):
+                # 旧スキーマのテーブルを削除して再作成
+                with db.engine.connect() as conn:
+                    conn.execute(text("DROP TABLE news_archive"))
                     conn.commit()
-                    print("✅ news_archive: data_json カラムを追加しました")
-                if 'updated_at' not in columns:
-                    conn.execute(text("ALTER TABLE news_archive ADD COLUMN updated_at TIMESTAMP WITH TIME ZONE"))
-                    conn.commit()
-                    print("✅ news_archive: updated_at カラムを追加しました")
-                if 'date' not in columns:
-                    conn.execute(text("ALTER TABLE news_archive ADD COLUMN date VARCHAR(10)"))
-                    conn.commit()
-                    print("✅ news_archive: date カラムを追加しました")
+                print("🔄 news_archive: 旧スキーマのテーブルを削除しました")
+                db.create_all()
+                print("✅ news_archive: 新スキーマでテーブルを作成しました")
         except Exception as e:
             print(f"⚠️ news_archive マイグレーションエラー: {e}")
 
