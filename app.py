@@ -22857,12 +22857,41 @@ def check_and_migrate_room_setting():
             print(f"RoomSetting migration check failed: {e}")
 
 check_and_migrate_room_setting()
+
+def check_and_migrate_news_archive():
+    """news_archiveテーブルのスキーマを現行定義に合わせる"""
+    from sqlalchemy import text, inspect
+    with app.app_context():
+        try:
+            inspector = inspect(db.engine)
+            if not inspector.has_table('news_archive'):
+                db.create_all()
+                return
+            columns = [c['name'] for c in inspector.get_columns('news_archive')]
+            with db.engine.connect() as conn:
+                if 'data_json' not in columns:
+                    conn.execute(text("ALTER TABLE news_archive ADD COLUMN data_json TEXT"))
+                    conn.commit()
+                    print("✅ news_archive: data_json カラムを追加しました")
+                if 'updated_at' not in columns:
+                    conn.execute(text("ALTER TABLE news_archive ADD COLUMN updated_at TIMESTAMP WITH TIME ZONE"))
+                    conn.commit()
+                    print("✅ news_archive: updated_at カラムを追加しました")
+                if 'date' not in columns:
+                    conn.execute(text("ALTER TABLE news_archive ADD COLUMN date VARCHAR(10)"))
+                    conn.commit()
+                    print("✅ news_archive: date カラムを追加しました")
+        except Exception as e:
+            print(f"⚠️ news_archive マイグレーションエラー: {e}")
+
+check_and_migrate_news_archive()
+
 with app.app_context():
     _add_read_columns_to_user()
     _create_column_table()
     _create_column_like_table()
     _create_column_view_table()
-    db.create_all()  # news_archive テーブルなど未作成のテーブルを作成
+    db.create_all()
 
 @app.route('/api/check_rpg_intro_eligibility', methods=['GET'])
 def check_rpg_intro_eligibility():
