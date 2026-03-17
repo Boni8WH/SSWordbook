@@ -1,82 +1,82 @@
 {
-  "updated_at": "2026-03-17T09:50:52.863732+09:00",
+  "updated_at": "2026-03-17T11:08:51.564242+09:00",
   "total_processed": 80,
   "articles": [
     {
-      "title": "トランプ大統領、イラン軍事作戦のため中国訪問を延期",
-      "summary": "トランプ大統領がイランでの軍事作戦を理由に、予定されていた中国訪問を延期。米中関係は、冷戦終結後の世界秩序において重要な二国間関係であり、その動向は世界経済や安全保障に大きな影響を与える。今回の延期は、中東情勢の緊迫化が米中関係にも影を落としていることを示唆している。",
-      "significance": "米中関係は、貿易摩擦や台湾問題など、歴史的な背景を持つ複雑な関係。今回の延期を機に、米中間のパワーバランスや国際協調のあり方について考察を深めよう。冷戦終結後の世界秩序、多極化、地政学などを学ぶと理解が深まる。",
+      "title": "ホルムズ海峡への艦船派遣 各国の対応分かれる",
+      "summary": "各国の対応が分かれる",
+      "significance": "ホルムズ海峡は世界のエネルギー供給の要であり、その安全確保は国際的な関心事です。19世紀以降、イギリスやアメリカがこの地域で影響力を行使し、石油資源を確保しようとしました。現代の艦船派遣をめぐる各国の対応の違いは、過去の帝国主義的な資源争奪の歴史と、それに対する各国の複雑な思惑を反映しています。地政学、エネルギー政策、国際関係の視点から考察しましょう。",
+      "keywords": [
+        "ホルムズ海峡",
+        "地政学",
+        "エネルギー政策",
+        "帝国主義",
+        "国際関係"
+      ],
+      "url": "http://www3.nhk.or.jp/news/html/20260317/k10015077481000.html",
+      "source": "NHKニュース",
+      "created_at": "3月17日 10:04"
+    },
+    {
+      "title": "トランプ大統領 中国訪問の約1か月延期申し入れ 軍事作戦対応",
+      "summary": "軍事作戦に対応するため延期",
+      "significance": "米中関係は、冷戦後の世界秩序を大きく左右する二国間関係です。トランプ大統領の中国訪問延期は、イランでの軍事作戦という偶発的な事態が、大国間の外交に影響を与えることを示しています。過去の米中関係（ニクソン訪中、天安門事件など）を振り返り、地政学的な緊張と協調の歴史的パターンを理解することが重要です。",
       "keywords": [
         "米中関係",
         "冷戦",
-        "多極化",
         "地政学",
-        "イラン"
+        "ニクソン",
+        "天安門事件"
       ],
       "url": "http://www3.nhk.or.jp/news/html/20260317/k10015077581000.html",
       "source": "NHKニュース",
       "created_at": "3月17日 08:07"
     },
     {
-      "title": "ホルムズ海峡への艦船派遣、各国の対応が分かれる",
-      "summary": "アメリカがホルムズ海峡への艦船派遣を各国に要請する中、イギリスは協議姿勢を示す一方、ドイツは不参加を表明。ホルムズ海峡は世界のエネルギー供給の要であり、その安全確保は国際的な関心事。各国の対応の違いは、それぞれの外交戦略や歴史的背景を反映している。",
-      "significance": "ホルムズ海峡を巡る各国の思惑から、地政学的な重要性を理解しよう。中東地域の紛争、石油資源、列強の思惑などが複雑に絡み合っている。中東戦争、オイルショック、冷戦時代の各国の戦略などを学ぶと、現代の国際関係をより深く理解できる。",
+      "title": "キューバの電力網が米国の石油封鎖の中で崩壊",
+      "summary": "1000万人が停電",
+      "significance": "キューバの電力網崩壊は、米国の経済封鎖が社会インフラに与える影響を示しています。冷戦時代から続く米国の対キューバ政策は、カリブ海危機やピッグス湾事件など、両国間の緊張を高めてきました。現代の経済制裁が、国家の安定や人々の生活にどのような影響を与えるのか、歴史的視点から考察することが重要です。",
       "keywords": [
-        "ホルムズ海峡",
-        "中東",
-        "地政学",
-        "エネルギー",
-        "国際関係"
+        "キューバ",
+        "アメリカ",
+        "経済封鎖",
+        "冷戦",
+        "カリブ海危機"
       ],
-      "url": "http://www3.nhk.or.jp/news/html/20260317/k10015077481000.html",
-      "source": "NHKニュース",
-      "created_at": "3月17日 09:38"
-    },
-    {
-      "title": "フランス、コートジボワールから略奪した聖なる太鼓を返還",
-      "summary": "フランスが、100年以上前にコートジボワールから略奪した聖なる太鼓「Djidji Ayôkwé」を返還。植民地時代に欧米列強がアフリカから略奪した文化財の返還は、近年高まるアフリカのナショナリズムと、過去の不正を正そうとする国際的な動きを反映している。",
-      "significance": "文化財の返還問題は、植民地支配の歴史と深く関わっている。アフリカの歴史、ナショナリズム、文化人類学などを学ぶことで、文化財が持つ意味や、返還運動の意義を理解できる。帝国主義、文化帝国主義、脱植民地化といったキーワードも重要。",
-      "keywords": [
-        "植民地主義",
-        "文化財返還",
-        "ナショナリズム",
-        "帝国主義",
-        "アフリカ"
-      ],
-      "url": "https://www.theguardian.com/world/2026/mar/13/france-returns-sacred-djidji-ayokwe-talking-drum-looted-from-cote-divoire",
+      "url": "https://www.theguardian.com/world/2026/mar/16/cuba-electrical-grid-collapses-amid-us-oil-blockade",
       "source": "ガーディアン",
-      "created_at": "3月13日 22:06"
+      "created_at": "3月17日 04:41"
     }
   ],
   "other_topics": [
     {
-      "title": "キューバ、アメリカの石油封鎖で電力網が崩壊し全国的な停電が発生",
-      "url": "https://www.aljazeera.com/news/2026/3/16/cuba-electric-grid-collapses-amid-us-oil-blockade-causing-national-blackout",
+      "title": "アフガニスタン、パキスタンの麻薬リハビリセンターへの空爆を非難",
+      "url": "https://www.aljazeera.com/video/newsfeed/2026/3/17/afghanistan-accuses-pakistan-of-air-strike-on-drug-rehab-centre?traffic_source=rss",
       "source": "アルジャジーラ"
     },
     {
-      "title": "アフリカ、イラン紛争によるサプライチェーンの混乱に特に脆弱",
-      "url": "https://www.theguardian.com/world/2026/mar/16/africa-particularly-vulnerable-iran-conflict-disrupts-supply-chains",
-      "source": "ガーディアン"
+      "title": "ナイジェリアのメイドゥグリで爆発が発生し、多数が死傷",
+      "url": "https://www.aljazeera.com/news/2026/3/17/many-killed-wounded-after-blasts-hit-nigerias-maiduguri-witnesses-say?traffic_source=rss",
+      "source": "アルジャジーラ"
     },
     {
-      "title": "ロシア、ウクライナ紛争でケニア人兵士の利用を停止するとケニアが発表",
-      "url": "https://www.bbc.com/news/articles/cev7rdwmky9o",
-      "source": "BBCニュース"
+      "title": "イラン戦争：トランプ大統領、ホルムズ海峡ミッションに同盟国が参加しないことを非難",
+      "url": "https://www.aljazeera.com/news/liveblog/2026/3/17/iran-war-live-trump-scolds-allies-for-not-joining-strait-of-hormuz-mission?traffic_source=rss",
+      "source": "アルジャジーラ"
     },
     {
-      "title": "ベネズエラで拘留者の拷問疑惑が続くとの報告を国連が受理",
-      "url": "https://www.bbc.com/news/articles/c0e5v9n1qqwo",
-      "source": "BBCニュース"
-    },
-    {
-      "title": "NEC、海底ケーブル事業に6億3000万ドルを投資",
-      "url": "https://asia.nikkei.com/business/telecommunication/japan-s-nec-to-pour-630m-into-undersea-cable-business",
-      "source": "日経アジア"
+      "title": "米国はホルムズ海峡の警備支援を求めているが、EUは乗り気ではない",
+      "url": "https://www.dw.com/en/us-wants-help-to-guard-strait-of-hormuz-but-eu-is-not-keen/a-76380348?maca=en-rss-en-world-4025-rdf",
+      "source": "ドイチェ・ヴェレ"
     },
     {
       "title": "中国：「民族団結」法が強制的な統合への懸念を引き起こす",
       "url": "https://www.dw.com/en/china-ethnic-unity-law-sparks-fears-of-forced-integration/a-76383259?maca=en-rss-en-world-4025-rdf",
+      "source": "ドイチェ・ヴェレ"
+    },
+    {
+      "title": "アフリカ：石油生産国が価格ショックに対抗するためにできること",
+      "url": "https://www.dw.com/en/africa-what-oil-producers-can-do-to-counter-price-shocks/a-76376251?maca=en-rss-en-world-4025-rdf",
       "source": "ドイチェ・ヴェレ"
     }
   ]

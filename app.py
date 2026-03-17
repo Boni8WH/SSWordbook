@@ -4,6 +4,7 @@ import csv
 import re
 import hashlib
 import logging
+import calendar as cal_module
 import math
 import time
 import secrets
@@ -1526,9 +1527,9 @@ def check_daily_quiz_reminders():
 
 # --- 構造化データ用のPydanticモデル ---
 class ArticleSchema(BaseModel):
-    title: str = Field(description="ニュースのタイトル（必ず日本語に翻訳してください）")
-    summary: str = Field(description="歴史的背景を含めた詳しい要約（日本語、200〜300文字）")
-    significance: str = Field(description="世界史のどの単元と関連するか、何を学ぶべきかの解説（日本語、100〜200文字）")
+    title: str = Field(description="ニュースのタイトル（提供されたニュースリストから忠実に直訳または引用してください。創作は厳禁です）")
+    summary: str = Field(description="配信元の短い説明（要約は行わず、配信元の記述を優先してください。30文字以内。表示しないため内部処理用）")
+    significance: str = Field(description="世界史のどの単元と関連するか、何を学ぶべきかの解説（日本語、150〜250文字）")
     keywords: list[str] = Field(description="関連する世界史の重要用語（例: 帝国主義、冷戦、サイクス・ピコ協定など）3〜5個")
     url: str = Field(description="出典URL")
     source: str = Field(description="出典メディア名（日本語翻訳、例: BBCニュース）")
@@ -1647,13 +1648,13 @@ def update_world_news():
 2. **その他の注目トピック (other_topics)**: 次点で興味深いものを**厳密に６個**選び、タイトル、URL、出典メディア名をリストアップしてください。**特定のメディアに偏らず、できるだけ多様な出典（NHK, Nikkei, BBC, Guardian等）からバランスよく選出してください。** **重要: 各トピックのsourceフィールドには必ず出典メディア名（例: BBCニュース、ガーディアン、NHK等）を含めてください。空にしないでください。**
 
 **選出・要約のガイドライン（最優先）:**
-    1. **事実の正確性**: あなたの事前学習知識よりも、**提供されたニュースリストのテキスト内容を絶対的に優先**してください。人名、役職、現状について、リストと矛盾する推測や古い情報を入れないでください。
-    2. **歴史的背景・継続性**: 現在の出来事が、過去の歴史的事象（植民地支配、冷戦、宗教対立、条約など）と深く結びついているものを優先してください。
-    3. **トピックの多様性**: 過去に取り上げたトピックと極力被らないようにしてください。
+    1. **タイトルの忠実性**: 記事のタイトルは、提供されたニュースリストの内容を**忠実に日本語に翻訳**するか、そのまま引用してください。AIによる扇情的な改変や独自のタイトル作成は**絶対に避けてください**。
+    2. **要約の抑制**: 本機能では配信元の著作権を尊重し、AIによる創作的な文章要約は表示しません。`summary` フィールドには配信元の短い説明を引用するに留めてください。
+    3. **教育的解説 (Significance)**: あなたの主戦場はここです。ニュースそのものの解説ではなく、「教科書の知識が現在の世界を理解するレンズになる」ことを示す、独自の教育的・史学的な解説を作成してください。
+    4. **歴史的背景・継続性**: 現在の出来事が、過去の歴史的事象（植民地支配、冷戦、宗教対立、条約など）と深く結びついているものを優先してください。
+    5. **トピックの多様性**: 過去に取り上げたトピックと極力被らないようにしてください。
        - 過去3回の記事タイトル: {prev_articles_text}
        - 同じ問題（例：イラン情勢）に大きな進展がない限り、別の地域や異なる歴史テーマを優先してください。
-    4. **翻訳の徹底**: 記事のタイトルは、日本の高校生が理解しやすい自然な日本語に必ず翻訳してください。
-    5. **現代社会の理解**: 単なるニュースではなく「教科書の知識が現在の世界を理解するレンズになる」ことが実感できる内容にしてください。
     6. **地域バランス**: 欧米、アジア、中東、アフリカなど、地域が偏らないよう配慮してください。
 
 ニュースリスト:
@@ -7741,59 +7742,81 @@ def get_news_data_api():
 
 @app.route('/news/archive')
 def news_archive_list():
-    """ニュースアーカイブ一覧（ページネーション付き）"""
+    """ニュースアーカイブ一覧（カレンダー形式）"""
     context = get_template_context()
-    archive_dir = os.path.join(basedir, 'data', 'news_archive')
 
-    # アーカイブファイル一覧を取得（新しい順）
+    # アーカイブファイル一覧を取得
     local_archive_dir = os.path.join(basedir, 'data', 'news_archive')
     local_files = []
     if os.path.exists(local_archive_dir):
         local_files = [f for f in os.listdir(local_archive_dir) if f.endswith('.json')]
-    
-    # S3のアーカイブ一覧
+
     s3_files = list_s3_news_archives()
-    
-    # 両方を統合して重複排除
     all_filenames = sorted(list(set(local_files + s3_files)), reverse=True)
-    
-    archives = []
+
+    # 日付 -> total_processed のマップを構築
+    archive_date_map = {}
     for fname in all_filenames:
         date_str = fname.replace('.json', '')
         try:
             d = datetime.strptime(date_str, '%Y-%m-%d').date()
             local_path = os.path.join(local_archive_dir, fname)
-            # S3から優先的に読み込み（ローカルフォールバック付き）
             data = download_json_from_s3(f'data/news_archive/{fname}', local_path)
             if data:
-                archives.append({
-                    'date': d,
-                    'total_processed': data.get('total_processed', 0)
-                })
+                archive_date_map[d] = data.get('total_processed', 0)
         except Exception:
             pass
 
-    # 簡易ページネーション
-    page = request.args.get('page', 1, type=int)
-    per_page = 20
-    total = len(archives)
-    total_pages = max(1, math.ceil(total / per_page))
-    page = max(1, min(page, total_pages))
-    start = (page - 1) * per_page
-    items = archives[start:start + per_page]
+    today = datetime.now().date()
 
-    class Pagination:
-        pass
-    pagination = Pagination()
-    pagination.items = items
-    pagination.page = page
-    pagination.pages = total_pages
-    pagination.has_prev = page > 1
-    pagination.has_next = page < total_pages
-    pagination.prev_num = page - 1
-    pagination.next_num = page + 1
+    # 表示する年月（クエリパラメータ or 最新アーカイブ月）
+    if archive_date_map:
+        latest = max(archive_date_map.keys())
+        default_year, default_month = latest.year, latest.month
+    else:
+        default_year, default_month = today.year, today.month
 
-    return render_template('news_archive_list.html', pagination=pagination, **context)
+    year = request.args.get('year', default_year, type=int)
+    month = request.args.get('month', default_month, type=int)
+    month = max(1, min(12, month))
+
+    # 前後月の計算
+    if month == 1:
+        prev_year, prev_month = year - 1, 12
+    else:
+        prev_year, prev_month = year, month - 1
+    if month == 12:
+        next_year, next_month = year + 1, 1
+    else:
+        next_year, next_month = year, month + 1
+
+    has_prev = any(d.year == prev_year and d.month == prev_month for d in archive_date_map)
+    has_next = (next_year, next_month) <= (today.year, today.month) and \
+               any(d.year == next_year and d.month == next_month for d in archive_date_map)
+
+    # カレンダー週データ（月曜始まり、0=その月の日付なし）
+    cal_module.setfirstweekday(0)  # 月曜始まり
+    calendar_weeks = cal_module.monthcalendar(year, month)
+
+    # 利用可能な月リスト（年月セレクタ用）
+    available_months = sorted(set((d.year, d.month) for d in archive_date_map), reverse=True)
+
+    # Jinja2での辞書参照用に文字列キーマップを作成
+    archive_str_map = {d.strftime('%Y-%m-%d'): v for d, v in archive_date_map.items()}
+
+    return render_template(
+        'news_archive_list.html',
+        archive_date_map=archive_date_map,
+        archive_str_map=archive_str_map,
+        calendar_weeks=calendar_weeks,
+        year=year, month=month,
+        prev_year=prev_year, prev_month=prev_month,
+        next_year=next_year, next_month=next_month,
+        has_prev=has_prev, has_next=has_next,
+        today=today,
+        available_months=available_months,
+        **context
+    )
 
 
 @app.route('/news/archive/<date_str>')

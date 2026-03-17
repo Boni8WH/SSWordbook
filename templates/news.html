@@ -42,12 +42,14 @@
             <div
                 class="alert alert-info border-0 shadow-xs rounded-4 p-3 mb-4 animate__animated animate__fadeInDown d-flex align-items-start">
                 <div class="me-3 pt-1">
-                    <i class="fas fa-info-circle fa-lg text-info"></i>
+                    <i class="fas fa-balance-scale fa-lg text-info"></i>
                 </div>
                 <div class="text-start">
                     <p class="mb-0 small fw-medium text-dark">
-                        このニュース解説はAIによって自動生成されています。<br>
-                        <span class="text-secondary fw-normal">事実と異なる内容が含まれる可能性があるため、正確な情報は必ず各出典元のリンク先でご確認ください。</span>
+                        ニュースのタイトルは配信元の内容を引用・翻訳しています。<br>
+                        <span class="text-secondary fw-normal">「学びのポイント」はAIによる独自の史学的解説です。詳細は<a
+                                href="{{ url_for('terms_of_service') }}"
+                                class="text-info text-decoration-underline">利用規約</a>をご確認ください。</span>
                     </p>
                 </div>
             </div>
@@ -77,31 +79,25 @@
                             <span class="badge bg-white text-muted border me-1 mb-1 fw-normal">#{{ keyword }}</span>
                             {% endfor %}
                             <span class="ms-2 text-primary small accordion-hint"><i
-                                    class="fas fa-chevron-down ms-1"></i> 詳しく見る</span>
+                                    class="fas fa-chevron-down ms-1"></i> 解説を見る</span>
                         </div>
                         {% endif %}
 
                         <!-- 折りたたみ部分 -->
                         <div class="accordion-content">
-                            <div class="news-summary p-3 rounded-3 bg-light-blue mb-3 mt-3">
-                                <p class="mb-0 text-secondary leading-relaxed">
-                                    {{ article.summary }}
-                                </p>
-                            </div>
-
                             <div
-                                class="educational-insight p-3 border-start border-4 border-info bg-white shadow-xs rounded-end-3 mb-3">
+                                class="educational-insight p-3 border-start border-4 border-info bg-white shadow-xs rounded-3 mb-3 mt-3">
                                 <h4 class="h6 fw-bold text-info mb-2">
-                                    <i class="fas fa-lightbulb me-2"></i>学びのポイント
+                                    <i class="fas fa-lightbulb me-2"></i>学びのポイント（AI独自の解説）
                                 </h4>
-                                <p class="mb-0 text-muted small">
+                                <p class="mb-0 text-muted small leading-relaxed">
                                     {{ article.significance }}
                                 </p>
                             </div>
 
                             <div class="text-end">
                                 <a href="{{ article.url }}" target="_blank" rel="noopener noreferrer"
-                                    class="btn btn-link text-decoration-none p-0 fw-bold text-primary"
+                                    class="btn btn-primary btn-sm rounded-pill px-3 shadow-sm"
                                     onclick="event.stopPropagation()">
                                     元の記事を読む <i class="fas fa-external-link-alt ms-1 small"></i>
                                 </a>

@@ -1747,8 +1747,8 @@
                                                                                 id="feature_rpg_{{ room_num }}"
                                                                                 data-feature="feature_rpg" {% if
                                                                                 room_data.get(room_num,
-                                                                                {}).get('feature_rpg', True)
-                                                                                %}checked{% endif %}>
+                                                                                {}).get('feature_rpg', True) %}checked{%
+                                                                                endif %}>
                                                                             <label class="form-check-label"
                                                                                 for="feature_rpg_{{ room_num }}">RPGモード</label>
                                                                         </div>
@@ -3047,7 +3047,7 @@
                         <div class="admin-panel"
                             style="background-color: #e8f4fd; border-left: 5px solid #3498db; margin-bottom: 20px;">
                             <h4>📰 ニュース手動更新</h4>
-                            <p>複数のRSSフィードを取得し、Gemini AIで要約・整形します。<br>
+                            <p>複数のRSSフィードを取得し、Gemini AIで整形します。<br>
                                 <strong>目安：</strong>更新には30秒〜1分程度かかる場合があります。
                             </p>
                             <div id="news-last-updated" class="mb-3 text-muted small">
