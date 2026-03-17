@@ -2474,7 +2474,7 @@ class UserAnnouncementRead(db.Model):
     """ユーザーごとのお知らせ既読状況を管理するテーブル"""
     __tablename__ = 'user_announcement_reads'
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False)
     announcement_id = db.Column(db.Integer, db.ForeignKey('announcements.id'), nullable=False)
     last_read_at = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -11142,6 +11142,15 @@ def admin_bulk_delete_users():
         MonthlyResultViewed.query.filter(MonthlyResultViewed.user_id.in_(user_ids)).delete(synchronize_session=False)
         UserStats.query.filter(UserStats.user_id.in_(user_ids)).delete(synchronize_session=False)
         EssayProgress.query.filter(EssayProgress.user_id.in_(user_ids)).delete(synchronize_session=False)
+        # 🆕 追加分
+        UserAnnouncementRead.query.filter(UserAnnouncementRead.user_id.in_(user_ids)).delete(synchronize_session=False)
+        ChronologicalProgress.query.filter(ChronologicalProgress.user_id.in_(user_ids)).delete(synchronize_session=False)
+        EssayCorrectionRequest.query.filter(EssayCorrectionRequest.user_id.in_(user_ids)).delete(synchronize_session=False)
+        StudyTipLike.query.filter(StudyTipLike.user_id.in_(user_ids)).delete(synchronize_session=False)
+        MapQuizLog.query.filter(MapQuizLog.user_id.in_(user_ids)).delete(synchronize_session=False)
+        MapQuizComplete.query.filter(MapQuizComplete.user_id.in_(user_ids)).delete(synchronize_session=False)
+        RpgRematchHistory.query.filter(RpgRematchHistory.user_id.in_(user_ids)).delete(synchronize_session=False)
+        RpgState.query.filter(RpgState.user_id.in_(user_ids)).delete(synchronize_session=False)
 
         # ユーザーを削除
         num_deleted = User.query.filter(User.id.in_(user_ids)).delete(synchronize_session=False)
