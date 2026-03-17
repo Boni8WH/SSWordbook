@@ -68,3 +68,8 @@ ENV/
 
 # Output Logs
 app_output.txt
+
+# ニュースデータ（動的生成されるためGit管理から除外）
+data/featured_article.json
+data/news_history.json
+data/news_archive/
