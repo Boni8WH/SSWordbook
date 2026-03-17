@@ -22867,10 +22867,10 @@ def check_and_migrate_news_archive():
             if not inspector.has_table('news_archive'):
                 db.create_all()
                 return
-            # 現行スキーマに必要なカラムがすべて揃っているか確認
-            columns = [c['name'] for c in inspector.get_columns('news_archive')]
-            required = {'id', 'date', 'data_json', 'updated_at'}
-            if not required.issubset(set(columns)):
+            # 現行スキーマと一致しているか確認（余分なカラムがあってもNG）
+            columns = {c['name'] for c in inspector.get_columns('news_archive')}
+            expected = {'id', 'date', 'data_json', 'updated_at'}
+            if columns != expected:
                 # 旧スキーマのテーブルを削除して再作成
                 with db.engine.connect() as conn:
                     conn.execute(text("DROP TABLE news_archive"))
