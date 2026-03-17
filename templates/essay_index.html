@@ -535,6 +535,9 @@
             <i class="fas fa-stopwatch me-2"></i> 今日の10問
         </button>
         {% endif %}
+        {% endif %}
+
+        {% if feature_correction %}
         <a href="{{ url_for('my_corrections') }}" class="btn btn-outline-warning rounded-pill px-4 shadow-sm">
             <i class="fas fa-history me-2"></i> 添削履歴
         </a>
@@ -570,12 +573,14 @@
                                 <i class="fas fa-keyboard"></i> キーワード検索
                             </button>
                         </li>
+                        {% if feature_ai %}
                         <li class="nav-item" role="presentation">
                             <button class="nav-link" id="ai-search-tab" data-bs-toggle="tab" data-bs-target="#ai-search"
                                 type="button" role="tab" aria-controls="ai-search" aria-selected="false">
                                 <i class="fas fa-robot"></i> AI検索
                             </button>
                         </li>
+                        {% endif %}
                     </ul>
 
                     <div class="tab-content" id="searchTabContent">
@@ -589,6 +594,7 @@
                             </div>
                         </div>
 
+                        {% if feature_ai %}
                         <!-- AI検索タブ -->
                         <div class="tab-pane fade" id="ai-search" role="tabpanel" aria-labelledby="ai-search-tab">
                             <div class="mb-3">
@@ -691,6 +697,7 @@
                                 <i class="fas fa-sparkles"></i> AI検索
                             </button>
                         </div>
+                        {% endif %}
 
                         <!-- バナー広告エリア -->
                         <div class="text-center mb-3" id="bannerAdContainer">

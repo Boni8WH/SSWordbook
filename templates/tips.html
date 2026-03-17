@@ -533,7 +533,11 @@
         </div>
     </div>
 
-    {% if not session.get('user_id') %}
+    {% if not feature_post_tips %}
+    <div class="score-requirement-note">
+        <i class="fas fa-ban"></i> 現在、Tipsの投稿機能は制限されています
+    </div>
+    {% elif not session.get('user_id') %}
     <div class="score-requirement-note">
         <i class="fas fa-info-circle"></i> Tipsの投稿にはログインとスコア1000以上が必要です
     </div>
@@ -545,7 +549,7 @@
 </div>
 
 <!-- Floating Post Button -->
-{% if can_post %}
+{% if feature_post_tips and can_post %}
 <button class="fab-post" onclick="openPostModal()" title="Tipを投稿">
     <i class="fas fa-pen"></i>
 </button>
@@ -822,7 +826,7 @@
     // ── Like Toggle ──
     async function toggleLike(tipId, btn) {
         if (!isLoggedIn) return;
-        
+
         // 全ての同一TipIDのカードを取得
         const cards = document.querySelectorAll(`.tip-card[data-id="${tipId}"]`);
         if (cards.length === 0) return;
@@ -839,14 +843,14 @@
         cards.forEach(card => {
             const cardIcons = card.querySelectorAll('i.fa-heart');
             const cardCounts = card.querySelectorAll('.tip-like-count');
-            
+
             cardIcons.forEach(icon => {
                 icon.classList.toggle('fas', !wasLiked);
                 icon.classList.toggle('far', wasLiked);
                 icon.classList.add('like-anim');
                 setTimeout(() => icon.classList.remove('like-anim'), 400);
             });
-            
+
             const nextCount = wasLiked ? currentCount - 1 : currentCount + 1;
             cardCounts.forEach(el => el.textContent = nextCount);
         });
@@ -862,7 +866,7 @@
                 document.querySelectorAll(`.tip-card[data-id="${tipId}"]`).forEach(card => {
                     const cardCounts = card.querySelectorAll('.tip-like-count');
                     const cardIcons = card.querySelectorAll('i.fa-heart');
-                    
+
                     cardCounts.forEach(el => el.textContent = data.count);
                     cardIcons.forEach(icon => {
                         icon.classList.toggle('fas', data.liked);
@@ -875,7 +879,7 @@
             document.querySelectorAll(`.tip-card[data-id="${tipId}"]`).forEach(card => {
                 const cardCounts = card.querySelectorAll('.tip-like-count');
                 const cardIcons = card.querySelectorAll('i.fa-heart');
-                
+
                 cardIcons.forEach(icon => {
                     icon.classList.toggle('fas', wasLiked);
                     icon.classList.toggle('far', !wasLiked);

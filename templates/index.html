@@ -615,6 +615,7 @@
 {% block content %}
 <section class="selection-area">
     <!-- RPG Trigger Banner -->
+    {% if feature_rpg %}
     <div id="rpgTriggerBanner" class="rpg-banner hidden">
         <div class="rpg-banner-content" onclick="openRpgIntro()">
             <div class="distortion-void">
@@ -629,6 +630,7 @@
             <button class="btn-rpg-start">修正ミッションへ</button>
         </div>
     </div>
+    {% endif %}
 
     <div class="controls-area">
 
@@ -693,34 +695,48 @@
             <!-- ナビカルーセル（PC: 左パネルのフィルター下に表示） -->
             <div id="navCarouselDesktop" class="nav-carousel">
                 <div class="nav-carousel-track">
+                    {% if feature_daily_quiz %}
                     <button id="dailyQuizButton" class="nav-card daily">
                         <i class="fas fa-stopwatch"></i>
                         <span>今日の10問</span>
                     </button>
+                    {% endif %}
+                    {% if feature_weak_questions %}
                     <a href="{{ url_for('weak_problems_page') }}" class="nav-card weak" {% if not session.get('user_id') %}style="display: none;"{% endif %}>
                         <i class="fas fa-crosshairs"></i>
                         <span>苦手問題</span>
                     </a>
+                    {% endif %}
+                    {% if feature_essay_problems %}
                     <a href="{{ url_for('essay_index') }}" class="nav-card essay">
                         <i class="fas fa-edit"></i>
                         <span>論述問題集</span>
                     </a>
+                    {% endif %}
+                    {% if feature_map_quiz %}
                     <a href="{{ url_for('map_quiz_index') }}" class="nav-card map">
                         <i class="fas fa-globe-americas"></i>
                         <span>地図の深淵</span>
                     </a>
+                    {% endif %}
+                    {% if feature_chrono_quiz %}
                     <a href="{{ url_for('chronological_index') }}" class="nav-card chrono">
                         <i class="fas fa-hourglass-half"></i>
                         <span>刻の系譜</span>
                     </a>
+                    {% endif %}
+                    {% if feature_columns %}
                     <a href="{{ url_for('columns_page') }}" class="nav-card columns">
                         <i class="fas fa-book-open"></i>
                         <span>コラム集</span>
                     </a>
+                    {% endif %}
+                    {% if feature_tips %}
                     <a href="{{ url_for('tips_page') }}" class="nav-card tips">
                         <i class="fas fa-lightbulb"></i>
                         <span>学習Tips</span>
                     </a>
+                    {% endif %}
                 </div>
                 <button class="nav-carousel-arrow left" aria-label="前へ">&#8249;</button>
                 <button class="nav-carousel-arrow right" aria-label="次へ">&#8250;</button>
@@ -775,34 +791,48 @@
     <!-- ナビカルーセル（スマホ: チャプターリストの下に表示） -->
     <div id="navCarouselMobile" class="nav-carousel">
         <div class="nav-carousel-track">
+            {% if feature_daily_quiz %}
             <button id="dailyQuizButtonMobile" class="nav-card daily">
                 <i class="fas fa-stopwatch"></i>
                 <span>今日の10問</span>
             </button>
+            {% endif %}
+            {% if feature_weak_questions %}
             <a href="{{ url_for('weak_problems_page') }}" class="nav-card weak" {% if not session.get('user_id') %}style="display: none;"{% endif %}>
                 <i class="fas fa-crosshairs"></i>
                 <span>苦手問題</span>
             </a>
+            {% endif %}
+            {% if feature_essay_problems %}
             <a href="{{ url_for('essay_index') }}" class="nav-card essay">
                 <i class="fas fa-edit"></i>
                 <span>論述問題集</span>
             </a>
+            {% endif %}
+            {% if feature_map_quiz %}
             <a href="{{ url_for('map_quiz_index') }}" class="nav-card map">
                 <i class="fas fa-globe-americas"></i>
                 <span>地図の深淵</span>
             </a>
+            {% endif %}
+            {% if feature_chrono_quiz %}
             <a href="{{ url_for('chronological_index') }}" class="nav-card chrono">
                 <i class="fas fa-hourglass-half"></i>
                 <span>刻の系譜</span>
             </a>
+            {% endif %}
+            {% if feature_columns %}
             <a href="{{ url_for('columns_page') }}" class="nav-card columns">
                 <i class="fas fa-book-open"></i>
                 <span>コラム集</span>
             </a>
+            {% endif %}
+            {% if feature_tips %}
             <a href="{{ url_for('tips_page') }}" class="nav-card tips">
                 <i class="fas fa-lightbulb"></i>
                 <span>学習Tips</span>
             </a>
+            {% endif %}
         </div>
         <button class="nav-carousel-arrow left" aria-label="前へ">&#8249;</button>
         <button class="nav-carousel-arrow right" aria-label="次へ">&#8250;</button>
@@ -812,6 +842,7 @@
 <!-- 今日のコラム & AI厳選ニュース ウィジェット -->
 <div class="row g-3 mb-3 mt-1">
     <!-- 今日のコラム -->
+    {% if feature_columns %}
     <div id="todaysColumnWidget" class="col-md-6" style="display:none;">
         <a id="todaysColumnLink" href="/columns" class="text-decoration-none h-100" style="display:block;">
             <div style="
@@ -852,8 +883,10 @@
             </div>
         </a>
     </div>
+    {% endif %}
 
     <!-- AI厳選ニュース -->
+    {% if feature_news %}
     <div id="dailyNewsWidget" class="col-md-6" style="display:none;">
         <a href="/news" class="text-decoration-none h-100" style="display:block;">
             <div style="
@@ -892,6 +925,7 @@
             </div>
         </a>
     </div>
+    {% endif %}
 </div>
 
 <script>
@@ -1151,6 +1185,8 @@
     </div>
 </div>
 <!-- RPG Modal -->
+<!-- RPG Feature Toggle Wrapper -->
+{% if feature_rpg %}
 <div id="rpgOverlay" class="rpg-overlay hidden">
     <div class="rpg-modal-container">
         <!-- Intro Screen -->
@@ -1307,6 +1343,7 @@
         <div class="dialogue-arrow">▼</div>
     </div>
 </div>
+{% endif %}
 {% endblock %}
 
 {% block scripts %}

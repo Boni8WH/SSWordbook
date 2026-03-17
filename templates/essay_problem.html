@@ -879,6 +879,7 @@
         {% endif %}
     </div>
 
+    {% if feature_ai %}
     <!-- 答案作成・添削セクション -->
     <div class="submission-section">
         <h2 class="section-title">
@@ -892,11 +893,13 @@
                     type="button" role="tab" aria-controls="direct-input" aria-selected="true"><i
                         class="fas fa-keyboard"></i> 直接入力</button>
             </li>
+            {% if feature_ai %}
             <li class="nav-item" role="presentation">
                 <button class="nav-link" id="upload-tab" data-bs-toggle="tab" data-bs-target="#upload-input"
                     type="button" role="tab" aria-controls="upload-input" aria-selected="false"><i
                         class="fas fa-camera"></i> プリント読込</button>
             </li>
+            {% endif %}
         </ul>
 
         <div class="tab-content border border-top-0 p-3 bg-white rounded-bottom" id="submissionTabContent">
@@ -924,6 +927,7 @@
                 </div>
             </div>
 
+            {% if feature_ai %}
             <!-- 画像アップロードタブ -->
             <div class="tab-pane fade" id="upload-input" role="tabpanel" aria-labelledby="upload-tab">
                 <div class="upload-area" id="uploadArea">
@@ -945,6 +949,7 @@
                     <p class="text-muted small mt-2">読み取ったテキストは「直接入力」タブに反映されます。</p>
                 </div>
             </div>
+            {% endif %}
         </div>
 
         <div class="d-flex justify-content-end mb-2">
@@ -967,9 +972,11 @@
             <button type="button" class="btn btn-outline-primary" id="saveDraftBtn">
                 <i class="fas fa-save"></i> 下書き保存
             </button>
+            {% if feature_ai %}
             <button type="button" class="btn btn-success" id="gradeEssayBtn">
                 <i class="fas fa-robot"></i> AI添削を依頼する
             </button>
+            {% endif %}
         </div>
 
         <!-- 添削結果エリア -->
@@ -982,13 +989,14 @@
             </div>
         </div>
     </div>
+    {% endif %}
 
     <div class="action-buttons-container">
         <button class="btn btn-outline-success action-btn" id="startWarmUpQuizBtn" data-problem-id="{{ problem.id }}">
             <i class="fas fa-running"></i> 準備運動！
         </button>
 
-        {% if is_essay_room %}
+        {% if feature_correction %}
         <button class="btn btn-outline-warning action-btn" data-bs-toggle="modal"
             data-bs-target="#correctionRequestModal" style="border-radius: 22px; padding: 0 25px; border-width: 2px;">
             <i class="fas fa-user-edit"></i> 添削依頼
@@ -1098,7 +1106,7 @@
     </div>
 
     <!-- 添削依頼モーダル -->
-    {% if is_essay_room %}
+    {% if feature_correction %}
     <div class="modal fade" id="correctionRequestModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">

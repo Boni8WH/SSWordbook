@@ -530,32 +530,31 @@
             </a>
             {% endif %}
 
+            {% if not is_manager %}
             <a class="sidebar-link" id="tab-link-map-quiz" data-bs-toggle="pill" href="#section-map-quiz" role="tab">
                 <i class="fas fa-map-marked-alt me-2"></i> 地図クイズ管理
             </a>
 
-            {% if not is_manager %}
             <a class="sidebar-link" id="tab-link-chrono-management" data-bs-toggle="pill"
                 href="#section-chrono-management" role="tab">
                 <i class="fas fa-hourglass-half me-2"></i> 刻の系譜
             </a>
-            {% endif %}
 
             <a class="sidebar-link" id="tab-link-column-management" data-bs-toggle="pill"
                 href="#section-column-management" role="tab">
                 <i class="fas fa-columns me-2"></i> コラム管理
             </a>
 
-            <a class="sidebar-link" id="tab-link-tips-moderation" data-bs-toggle="pill"
-                href="#section-tips-moderation" role="tab">
+            <a class="sidebar-link" id="tab-link-tips-moderation" data-bs-toggle="pill" href="#section-tips-moderation"
+                role="tab">
                 <i class="fas fa-lightbulb me-2"></i> 学習Tips承認
             </a>
 
-            <a class="sidebar-link" id="tab-link-news-management" data-bs-toggle="pill" href="#section-news-management" role="tab">
+            <a class="sidebar-link" id="tab-link-news-management" data-bs-toggle="pill" href="#section-news-management"
+                role="tab">
                 <i class="fas fa-newspaper me-2"></i> ニュース管理
             </a>
 
-            {% if not is_manager %}
             <a class="sidebar-link" id="tab-link-rpg-management" data-bs-toggle="pill" href="#section-rpg-management"
                 role="tab">
                 <i class="fas fa-gamepad me-2"></i> RPG敵キャラ
@@ -1514,10 +1513,10 @@
                                 <table class="table table-striped room-setting-table" style="min-width: 700px;">
                                     <thead class="table-dark sticky-header">
                                         <tr>
-                                            <th>部屋番号</th>
+                                            <th>部屋</th>
                                             <th>有効単元設定</th>
                                             <th>使用CSVファイル</th>
-                                            <th>論述特化</th>
+                                            <th>機能</th>
                                             {% if not is_manager %}
                                             <th>管理パスワード</th>
                                             {% endif %}
@@ -1595,26 +1594,192 @@
                                             </td>
                                             </td>
                                             <td class="text-center">
-                                                <div class="d-flex flex-column align-items-start pl-3">
-                                                    <div class="form-check form-switch mb-2">
-                                                        <input class="form-check-input" type="checkbox"
-                                                            id="isEssayRoom_{{ room_num }}" {% if
-                                                            room_data.get(room_num, {}).get('is_essay_room', False)
-                                                            %}checked{% endif %}>
-                                                        <label class="form-check-label"
-                                                            for="isEssayRoom_{{ room_num }}">
-                                                            論述特化
-                                                        </label>
-                                                    </div>
-                                                    <div class="form-check form-switch">
-                                                        <input class="form-check-input" type="checkbox"
-                                                            id="isAllUnlocked_{{ room_num }}" {% if
-                                                            room_data.get(room_num, {}).get('is_all_unlocked', False)
-                                                            %}checked{% endif %}>
-                                                        <label class="form-check-label"
-                                                            for="isAllUnlocked_{{ room_num }}">
-                                                            すべて解放
-                                                        </label>
+                                                <button type="button" class="btn btn-outline-primary btn-sm mt-3"
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="#featureTogglesModal_{{ room_num }}">
+                                                    <i class="fas fa-sliders-h"></i>
+                                                </button>
+
+                                                <!-- Feature Toggles Modal -->
+                                                <div class="modal fade text-start"
+                                                    id="featureTogglesModal_{{ room_num }}" tabindex="-1"
+                                                    aria-labelledby="featureTogglesModalLabel_{{ room_num }}"
+                                                    aria-hidden="true">
+                                                    <div class="modal-dialog modal-dialog-centered">
+                                                        <div class="modal-content">
+                                                            <div class="modal-header">
+                                                                <h5 class="modal-title"
+                                                                    id="featureTogglesModalLabel_{{ room_num }}">部屋 {{
+                                                                    room_num }} の機能解放設定</h5>
+                                                                <button type="button" class="btn-close"
+                                                                    data-bs-dismiss="modal" aria-label="Close"></button>
+                                                            </div>
+                                                            <div class="modal-body">
+                                                                <div class="row">
+                                                                    <div class="col-md-6">
+                                                                        <div class="form-check form-switch mb-3">
+                                                                            <input
+                                                                                class="form-check-input feature-toggle-input"
+                                                                                type="checkbox"
+                                                                                id="feature_daily_quiz_{{ room_num }}"
+                                                                                data-feature="feature_daily_quiz" {% if
+                                                                                room_data.get(room_num,
+                                                                                {}).get('feature_daily_quiz', True)
+                                                                                %}checked{% endif %}>
+                                                                            <label class="form-check-label"
+                                                                                for="feature_daily_quiz_{{ room_num }}">今日の10問</label>
+                                                                        </div>
+                                                                        <div class="form-check form-switch mb-3">
+                                                                            <input
+                                                                                class="form-check-input feature-toggle-input"
+                                                                                type="checkbox"
+                                                                                id="feature_weak_questions_{{ room_num }}"
+                                                                                data-feature="feature_weak_questions" {%
+                                                                                if room_data.get(room_num,
+                                                                                {}).get('feature_weak_questions', True)
+                                                                                %}checked{% endif %}>
+                                                                            <label class="form-check-label"
+                                                                                for="feature_weak_questions_{{ room_num }}">苦手問題</label>
+                                                                        </div>
+                                                                        <div class="form-check form-switch mb-3">
+                                                                            <input
+                                                                                class="form-check-input feature-toggle-input"
+                                                                                type="checkbox"
+                                                                                id="feature_essay_problems_{{ room_num }}"
+                                                                                data-feature="feature_essay_problems" {%
+                                                                                if room_data.get(room_num,
+                                                                                {}).get('feature_essay_problems', True)
+                                                                                %}checked{% endif %}>
+                                                                            <label class="form-check-label"
+                                                                                for="feature_essay_problems_{{ room_num }}">論述問題集</label>
+                                                                        </div>
+                                                                        <div class="form-check form-switch mb-3">
+                                                                            <input
+                                                                                class="form-check-input feature-toggle-input"
+                                                                                type="checkbox"
+                                                                                id="feature_map_quiz_{{ room_num }}"
+                                                                                data-feature="feature_map_quiz" {% if
+                                                                                room_data.get(room_num,
+                                                                                {}).get('feature_map_quiz', True)
+                                                                                %}checked{% endif %}>
+                                                                            <label class="form-check-label"
+                                                                                for="feature_map_quiz_{{ room_num }}">地図の深淵</label>
+                                                                        </div>
+                                                                        <div class="form-check form-switch mb-3">
+                                                                            <input
+                                                                                class="form-check-input feature-toggle-input"
+                                                                                type="checkbox"
+                                                                                id="feature_chrono_quiz_{{ room_num }}"
+                                                                                data-feature="feature_chrono_quiz" {% if
+                                                                                room_data.get(room_num,
+                                                                                {}).get('feature_chrono_quiz', True)
+                                                                                %}checked{% endif %}>
+                                                                            <label class="form-check-label"
+                                                                                for="feature_chrono_quiz_{{ room_num }}">刻の系譜</label>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div class="col-md-6">
+                                                                        <div class="form-check form-switch mb-3">
+                                                                            <input
+                                                                                class="form-check-input feature-toggle-input"
+                                                                                type="checkbox"
+                                                                                id="feature_columns_{{ room_num }}"
+                                                                                data-feature="feature_columns" {% if
+                                                                                room_data.get(room_num,
+                                                                                {}).get('feature_columns', True)
+                                                                                %}checked{% endif %}>
+                                                                            <label class="form-check-label"
+                                                                                for="feature_columns_{{ room_num }}">コラム集</label>
+                                                                        </div>
+                                                                        <div class="form-check form-switch mb-3">
+                                                                            <input
+                                                                                class="form-check-input feature-toggle-input"
+                                                                                type="checkbox"
+                                                                                id="feature_tips_{{ room_num }}"
+                                                                                data-feature="feature_tips" {% if
+                                                                                room_data.get(room_num,
+                                                                                {}).get('feature_tips', True)
+                                                                                %}checked{% endif %}>
+                                                                            <label class="form-check-label"
+                                                                                for="feature_tips_{{ room_num }}">学習Tips</label>
+                                                                        </div>
+                                                                        <div class="form-check form-switch mb-3">
+                                                                            <input
+                                                                                class="form-check-input feature-toggle-input"
+                                                                                type="checkbox"
+                                                                                id="feature_news_{{ room_num }}"
+                                                                                data-feature="feature_news" {% if
+                                                                                room_data.get(room_num,
+                                                                                {}).get('feature_news', True)
+                                                                                %}checked{% endif %}>
+                                                                            <label class="form-check-label"
+                                                                                for="feature_news_{{ room_num }}">今日のニュース</label>
+                                                                        </div>
+                                                                        <div class="form-check form-switch mb-3">
+                                                                            <input
+                                                                                class="form-check-input feature-toggle-input"
+                                                                                type="checkbox"
+                                                                                id="feature_ai_{{ room_num }}"
+                                                                                data-feature="feature_ai" {% if
+                                                                                room_data.get(room_num,
+                                                                                {}).get('feature_ai', True) %}checked{%
+                                                                                endif %}>
+                                                                            <label class="form-check-label"
+                                                                                for="feature_ai_{{ room_num }}">AI機能
+                                                                                (検索/OCR/添削)</label>
+                                                                        </div>
+                                                                        <div class="form-check form-switch mb-3">
+                                                                            <input
+                                                                                class="form-check-input feature-toggle-input"
+                                                                                type="checkbox"
+                                                                                id="feature_post_tips_{{ room_num }}"
+                                                                                data-feature="feature_post_tips" {% if
+                                                                                room_data.get(room_num,
+                                                                                {}).get('feature_post_tips', True)
+                                                                                %}checked{% endif %}>
+                                                                            <label class="form-check-label"
+                                                                                for="feature_post_tips_{{ room_num }}">学習Tipsの投稿</label>
+                                                                        </div>
+                                                                        <div class="form-check form-switch mb-3">
+                                                                            <input
+                                                                                class="form-check-input feature-toggle-input"
+                                                                                type="checkbox"
+                                                                                id="feature_rpg_{{ room_num }}"
+                                                                                data-feature="feature_rpg" {% if
+                                                                                room_data.get(room_num,
+                                                                                {}).get('feature_rpg', True)
+                                                                                %}checked{% endif %}>
+                                                                            <label class="form-check-label"
+                                                                                for="feature_rpg_{{ room_num }}">RPGモード</label>
+                                                                        </div>
+                                                                        <div class="form-check form-switch mb-3">
+                                                                            <input
+                                                                                class="form-check-input feature-toggle-input"
+                                                                                type="checkbox"
+                                                                                id="feature_correction_{{ room_num }}"
+                                                                                data-feature="feature_correction" {% if
+                                                                                room_data.get(room_num,
+                                                                                {}).get('feature_correction', True)
+                                                                                %}checked{% endif %}>
+                                                                            <label class="form-check-label"
+                                                                                for="feature_correction_{{ room_num }}">論述添削依頼</label>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                                <!-- 互換性維持のための非表示フィールド -->
+                                                                <input type="hidden" id="isEssayRoom_{{ room_num }}"
+                                                                    value="{% if room_data.get(room_num, {}).get('is_essay_room', False) %}true{% else %}false{% endif %}">
+                                                                <input type="hidden" id="isAllUnlocked_{{ room_num }}"
+                                                                    value="{% if room_data.get(room_num, {}).get('is_all_unlocked', False) %}true{% else %}false{% endif %}">
+                                                            </div>
+                                                            <div class="modal-footer">
+                                                                <button type="button" class="btn btn-secondary"
+                                                                    data-bs-dismiss="modal">閉じる</button>
+                                                                <button type="button" class="btn btn-primary"
+                                                                    data-bs-dismiss="modal"
+                                                                    onclick="document.querySelector('.save-room-setting-btn[data-room-number=\'{{ room_num }}\']').click()">保存して反映</button>
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </td>
@@ -2505,7 +2670,8 @@
                     <div class="card-header bg-white d-flex justify-content-between align-items-center">
                         <h5 class="mb-0"><i class="fas fa-tags text-info"></i> タグ管理</h5>
                         <div class="d-flex gap-2">
-                            <button id="saveTagsOrderBtn" class="btn btn-primary btn-sm" onclick="saveTagsOrder()" style="display:none;">
+                            <button id="saveTagsOrderBtn" class="btn btn-primary btn-sm" onclick="saveTagsOrder()"
+                                style="display:none;">
                                 <i class="fas fa-save"></i> 順番を保存
                             </button>
                             <button class="btn btn-info btn-sm" onclick="openCreateTagPrompt()">
@@ -2527,15 +2693,18 @@
                         <div class="text-muted small mb-3">管理者として直接Tipsを投稿できます（承認不要で即公開）。</div>
                         <div class="mb-3">
                             <label class="form-label fw-bold small">タイトル</label>
-                            <input type="text" id="adminTipTitle" class="form-control form-control-sm" placeholder="覚え方のタイトルなど" maxlength="100">
+                            <input type="text" id="adminTipTitle" class="form-control form-control-sm"
+                                placeholder="覚え方のタイトルなど" maxlength="100">
                         </div>
                         <div class="mb-3">
                             <label class="form-label fw-bold small">投稿者名</label>
-                            <input type="text" id="adminTipAuthorName" class="form-control form-control-sm" placeholder="例: 山田先生（空欄の場合「管理者」と表示）" maxlength="100">
+                            <input type="text" id="adminTipAuthorName" class="form-control form-control-sm"
+                                placeholder="例: 山田先生（空欄の場合「管理者」と表示）" maxlength="100">
                         </div>
                         <div class="mb-3">
                             <label class="form-label fw-bold small">本文 <span class="text-danger">*</span></label>
-                            <textarea id="adminTipBody" class="form-control" rows="4" placeholder="Tipsの内容を入力..." maxlength="1000"></textarea>
+                            <textarea id="adminTipBody" class="form-control" rows="4" placeholder="Tipsの内容を入力..."
+                                maxlength="1000"></textarea>
                             <div class="text-end text-muted small mt-1"><span id="adminTipCharCount">0</span>/1000</div>
                         </div>
                         <div class="d-flex gap-2 align-items-center flex-wrap">
@@ -2875,7 +3044,8 @@
                     <div class="card-body">
                         <p>時事ニュースは毎日午前7時に自動更新されます。手動で今すぐ更新することもできます。</p>
 
-                        <div class="admin-panel" style="background-color: #e8f4fd; border-left: 5px solid #3498db; margin-bottom: 20px;">
+                        <div class="admin-panel"
+                            style="background-color: #e8f4fd; border-left: 5px solid #3498db; margin-bottom: 20px;">
                             <h4>📰 ニュース手動更新</h4>
                             <p>複数のRSSフィードを取得し、Gemini AIで要約・整形します。<br>
                                 <strong>目安：</strong>更新には30秒〜1分程度かかる場合があります。
@@ -2884,10 +3054,12 @@
                                 最終更新日時を読み込み中...
                             </div>
                             <div class="d-flex align-items-center gap-2">
-                                <button type="button" class="btn btn-primary" id="updateNewsBtn" onclick="updateNewsNow(event)">
+                                <button type="button" class="btn btn-primary" id="updateNewsBtn"
+                                    onclick="updateNewsNow(event)">
                                     <i class="fas fa-sync-alt me-1"></i> 今すぐ更新
                                 </button>
-                                <a href="{{ url_for('news_page') }}" target="_blank" class="btn btn-outline-secondary btn-sm">
+                                <a href="{{ url_for('news_page') }}" target="_blank"
+                                    class="btn btn-outline-secondary btn-sm">
                                     <i class="fas fa-external-link-alt me-1"></i> ニュースページを見る
                                 </a>
                             </div>
@@ -4117,6 +4289,22 @@
                         this.disabled = true;
                         this.textContent = '保存中...';
 
+                        // 選択された機能フラグを取得
+                        const featureFlags = {
+                            feature_daily_quiz: document.getElementById('feature_daily_quiz_' + roomNumber).checked,
+                            feature_weak_questions: document.getElementById('feature_weak_questions_' + roomNumber).checked,
+                            feature_essay_problems: document.getElementById('feature_essay_problems_' + roomNumber).checked,
+                            feature_map_quiz: document.getElementById('feature_map_quiz_' + roomNumber).checked,
+                            feature_chrono_quiz: document.getElementById('feature_chrono_quiz_' + roomNumber).checked,
+                            feature_columns: document.getElementById('feature_columns_' + roomNumber).checked,
+                            feature_tips: document.getElementById('feature_tips_' + roomNumber).checked,
+                            feature_news: document.getElementById('feature_news_' + roomNumber).checked,
+                            feature_ai: document.getElementById('feature_ai_' + roomNumber).checked,
+                            feature_post_tips: document.getElementById('feature_post_tips_' + roomNumber).checked,
+                            feature_rpg: document.getElementById('feature_rpg_' + roomNumber).checked,
+                            feature_correction: document.getElementById('feature_correction_' + roomNumber).checked
+                        };
+
                         // 単元設定、CSVファイル設定を同時に更新
                         Promise.all([
                             fetch('/admin/update_room_units_setting', {
@@ -4140,8 +4328,11 @@
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({
                                     room_number: roomNumber,
-                                    is_essay_room: document.getElementById('isEssayRoom_' + roomNumber).checked,
-                                    is_all_unlocked: document.getElementById('isAllUnlocked_' + roomNumber).checked
+                                    // is_essay_room と is_all_unlocked は互換性維持
+                                    is_essay_room: document.getElementById('isEssayRoom_' + roomNumber).value === 'true',
+                                    is_all_unlocked: document.getElementById('isAllUnlocked_' + roomNumber).value === 'true',
+                                    // 以下の機能フラグを追加
+                                    ...featureFlags
                                 })
                             }),
                             fetch('/admin/update_room_management_password', {
@@ -9285,35 +9476,35 @@
 
     <!-- 学習Tips承認管理 JS -->
     <script>
-    (function() {
-        function escapeHtmlAdmin(str) {
-            if (!str) return '';
-            const d = document.createElement('div');
-            d.textContent = str;
-            return d.innerHTML;
-        }
+        (function () {
+            function escapeHtmlAdmin(str) {
+                if (!str) return '';
+                const d = document.createElement('div');
+                d.textContent = str;
+                return d.innerHTML;
+            }
 
-        // ── タグ管理 ──
-        let sortableTags = null;
+            // ── タグ管理 ──
+            let sortableTags = null;
 
-        function loadTags() {
-            fetch('/api/admin/tips/tags')
-                .then(r => r.json())
-                .then(data => {
-                    if (data.status !== 'success') return;
-                    const container = document.getElementById('tagsList');
-                    if (data.tags.length === 0) {
-                        container.innerHTML = '<div class="text-muted text-center py-2">タグがまだありません。「新規タグ」で作成してください。</div>';
-                        document.getElementById('saveTagsOrderBtn').style.display = 'none';
-                        return;
-                    }
+            function loadTags() {
+                fetch('/api/admin/tips/tags')
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.status !== 'success') return;
+                        const container = document.getElementById('tagsList');
+                        if (data.tags.length === 0) {
+                            container.innerHTML = '<div class="text-muted text-center py-2">タグがまだありません。「新規タグ」で作成してください。</div>';
+                            document.getElementById('saveTagsOrderBtn').style.display = 'none';
+                            return;
+                        }
 
-                    // SortableJSの初期化が終わっていたら破棄
-                    if (sortableTags) {
-                        sortableTags.destroy();
-                    }
+                        // SortableJSの初期化が終わっていたら破棄
+                        if (sortableTags) {
+                            sortableTags.destroy();
+                        }
 
-                    container.innerHTML = data.tags.map(tag => `
+                        container.innerHTML = data.tags.map(tag => `
                         <div class="d-flex align-items-center gap-2 mb-2 p-2 border rounded bg-white" id="tag-row-${tag.id}" data-id="${tag.id}">
                             <div class="drag-handle px-1" style="cursor: move; color: #ccc;">
                                 <i class="fas fa-grip-vertical"></i>
@@ -9331,133 +9522,133 @@
                         </div>
                     `).join('');
 
-                    // SortableJSの初期化
-                    sortableTags = new Sortable(container, {
-                        handle: '.drag-handle',
-                        animation: 150,
-                        onEnd: function() {
-                            document.getElementById('saveTagsOrderBtn').style.display = 'block';
-                        }
+                        // SortableJSの初期化
+                        sortableTags = new Sortable(container, {
+                            handle: '.drag-handle',
+                            animation: 150,
+                            onEnd: function () {
+                                document.getElementById('saveTagsOrderBtn').style.display = 'block';
+                            }
+                        });
                     });
-                });
-        }
-
-        window.saveTagsOrder = async function() {
-            const container = document.getElementById('tagsList');
-            const tagIds = Array.from(container.children).map(el => el.dataset.id).filter(id => id);
-            
-            const btn = document.getElementById('saveTagsOrderBtn');
-            const originalHtml = btn.innerHTML;
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 保存中...';
-
-            try {
-                const res = await fetch('/api/admin/tips/tags/reorder', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ tag_ids: tagIds.map(Number) })
-                });
-                const data = await res.json();
-                if (data.status === 'success') {
-                    btn.style.display = 'none';
-                    // 再読み込みして順番を確定
-                    loadTags();
-                    loadPendingTips(); // 承認画面の選択肢順も更新されるように
-                } else {
-                    alert(data.message);
-                }
-            } catch (e) {
-                alert('通信エラーが発生しました');
-            } finally {
-                btn.disabled = false;
-                btn.innerHTML = originalHtml;
             }
-        };
 
-        window.openCreateTagPrompt = async function() {
-            const name = prompt('新しいタグ名を入力:');
-            if (!name || !name.trim()) return;
-            try {
-                const res = await fetch('/api/admin/tips/tags', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name: name.trim() })
-                });
-                const data = await res.json();
-                if (data.status === 'success') {
-                    loadTags();
-                    loadPendingTips(); // タグ選択肢を更新
-                } else {
-                    alert(data.message);
-                }
-            } catch (e) {
-                alert('通信エラーが発生しました');
-            }
-        };
+            window.saveTagsOrder = async function () {
+                const container = document.getElementById('tagsList');
+                const tagIds = Array.from(container.children).map(el => el.dataset.id).filter(id => id);
 
-        window.renameTag = async function(tagId, currentName) {
-            const newName = prompt('新しいタグ名を入力:', currentName);
-            if (!newName || !newName.trim() || newName.trim() === currentName) return;
-            try {
-                const res = await fetch(`/api/admin/tips/tags/${tagId}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name: newName.trim() })
-                });
-                const data = await res.json();
-                if (data.status === 'success') {
-                    loadTags();
-                    loadPendingTips();
-                } else {
-                    alert(data.message);
-                }
-            } catch (e) {
-                alert('通信エラーが発生しました');
-            }
-        };
+                const btn = document.getElementById('saveTagsOrderBtn');
+                const originalHtml = btn.innerHTML;
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 保存中...';
 
-        window.deleteTag = async function(tagId, tagName) {
-            if (!confirm(`タグ「${tagName}」を削除しますか？\n紐付くTipsはタグなしになります。`)) return;
-            try {
-                const res = await fetch(`/api/admin/tips/tags/${tagId}/delete`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
-                });
-                const data = await res.json();
-                if (data.status === 'success') {
-                    loadTags();
-                    loadPendingTips();
-                } else {
-                    alert(data.message);
-                }
-            } catch (e) {
-                alert('通信エラーが発生しました');
-            }
-        };
-
-        // ── 承認待ちTips ──
-        function loadPendingTips() {
-            fetch('/api/admin/tips/pending')
-                .then(r => r.json())
-                .then(data => {
-                    if (data.status !== 'success') return;
-                    document.getElementById('pendingTipsCount').textContent = data.count + '件';
-                    const container = document.getElementById('pendingTipsList');
-                    const noMsg = document.getElementById('noTipsMessage');
-                    if (data.tips.length === 0) {
-                        container.innerHTML = '';
-                        noMsg.style.display = 'block';
-                        return;
+                try {
+                    const res = await fetch('/api/admin/tips/tags/reorder', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ tag_ids: tagIds.map(Number) })
+                    });
+                    const data = await res.json();
+                    if (data.status === 'success') {
+                        btn.style.display = 'none';
+                        // 再読み込みして順番を確定
+                        loadTags();
+                        loadPendingTips(); // 承認画面の選択肢順も更新されるように
+                    } else {
+                        alert(data.message);
                     }
-                    noMsg.style.display = 'none';
+                } catch (e) {
+                    alert('通信エラーが発生しました');
+                } finally {
+                    btn.disabled = false;
+                    btn.innerHTML = originalHtml;
+                }
+            };
 
-                    // タグ選択オプション
-                    const tags = data.tags || [];
-                    function tagOptions() {
-                        return tags.map(tg => `<option value="${tg.id}">${escapeHtmlAdmin(tg.name)}</option>`).join('');
+            window.openCreateTagPrompt = async function () {
+                const name = prompt('新しいタグ名を入力:');
+                if (!name || !name.trim()) return;
+                try {
+                    const res = await fetch('/api/admin/tips/tags', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name: name.trim() })
+                    });
+                    const data = await res.json();
+                    if (data.status === 'success') {
+                        loadTags();
+                        loadPendingTips(); // タグ選択肢を更新
+                    } else {
+                        alert(data.message);
                     }
+                } catch (e) {
+                    alert('通信エラーが発生しました');
+                }
+            };
 
-                    container.innerHTML = data.tips.map(tip => `
+            window.renameTag = async function (tagId, currentName) {
+                const newName = prompt('新しいタグ名を入力:', currentName);
+                if (!newName || !newName.trim() || newName.trim() === currentName) return;
+                try {
+                    const res = await fetch(`/api/admin/tips/tags/${tagId}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name: newName.trim() })
+                    });
+                    const data = await res.json();
+                    if (data.status === 'success') {
+                        loadTags();
+                        loadPendingTips();
+                    } else {
+                        alert(data.message);
+                    }
+                } catch (e) {
+                    alert('通信エラーが発生しました');
+                }
+            };
+
+            window.deleteTag = async function (tagId, tagName) {
+                if (!confirm(`タグ「${tagName}」を削除しますか？\n紐付くTipsはタグなしになります。`)) return;
+                try {
+                    const res = await fetch(`/api/admin/tips/tags/${tagId}/delete`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+                    const data = await res.json();
+                    if (data.status === 'success') {
+                        loadTags();
+                        loadPendingTips();
+                    } else {
+                        alert(data.message);
+                    }
+                } catch (e) {
+                    alert('通信エラーが発生しました');
+                }
+            };
+
+            // ── 承認待ちTips ──
+            function loadPendingTips() {
+                fetch('/api/admin/tips/pending')
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.status !== 'success') return;
+                        document.getElementById('pendingTipsCount').textContent = data.count + '件';
+                        const container = document.getElementById('pendingTipsList');
+                        const noMsg = document.getElementById('noTipsMessage');
+                        if (data.tips.length === 0) {
+                            container.innerHTML = '';
+                            noMsg.style.display = 'block';
+                            return;
+                        }
+                        noMsg.style.display = 'none';
+
+                        // タグ選択オプション
+                        const tags = data.tags || [];
+                        function tagOptions() {
+                            return tags.map(tg => `<option value="${tg.id}">${escapeHtmlAdmin(tg.name)}</option>`).join('');
+                        }
+
+                        container.innerHTML = data.tips.map(tip => `
                         <div class="border rounded p-3 mb-3" id="admin-tip-${tip.id}">
                             <div class="d-flex justify-content-between mb-2 flex-wrap">
                                 <div>
@@ -9483,83 +9674,83 @@
                             </div>
                         </div>
                     `).join('');
-                })
-                .catch(e => console.error('loadPendingTips error:', e));
-        }
-
-        window.approveTip = async function(tipId) {
-            const tagSelect = document.getElementById(`tag-select-${tipId}`);
-            const tagId = tagSelect ? tagSelect.value : '';
-            if (!tagId) {
-                alert('タグを選択してください');
-                return;
+                    })
+                    .catch(e => console.error('loadPendingTips error:', e));
             }
-            try {
-                const res = await fetch(`/api/admin/tips/${tipId}/approve`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ tag_id: parseInt(tagId) })
-                });
-                const data = await res.json();
-                if (data.status === 'success') {
-                    const el = document.getElementById(`admin-tip-${tipId}`);
-                    if (el) el.remove();
-                    loadPendingTips();
-                    loadTags();
-                } else {
-                    alert(data.message || '承認に失敗しました');
+
+            window.approveTip = async function (tipId) {
+                const tagSelect = document.getElementById(`tag-select-${tipId}`);
+                const tagId = tagSelect ? tagSelect.value : '';
+                if (!tagId) {
+                    alert('タグを選択してください');
+                    return;
                 }
-            } catch (e) {
-                alert('通信エラーが発生しました');
-            }
-        };
-
-        window.rejectTip = async function(tipId) {
-            const reason = prompt('却下理由（任意）:');
-            if (reason === null) return;
-            try {
-                const res = await fetch(`/api/admin/tips/${tipId}/reject`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ reason: reason })
-                });
-                const data = await res.json();
-                if (data.status === 'success') {
-                    const el = document.getElementById(`admin-tip-${tipId}`);
-                    if (el) el.remove();
-                    loadPendingTips();
-                } else {
-                    alert(data.message || '却下に失敗しました');
+                try {
+                    const res = await fetch(`/api/admin/tips/${tipId}/approve`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ tag_id: parseInt(tagId) })
+                    });
+                    const data = await res.json();
+                    if (data.status === 'success') {
+                        const el = document.getElementById(`admin-tip-${tipId}`);
+                        if (el) el.remove();
+                        loadPendingTips();
+                        loadTags();
+                    } else {
+                        alert(data.message || '承認に失敗しました');
+                    }
+                } catch (e) {
+                    alert('通信エラーが発生しました');
                 }
-            } catch (e) {
-                alert('通信エラーが発生しました');
-            }
-        };
+            };
 
-        // ── 承認済みTips管理 ──
-        function loadApprovedTips() {
-            fetch('/api/admin/tips/approved')
-                .then(r => r.json())
-                .then(data => {
-                    if (data.status !== 'success') return;
-                    document.getElementById('approvedTipsCount').textContent = data.count + '件';
-                    const container = document.getElementById('approvedTipsList');
-                    const noMsg = document.getElementById('noApprovedTipsMessage');
-                    if (data.tips.length === 0) {
-                        container.innerHTML = '';
-                        noMsg.style.display = 'block';
-                        return;
+            window.rejectTip = async function (tipId) {
+                const reason = prompt('却下理由（任意）:');
+                if (reason === null) return;
+                try {
+                    const res = await fetch(`/api/admin/tips/${tipId}/reject`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ reason: reason })
+                    });
+                    const data = await res.json();
+                    if (data.status === 'success') {
+                        const el = document.getElementById(`admin-tip-${tipId}`);
+                        if (el) el.remove();
+                        loadPendingTips();
+                    } else {
+                        alert(data.message || '却下に失敗しました');
                     }
-                    noMsg.style.display = 'none';
+                } catch (e) {
+                    alert('通信エラーが発生しました');
+                }
+            };
 
-                    const tags = data.tags || [];
-                    function tagOpts(currentTagId) {
-                        return tags.map(tg =>
-                            `<option value="${tg.id}" ${tg.id === currentTagId ? 'selected' : ''}>${escapeHtmlAdmin(tg.name)}</option>`
-                        ).join('');
-                    }
+            // ── 承認済みTips管理 ──
+            function loadApprovedTips() {
+                fetch('/api/admin/tips/approved')
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.status !== 'success') return;
+                        document.getElementById('approvedTipsCount').textContent = data.count + '件';
+                        const container = document.getElementById('approvedTipsList');
+                        const noMsg = document.getElementById('noApprovedTipsMessage');
+                        if (data.tips.length === 0) {
+                            container.innerHTML = '';
+                            noMsg.style.display = 'block';
+                            return;
+                        }
+                        noMsg.style.display = 'none';
 
-                    container.innerHTML = data.tips.map(tip => `
+                        const tags = data.tags || [];
+                        function tagOpts(currentTagId) {
+                            return tags.map(tg =>
+                                `<option value="${tg.id}" ${tg.id === currentTagId ? 'selected' : ''}>${escapeHtmlAdmin(tg.name)}</option>`
+                            ).join('');
+                        }
+
+                        container.innerHTML = data.tips.map(tip => `
                         <div class="border rounded p-2 mb-2 d-flex align-items-center gap-2 flex-wrap" id="approved-tip-${tip.id}" style="font-size:0.85rem;">
                             <div style="flex:1; min-width:180px;">
                                 <div class="text-truncate" style="max-width:400px;" title="${escapeHtmlAdmin(tip.body_full)}">${escapeHtmlAdmin(tip.body)}</div>
@@ -9576,118 +9767,118 @@
                             </button>
                         </div>
                     `).join('');
-                })
-                .catch(e => console.error('loadApprovedTips error:', e));
-        }
-
-        window.updateApprovedTag = async function(tipId) {
-            const sel = document.getElementById(`approved-tag-${tipId}`);
-            const tagId = sel ? sel.value : '';
-            try {
-                const res = await fetch(`/api/admin/tips/${tipId}/update_tag`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ tag_id: tagId ? parseInt(tagId) : null })
-                });
-                const data = await res.json();
-                if (data.status !== 'success') {
-                    alert(data.message || 'タグ更新に失敗しました');
-                    loadApprovedTips();
-                }
-            } catch (e) {
-                alert('通信エラーが発生しました');
-                loadApprovedTips();
+                    })
+                    .catch(e => console.error('loadApprovedTips error:', e));
             }
-        };
 
-        window.adminDeleteTip = async function(tipId) {
-            if (!confirm('このTipを削除しますか？この操作は取り消せません。')) return;
-            try {
-                const res = await fetch(`/api/tips/${tipId}/delete`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
-                });
-                const data = await res.json();
-                if (data.status === 'success') {
-                    const el = document.getElementById(`approved-tip-${tipId}`);
-                    if (el) el.remove();
-                    loadApprovedTips();
-                    loadTags();
-                } else {
-                    alert(data.message || '削除に失敗しました');
-                }
-            } catch (e) {
-                alert('通信エラーが発生しました');
-            }
-        };
-
-        // ── 管理者Tips投稿 ──
-        function loadAdminTipTagOptions() {
-            fetch('/api/admin/tips/tags')
-                .then(r => r.json())
-                .then(data => {
-                    if (data.status !== 'success') return;
-                    const select = document.getElementById('adminTipTagSelect');
-                    if (!select) return;
-                    const currentVal = select.value;
-                    select.innerHTML = '<option value="" disabled selected>タグを選択 *</option>';
-                    data.tags.forEach(tag => {
-                        select.innerHTML += `<option value="${tag.id}">${escapeHtmlAdmin(tag.name)}</option>`;
+            window.updateApprovedTag = async function (tipId) {
+                const sel = document.getElementById(`approved-tag-${tipId}`);
+                const tagId = sel ? sel.value : '';
+                try {
+                    const res = await fetch(`/api/admin/tips/${tipId}/update_tag`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ tag_id: tagId ? parseInt(tagId) : null })
                     });
-                    if (currentVal) select.value = currentVal;
-                });
-        }
-
-        // 文字数カウント
-        const adminTipBodyEl = document.getElementById('adminTipBody');
-        if (adminTipBodyEl) {
-            adminTipBodyEl.addEventListener('input', function() {
-                document.getElementById('adminTipCharCount').textContent = this.value.length;
-            });
-        }
-
-        window.adminPostTip = async function() {
-            const title = (document.getElementById('adminTipTitle').value || '').trim();
-            const body = (document.getElementById('adminTipBody').value || '').trim();
-            const authorName = (document.getElementById('adminTipAuthorName').value || '').trim();
-            const tagId = document.getElementById('adminTipTagSelect').value;
-
-            if (!body) { alert('本文を入力してください'); return; }
-            if (!tagId) { alert('タグを選択してください'); return; }
-
-            try {
-                const res = await fetch('/api/admin/tips/post', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ title: title, body: body, author_name: authorName, tag_id: parseInt(tagId) })
-                });
-                const data = await res.json();
-                if (data.status === 'success') {
-                    alert('Tipsを投稿しました');
-                    document.getElementById('adminTipBody').value = '';
-                    document.getElementById('adminTipAuthorName').value = '';
-                    document.getElementById('adminTipCharCount').textContent = '0';
-                    document.getElementById('adminTipTagSelect').selectedIndex = 0;
+                    const data = await res.json();
+                    if (data.status !== 'success') {
+                        alert(data.message || 'タグ更新に失敗しました');
+                        loadApprovedTips();
+                    }
+                } catch (e) {
+                    alert('通信エラーが発生しました');
                     loadApprovedTips();
-                    loadTags();
-                } else {
-                    alert(data.message || '投稿に失敗しました');
                 }
-            } catch (e) {
-                alert('通信エラーが発生しました');
-            }
-        };
+            };
 
-        // タブが表示された時に自動読込
-        const tabLink = document.getElementById('tab-link-tips-moderation');
-        if (tabLink) {
-            tabLink.addEventListener('shown.bs.tab', function() {
-                loadTags();
-                loadAdminTipTagOptions();
-                loadPendingTips();
-                loadApprovedTips();
-            });
-        }
-    })();
+            window.adminDeleteTip = async function (tipId) {
+                if (!confirm('このTipを削除しますか？この操作は取り消せません。')) return;
+                try {
+                    const res = await fetch(`/api/tips/${tipId}/delete`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+                    const data = await res.json();
+                    if (data.status === 'success') {
+                        const el = document.getElementById(`approved-tip-${tipId}`);
+                        if (el) el.remove();
+                        loadApprovedTips();
+                        loadTags();
+                    } else {
+                        alert(data.message || '削除に失敗しました');
+                    }
+                } catch (e) {
+                    alert('通信エラーが発生しました');
+                }
+            };
+
+            // ── 管理者Tips投稿 ──
+            function loadAdminTipTagOptions() {
+                fetch('/api/admin/tips/tags')
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.status !== 'success') return;
+                        const select = document.getElementById('adminTipTagSelect');
+                        if (!select) return;
+                        const currentVal = select.value;
+                        select.innerHTML = '<option value="" disabled selected>タグを選択 *</option>';
+                        data.tags.forEach(tag => {
+                            select.innerHTML += `<option value="${tag.id}">${escapeHtmlAdmin(tag.name)}</option>`;
+                        });
+                        if (currentVal) select.value = currentVal;
+                    });
+            }
+
+            // 文字数カウント
+            const adminTipBodyEl = document.getElementById('adminTipBody');
+            if (adminTipBodyEl) {
+                adminTipBodyEl.addEventListener('input', function () {
+                    document.getElementById('adminTipCharCount').textContent = this.value.length;
+                });
+            }
+
+            window.adminPostTip = async function () {
+                const title = (document.getElementById('adminTipTitle').value || '').trim();
+                const body = (document.getElementById('adminTipBody').value || '').trim();
+                const authorName = (document.getElementById('adminTipAuthorName').value || '').trim();
+                const tagId = document.getElementById('adminTipTagSelect').value;
+
+                if (!body) { alert('本文を入力してください'); return; }
+                if (!tagId) { alert('タグを選択してください'); return; }
+
+                try {
+                    const res = await fetch('/api/admin/tips/post', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ title: title, body: body, author_name: authorName, tag_id: parseInt(tagId) })
+                    });
+                    const data = await res.json();
+                    if (data.status === 'success') {
+                        alert('Tipsを投稿しました');
+                        document.getElementById('adminTipBody').value = '';
+                        document.getElementById('adminTipAuthorName').value = '';
+                        document.getElementById('adminTipCharCount').textContent = '0';
+                        document.getElementById('adminTipTagSelect').selectedIndex = 0;
+                        loadApprovedTips();
+                        loadTags();
+                    } else {
+                        alert(data.message || '投稿に失敗しました');
+                    }
+                } catch (e) {
+                    alert('通信エラーが発生しました');
+                }
+            };
+
+            // タブが表示された時に自動読込
+            const tabLink = document.getElementById('tab-link-tips-moderation');
+            if (tabLink) {
+                tabLink.addEventListener('shown.bs.tab', function () {
+                    loadTags();
+                    loadAdminTipTagOptions();
+                    loadPendingTips();
+                    loadApprovedTips();
+                });
+            }
+        })();
     </script>
     {% endblock %}

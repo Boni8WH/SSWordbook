@@ -1,81 +1,81 @@
 {
-  "updated_at": "2026-03-11T07:00:17.392661+09:00",
+  "updated_at": "2026-03-11T15:14:35.591084+09:00",
   "total_processed": 80,
   "articles": [
     {
-      "title": "イランがホルムズ海峡に機雷を敷設か、米報道",
-      "summary": "アメリカのCNNテレビは、関係者の話として、イランがホルムズ海峡に機雷を敷設し始めたと報道しました。ホルムズ海峡は世界の原油輸送の重要なルートであり、過去にもイランがタンカーを拿捕するなど緊張が高まった場所です。今回の機雷敷設は、アメリカとイスラエルによる軍事作戦への対抗措置と見られます。",
-      "significance": "ホルムズ海峡は、世界のエネルギー供給を左右する戦略的な要衝です。過去のイラン・イラク戦争や湾岸戦争でも、この海峡の封鎖が試みられ、国際的な原油価格が高騰しました。地政学的な重要性を理解し、紛争が世界経済に与える影響について考察しましょう。",
+      "title": "アメリカ、イランの機雷敷設船16隻を攻撃：ホルムズ海峡の封鎖を巡り緊張高まる",
+      "summary": "アメリカ軍が、イランがホルムズ海峡に機雷を敷設しているとして、関連船舶を攻撃したと発表しました。ホルムズ海峡は世界の原油輸送の要であり、過去にもイランがタンカーを攻撃するなど緊張が高まった地域です。今回の事態は、原油価格の高騰や世界経済への影響が懸念されるだけでなく、アメリカとイランの対立がさらに激化する可能性を示唆しています。",
+      "significance": "ホルムズ海峡は、世界のエネルギー供給において非常に重要な場所です。地政学的な緊張が、いかに世界経済に影響を与えるかを理解する上で役立ちます。また、中東におけるアメリカとイランの対立の歴史（イラン革命、イラン・イラク戦争など）を学ぶことで、現代の国際関係をより深く理解することができます。",
       "keywords": [
         "ホルムズ海峡",
         "機雷",
-        "イラン",
         "原油",
-        "地政学"
+        "イラン",
+        "アメリカ"
       ],
-      "url": "http://www3.nhk.or.jp/news/html/20260311/k10015072361000.html",
-      "source": "NHK",
-      "created_at": "3月11日 05:41"
+      "url": "https://www.nytimes.com/live/2026/03/10/world/iran-war-trump-us-israel",
+      "source": "ニューヨーク・タイムズ",
+      "created_at": "3月11日 14:56"
     },
     {
-      "title": "G7、イラン攻撃後の原油価格高騰に対しエネルギー供給支援で合意",
-      "summary": "G7の財務大臣が緊急オンライン会議を開き、アメリカとイスラエルによるイランへの攻撃後の原油価格高騰に対応するため、エネルギー供給を支援することで合意しました。中東地域における地政学的リスクの高まりが、世界経済に大きな影響を与えていることがわかります。",
-      "significance": "中東地域は、世界のエネルギー供給において重要な役割を果たしています。紛争や政情不安は、原油価格の変動を通じて世界経済全体に影響を及ぼします。過去のオイルショックや、中東戦争と原油価格の関係について調べてみましょう。",
+      "title": "ドレスデンで第二次世界大戦の爆弾発見、大規模な避難",
+      "summary": "ドイツのドレスデンで、第二次世界大戦中にイギリス軍が投下した爆弾が発見され、市内で過去最大規模の避難が行われました。ドレスデンは、第二次世界大戦末期に連合国軍による大規模な空襲を受け、多くの市民が犠牲となった悲劇の地です。戦後80年以上経った今も、不発弾が発見されることは、戦争の傷跡が深く残っていることを示しています。",
+      "significance": "第二次世界大戦は、ヨーロッパの都市に甚大な被害をもたらしました。ドレスデンの空襲は、戦争の悲惨さを象徴する出来事の一つです。このニュースを通して、第二次世界大戦の原因、経過、そしてその後の世界に与えた影響について学ぶことの重要性を再認識することができます。",
       "keywords": [
-        "G7",
-        "原油価格",
-        "エネルギー供給",
-        "中東",
-        "地政学"
+        "第二次世界大戦",
+        "ドレスデン",
+        "空襲",
+        "不発弾",
+        "連合国軍"
       ],
-      "url": "https://japannews.yomiuri.co.jp/business/economy/20260310-315623/",
-      "source": "The Japan News",
-      "created_at": "3月10日 21:00"
-    },
-    {
-      "title": "シリアの元大佐、人道に対する罪で訴追",
-      "summary": "シリアで2011年と2012年に犯されたとされる犯罪に関与したとして、サレム・ミシェル・アル・サレムというシリアの元大佐が人道に対する罪で訴追されました。これは、2011年に始まったシリア内戦におけるアサド政権による人権侵害を裁く国際的な動きの一環です。",
-      "significance": "シリア内戦は、アラブの春の影響を受け、民主化を求めるデモが政府によって弾圧されたことから始まりました。この内戦は、国際社会を巻き込み、難民問題やテロ組織の台頭など、多くの深刻な問題を引き起こしています。人道に対する罪は、国際法で最も重大な犯罪の一つとされており、その責任追及は、紛争の真相解明と正義の実現に不可欠です。",
-      "keywords": [
-        "シリア内戦",
-        "人道に対する罪",
-        "アラブの春",
-        "アサド政権",
-        "国際刑事裁判所"
-      ],
-      "url": "https://www.bbc.com/news/articles/cedz4jp379wo",
+      "url": "https://www.bbc.com/news/articles/c1781gr5n9go",
       "source": "BBCニュース",
-      "created_at": "3月10日 23:17"
+      "created_at": "3月11日 06:36"
+    },
+    {
+      "title": "プリンシペ島、生態系保護のため住民に報酬支払い",
+      "summary": "西アフリカのプリンシペ島で、地元の住民が島の生態系を保護する代わりに報酬を受け取るという、持続可能な開発プロジェクトが始まりました。プリンシペ島は「アフリカのガラパゴス」とも呼ばれ、固有の動植物が生息する貴重な生態系を有しています。このプロジェクトは、環境保護と地域住民の生活向上を両立させる試みとして注目されています。",
+      "significance": "植民地時代以降、アフリカの国々は資源の略奪や環境破壊に苦しんできました。プリンシペ島の取り組みは、地域住民が主体となって環境を保護し、持続可能な開発を目指す新しいモデルとなる可能性があります。環境問題と開発の関係、そして地域社会の役割について考える上で重要な事例です。",
+      "keywords": [
+        "プリンシペ島",
+        "生態系",
+        "環境保護",
+        "持続可能な開発",
+        "植民地"
+      ],
+      "url": "https://www.theguardian.com/travel/2026/mar/10/principe-africa-villagers-to-be-paid-protect-ecosystem-african-galapagos",
+      "source": "ガーディアン",
+      "created_at": "3月11日 01:13"
     }
   ],
   "other_topics": [
     {
-      "title": "トランプ大統領顧問、戦争からの撤退計画を示すよう促す",
-      "url": "http://www3.nhk.or.jp/news/html/20260311/k10015072311000.html",
-      "source": "NHK"
-    },
-    {
-      "title": "レバノン、ヒズボラとの紛争終結に向けイスラエルとの協議を呼びかけ",
-      "url": "https://www.bbc.com/news/articles/cd9g5p3ppxlo",
+      "title": "スイスでバス火災、少なくとも6人死亡",
+      "url": "https://www.bbc.com/news/articles/c5y4wdlyy9xo",
       "source": "BBCニュース"
     },
     {
-      "title": "ドイツ首相、アメリカとイスラエルにイラン戦争の出口戦略がないことを懸念",
-      "url": "https://www.aljazeera.com/video/newsfeed/2026/3/10/german-chancellor-concerned-us-israel-have-no-exit-plan-for-iran-war",
+      "title": "イラン戦争が東アジアからのアメリカの防衛シフトの懸念を高める",
+      "url": "https://asia.nikkei.com/politics/defense/iran-conflict-raises-fears-of-us-defense-shift-away-from-east-asia",
+      "source": "日経アジア"
+    },
+    {
+      "title": "レバノン、イスラエルとの攻撃激化でさらなる戦争に備える",
+      "url": "https://www.dw.com/en/lebanese-brace-for-more-war-as-hezbollah-israel-attacks-escalate/a-76293444?maca=en-rss-en-world-4025-rdf",
+      "source": "ドイチェ・ヴェレ"
+    },
+    {
+      "title": "北朝鮮、モジタバ・ハメネイ氏の最高指導者選出を「尊重」",
+      "url": "https://www.aljazeera.com/news/2026/3/11/n-korea-respects-irans-selection-of-mojtaba-khamenei-as-supreme-leader",
       "source": "アルジャジーラ"
     },
     {
-      "title": "パキスタン、イラン戦争の影響で学校閉鎖と支出削減",
-      "url": "https://www.dw.com/en/pakistan-to-close-schools-cut-spending-over-iran-war/a-76293311",
-      "source": "DW（ドイツ国際放送）"
+      "title": "パキスタン、イラン戦争を受け学校閉鎖と支出削減",
+      "url": "https://www.dw.com/en/pakistan-to-close-schools-cut-spending-over-iran-war/a-76293311?maca=en-rss-en-world-4025-rdf",
+      "source": "ドイチェ・ヴェレ"
     },
     {
-      "title": "米国の公民権団体、2025年の「イスラム教徒の生活への広範な攻撃」を記録",
-      "url": "https://www.aljazeera.com/news/2026/3/10/us-civil-rights-group-documents-broad-attack-on-muslim-life-in-2025?traffic_source=rss",
-      "source": "アルジャジーラ"
-    },
-    {
-      "title": "ハイチ大統領暗殺事件、米国で裁判開始",
+      "title": "ハイチ大統領暗殺事件、アメリカの裁判へ",
       "url": "https://www.nytimes.com/2026/03/10/world/americas/haiti-president-murder-assassination-trial-miami-florida.html",
       "source": "ニューヨーク・タイムズ"
     }

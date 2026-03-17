@@ -582,10 +582,24 @@ class RoomSetting(db.Model):
     is_suspended = db.Column(db.Boolean, nullable=False, default=False)
     suspended_at = db.Column(db.DateTime, nullable=True)
 
-    # 🆕 論述特化ルーム設定
+    # 🆕 論述特化ルーム設定 (Deprecated - kept for backwards compatibility during migration)
     is_essay_room = db.Column(db.Boolean, default=False, nullable=False)
-    # 🆕 すべて解放ルーム設定
+    # 🆕 すべて解放ルーム設定 (Deprecated - kept for backwards compatibility during migration)
     is_all_unlocked = db.Column(db.Boolean, default=False, nullable=False)
+
+    # 🆕 機能別個別トグル
+    feature_daily_quiz = db.Column(db.Boolean, default=True, nullable=False)     # 今日の10問
+    feature_weak_questions = db.Column(db.Boolean, default=True, nullable=False) # 苦手問題
+    feature_essay_problems = db.Column(db.Boolean, default=True, nullable=False) # 論述問題集
+    feature_map_quiz = db.Column(db.Boolean, default=True, nullable=False)       # 地図の深淵
+    feature_chrono_quiz = db.Column(db.Boolean, default=True, nullable=False)    # 刻の系譜
+    feature_columns = db.Column(db.Boolean, default=True, nullable=False)        # コラム集
+    feature_tips = db.Column(db.Boolean, default=True, nullable=False)           # 学習Tips
+    feature_news = db.Column(db.Boolean, default=True, nullable=False)           # 今日のニュース
+    feature_ai = db.Column(db.Boolean, default=True, nullable=False)             # AI機能（検索・OCR・添削）
+    feature_post_tips = db.Column(db.Boolean, default=True, nullable=False)      # 学習Tipsの投稿
+    feature_rpg = db.Column(db.Boolean, default=True, nullable=False)            # RPGモード
+    feature_correction = db.Column(db.Boolean, default=True, nullable=False)     # 論述添削依頼
 
     # 🆕 管理者ページ用パスワードハッシュ
     management_password_hash = db.Column(db.String(255), nullable=True)
@@ -10448,7 +10462,19 @@ def admin_page():
                 'is_suspended': getattr(rs, 'is_suspended', False),  # 一時停止状態
                 'suspended_at': getattr(rs, 'suspended_at', None),     # 一時停止日時
                 'is_essay_room': getattr(rs, 'is_essay_room', False),  # 🆕 論述特化ルーム
-                'is_all_unlocked': getattr(rs, 'is_all_unlocked', False)  # 🆕 すべて解放
+                'is_all_unlocked': getattr(rs, 'is_all_unlocked', False),  # 🆕 すべて解放
+                'feature_daily_quiz': getattr(rs, 'feature_daily_quiz', True),
+                'feature_weak_questions': getattr(rs, 'feature_weak_questions', True),
+                'feature_essay_problems': getattr(rs, 'feature_essay_problems', True),
+                'feature_map_quiz': getattr(rs, 'feature_map_quiz', True),
+                'feature_chrono_quiz': getattr(rs, 'feature_chrono_quiz', True),
+                'feature_columns': getattr(rs, 'feature_columns', True),
+                'feature_tips': getattr(rs, 'feature_tips', True),
+                'feature_news': getattr(rs, 'feature_news', True),
+                'feature_ai': getattr(rs, 'feature_ai', True),
+                'feature_post_tips': getattr(rs, 'feature_post_tips', True),
+                'feature_rpg': getattr(rs, 'feature_rpg', True),
+                'feature_correction': getattr(rs, 'feature_correction', True)
             }
 
         # ユーザー情報を拡張（元のアカウント名と変更履歴を含む）
@@ -10519,7 +10545,13 @@ def admin_page():
         context = get_template_context()
         
         # 未対応の添削依頼件数を取得
-        pending_correction_count = EssayCorrectionRequest.query.filter_by(status='pending').count()
+        if is_manager and not is_super_admin:
+            pending_correction_count = EssayCorrectionRequest.query.join(User).filter(
+                EssayCorrectionRequest.status == 'pending',
+                User.room_number.in_(auth_rooms)
+            ).count()
+        else:
+            pending_correction_count = EssayCorrectionRequest.query.filter_by(status='pending').count()
         
         template_context = {
             'is_manager': is_manager,
@@ -13545,9 +13577,9 @@ def submit_correction_request():
         
     user = User.query.get(session['user_id'])
     
-    # 部屋が論述ルームかチェック（念のため）
+    # 部屋が論述添削を許可しているかチェック
     room_setting = RoomSetting.query.filter_by(room_number=user.room_number).first()
-    if not room_setting or not room_setting.is_essay_room:
+    if not room_setting or not getattr(room_setting, 'feature_correction', True):
         flash('この機能はお使いのルームでは利用できません。', 'warning')
         return redirect(url_for('essay_index'))
 
@@ -13832,9 +13864,15 @@ def get_adjacent_problems_with_visibility(problem, room_number):
 # 論述添削 管理機能
 # ====================================================================
 @app.route('/admin/essay_requests')
-@admin_required
 def admin_essay_requests_list():
     """添削依頼一覧ページ"""
+    is_admin = session.get('admin_logged_in')
+    is_manager = session.get('manager_logged_in')
+    
+    if not is_admin and not is_manager:
+        flash('管理者権限がありません。', 'danger')
+        return redirect(url_for('login_page'))
+        
     # フィルタリング（未対応/対応済み）
     status_filter = request.args.get('status', 'pending')
     
@@ -13842,9 +13880,17 @@ def admin_essay_requests_list():
     if status_filter != 'all':
         query = query.filter_by(status=status_filter)
         
+    if is_manager and not is_admin:
+        auth_rooms = session.get('manager_auth_rooms', [])
+        query = query.join(User).filter(User.room_number.in_(auth_rooms))
+        
     requests = query.order_by(EssayCorrectionRequest.created_at.desc()).all()
     
-    return render_template('admin/essay_requests_list.html', requests=requests, current_filter=status_filter)
+    context = get_template_context()
+    context['requests'] = requests
+    context['current_filter'] = status_filter
+    context['manager_mode'] = is_manager
+    return render_template('admin/essay_requests_list.html', **context)
 
 @app.route('/correction_image/<int:image_id>')
 def serve_correction_image(image_id):
@@ -13869,18 +13915,46 @@ def serve_correction_image(image_id):
     )
 
 @app.route('/admin/essay_request/<int:request_id>')
-@admin_required
 def admin_correction_request_detail(request_id):
     """添削依頼詳細ページ"""
-    req = EssayCorrectionRequest.query.get_or_404(request_id)
-    return render_template('admin/essay_request_detail.html', req=req)
-
-@app.route('/admin/essay_request/<int:request_id>/reply', methods=['POST'])
-@admin_required
-def admin_reply_correction_request(request_id):
-    """添削返信処理"""
+    is_admin = session.get('admin_logged_in')
+    is_manager = session.get('manager_logged_in')
+    
+    if not is_admin and not is_manager:
+        flash('管理者権限がありません。', 'danger')
+        return redirect(url_for('login_page'))
+        
     req = EssayCorrectionRequest.query.get_or_404(request_id)
     
+    if is_manager and not is_admin:
+        auth_rooms = session.get('manager_auth_rooms', [])
+        if req.user.room_number not in auth_rooms:
+            flash('権限がありません。', 'danger')
+            return redirect(url_for('admin_essay_requests_list'))
+            
+    context = get_template_context()
+    context['req'] = req
+    context['manager_mode'] = is_manager
+    return render_template('admin/essay_request_detail.html', **context)
+
+@app.route('/admin/essay_request/<int:request_id>/reply', methods=['POST'])
+def admin_reply_correction_request(request_id):
+    """添削返信処理"""
+    is_admin = session.get('admin_logged_in')
+    is_manager = session.get('manager_logged_in')
+    
+    if not is_admin and not is_manager:
+        flash('管理者権限がありません。', 'danger')
+        return redirect(url_for('login_page'))
+        
+    req = EssayCorrectionRequest.query.get_or_404(request_id)
+    
+    if is_manager and not is_admin:
+        auth_rooms = session.get('manager_auth_rooms', [])
+        if req.user.room_number not in auth_rooms:
+            flash('権限がありません。', 'danger')
+            return redirect(url_for('admin_essay_requests_list'))
+            
     try:
         # すでに返信済みの場合はエラー
         if req.replied_at:
@@ -13960,11 +14034,21 @@ def admin_reply_correction_request(request_id):
         return redirect(url_for('admin_correction_request_detail', request_id=request_id))
 
 @app.route('/api/admin/essay_request/<int:request_id>/chat_action', methods=['POST'])
-@admin_required
 def admin_chat_action(request_id):
     """チャットモーダルからの返信・解決処理（AJAX）"""
+    is_admin = session.get('admin_logged_in')
+    is_manager = session.get('manager_logged_in')
+    
+    if not is_admin and not is_manager:
+        return jsonify({'status': 'error', 'message': '管理者権限がありません'}), 401
+        
     req = EssayCorrectionRequest.query.get_or_404(request_id)
     
+    if is_manager and not is_admin:
+        auth_rooms = session.get('manager_auth_rooms', [])
+        if req.user.room_number not in auth_rooms:
+            return jsonify({'status': 'error', 'message': '権限がありません'}), 403
+            
     try:
         data = request.get_json()
         # ensure null is treated as empty string
@@ -14044,12 +14128,28 @@ def admin_chat_action(request_id):
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/api/admin/essay_request/<int:request_id>/delete', methods=['POST'])
-@admin_required
 def admin_delete_correction_request(request_id):
     """添削依頼を削除する（管理者のみ）"""
+    is_admin = session.get('admin_logged_in')
+    is_manager = session.get('manager_logged_in')
+    
+    if not is_admin and not is_manager:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.is_json:
+            return jsonify({'status': 'error', 'message': '管理者権限がありません'}), 401
+        flash('管理者権限がありません。', 'danger')
+        return redirect(url_for('login_page'))
+        
     try:
         req = EssayCorrectionRequest.query.get_or_404(request_id)
         
+        if is_manager and not is_admin:
+            auth_rooms = session.get('manager_auth_rooms', [])
+            if req.user.room_number not in auth_rooms:
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.is_json:
+                    return jsonify({'status': 'error', 'message': '権限がありません'}), 403
+                flash('権限がありません。', 'danger')
+                return redirect(url_for('admin_essay_requests_list'))
+                
         # 画像ファイルがあれば削除（オプション）
         if req.request_image_path:
             try:
@@ -14097,6 +14197,12 @@ def essay_ocr():
     import PIL.Image
     if not GEMINI_API_KEY:
         return jsonify({'status': 'error', 'message': 'Gemini API key not configured'}), 500
+
+    # Ensure AI features are enabled for the room
+    user_room = session.get('room') or 'default'
+    room_setting = RoomSetting.query.filter_by(room_name=user_room).first()
+    if room_setting and not room_setting.feature_ai:
+        return jsonify({'status': 'error', 'message': 'この機能は現在の部屋では利用できません'}), 403
 
     if 'image' not in request.files:
         return jsonify({'status': 'error', 'message': 'No image provided'}), 400
@@ -14410,6 +14516,12 @@ def essay_grade():
     import PIL.Image
     if not GEMINI_API_KEY:
         return jsonify({'status': 'error', 'message': 'Gemini API key not configured'}), 500
+
+    # Ensure AI features are enabled for the room
+    user_room = session.get('room') or 'default'
+    room_setting = RoomSetting.query.filter_by(room_name=user_room).first()
+    if room_setting and not room_setting.feature_ai:
+        return jsonify({'status': 'error', 'message': 'この機能は現在の部屋では利用できません'}), 403
 
     data = request.json
     if not data:
@@ -18289,7 +18401,26 @@ def has_essay_image(problem_id):
 @app.context_processor
 def inject_room_settings():
     """テンプレートで部屋設定（論述特化など）を利用可能にする"""
+    
+    # 既存のフラグ（互換性のため残すが、徐々に個別の機能フラグに移行する）
     is_essay_room_val = False
+    is_all_unlocked_val = False
+    
+    # デフォルトの機能フラグ（全て有効）
+    feature_flags = {
+        'feature_daily_quiz': True,
+        'feature_weak_questions': True,
+        'feature_essay_problems': True,
+        'feature_map_quiz': True,
+        'feature_chrono_quiz': True,
+        'feature_columns': True,
+        'feature_tips': True,
+        'feature_news': True,
+        'feature_ai': True,
+        'feature_post_tips': True,
+        'feature_rpg': True,
+        'feature_correction': True
+    }
     
     if 'user_id' in session:
         # セッションからユーザーID取得
@@ -18302,16 +18433,37 @@ def inject_room_settings():
              if user:
                  rs = RoomSetting.query.filter_by(room_number=user.room_number).first()
                  if rs:
-                     if rs.is_essay_room:
-                         is_essay_room_val = True
-                     # "すべて解放"の場合は、is_essay_roomフラグがTrueでもナビバーなどを通常通り表示させたい
-                     if rs.is_all_unlocked:
-                         # テンプレート側で is_essay_room と is_all_unlocked の組み合わせで判断する
-                         pass
+                     is_essay_room_val = rs.is_essay_room
+                     is_all_unlocked_val = rs.is_all_unlocked
                      
-                     return dict(is_essay_room=is_essay_room_val, is_all_unlocked=rs.is_all_unlocked)
+                     # 個別の機能フラグを取得
+                     if hasattr(rs, 'feature_daily_quiz'):
+                        feature_flags = {
+                            'feature_daily_quiz': rs.feature_daily_quiz,
+                            'feature_weak_questions': rs.feature_weak_questions,
+                            'feature_essay_problems': rs.feature_essay_problems,
+                            'feature_map_quiz': rs.feature_map_quiz,
+                            'feature_chrono_quiz': rs.feature_chrono_quiz,
+                            'feature_columns': rs.feature_columns,
+                            'feature_tips': rs.feature_tips,
+                            'feature_news': rs.feature_news,
+                            'feature_ai': rs.feature_ai,
+                            'feature_post_tips': rs.feature_post_tips,
+                            'feature_rpg': getattr(rs, 'feature_rpg', True),
+                            'feature_correction': getattr(rs, 'feature_correction', True)
+                        }
+                     
+                     return dict(
+                         is_essay_room=is_essay_room_val, 
+                         is_all_unlocked=is_all_unlocked_val,
+                         **feature_flags
+                     )
                  
-    return dict(is_essay_room=is_essay_room_val, is_all_unlocked=False)
+    return dict(
+        is_essay_room=is_essay_room_val, 
+        is_all_unlocked=is_all_unlocked_val,
+        **feature_flags
+    )
 
 
 
@@ -19522,6 +19674,12 @@ def api_tips_create():
     """新規Tip投稿（スコア1000以上、管理者承認制）"""
     if 'user_id' not in session:
         return jsonify({'status': 'error', 'message': 'ログインが必要です'}), 401
+
+    # Ensure tip posting is enabled for the room
+    user_room = session.get('room') or 'default'
+    room_setting = RoomSetting.query.filter_by(room_number=user_room).first()
+    if room_setting and not room_setting.feature_post_tips:
+        return jsonify({'status': 'error', 'message': '現在、Tipsの投稿機能は制限されています'}), 403
 
     user_stats = UserStats.query.filter_by(user_id=session['user_id']).first()
     if not user_stats or user_stats.balance_score < 1000:
@@ -20813,58 +20971,7 @@ def start_rpg_battle():
     if len(valid_problems) < 10:
         return jsonify({'status': 'error', 'message': '出題可能な問題が少なすぎます（10問以上必要）'}), 400
         
-    # ランダムに30問選択（10問正解到達用、または全て）
-    sample_size = min(len(valid_problems), 30)
-    selected_problems_data = random.sample(valid_problems, sample_size)
-    
-    # 全回答リストを作成（ダミー生成用）
-    all_answers = list(set(w['answer'] for w in word_data if w.get('answer')))
-
-    final_problems = []
-    for problem in selected_problems_data:
-        correct_answer = problem['answer']
-        
-        # --- 誤答選択肢の生成ロジック (DailyQuizと同等) ---
-        # 1. CSVのG列 (incorrect) に指定がある場合はそれを使用
-        manual_incorrect_str = problem.get('incorrect', '')
-        
-        if manual_incorrect_str and manual_incorrect_str.strip():
-            manual_candidates = [x.strip() for x in manual_incorrect_str.split(',') if x.strip()]
-            if len(manual_candidates) > 3:
-                distractors = random.sample(manual_candidates, 3)
-            else:
-                distractors = manual_candidates
-        else:
-            # 2. 指定がない場合はレーベンシュタイン距離で類似語を探す
-            distractor_pool = [ans for ans in all_answers if ans != correct_answer]
-            # パフォーマンス考慮: プールが大きすぎる場合はランダムサンプリング後に計算しても良いが
-            # 今回はDailyQuiz同様に全件計算（数千件程度なら高速）
-            distractors_with_distance = [(levenshtein_distance(correct_answer, ans), ans) for ans in distractor_pool]
-            distractors_with_distance.sort(key=lambda x: x[0])
-            distractors = [ans for distance, ans in distractors_with_distance[:3]]
-            
-            # 候補が足りない場合はランダムに補充
-            if len(distractors) < 3 and len(distractor_pool) >= 3:
-                remaining = [ans for ans in distractor_pool if ans not in distractors]
-                distractors.extend(random.sample(remaining, 3 - len(distractors)))
-        
-        # 正解と誤答を合わせてシャッフル
-        choices = distractors + [correct_answer]
-        random.shuffle(choices)
-        
-        final_problems.append({
-            'index': i, # インデックスを追加
-            'question': problem['question'],
-            'choices': choices
-        })
-    
-    # サーバー側で正解を照合できるように、選ばれた問題のIDリストをセッションに保存
-    session['rpg_battle_pids'] = [get_problem_id(p) for p in selected_problems_data]
-    session['rpg_correct_count'] = 0
-    session['rpg_incorrect_count'] = 0
-    session['rpg_battle_stage_id'] = target_boss.id
-    
-    # ボス決定
+    # --- ボス決定処理 ---
     rpg_state = RpgState.query.filter_by(user_id=user_id).first()
     if not rpg_state:
         rpg_state = RpgState(user_id=user_id)
@@ -20875,15 +20982,11 @@ def start_rpg_battle():
     target_boss = None
     is_rematch = False
 
-    # 日付判定ロジック（朝7時切り替え）
     current_time = datetime.now(JST)
     logic_date = get_logic_date(current_time)
 
     if rematch_enemy_id:
-        # === 再戦ロジック ===
         is_rematch = True
-        
-        # 1. 既に今日挑戦済みかチェック
         if RpgRematchHistory.query.filter_by(user_id=user_id, enemy_id=rematch_enemy_id, rematch_date=logic_date).first():
              return jsonify({'status': 'error', 'message': 'ボスとの再戦は1日1回までです（毎日7:00更新）'}), 403
              
@@ -20891,12 +20994,10 @@ def start_rpg_battle():
         if not target_boss:
              return jsonify({'status': 'error', 'message': 'ボスが見つかりません'}), 404
 
-        # 2. 既に倒しているかチェック
         cleared_set = {int(x) for x in (rpg_state.cleared_stages or []) if str(x).isdigit()}
         if int(rematch_enemy_id) not in cleared_set:
              return jsonify({'status': 'error', 'message': 'まだ倒していないボスとは再戦できません'}), 403
         
-        # 3. ★ここで挑戦履歴を作成してしまう（リロード対策：即座に消費）
         try:
             new_history = RpgRematchHistory(user_id=user_id, enemy_id=rematch_enemy_id, rematch_date=logic_date)
             db.session.add(new_history)
@@ -20906,24 +21007,60 @@ def start_rpg_battle():
             return jsonify({'status': 'error', 'message': '再戦の開始処理に失敗しました。'}), 500
 
     else:
-        # === 通常ボス戦 ===
-        # 1. 今日の挑戦権があるかチェック
         if rpg_state.last_challenge_at:
             last_challenge = rpg_state.last_challenge_at
             last_logic_date = get_logic_date(last_challenge)
-                
             if last_logic_date == logic_date:
                  return jsonify({'status': 'error', 'message': 'ストーリーボスの挑戦は1日1回までです（毎日7:00更新）。また明日来てください！'}), 403
 
         target_boss = get_current_boss(user_id, rpg_state)
         
         if target_boss:
-            # 2. ★ここで挑戦日時を更新してしまう（リロード対策：即座に消費）
             rpg_state.last_challenge_at = current_time
             db.session.commit()
     
     if not target_boss:
         return jsonify({'status': 'error', 'message': '現在挑戦できるボスはいません。学習を進めてスコアを貯めましょう！'}), 404
+
+    # ランダムに30問選択
+    sample_size = min(len(valid_problems), 30)
+    selected_problems_data = random.sample(valid_problems, sample_size)
+    all_answers = list(set(w['answer'] for w in word_data if w.get('answer')))
+
+    final_problems = []
+    for i, problem in enumerate(selected_problems_data):
+        correct_answer = problem['answer']
+        manual_incorrect_str = problem.get('incorrect', '')
+        
+        if manual_incorrect_str and manual_incorrect_str.strip():
+            manual_candidates = [x.strip() for x in manual_incorrect_str.split(',') if x.strip()]
+            if len(manual_candidates) > 3:
+                distractors = random.sample(manual_candidates, 3)
+            else:
+                distractors = manual_candidates
+        else:
+            distractor_pool = [ans for ans in all_answers if ans != correct_answer]
+            distractors_with_distance = [(levenshtein_distance(correct_answer, ans), ans) for ans in distractor_pool]
+            distractors_with_distance.sort(key=lambda x: x[0])
+            distractors = [ans for distance, ans in distractors_with_distance[:3]]
+            
+            if len(distractors) < 3 and len(distractor_pool) >= 3:
+                remaining = [ans for ans in distractor_pool if ans not in distractors]
+                distractors.extend(random.sample(remaining, 3 - len(distractors)))
+        
+        choices = distractors + [correct_answer]
+        random.shuffle(choices)
+        
+        final_problems.append({
+            'index': i,
+            'question': problem['question'],
+            'choices': choices
+        })
+    
+    session['rpg_battle_pids'] = [get_problem_id(p) for p in selected_problems_data]
+    session['rpg_correct_count'] = 0
+    session['rpg_incorrect_count'] = 0
+    session['rpg_battle_stage_id'] = target_boss.id
         
     return jsonify({
         'status': 'success',
@@ -22675,6 +22812,24 @@ def check_and_migrate_room_setting():
                         conn.execute(text("ALTER TABLE room_setting ADD COLUMN is_essay_room BOOLEAN DEFAULT FALSE"))
                     else:
                         conn.execute(text("ALTER TABLE room_setting ADD COLUMN is_essay_room BOOLEAN DEFAULT 0"))
+                        
+                # 🆕 機能別個別トグルのマイグレーション
+                new_features = [
+                    'feature_daily_quiz', 'feature_weak_questions', 'feature_essay_problems',
+                    'feature_map_quiz', 'feature_chrono_quiz', 'feature_columns',
+                    'feature_tips', 'feature_news', 'feature_ai', 'feature_post_tips',
+                    'feature_rpg', 'feature_correction'
+                ]
+                
+                for feature in new_features:
+                    if feature not in columns:
+                        print(f"Migrating: Adding {feature} column to room_setting")
+                        # 既存のis_essay_roomの値に基づいて初期化することも可能ですが、シンプルに全てTrue（有効）をデフォルトとします
+                        if db.engine.dialect.name == 'postgresql':
+                            conn.execute(text(f"ALTER TABLE room_setting ADD COLUMN {feature} BOOLEAN DEFAULT TRUE NOT NULL"))
+                        else:
+                            conn.execute(text(f"ALTER TABLE room_setting ADD COLUMN {feature} BOOLEAN DEFAULT 1 NOT NULL"))
+                            
                 conn.commit()
                 # print("RoomSetting migration check completed.")
         except Exception as e:
@@ -22729,7 +22884,6 @@ def mark_rpg_intro_seen():
         return jsonify({'status': 'error', 'message': str(e)})
 
 @app.route('/admin/update_room_essay_setting', methods=['POST'])
-
 def admin_update_room_essay_setting():
     # 権限チェック (Admin or Manager)
     if 'user_id' not in session:
@@ -22760,17 +22914,29 @@ def admin_update_room_essay_setting():
             setting = RoomSetting(room_number=room_number)
             db.session.add(setting)
             
-        setting.is_essay_room = bool(is_essay_room)
+        # 旧フラグの保存
+        if is_essay_room is not None:
+            setting.is_essay_room = bool(is_essay_room)
         
-        # 🆕 すべて解放設定の保存
         is_all_unlocked = data.get('is_all_unlocked')
-        # 明示的にNoneでない場合のみ更新
         if is_all_unlocked is not None:
              setting.is_all_unlocked = bool(is_all_unlocked)
              
         # "すべて解放"がオンの場合、自動的に"論述特化"もオンにする
         if setting.is_all_unlocked:
             setting.is_essay_room = True
+            
+        # 12個の機能フラグを保存
+        feature_keys = [
+            'feature_daily_quiz', 'feature_weak_questions', 'feature_essay_problems',
+            'feature_map_quiz', 'feature_chrono_quiz', 'feature_columns',
+            'feature_tips', 'feature_news', 'feature_ai', 'feature_post_tips',
+            'feature_rpg', 'feature_correction'
+        ]
+        
+        for key in feature_keys:
+            if key in data:
+                setattr(setting, key, bool(data.get(key)))
              
         db.session.commit()
         
@@ -22781,7 +22947,7 @@ def admin_update_room_essay_setting():
         
         return jsonify({
             'status': 'success', 
-            'message': f'部屋 {room_number} の論述特化設定を更新しました',
+            'message': f'部屋 {room_number} の個別設定を更新しました',
             'is_essay_room': setting.is_essay_room,
             'is_all_unlocked': setting.is_all_unlocked
         })
