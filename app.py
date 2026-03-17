@@ -1225,6 +1225,15 @@ class ColumnView(db.Model):
     view_count = db.Column(db.Integer, default=0, nullable=False)
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(JST), onupdate=lambda: datetime.now(JST))
 
+# ── ニュースアーカイブ ────────────────────────────────────
+class NewsArchive(db.Model):
+    """今日のニュース（日付ごとのアーカイブ）"""
+    __tablename__ = 'news_archive'
+    id = db.Column(db.Integer, primary_key=True)
+    date = db.Column(db.String(10), unique=True, nullable=False)  # YYYY-MM-DD
+    data_json = db.Column(db.Text, nullable=False)
+    updated_at = db.Column(db.DateTime(timezone=True), nullable=False)
+
 # ── 学習Tips ──────────────────────────────────────────────
 class StudyTipTag(db.Model):
     """学習Tipsタグ（管理者が自由に作成・編集）"""
@@ -1619,20 +1628,20 @@ def update_world_news():
             
         news_text = "\n".join([f"- [{item['source']}] {item['title']} ({item.get('pub_date')}): {item['description']} ({item['link']})" for item in unique_items])
         
-        # 過去3回分の選出記事タイトルを取得して、重複を避ける
+        # 過去3回分の選出記事タイトルをDBから取得して、重複を避ける
         prev_articles_text = "なし"
-        history_path = os.path.join(basedir, 'data', 'news_history.json')
-        history = []
-        if os.path.exists(history_path):
-            try:
-                with open(history_path, 'r', encoding='utf-8') as f:
-                    history = json.load(f)
-            except Exception:
-                history = []
-        if history:
+        recent_records = NewsArchive.query.order_by(NewsArchive.updated_at.desc()).limit(3).all()
+        if recent_records:
             all_prev_titles = []
-            for entry in history:
-                all_prev_titles.extend(entry.get('titles', []))
+            for rec in recent_records:
+                try:
+                    rec_data = json.loads(rec.data_json)
+                    for a in rec_data.get('articles', []):
+                        t = a.get('title', '')
+                        if t:
+                            all_prev_titles.append(t)
+                except Exception:
+                    pass
             if all_prev_titles:
                 prev_articles_text = ", ".join(all_prev_titles)
 
@@ -1672,43 +1681,51 @@ def update_world_news():
             )
             data_json = json.loads(response.text)
             
+            now = datetime.now(JST)
             data = {
-                'updated_at': datetime.now(JST).isoformat(),
+                'updated_at': now.isoformat(),
                 'total_processed': len(unique_items),
                 'articles': data_json.get('articles', []),
                 'other_topics': data_json.get('other_topics', [])
             }
-            
-            data_dir = os.path.join(basedir, 'data')
-            os.makedirs(data_dir, exist_ok=True)
-            file_path = os.path.join(data_dir, 'featured_article.json')
-            with open(file_path, 'w', encoding='utf-8') as f:
-                json.dump(data, f, ensure_ascii=False, indent=2)
+            archive_date = now.strftime('%Y-%m-%d')
 
-            # 日付別アーカイブとして保存
-            archive_dir = os.path.join(data_dir, 'news_archive')
-            os.makedirs(archive_dir, exist_ok=True)
-            archive_date = datetime.now(JST).strftime('%Y-%m-%d')
-            archive_path = os.path.join(archive_dir, f'{archive_date}.json')
-            with open(archive_path, 'w', encoding='utf-8') as f:
-                json.dump(data, f, ensure_ascii=False, indent=2)
+            # DBに保存（upsert）
+            record = NewsArchive.query.filter_by(date=archive_date).first()
+            if record:
+                record.data_json = json.dumps(data, ensure_ascii=False)
+                record.updated_at = now
+            else:
+                record = NewsArchive(
+                    date=archive_date,
+                    data_json=json.dumps(data, ensure_ascii=False),
+                    updated_at=now
+                )
+                db.session.add(record)
+            db.session.commit()
 
-            # 過去3回分の記事タイトル履歴を更新
-            new_titles = [a.get('title', '') for a in data_json.get('articles', [])]
-            history.append({'titles': new_titles, 'updated_at': datetime.now(JST).isoformat()})
-            history = history[-3:]  # 直近3回分のみ保持
-            with open(history_path, 'w', encoding='utf-8') as f:
-                json.dump(history, f, ensure_ascii=False, indent=2)
+            print(f"✅ ニュースをDBに保存しました ({archive_date})")
 
-            print(f"✅ ニュースを更新しました: {file_path}")
-            
-            # --- S3への永続化処理を追加 ---
+            # ローカルファイルにも書き出し（S3バックアップ用キャッシュ）
+            try:
+                data_dir = os.path.join(basedir, 'data')
+                os.makedirs(data_dir, exist_ok=True)
+                file_path = os.path.join(data_dir, 'featured_article.json')
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    json.dump(data, f, ensure_ascii=False, indent=2)
+                archive_dir = os.path.join(data_dir, 'news_archive')
+                os.makedirs(archive_dir, exist_ok=True)
+                with open(os.path.join(archive_dir, f'{archive_date}.json'), 'w', encoding='utf-8') as f:
+                    json.dump(data, f, ensure_ascii=False, indent=2)
+            except Exception as e:
+                print(f"⚠️ ローカルファイル書き出し失敗（無視）: {e}")
+
+            # S3バックアップ（設定済みの場合のみ）
             if S3_AVAILABLE:
                 upload_json_to_s3(data, 'data/featured_article.json')
                 upload_json_to_s3(data, f'data/news_archive/{archive_date}.json')
-                upload_json_to_s3(history, 'data/news_history.json')
                 print("☁️ S3へのバックアップが完了しました")
-            
+
             return True, "ニュースを更新しました"
         except Exception as e:
             print(f"⚠️ Gemini News Update Error: {e}")
@@ -7705,14 +7722,11 @@ def news_page():
     """時事ニュースページ"""
     context = get_template_context()
     try:
-        local_path = os.path.join(basedir, 'data', 'featured_article.json')
-        # S3から優先的に読み込み（ローカルフォールバック付き）
-        news_data = download_json_from_s3('data/featured_article.json', local_path)
-
-        if not news_data:
+        record = NewsArchive.query.order_by(NewsArchive.updated_at.desc()).first()
+        if not record:
             return render_template('news.html', news_data=None, **context)
 
-        # updated_at をパースしてフォーマット
+        news_data = json.loads(record.data_json)
         if 'updated_at' in news_data:
             try:
                 dt = datetime.fromisoformat(news_data['updated_at'])
@@ -7729,14 +7743,10 @@ def news_page():
 def get_news_data_api():
     """ニュースデータをJSONで返すAPI"""
     try:
-        local_path = os.path.join(basedir, 'data', 'featured_article.json')
-        # S3から優先的に読み込み（ローカルフォールバック付き）
-        news_data = download_json_from_s3('data/featured_article.json', local_path)
-
-        if not news_data:
+        record = NewsArchive.query.order_by(NewsArchive.updated_at.desc()).first()
+        if not record:
             return jsonify({'status': 'no_data'})
-            
-        return jsonify(news_data)
+        return jsonify(json.loads(record.data_json))
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
@@ -7745,25 +7755,14 @@ def news_archive_list():
     """ニュースアーカイブ一覧（カレンダー形式）"""
     context = get_template_context()
 
-    # アーカイブファイル一覧を取得
-    local_archive_dir = os.path.join(basedir, 'data', 'news_archive')
-    local_files = []
-    if os.path.exists(local_archive_dir):
-        local_files = [f for f in os.listdir(local_archive_dir) if f.endswith('.json')]
-
-    s3_files = list_s3_news_archives()
-    all_filenames = sorted(list(set(local_files + s3_files)), reverse=True)
-
-    # 日付 -> total_processed のマップを構築
+    # DBからアーカイブ一覧を取得
+    records = NewsArchive.query.order_by(NewsArchive.date.desc()).all()
     archive_date_map = {}
-    for fname in all_filenames:
-        date_str = fname.replace('.json', '')
+    for rec in records:
         try:
-            d = datetime.strptime(date_str, '%Y-%m-%d').date()
-            local_path = os.path.join(local_archive_dir, fname)
-            data = download_json_from_s3(f'data/news_archive/{fname}', local_path)
-            if data:
-                archive_date_map[d] = data.get('total_processed', 0)
+            d = datetime.strptime(rec.date, '%Y-%m-%d').date()
+            data = json.loads(rec.data_json)
+            archive_date_map[d] = data.get('total_processed', 0)
         except Exception:
             pass
 
@@ -7824,13 +7823,11 @@ def news_archive_detail(date_str):
     """特定日のニュースアーカイブ詳細"""
     context = get_template_context()
     try:
-        local_path = os.path.join(basedir, 'data', 'news_archive', f'{date_str}.json')
-        # S3から優先的に読み込み（ローカルフォールバック付き）
-        news_data = download_json_from_s3(f'data/news_archive/{date_str}.json', local_path)
-
-        if not news_data:
+        record = NewsArchive.query.filter_by(date=date_str).first()
+        if not record:
             return render_template('news_archive_detail.html', news_data=None, date_str=date_str, **context)
 
+        news_data = json.loads(record.data_json)
         if 'updated_at' in news_data:
             dt = datetime.fromisoformat(news_data['updated_at'])
             news_data['display_date'] = dt.strftime('%Y年%m月%d日 %H:%M')
@@ -7848,40 +7845,34 @@ def news_archive_search():
     results = []
 
     if query:
-        archive_dir = os.path.join(basedir, 'data', 'news_archive')
-        if os.path.isdir(archive_dir):
-            for fname in sorted(os.listdir(archive_dir), reverse=True):
-                if not fname.endswith('.json'):
-                    continue
-                date_str = fname.replace('.json', '')
-                try:
-                    fpath = os.path.join(archive_dir, fname)
-                    with open(fpath, 'r', encoding='utf-8') as f:
-                        data = json.load(f)
-                    d = datetime.strptime(date_str, '%Y-%m-%d').date()
-                    dt = datetime.fromisoformat(data['updated_at']) if 'updated_at' in data else None
-                    display_date = dt.strftime('%Y年%m月%d日') if dt else date_str
+        records = NewsArchive.query.order_by(NewsArchive.date.desc()).all()
+        for rec in records:
+            try:
+                data = json.loads(rec.data_json)
+                d = datetime.strptime(rec.date, '%Y-%m-%d').date()
+                dt = datetime.fromisoformat(data['updated_at']) if 'updated_at' in data else None
+                display_date = dt.strftime('%Y年%m月%d日') if dt else rec.date
 
-                    matched_articles = []
-                    for article in data.get('articles', []):
-                        searchable = ' '.join([
-                            article.get('title', ''),
-                            article.get('summary', ''),
-                            article.get('significance', ''),
-                            ' '.join(article.get('keywords', []))
-                        ]).lower()
-                        if query.lower() in searchable:
-                            matched_articles.append(article)
+                matched_articles = []
+                for article in data.get('articles', []):
+                    searchable = ' '.join([
+                        article.get('title', ''),
+                        article.get('summary', ''),
+                        article.get('significance', ''),
+                        ' '.join(article.get('keywords', []))
+                    ]).lower()
+                    if query.lower() in searchable:
+                        matched_articles.append(article)
 
-                    if matched_articles:
-                        results.append({
-                            'date': d,
-                            'date_str': date_str,
-                            'display_date': display_date,
-                            'articles': matched_articles
-                        })
-                except Exception:
-                    pass
+                if matched_articles:
+                    results.append({
+                        'date': d,
+                        'date_str': rec.date,
+                        'display_date': display_date,
+                        'articles': matched_articles
+                    })
+            except Exception:
+                pass
 
     return render_template('news_archive_search.html', query=query, results=results, **context)
 
@@ -7897,31 +7888,22 @@ def admin_update_news():
         return jsonify({'status': 'error', 'message': '権限がありません'}), 403
 
     try:
-        file_path = os.path.join(basedir, 'data', 'featured_article.json')
-        # 更新前のタイムスタンプを記録
-        old_mtime = os.path.getmtime(file_path) if os.path.exists(file_path) else None
-
-        # update_world_news は (success, message) を返すように変更
         success, message = update_world_news()
 
         if not success:
             return jsonify({'status': 'error', 'message': message})
 
-        # 更新後にファイルが実際に更新されたか確認
-        if not os.path.exists(file_path):
-            return jsonify({'status': 'error', 'message': 'ニュースデータのファイル生成に失敗しました。'})
-
-        new_mtime = os.path.getmtime(file_path)
-        if old_mtime is not None and new_mtime == old_mtime:
-            return jsonify({'status': 'error', 'message': 'ニュースデータファイルの内容が更新されませんでした（同一内容）。'})
-
-        # 更新後の最終更新日時を取得
+        # 更新後の最終更新日時をDBから取得
         updated_at = None
-        with open(file_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-            if 'updated_at' in data:
-                dt = datetime.fromisoformat(data['updated_at'])
-                updated_at = dt.strftime('%Y年%m月%d日 %H:%M')
+        record = NewsArchive.query.order_by(NewsArchive.updated_at.desc()).first()
+        if record:
+            try:
+                data = json.loads(record.data_json)
+                if 'updated_at' in data:
+                    dt = datetime.fromisoformat(data['updated_at'])
+                    updated_at = dt.strftime('%Y年%m月%d日 %H:%M')
+            except Exception:
+                pass
         return jsonify({'status': 'success', 'message': message, 'updated_at': updated_at})
     except Exception as e:
         import traceback
@@ -19085,6 +19067,12 @@ def terms_of_service():
     context = get_template_context()
     return render_template('terms_of_service.html', **context)
 
+@app.route('/manual')
+def manual_page():
+    """取扱説明書ページ"""
+    context = get_template_context()
+    return render_template('manual.html', **context)
+
 # ====================================================================
 # サンプルクイズAPI（ログイン不要）
 # ====================================================================
@@ -19189,6 +19177,7 @@ def get_sample_quiz():
             sample_questions.append({
                 'question': problem['question'],
                 'choices': choices,
+                'answer': correct_answer,
                 'category': problem['category']
             })
         
@@ -22873,6 +22862,7 @@ with app.app_context():
     _create_column_table()
     _create_column_like_table()
     _create_column_view_table()
+    db.create_all()  # news_archive テーブルなど未作成のテーブルを作成
 
 @app.route('/api/check_rpg_intro_eligibility', methods=['GET'])
 def check_rpg_intro_eligibility():

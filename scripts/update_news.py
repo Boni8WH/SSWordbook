@@ -15,6 +15,74 @@ from pydantic import BaseModel, Field
 basedir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 load_dotenv(os.path.join(basedir, '.env'))
 
+def save_to_db(archive_date, data):
+    """DBにニュースデータを保存（DATABASE_URLが設定されている場合）"""
+    database_url = os.environ.get('DATABASE_URL', '')
+    if not database_url:
+        return False
+    try:
+        import sqlalchemy
+        # PostgreSQL接続文字列の修正（Heroku等の旧形式対応）
+        if database_url.startswith('postgres://'):
+            database_url = database_url.replace('postgres://', 'postgresql://', 1)
+        engine = sqlalchemy.create_engine(database_url)
+        updated_at = datetime.fromisoformat(data['updated_at'])
+        data_json_str = json.dumps(data, ensure_ascii=False)
+        with engine.connect() as conn:
+            result = conn.execute(
+                sqlalchemy.text("SELECT id FROM news_archive WHERE date = :date"),
+                {"date": archive_date}
+            ).fetchone()
+            if result:
+                conn.execute(
+                    sqlalchemy.text(
+                        "UPDATE news_archive SET data_json = :data_json, updated_at = :updated_at WHERE date = :date"
+                    ),
+                    {"data_json": data_json_str, "updated_at": updated_at, "date": archive_date}
+                )
+            else:
+                conn.execute(
+                    sqlalchemy.text(
+                        "INSERT INTO news_archive (date, data_json, updated_at) VALUES (:date, :data_json, :updated_at)"
+                    ),
+                    {"date": archive_date, "data_json": data_json_str, "updated_at": updated_at}
+                )
+            conn.commit()
+        print(f"✅ DBへの保存完了 ({archive_date})")
+        return True
+    except Exception as e:
+        print(f"⚠️ DB保存エラー: {e}")
+        return False
+
+def get_prev_titles_from_db():
+    """DBから過去3回分の記事タイトルを取得"""
+    database_url = os.environ.get('DATABASE_URL', '')
+    if not database_url:
+        return []
+    try:
+        import sqlalchemy
+        if database_url.startswith('postgres://'):
+            database_url = database_url.replace('postgres://', 'postgresql://', 1)
+        engine = sqlalchemy.create_engine(database_url)
+        with engine.connect() as conn:
+            rows = conn.execute(
+                sqlalchemy.text("SELECT data_json FROM news_archive ORDER BY updated_at DESC LIMIT 3")
+            ).fetchall()
+        titles = []
+        for row in rows:
+            try:
+                d = json.loads(row[0])
+                for a in d.get('articles', []):
+                    t = a.get('title', '')
+                    if t:
+                        titles.append(t)
+            except Exception:
+                pass
+        return titles
+    except Exception as e:
+        print(f"⚠️ DB履歴取得エラー: {e}")
+        return []
+
 JST = pytz.timezone('Asia/Tokyo')
 
 # AWS S3設定
@@ -128,18 +196,21 @@ def get_gemini_summary(news_items):
         # ニュース項目をプロンプト用に整形（全件渡す）
         news_text = "\n".join([f"- [{item['source']}] {item['title']} (PubDate: {item.get('pub_date')}): {item['description']} (URL: {item['link']})" for item in news_items])
         
-        # 前回選出された記事の情報を取得して、重複を避ける
+        # 過去3回分の選出記事タイトルを取得して、重複を避ける
         prev_articles_text = "なし"
-        json_path = os.path.join(basedir, 'data', 'featured_article.json')
-        if os.path.exists(json_path):
-            try:
-                with open(json_path, 'r', encoding='utf-8') as f:
-                    prev_data = json.load(f)
-                    prev_titles = [a.get('title') for a in prev_data.get('articles', [])]
-                    if prev_titles:
-                        prev_articles_text = ", ".join(prev_titles)
-            except Exception:
-                pass
+        prev_titles = get_prev_titles_from_db()
+        if not prev_titles:
+            # DBが使えない場合はローカルファイルから
+            json_path = os.path.join(basedir, 'data', 'featured_article.json')
+            if os.path.exists(json_path):
+                try:
+                    with open(json_path, 'r', encoding='utf-8') as f:
+                        prev_data = json.load(f)
+                        prev_titles = [a.get('title') for a in prev_data.get('articles', [])]
+                except Exception:
+                    pass
+        if prev_titles:
+            prev_articles_text = ", ".join(t for t in prev_titles if t)
 
         current_time = datetime.now(JST).strftime("%Y年%m月%d日 %H:%M")
         prompt = f"""
@@ -263,26 +334,29 @@ def update_news():
             'other_topics': summarized_news.get('other_topics', [])
         }
         
-        data_dir = os.path.join(basedir, 'data')
-        os.makedirs(data_dir, exist_ok=True)
-        
-        file_path = os.path.join(data_dir, 'featured_article.json')
-        with open(file_path, 'w', encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
-            
-        # 日付別アーカイブとして保存
-        archive_dir = os.path.join(data_dir, 'news_archive')
-        os.makedirs(archive_dir, exist_ok=True)
         archive_date = datetime.now(JST).strftime("%Y-%m-%d")
-        archive_path = os.path.join(archive_dir, f'{archive_date}.json')
-        with open(archive_path, 'w', encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
 
-        print(f"✅ News updated and saved locally: {file_path}")
-        
-        # S3への永続化
+        # DBに保存（最優先）
+        save_to_db(archive_date, data)
+
+        # ローカルファイルにも保存（キャッシュ）
+        try:
+            data_dir = os.path.join(basedir, 'data')
+            os.makedirs(data_dir, exist_ok=True)
+            file_path = os.path.join(data_dir, 'featured_article.json')
+            with open(file_path, 'w', encoding='utf-8') as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+            archive_dir = os.path.join(data_dir, 'news_archive')
+            os.makedirs(archive_dir, exist_ok=True)
+            archive_path = os.path.join(archive_dir, f'{archive_date}.json')
+            with open(archive_path, 'w', encoding='utf-8') as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+            print(f"✅ ローカルファイルにも保存: {file_path}")
+        except Exception as e:
+            print(f"⚠️ ローカルファイル保存失敗（無視）: {e}")
+
+        # S3バックアップ（設定済みの場合のみ）
         if S3_AVAILABLE:
-            archive_date = datetime.now(JST).strftime("%Y-%m-%d")
             upload_json_to_s3(data, 'data/featured_article.json')
             upload_json_to_s3(data, f'data/news_archive/{archive_date}.json')
             print("☁️ S3へのバックアップが完了しました")
