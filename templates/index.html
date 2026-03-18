@@ -2576,9 +2576,29 @@
         dockBar.addEventListener('touchcancel', resetMagnify, { passive: true });
     }
 
-    // Dockを初期化
+    // Dockを初期化 & クイズ中/リザルト中は非表示
     document.addEventListener('DOMContentLoaded', () => {
         initDock(document.querySelector('.dock-bar'));
+
+        const dockWrapper = document.querySelector('.dock-wrapper');
+        if (!dockWrapper) return;
+
+        function updateDockVisibility() {
+            const cardArea = document.querySelector('.card-area');
+            const quizResultArea = document.getElementById('quizResult');
+            const quizActive = cardArea && !cardArea.classList.contains('hidden');
+            const resultActive = quizResultArea && !quizResultArea.classList.contains('hidden');
+            dockWrapper.style.display = (quizActive || resultActive) ? 'none' : '';
+        }
+
+        const targets = [
+            document.querySelector('.card-area'),
+            document.getElementById('quizResult')
+        ].filter(Boolean);
+
+        const observer = new MutationObserver(updateDockVisibility);
+        targets.forEach(el => observer.observe(el, { attributes: true, attributeFilter: ['class'] }));
+        updateDockVisibility();
     });
 </script>
 {% endblock %}
