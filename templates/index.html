@@ -2541,16 +2541,17 @@
     /* ── macOS Dock マグニファイ ── */
     function initDock(dockBar) {
         if (!dockBar) return;
-        const icons = Array.from(dockBar.querySelectorAll('.dock-icon'));
+        const items = Array.from(dockBar.querySelectorAll('.dock-item'));
+        const icons = items.map(i => i.querySelector('.dock-icon'));
         const SPREAD = 90;
         const MAX_SCALE = 0.65;
         const MAX_LIFT = 14;
 
-        function applyMagnify(mouseX) {
+        function applyMagnify(clientX) {
             icons.forEach(icon => {
                 const rect = icon.getBoundingClientRect();
                 const center = rect.left + rect.width / 2;
-                const dist = Math.abs(mouseX - center);
+                const dist = Math.abs(clientX - center);
                 const ratio = Math.max(0, 1 - dist / SPREAD);
                 const scale = 1 + MAX_SCALE * ratio;
                 const lift = MAX_LIFT * ratio;
@@ -2562,8 +2563,17 @@
             icons.forEach(icon => { icon.style.transform = ''; });
         }
 
+        // Desktop: hover magnification
         dockBar.addEventListener('mousemove', e => applyMagnify(e.clientX));
         dockBar.addEventListener('mouseleave', resetMagnify);
+
+        // Mobile/Tablet: drag magnification
+        dockBar.addEventListener('touchmove', e => {
+            applyMagnify(e.touches[0].clientX);
+        }, { passive: true });
+        // タップはブラウザのデフォルト click イベントに委ねる
+        dockBar.addEventListener('touchend', resetMagnify, { passive: true });
+        dockBar.addEventListener('touchcancel', resetMagnify, { passive: true });
     }
 
     // Dockを初期化

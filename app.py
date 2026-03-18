@@ -8333,6 +8333,9 @@ def weak_problems_page():
     if 'user_id' not in session:
         flash('ログインが必要です。', 'info')
         return redirect(url_for('login_page'))
+    if not get_room_feature('feature_weak_questions'):
+        flash('この機能は現在ご利用いただけません。', 'warning')
+        return redirect(url_for('index'))
     
     context = get_template_context()
     return render_template('weak_problem.html', **context)
@@ -12541,6 +12544,20 @@ def inject_app_info():
             'is_admin_logged_in': session.get('admin_logged_in', False)
         }
 
+def get_room_feature(feature_name, default=True):
+    """ログイン中ユーザーの部屋設定から機能フラグを取得する。未ログイン時はdefaultを返す。"""
+    user_id = session.get('user_id')
+    if not user_id:
+        return default
+    user = User.query.get(user_id)
+    if not user:
+        return default
+    rs = RoomSetting.query.filter_by(room_number=user.room_number).first()
+    if not rs:
+        return default
+    return getattr(rs, feature_name, default)
+
+
 def get_template_context():
     """全テンプレートで共通に使用するコンテキストを取得"""
     try:
@@ -12775,7 +12792,10 @@ def chronological_index():
     """年代順並び替え問題のセクション一覧ページ"""
     if 'user_id' not in session:
         return redirect(url_for('login_page'))
-    
+    if not get_room_feature('feature_chrono_quiz'):
+        flash('この機能は現在ご利用いただけません。', 'warning')
+        return redirect(url_for('index'))
+
     try:
         # Get all active chapters
         problems = ChronologicalProblem.query.filter_by(enabled=True).all()
@@ -13066,7 +13086,10 @@ def essay_index():
     """論述問題の章一覧ページ"""
     if not session.get('user_id'):
         return redirect(url_for('login_page'))
-    
+    if not get_room_feature('feature_essay_problems'):
+        flash('この機能は現在ご利用いただけません。', 'warning')
+        return redirect(url_for('index'))
+
     try:
         current_user = session.get('username', 'unknown')
         
@@ -16762,6 +16785,9 @@ def api_record_map_quiz_perfect():
 def map_quiz_index():
     if 'user_id' not in session:
         return redirect(url_for('login'))
+    if not get_room_feature('feature_map_quiz'):
+        flash('この機能は現在ご利用いただけません。', 'warning')
+        return redirect(url_for('index'))
 
     # Fetch Genres sorted by order
     genres = MapGenre.query.order_by(MapGenre.display_order).all()
@@ -19207,8 +19233,11 @@ def get_sample_quiz():
 
 @app.route('/columns')
 def columns_page():
+    if session.get('user_id') and not get_room_feature('feature_columns'):
+        flash('この機能は現在ご利用いただけません。', 'warning')
+        return redirect(url_for('index'))
     context = get_template_context()
-    
+
     # DBからコラムデータ取得して構築
     columns_data = {
         'middle': {},
@@ -19577,6 +19606,9 @@ def api_columns_for_home():
 @app.route('/tips')
 def tips_page():
     """学習Tips一覧ページ"""
+    if session.get('user_id') and not get_room_feature('feature_tips'):
+        flash('この機能は現在ご利用いただけません。', 'warning')
+        return redirect(url_for('index'))
     context = get_template_context()
     can_post = False
     if 'user_id' in session:
