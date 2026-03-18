@@ -610,6 +610,110 @@
             display: block;
         }
     }
+
+    /* ── macOS Dock ── */
+    .dock-wrapper {
+        display: flex;
+        justify-content: center;
+        margin: 16px 0 10px;
+    }
+
+    .dock-bar {
+        display: inline-flex;
+        align-items: flex-end;
+        gap: 10px;
+        padding: 10px 22px 14px;
+        background: rgba(255, 255, 255, 0.28);
+        backdrop-filter: blur(24px) saturate(180%);
+        -webkit-backdrop-filter: blur(24px) saturate(180%);
+        border: 1px solid rgba(255, 255, 255, 0.62);
+        border-radius: 24px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.10),
+                    inset 0 1px 0 rgba(255, 255, 255, 0.75);
+        position: relative;
+    }
+
+    .dock-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        cursor: pointer;
+        position: relative;
+        text-decoration: none;
+        border: none;
+        background: none;
+        padding: 0;
+    }
+
+    .dock-icon {
+        width: 52px;
+        height: 52px;
+        border-radius: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        color: white;
+        transform-origin: bottom center;
+        transition: transform 0.12s ease;
+        will-change: transform;
+    }
+
+    .dock-icon.daily   { background: linear-gradient(135deg, #2ecc71, #27ae60); box-shadow: 0 4px 14px rgba(46, 204, 113, 0.45); }
+    .dock-icon.weak    { background: linear-gradient(135deg, #e74c3c, #c0392b); box-shadow: 0 4px 14px rgba(231, 76, 60, 0.45); }
+    .dock-icon.essay   { background: linear-gradient(135deg, #3498db, #2980b9); box-shadow: 0 4px 14px rgba(52, 152, 219, 0.45); }
+    .dock-icon.map     { background: linear-gradient(135deg, #00b894, #00cec9); box-shadow: 0 4px 14px rgba(0, 184, 148, 0.45); }
+    .dock-icon.chrono  { background: linear-gradient(135deg, #f39c12, #e67e22); box-shadow: 0 4px 14px rgba(230, 126, 34, 0.45); }
+    .dock-icon.columns { background: linear-gradient(135deg, #8e44ad, #9b59b6); box-shadow: 0 4px 14px rgba(155, 89, 182, 0.45); }
+    .dock-icon.tips    { background: linear-gradient(135deg, #f1c40f, #f39c12); box-shadow: 0 4px 14px rgba(241, 196, 15, 0.45); }
+
+    .dock-label {
+        position: absolute;
+        bottom: calc(100% + 10px);
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(28, 28, 28, 0.82);
+        color: white;
+        font-size: 0.65rem;
+        font-weight: 600;
+        padding: 3px 9px;
+        border-radius: 6px;
+        white-space: nowrap;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.15s ease;
+        letter-spacing: 0.04em;
+        z-index: 10;
+    }
+
+    .dock-label::after {
+        content: '';
+        position: absolute;
+        top: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        border: 4px solid transparent;
+        border-top-color: rgba(28, 28, 28, 0.82);
+    }
+
+    .dock-item:hover .dock-label,
+    .dock-item:focus .dock-label {
+        opacity: 1;
+    }
+
+    @media (max-width: 767px) {
+        .dock-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            font-size: 1.25rem;
+        }
+
+        .dock-bar {
+            gap: 8px;
+            padding: 8px 16px 12px;
+        }
+    }
 </style>
 {% endblock %}
 
@@ -2129,110 +2233,6 @@
 
         .retreat-title {
             font-size: 1.5rem;
-        }
-    }
-
-    /* ── macOS Dock ── */
-    .dock-wrapper {
-        display: flex;
-        justify-content: center;
-        margin: 16px 0 10px;
-    }
-
-    .dock-bar {
-        display: inline-flex;
-        align-items: flex-end;
-        gap: 10px;
-        padding: 10px 22px 14px;
-        background: rgba(255, 255, 255, 0.28);
-        backdrop-filter: blur(24px) saturate(180%);
-        -webkit-backdrop-filter: blur(24px) saturate(180%);
-        border: 1px solid rgba(255, 255, 255, 0.62);
-        border-radius: 24px;
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.10),
-                    inset 0 1px 0 rgba(255, 255, 255, 0.75);
-        position: relative;
-    }
-
-    .dock-item {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        cursor: pointer;
-        position: relative;
-        text-decoration: none;
-        border: none;
-        background: none;
-        padding: 0;
-    }
-
-    .dock-icon {
-        width: 52px;
-        height: 52px;
-        border-radius: 14px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.5rem;
-        color: white;
-        transform-origin: bottom center;
-        transition: transform 0.12s ease;
-        will-change: transform;
-    }
-
-    .dock-icon.daily   { background: linear-gradient(135deg, #2ecc71, #27ae60); box-shadow: 0 4px 14px rgba(46, 204, 113, 0.45); }
-    .dock-icon.weak    { background: linear-gradient(135deg, #e74c3c, #c0392b); box-shadow: 0 4px 14px rgba(231, 76, 60, 0.45); }
-    .dock-icon.essay   { background: linear-gradient(135deg, #3498db, #2980b9); box-shadow: 0 4px 14px rgba(52, 152, 219, 0.45); }
-    .dock-icon.map     { background: linear-gradient(135deg, #00b894, #00cec9); box-shadow: 0 4px 14px rgba(0, 184, 148, 0.45); }
-    .dock-icon.chrono  { background: linear-gradient(135deg, #f39c12, #e67e22); box-shadow: 0 4px 14px rgba(230, 126, 34, 0.45); }
-    .dock-icon.columns { background: linear-gradient(135deg, #8e44ad, #9b59b6); box-shadow: 0 4px 14px rgba(155, 89, 182, 0.45); }
-    .dock-icon.tips    { background: linear-gradient(135deg, #f1c40f, #f39c12); box-shadow: 0 4px 14px rgba(241, 196, 15, 0.45); }
-
-    .dock-label {
-        position: absolute;
-        bottom: calc(100% + 10px);
-        left: 50%;
-        transform: translateX(-50%);
-        background: rgba(28, 28, 28, 0.82);
-        color: white;
-        font-size: 0.65rem;
-        font-weight: 600;
-        padding: 3px 9px;
-        border-radius: 6px;
-        white-space: nowrap;
-        pointer-events: none;
-        opacity: 0;
-        transition: opacity 0.15s ease;
-        letter-spacing: 0.04em;
-        z-index: 10;
-    }
-
-    .dock-label::after {
-        content: '';
-        position: absolute;
-        top: 100%;
-        left: 50%;
-        transform: translateX(-50%);
-        border: 4px solid transparent;
-        border-top-color: rgba(28, 28, 28, 0.82);
-    }
-
-    .dock-item:hover .dock-label,
-    .dock-item:focus .dock-label {
-        opacity: 1;
-    }
-
-    @media (max-width: 767px) {
-        .dock-icon {
-            width: 44px;
-            height: 44px;
-            border-radius: 12px;
-            font-size: 1.25rem;
-        }
-
-        .dock-bar {
-            gap: 8px;
-            padding: 8px 16px 12px;
         }
     }
 </style>
