@@ -2599,6 +2599,17 @@
         const observer = new MutationObserver(updateDockVisibility);
         targets.forEach(el => observer.observe(el, { attributes: true, attributeFilter: ['class'] }));
         updateDockVisibility();
+
+        // Enterキーで開始ボタンをトリガー（選択画面表示中のみ）
+        document.addEventListener('keydown', (e) => {
+            if (e.key !== 'Enter') return;
+            const tag = document.activeElement.tagName;
+            if (['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON', 'A'].includes(tag)) return;
+            const selectionArea = document.querySelector('.selection-area');
+            if (selectionArea && selectionArea.classList.contains('hidden')) return;
+            const startBtn = document.getElementById('startButton');
+            if (startBtn) startBtn.click();
+        });
     });
 </script>
 {% endblock %}
