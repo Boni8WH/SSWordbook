@@ -2325,6 +2325,48 @@
                                 </p>
                             </div>
 
+                            <!-- Summary Cards -->
+                            <div class="visibility-summary-container mb-4">
+                                <div class="row g-3">
+                                    <div class="col-6 col-md-3">
+                                        <div class="summary-card visible">
+                                            <div class="summary-icon"><i class="fas fa-eye"></i></div>
+                                            <div class="summary-details">
+                                                <div class="summary-label">公開中</div>
+                                                <div class="summary-value"><span id="visibleCount">0</span></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-6 col-md-3">
+                                        <div class="summary-card hidden">
+                                            <div class="summary-icon"><i class="fas fa-eye-slash"></i></div>
+                                            <div class="summary-details">
+                                                <div class="summary-label">非公開</div>
+                                                <div class="summary-value"><span id="hiddenCount">0</span></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-6 col-md-3">
+                                        <div class="summary-card total">
+                                            <div class="summary-icon"><i class="fas fa-list-ul"></i></div>
+                                            <div class="summary-details">
+                                                <div class="summary-label">合計</div>
+                                                <div class="summary-value"><span id="totalCount">0</span></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-6 col-md-3">
+                                        <div class="summary-card rate">
+                                            <div class="summary-icon"><i class="fas fa-percentage"></i></div>
+                                            <div class="summary-details">
+                                                <div class="summary-label">最大公開率</div>
+                                                <div class="summary-value"><span id="visibilityRate">0%</span></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
                             <!-- Grid Container -->
                             <div id="visibilityGrid" class="visibility-grid">
                                 <!-- ヘッダー行 -->
@@ -8629,6 +8671,81 @@
             border-radius: 8px;
             border: 1px solid #dee2e6;
             margin: 0 20px 20px 20px !important;
+        }
+
+        /* Summary Cards Styling */
+        .visibility-summary-container {
+            padding: 0 20px !important;
+            margin-bottom: 25px !important;
+        }
+
+        .summary-card {
+            background: #ffffff !important;
+            border-radius: 12px !important;
+            padding: 15px !important;
+            display: flex !important;
+            align-items: center !important;
+            gap: 15px !important;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05) !important;
+            border: 1px solid #f0f0f0 !important;
+            transition: all 0.3s ease !important;
+            height: 100% !important;
+        }
+
+        .summary-card:hover {
+            transform: translateY(-3px) !important;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08) !important;
+        }
+
+        .summary-icon {
+            width: 45px !important;
+            height: 45px !important;
+            border-radius: 10px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            font-size: 1.2rem !important;
+            flex-shrink: 0 !important;
+        }
+
+        .summary-card.visible .summary-icon {
+            background: rgba(40, 167, 69, 0.1) !important;
+            color: #28a745 !important;
+        }
+
+        .summary-card.hidden .summary-icon {
+            background: rgba(220, 53, 69, 0.1) !important;
+            color: #dc3545 !important;
+        }
+
+        .summary-card.total .summary-icon {
+            background: rgba(52, 58, 64, 0.1) !important;
+            color: #343a40 !important;
+        }
+
+        .summary-card.rate .summary-icon {
+            background: rgba(0, 123, 255, 0.1) !important;
+            color: #007bff !important;
+        }
+
+        .summary-details {
+            min-width: 0 !important;
+        }
+
+        .summary-label {
+            font-size: 0.75rem !important;
+            color: #6c757d !important;
+            font-weight: 600 !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.5px !important;
+            margin-bottom: 2px !important;
+        }
+
+        .summary-value {
+            font-size: 1.25rem !important;
+            font-weight: 700 !important;
+            color: #212529 !important;
+            line-height: 1.2 !important;
         }
 
         /* ========================================

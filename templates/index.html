@@ -494,6 +494,7 @@
         right: 4px;
     }
 
+
     /* カードのガラス風リデザイン */
     .card {
         background: rgba(255, 255, 255, 0.95);
@@ -692,55 +693,6 @@
                 </div>
             </div>
 
-            <!-- ナビカルーセル（PC: 左パネルのフィルター下に表示） -->
-            <div id="navCarouselDesktop" class="nav-carousel">
-                <div class="nav-carousel-track">
-                    {% if feature_daily_quiz %}
-                    <button id="dailyQuizButton" class="nav-card daily">
-                        <i class="fas fa-stopwatch"></i>
-                        <span>今日の10問</span>
-                    </button>
-                    {% endif %}
-                    {% if feature_weak_questions %}
-                    <a href="{{ url_for('weak_problems_page') }}" class="nav-card weak" {% if not session.get('user_id') %}style="display: none;"{% endif %}>
-                        <i class="fas fa-crosshairs"></i>
-                        <span>苦手問題</span>
-                    </a>
-                    {% endif %}
-                    {% if feature_essay_problems %}
-                    <a href="{{ url_for('essay_index') }}" class="nav-card essay">
-                        <i class="fas fa-edit"></i>
-                        <span>論述問題集</span>
-                    </a>
-                    {% endif %}
-                    {% if feature_map_quiz %}
-                    <a href="{{ url_for('map_quiz_index') }}" class="nav-card map">
-                        <i class="fas fa-globe-americas"></i>
-                        <span>地図の深淵</span>
-                    </a>
-                    {% endif %}
-                    {% if feature_chrono_quiz %}
-                    <a href="{{ url_for('chronological_index') }}" class="nav-card chrono">
-                        <i class="fas fa-hourglass-half"></i>
-                        <span>刻の系譜</span>
-                    </a>
-                    {% endif %}
-                    {% if feature_columns %}
-                    <a href="{{ url_for('columns_page') }}" class="nav-card columns">
-                        <i class="fas fa-book-open"></i>
-                        <span>コラム集</span>
-                    </a>
-                    {% endif %}
-                    {% if feature_tips %}
-                    <a href="{{ url_for('tips_page') }}" class="nav-card tips">
-                        <i class="fas fa-lightbulb"></i>
-                        <span>学習Tips</span>
-                    </a>
-                    {% endif %}
-                </div>
-                <button class="nav-carousel-arrow left" aria-label="前へ">&#8249;</button>
-                <button class="nav-carousel-arrow right" aria-label="次へ">&#8250;</button>
-            </div>
         </div>
 
         <div class="range-selection-area">
@@ -788,56 +740,56 @@
         </div>
     </div>
 
-    <!-- ナビカルーセル（スマホ: チャプターリストの下に表示） -->
-    <div id="navCarouselMobile" class="nav-carousel">
-        <div class="nav-carousel-track">
-            {% if feature_daily_quiz %}
-            <button id="dailyQuizButtonMobile" class="nav-card daily">
-                <i class="fas fa-stopwatch"></i>
-                <span>今日の10問</span>
-            </button>
-            {% endif %}
-            {% if feature_weak_questions %}
-            <a href="{{ url_for('weak_problems_page') }}" class="nav-card weak" {% if not session.get('user_id') %}style="display: none;"{% endif %}>
-                <i class="fas fa-crosshairs"></i>
-                <span>苦手問題</span>
-            </a>
-            {% endif %}
-            {% if feature_essay_problems %}
-            <a href="{{ url_for('essay_index') }}" class="nav-card essay">
-                <i class="fas fa-edit"></i>
-                <span>論述問題集</span>
-            </a>
-            {% endif %}
-            {% if feature_map_quiz %}
-            <a href="{{ url_for('map_quiz_index') }}" class="nav-card map">
-                <i class="fas fa-globe-americas"></i>
-                <span>地図の深淵</span>
-            </a>
-            {% endif %}
-            {% if feature_chrono_quiz %}
-            <a href="{{ url_for('chronological_index') }}" class="nav-card chrono">
-                <i class="fas fa-hourglass-half"></i>
-                <span>刻の系譜</span>
-            </a>
-            {% endif %}
-            {% if feature_columns %}
-            <a href="{{ url_for('columns_page') }}" class="nav-card columns">
-                <i class="fas fa-book-open"></i>
-                <span>コラム集</span>
-            </a>
-            {% endif %}
-            {% if feature_tips %}
-            <a href="{{ url_for('tips_page') }}" class="nav-card tips">
-                <i class="fas fa-lightbulb"></i>
-                <span>学習Tips</span>
-            </a>
-            {% endif %}
-        </div>
-        <button class="nav-carousel-arrow left" aria-label="前へ">&#8249;</button>
-        <button class="nav-carousel-arrow right" aria-label="次へ">&#8250;</button>
-    </div>
+
 </section>
+
+<!-- ナビゲーションDock -->
+<div class="dock-wrapper">
+    <div class="dock-bar">
+        {% if feature_daily_quiz %}
+        <button id="dailyQuizButton" class="dock-item" type="button">
+            <div class="dock-icon daily"><i class="fas fa-stopwatch"></i></div>
+            <span class="dock-label">今日の10問</span>
+        </button>
+        {% endif %}
+        {% if feature_weak_questions %}
+        <a href="{{ url_for('weak_problems_page') }}" class="dock-item" {% if not session.get('user_id') %}style="display:none;"{% endif %}>
+            <div class="dock-icon weak"><i class="fas fa-crosshairs"></i></div>
+            <span class="dock-label">苦手問題</span>
+        </a>
+        {% endif %}
+        {% if feature_essay_problems %}
+        <a href="{{ url_for('essay_index') }}" class="dock-item">
+            <div class="dock-icon essay"><i class="fas fa-edit"></i></div>
+            <span class="dock-label">論述問題集</span>
+        </a>
+        {% endif %}
+        {% if feature_map_quiz %}
+        <a href="{{ url_for('map_quiz_index') }}" class="dock-item">
+            <div class="dock-icon map"><i class="fas fa-globe-americas"></i></div>
+            <span class="dock-label">地図の深淵</span>
+        </a>
+        {% endif %}
+        {% if feature_chrono_quiz %}
+        <a href="{{ url_for('chronological_index') }}" class="dock-item">
+            <div class="dock-icon chrono"><i class="fas fa-hourglass-half"></i></div>
+            <span class="dock-label">刻の系譜</span>
+        </a>
+        {% endif %}
+        {% if feature_columns %}
+        <a href="{{ url_for('columns_page') }}" class="dock-item">
+            <div class="dock-icon columns"><i class="fas fa-book-open"></i></div>
+            <span class="dock-label">コラム集</span>
+        </a>
+        {% endif %}
+        {% if feature_tips %}
+        <a href="{{ url_for('tips_page') }}" class="dock-item">
+            <div class="dock-icon tips"><i class="fas fa-lightbulb"></i></div>
+            <span class="dock-label">学習Tips</span>
+        </a>
+        {% endif %}
+    </div>
+</div>
 
 <!-- 今日のコラム & AI厳選ニュース ウィジェット -->
 <div class="row g-3 mb-3 mt-1">
@@ -2179,6 +2131,110 @@
             font-size: 1.5rem;
         }
     }
+
+    /* ── macOS Dock ── */
+    .dock-wrapper {
+        display: flex;
+        justify-content: center;
+        margin: 16px 0 10px;
+    }
+
+    .dock-bar {
+        display: inline-flex;
+        align-items: flex-end;
+        gap: 10px;
+        padding: 10px 22px 14px;
+        background: rgba(255, 255, 255, 0.28);
+        backdrop-filter: blur(24px) saturate(180%);
+        -webkit-backdrop-filter: blur(24px) saturate(180%);
+        border: 1px solid rgba(255, 255, 255, 0.62);
+        border-radius: 24px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.10),
+                    inset 0 1px 0 rgba(255, 255, 255, 0.75);
+        position: relative;
+    }
+
+    .dock-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        cursor: pointer;
+        position: relative;
+        text-decoration: none;
+        border: none;
+        background: none;
+        padding: 0;
+    }
+
+    .dock-icon {
+        width: 52px;
+        height: 52px;
+        border-radius: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        color: white;
+        transform-origin: bottom center;
+        transition: transform 0.12s ease;
+        will-change: transform;
+    }
+
+    .dock-icon.daily   { background: linear-gradient(135deg, #2ecc71, #27ae60); box-shadow: 0 4px 14px rgba(46, 204, 113, 0.45); }
+    .dock-icon.weak    { background: linear-gradient(135deg, #e74c3c, #c0392b); box-shadow: 0 4px 14px rgba(231, 76, 60, 0.45); }
+    .dock-icon.essay   { background: linear-gradient(135deg, #3498db, #2980b9); box-shadow: 0 4px 14px rgba(52, 152, 219, 0.45); }
+    .dock-icon.map     { background: linear-gradient(135deg, #00b894, #00cec9); box-shadow: 0 4px 14px rgba(0, 184, 148, 0.45); }
+    .dock-icon.chrono  { background: linear-gradient(135deg, #f39c12, #e67e22); box-shadow: 0 4px 14px rgba(230, 126, 34, 0.45); }
+    .dock-icon.columns { background: linear-gradient(135deg, #8e44ad, #9b59b6); box-shadow: 0 4px 14px rgba(155, 89, 182, 0.45); }
+    .dock-icon.tips    { background: linear-gradient(135deg, #f1c40f, #f39c12); box-shadow: 0 4px 14px rgba(241, 196, 15, 0.45); }
+
+    .dock-label {
+        position: absolute;
+        bottom: calc(100% + 10px);
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(28, 28, 28, 0.82);
+        color: white;
+        font-size: 0.65rem;
+        font-weight: 600;
+        padding: 3px 9px;
+        border-radius: 6px;
+        white-space: nowrap;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.15s ease;
+        letter-spacing: 0.04em;
+        z-index: 10;
+    }
+
+    .dock-label::after {
+        content: '';
+        position: absolute;
+        top: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        border: 4px solid transparent;
+        border-top-color: rgba(28, 28, 28, 0.82);
+    }
+
+    .dock-item:hover .dock-label,
+    .dock-item:focus .dock-label {
+        opacity: 1;
+    }
+
+    @media (max-width: 767px) {
+        .dock-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            font-size: 1.25rem;
+        }
+
+        .dock-bar {
+            gap: 8px;
+            padding: 8px 16px 12px;
+        }
+    }
 </style>
 <script>
     // Flaskから渡された語彙データを設定
@@ -2290,6 +2346,18 @@
         const count = originals.length;
         if (count === 0) return;
 
+        // ドットインジケーター生成
+        const dotsContainer = container.querySelector('.nav-carousel-dots');
+        const dots = [];
+        if (dotsContainer && count > 1) {
+            for (let i = 0; i < count; i++) {
+                const dot = document.createElement('span');
+                dot.className = 'nav-carousel-dot' + (i === 0 ? ' active' : '');
+                dotsContainer.appendChild(dot);
+                dots.push(dot);
+            }
+        }
+
         const CLONE_COUNT = Math.min(3, count);
         const CARD_W = 110;
         const GAP = 14;
@@ -2352,6 +2420,28 @@
                 card.style.transform = `scale(${scale})`;
                 card.style.opacity = opacity;
             });
+
+            // ドットの更新（中央に最も近いカードのoriginals indexを特定）
+            if (dots.length > 0) {
+                let minDist = Infinity;
+                let activeSrcIdx = 0;
+                allCards.forEach(card => {
+                    const cardRect = card.getBoundingClientRect();
+                    const cardCenterX = cardRect.left + cardRect.width / 2;
+                    const dist = Math.abs(centerX - cardCenterX);
+                    if (dist < minDist) {
+                        minDist = dist;
+                        const srcAttr = card.getAttribute('data-clone-src');
+                        if (srcAttr !== null) {
+                            activeSrcIdx = parseInt(srcAttr);
+                        } else {
+                            const idx = originals.indexOf(card);
+                            if (idx !== -1) activeSrcIdx = idx;
+                        }
+                    }
+                });
+                dots.forEach((dot, i) => dot.classList.toggle('active', i === activeSrcIdx));
+            }
         }
 
         // 初期スクロール位置（最初の本物カードが中央に来るように）
@@ -2448,10 +2538,37 @@
         });
     }
 
-    // 両カルーセルを初期化
+    /* ── macOS Dock マグニファイ ── */
+    function initDock(dockBar) {
+        if (!dockBar) return;
+        const icons = Array.from(dockBar.querySelectorAll('.dock-icon'));
+        const SPREAD = 90;
+        const MAX_SCALE = 0.65;
+        const MAX_LIFT = 14;
+
+        function applyMagnify(mouseX) {
+            icons.forEach(icon => {
+                const rect = icon.getBoundingClientRect();
+                const center = rect.left + rect.width / 2;
+                const dist = Math.abs(mouseX - center);
+                const ratio = Math.max(0, 1 - dist / SPREAD);
+                const scale = 1 + MAX_SCALE * ratio;
+                const lift = MAX_LIFT * ratio;
+                icon.style.transform = `translateY(-${lift}px) scale(${scale})`;
+            });
+        }
+
+        function resetMagnify() {
+            icons.forEach(icon => { icon.style.transform = ''; });
+        }
+
+        dockBar.addEventListener('mousemove', e => applyMagnify(e.clientX));
+        dockBar.addEventListener('mouseleave', resetMagnify);
+    }
+
+    // Dockを初期化
     document.addEventListener('DOMContentLoaded', () => {
-        initNavCarousel(document.getElementById('navCarouselDesktop'));
-        initNavCarousel(document.getElementById('navCarouselMobile'));
+        initDock(document.querySelector('.dock-bar'));
     });
 </script>
 {% endblock %}

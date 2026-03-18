@@ -17,9 +17,21 @@ import psutil
 import requests
 import xml.etree.ElementTree as ET
 import email.utils
-import feedparser
 
 import ctypes  # For malloc_trim
+
+from pywebpush import webpush, WebPushException
+from dotenv import load_dotenv
+
+# .envファイルの内容を環境変数として読み込む
+load_dotenv()
+
+# Gemini API設定
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
+
+import feedparser
+import numpy as np
+from google.genai import types
 
 # Check if memory usage exceeds this threshold (MB)
 MEMORY_THRESHOLD_MB = 350
@@ -48,8 +60,7 @@ import pytz
 from pydantic import BaseModel, Field
 import threading
 from flask_apscheduler import APScheduler
-from pywebpush import webpush, WebPushException
-from dotenv import load_dotenv
+# .env-related imports already handled above
 
 # .envファイルの内容を環境変数として読み込む
 # (basedir定義後に呼び出す)
@@ -103,8 +114,7 @@ def get_genai_client():
     """google.genaiを遅延インポートして設定済みClientを返す（シングルトン）"""
     global _genai_client_instance
     
-    api_key = os.environ.get('GEMINI_API_KEY')
-    if not api_key:
+    if not GEMINI_API_KEY:
         print("⚠️ GEMINI_API_KEYが設定されていません")
         return None
     
@@ -115,7 +125,7 @@ def get_genai_client():
     # 初回のみクライアントを作成
     try:
         from google import genai
-        _genai_client_instance = genai.Client(api_key=api_key)
+        _genai_client_instance = genai.Client(api_key=GEMINI_API_KEY)
         print("✅ Gemini APIクライアントを初期化しました（シングルトン）")
         return _genai_client_instance
     except Exception as e:
@@ -14214,7 +14224,7 @@ def essay_ocr():
 
     # Ensure AI features are enabled for the room
     user_room = session.get('room') or 'default'
-    room_setting = RoomSetting.query.filter_by(room_name=user_room).first()
+    room_setting = RoomSetting.query.filter_by(room_number=user_room).first()
     if room_setting and not room_setting.feature_ai:
         return jsonify({'status': 'error', 'message': 'この機能は現在の部屋では利用できません'}), 403
 
@@ -14270,7 +14280,6 @@ def essay_ocr():
         response = None
         
         # Use types.Part explicitly to avoid mixed type issues
-        from google.genai import types
         content_payload = [
             types.Part.from_text(text=prompt),
             types.Part.from_bytes(data=img_byte_arr, mime_type='image/png')
@@ -14413,21 +14422,27 @@ class TextbookManager:
             gc.collect()
             return []
 
-        # 3. Cosine Similarity Calculation
-        # (Since vectors are normalized, dot product is sufficient, but let's be safe)
-        scores = []
-        for item in self.vectors:
-            vec = np.array(item['vector'])
-            # Cosine similarity: (A . B) / (||A||*||B||)
-            # Assuming embeddings are not guaranteed normalized:
-            norm_q = np.linalg.norm(query_vector)
-            norm_v = np.linalg.norm(vec)
-            if norm_q == 0 or norm_v == 0:
-                score = 0
-            else:
-                score = np.dot(query_vector, vec) / (norm_q * norm_v)
-            
-            scores.append((score, item))
+        try:
+            # 3. Cosine Similarity Calculation
+            # (Since vectors are normalized, dot product is sufficient, but let's be safe)
+            scores = []
+            for item in self.vectors:
+                vec = np.array(item['vector'])
+                # Cosine similarity: (A . B) / (||A||*||B||)
+                # Assuming embeddings are not guaranteed normalized:
+                norm_q = np.linalg.norm(query_vector)
+                norm_v = np.linalg.norm(vec)
+                if norm_q == 0 or norm_v == 0:
+                    score = 0
+                else:
+                    score = np.dot(query_vector, vec) / (norm_q * norm_v)
+                
+                scores.append((score, item))
+        except Exception as sim_err:
+            print(f"⚠️ Similarity calculation failed: {sim_err}")
+            self.vectors = None
+            gc.collect()
+            return []
 
         # 4. Sort & Select
         scores.sort(key=lambda x: x[0], reverse=True)
@@ -14533,7 +14548,7 @@ def essay_grade():
 
     # Ensure AI features are enabled for the room
     user_room = session.get('room') or 'default'
-    room_setting = RoomSetting.query.filter_by(room_name=user_room).first()
+    room_setting = RoomSetting.query.filter_by(room_number=user_room).first()
     if room_setting and not room_setting.feature_ai:
         return jsonify({'status': 'error', 'message': 'この機能は現在の部屋では利用できません'}), 403
 
@@ -14708,10 +14723,6 @@ def essay_grade():
         # ---------------------------------------------------------
         # Prompt Selection based on Style
         # ---------------------------------------------------------
-
-        # ---------------------------------------------------------
-        # Prompt Selection based on Style
-        # ---------------------------------------------------------
         if feedback_style == 'detailed':
             # === 丁寧（詳細）モード ===
             prompt = f"""
@@ -14774,14 +14785,15 @@ def essay_grade():
 
 ## Step 2: 【フィードバック】
 受験生が次にすべきことを伝えよ。
-1. 評価点: 加点箇所。
+1. 評価点: 単に「よく書けている」ではなく、「設問の意図をどう正しく掴めていたか」「どの歴史的用語を適切に因果関係として繋げていたか」など、具体的に加点対象となったプロセスを褒めよ。
 2. 減点対象・改善点: 
    - **注意**: 文字数制約が厳しい(60字以下)問題では、「〜にも触れるべき」といった追加要素の提案は控えよ。誤りや明確な不足点のみを指摘すること。
-   - 誤り、問題文が明示的に求めているにも関わらず不足している視点・要素、復習すべき単元。
+   - 不足点を指摘する際は、単なる用語の欠落としてではなく、「〇〇の記述がないと、△△という結果に至る歴史的因果関係が繋がらない」といった【論理的な理由】を添えて説明せよ。
+   - 「〜の意義を記せ」「〜の推移を説明せよ」といった【問題文の要求に対する直接的な答え（文末表現など）】になっているかを厳しくチェックし、ズレがあれば指摘せよ。
 3. 合格者の思考プロセス（論理構成の組み立て方）:
    - 問題文の着眼点、想起すべき歴史的事象、因果関係の構築手順を箇条書きで示せ。
    - どのように思考すれば満点答案に辿り着けるかをガイドせよ。
-   - **重要**: このセクションは `<div class=\"logic-flow\">` と `</div>` で囲め。
+   - **重要**: このセクションは `<div class="logic-flow">` と `</div>` で囲め。
 
 # Constraints
 - 基準: 高校教科書範囲。大学レベルの特殊な学説は加点しない。採点の正解基準は『教科書データ』のみとする。
@@ -14846,11 +14858,11 @@ def essay_grade():
 - **合計得点**: 上記2項目の合計を必ず計算し、「合計得点: XX/100点」と明記すること。
 
 ## Step 2: 【フィードバック】
-1. 評価点: 簡潔に。
-2. 改善点: 60字以下の問題では、追加要素の提案ではなく、誤りや明確な不足点のみ指摘。
+1. 評価点: 設問の意図の把握や、因果関係の構築など、具体的に良かった思考プロセスを1〜2文で簡潔に褒めよ。
+2. 改善点: 60字以下の問題では追加要素の提案はせず、誤りや明確な不足点のみ指摘。その際、「〇〇がないと△△への因果関係が繋がらない」といった論理的理由を簡潔に添えよ。また、設問の要求（文末表現等）に正しく応えているかも確認せよ。
 3. 合格への思考フロー:
    - 結論に至る論理ステップを `→` で繋いで示せ。
-   - 例: 着眼点 → 想起事項 → 結びつけ
+   - 例: 着眼点 → 想起事項 → 因果関係の結びつけ
    - **重要**: このセクションは `<div class="logic-flow">` と `</div>` で囲め。
 
 # Constraints
@@ -14863,7 +14875,6 @@ def essay_grade():
 """
 
         # Safety settings to avoid blocking legitimate educational content
-        from google.genai import types
         safety_settings = [
             types.SafetySetting(
                 category='HARM_CATEGORY_HARASSMENT',
@@ -15088,11 +15099,13 @@ def essay_grade():
 
             feedback = re.sub(r'<div class="model-rewrite">(.*?)</div>', inject_count, feedback, flags=re.DOTALL)
 
-        except ValueError:
+        except Exception as gen_err:
             # Fallback if response.text fails (e.g., safety block or empty)
-            print(f"Gemini generation error. Finish reason: {response.prompt_feedback}")
-            if response.candidates:
-                 print(f"Candidates: {response.candidates}")
+            print(f"Gemini generation error: {gen_err}")
+            if 'response' in locals() and response:
+                print(f"Prompt Feedback: {getattr(response, 'prompt_feedback', 'N/A')}")
+                if getattr(response, 'candidates', None):
+                    print(f"Candidates: {response.candidates}")
             return jsonify({'status': 'error', 'message': 'AIからの応答が取得できませんでした。時間をおいて再試行するか、入力内容を確認してください。'}), 500
         
         return jsonify({'status': 'success', 'feedback': feedback})

@@ -1,0 +1,727 @@
+{% extends "base.html" %}
+
+{% block title %}取扱説明書 - {{ app_name }}
+{% block footer %}{% endblock %}
+{% block info_icon %}{% endblock %}
+{% endblock %}
+
+{% block head_extra %}
+<style>
+    .manual-container {
+        max-width: 900px;
+        margin: 0 auto;
+    }
+
+    .manual-toc {
+        background: #f8f9fa;
+        border: 1px solid #e9ecef;
+        border-radius: 12px;
+        padding: 24px 28px;
+        margin-bottom: 32px;
+    }
+
+    .manual-toc h2 {
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: #2c3e50;
+        margin-bottom: 16px;
+        padding-bottom: 8px;
+        border-bottom: 2px solid #4a90e2;
+    }
+
+    .manual-toc ol {
+        padding-left: 20px;
+        margin-bottom: 0;
+    }
+
+    .manual-toc li {
+        margin-bottom: 6px;
+    }
+
+    .manual-toc a {
+        color: #4a90e2;
+        text-decoration: none;
+        font-size: 0.95rem;
+    }
+
+    .manual-toc a:hover {
+        text-decoration: underline;
+        color: #2c6fba;
+    }
+
+    .manual-toc .toc-sub {
+        padding-left: 20px;
+        margin-top: 4px;
+        list-style-type: disc;
+    }
+
+    .manual-toc .toc-sub li {
+        margin-bottom: 3px;
+    }
+
+    .manual-section {
+        margin-bottom: 40px;
+        scroll-margin-top: 80px;
+    }
+
+    .manual-section h2 {
+        font-size: 1.35rem;
+        font-weight: 800;
+        color: #2c3e50;
+        border-left: 5px solid #4a90e2;
+        padding-left: 14px;
+        margin-bottom: 18px;
+    }
+
+    .manual-section h3 {
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: #34495e;
+        margin-top: 20px;
+        margin-bottom: 10px;
+        padding-bottom: 4px;
+        border-bottom: 1px solid #eee;
+    }
+
+    .manual-section p,
+    .manual-section li {
+        font-size: 0.95rem;
+        line-height: 1.75;
+        color: #444;
+    }
+
+    .manual-section ul,
+    .manual-section ol {
+        padding-left: 22px;
+    }
+
+    .manual-section li {
+        margin-bottom: 4px;
+    }
+
+    .manual-badge {
+        display: inline-block;
+        padding: 2px 10px;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        vertical-align: middle;
+    }
+
+    .badge-login {
+        background: #e3f2fd;
+        color: #1565c0;
+    }
+
+    .badge-guest {
+        background: #e8f5e9;
+        color: #2e7d32;
+    }
+
+    .manual-tip {
+        background: #fffde7;
+        border-left: 4px solid #fbc02d;
+        padding: 12px 16px;
+        border-radius: 0 8px 8px 0;
+        margin: 12px 0;
+        font-size: 0.9rem;
+    }
+
+    .manual-tip i {
+        color: #f9a825;
+        margin-right: 6px;
+    }
+
+    .manual-note {
+        background: #e3f2fd;
+        border-left: 4px solid #42a5f5;
+        padding: 12px 16px;
+        border-radius: 0 8px 8px 0;
+        margin: 12px 0;
+        font-size: 0.9rem;
+    }
+
+    .manual-note i {
+        color: #1e88e5;
+        margin-right: 6px;
+    }
+
+    .manual-warn {
+        background: #fce4ec;
+        border-left: 4px solid #ef5350;
+        padding: 12px 16px;
+        border-radius: 0 8px 8px 0;
+        margin: 12px 0;
+        font-size: 0.9rem;
+    }
+
+    .manual-warn i {
+        color: #e53935;
+        margin-right: 6px;
+    }
+
+    .back-to-toc {
+        font-size: 0.8rem;
+        color: #999;
+        text-decoration: none;
+    }
+
+    .back-to-toc:hover {
+        color: #4a90e2;
+    }
+
+    .feature-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.9rem;
+        margin: 12px 0;
+    }
+
+    .feature-table th,
+    .feature-table td {
+        padding: 10px 14px;
+        border: 1px solid #e9ecef;
+        text-align: left;
+    }
+
+    .feature-table th {
+        background: #f1f3f5;
+        font-weight: 700;
+        color: #495057;
+        white-space: nowrap;
+    }
+
+    .feature-table tr:nth-child(even) {
+        background: #fafbfc;
+    }
+
+    @media (max-width: 768px) {
+        .manual-toc {
+            padding: 16px 18px;
+        }
+
+        .manual-section h2 {
+            font-size: 1.15rem;
+        }
+
+        .feature-table {
+            font-size: 0.8rem;
+        }
+
+        .feature-table th,
+        .feature-table td {
+            padding: 7px 10px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="manual-container">
+        <!-- ヘッダー -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-primary text-white">
+                <h1 class="h3 mb-0"><i class="fas fa-book me-2"></i>{{ app_name }} 取扱説明書</h1>
+            </div>
+            <div class="card-body p-4">
+                <p class="text-muted mb-2">本ページでは {{ app_name }} の各機能と操作方法を詳しく解説しています。</p>
+                <p class="text-muted mb-0" style="font-size: 0.85rem;">最終更新日: 2026年3月17日</p>
+            </div>
+        </div>
+
+        <!-- 目次 -->
+        <nav class="manual-toc" id="toc">
+            <h2><i class="fas fa-list me-2"></i>目次</h2>
+            <ol>
+                <li><a href="#sec-overview">サービス概要</a></li>
+                <li>
+                    <a href="#sec-account">アカウントとログイン</a>
+                    <ul class="toc-sub">
+                        <li><a href="#sec-login">ログイン方法</a></li>
+                        <li><a href="#sec-password">パスワード・ユーザー名の変更</a></li>
+                    </ul>
+                </li>
+                <li>
+                    <a href="#sec-quiz">一問一答（メインクイズ）</a>
+                    <ul class="toc-sub">
+                        <li><a href="#sec-quiz-settings">出題設定</a></li>
+                        <li><a href="#sec-quiz-modes">出題モード</a></li>
+                        <li><a href="#sec-quiz-answer">解答方法</a></li>
+                        <li><a href="#sec-quiz-voice">音声入力</a></li>
+                    </ul>
+                </li>
+                <li><a href="#sec-daily">今日の10問</a></li>
+                <li><a href="#sec-weak">苦手問題</a></li>
+                <li>
+                    <a href="#sec-essay">論述問題演習</a>
+                    <ul class="toc-sub">
+                        <li><a href="#sec-essay-browse">問題の閲覧</a></li>
+                        <li><a href="#sec-essay-ai">AI添削機能</a></li>
+                        <li><a href="#sec-essay-ocr">手書きOCR</a></li>
+                        <li><a href="#sec-essay-correction">添削リクエスト</a></li>
+                    </ul>
+                </li>
+                <li><a href="#sec-chrono">年代順並び替え問題</a></li>
+                <li><a href="#sec-map">地図クイズ</a></li>
+                <li><a href="#sec-rpg">RPGモード</a></li>
+                <li><a href="#sec-progress">進捗管理・成績確認</a></li>
+                <li><a href="#sec-news">今日のニュース</a></li>
+                <li><a href="#sec-columns">コラム</a></li>
+                <li><a href="#sec-tips">勉強法・Tips</a></li>
+                <li><a href="#sec-announcements">お知らせ</a></li>
+                <li><a href="#sec-notification">通知機能</a></li>
+                <li><a href="#sec-pwa">PWA（アプリとしての利用）</a></li>
+                <li><a href="#sec-sample">サンプルクイズ（ログイン不要）</a></li>
+                <li><a href="#sec-faq">よくある質問</a></li>
+            </ol>
+        </nav>
+
+        <!-- 1. サービス概要 -->
+        <section class="manual-section" id="sec-overview">
+            <h2>1. サービス概要</h2>
+            <p>
+                {{ app_name }} は、社会科（主に世界史）の学習を支援するWebアプリケーションです。
+                一問一答形式のクイズ、論述問題のAI添削、年代順並び替え、地図クイズ、RPGモードなど
+                多彩な学習機能を搭載しています。
+            </p>
+            <p>クラス・部屋単位でユーザーを管理し、担当者（マネージャー）が出題範囲や設定を柔軟にコントロールできます。</p>
+
+            <table class="feature-table">
+                <thead>
+                    <tr>
+                        <th>機能</th>
+                        <th>概要</th>
+                        <th>対象</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>一問一答</td>
+                        <td>章・単元ごとの選択式クイズ</td>
+                        <td><span class="manual-badge badge-login">ログインユーザー</span></td>
+                    </tr>
+                    <tr>
+                        <td>今日の10問</td>
+                        <td>毎日更新される日替わりクイズ</td>
+                        <td><span class="manual-badge badge-login">ログインユーザー</span></td>
+                    </tr>
+                    <tr>
+                        <td>論述問題演習</td>
+                        <td>大学入試レベルの論述問題＋AI添削</td>
+                        <td><span class="manual-badge badge-login">ログインユーザー</span></td>
+                    </tr>
+                    <tr>
+                        <td>年代順並び替え</td>
+                        <td>歴史イベントの年代順ドラッグ＆ドロップ</td>
+                        <td><span class="manual-badge badge-login">ログインユーザー</span></td>
+                    </tr>
+                    <tr>
+                        <td>地図クイズ</td>
+                        <td>地図上の場所をクリックして解答</td>
+                        <td><span class="manual-badge badge-login">ログインユーザー</span></td>
+                    </tr>
+                    <tr>
+                        <td>RPGモード</td>
+                        <td>敵とバトルしながら問題を解くゲーミフィケーション</td>
+                        <td><span class="manual-badge badge-login">ログインユーザー</span></td>
+                    </tr>
+                    <tr>
+                        <td>コラム</td>
+                        <td>歴史の背景を深掘りする教育記事</td>
+                        <td><span class="manual-badge badge-guest">ゲスト閲覧可</span></td>
+                    </tr>
+                    <tr>
+                        <td>サンプルクイズ</td>
+                        <td>ログイン不要で10問のお試しクイズ</td>
+                        <td><span class="manual-badge badge-guest">ゲスト閲覧可</span></td>
+                    </tr>
+                </tbody>
+            </table>
+            <a href="#toc" class="back-to-toc"><i class="fas fa-arrow-up me-1"></i>目次に戻る</a>
+        </section>
+
+        <!-- 2. アカウントとログイン -->
+        <section class="manual-section" id="sec-account">
+            <h2>2. アカウントとログイン</h2>
+
+            <h3 id="sec-login">ログイン方法</h3>
+            <p>ログインページから、部屋番号・出席番号・個人パスワードを入力してログインします。</p>
+            <div class="manual-tip">
+                <i class="fas fa-lightbulb"></i>「ログインを記憶する」にチェックを入れると、次回からパスワード入力を省略できます。
+            </div>
+
+            <h3 id="sec-password">パスワード・ユーザー名の変更</h3>
+            <ul>
+                <li><strong>パスワード変更:</strong> ログインページの「パスワード変更」リンクから変更ができます。</li>
+                <li><strong>ユーザー名変更:</strong> ログイン後、画面右上の設定（歯車アイコン）からパスワードを変更できます。</li>
+                <li><strong>パスワードリセット:</strong> パスワードを忘れた場合は、ログインページの「パスワードを忘れた場合」リンクからリセットをリクエストできます。</li>
+            </ul>
+            <div class="manual-note">
+                <i class="fas fa-info-circle"></i>初回ログイン時にパスワードの変更を求められる場合があります。
+            </div>
+            <a href="#toc" class="back-to-toc"><i class="fas fa-arrow-up me-1"></i>目次に戻る</a>
+        </section>
+
+        <!-- 3. 一問一答 -->
+        <section class="manual-section" id="sec-quiz">
+            <h2>3. 一問一答（メインクイズ）</h2>
+            <p>ログイン後のメイン画面から利用できる、{{ app_name }} の中核となる学習機能です。</p>
+
+            <h3 id="sec-quiz-settings">出題設定</h3>
+            <ul>
+                <li><strong>出題数の選択:</strong> 10問 / 20問 / 50問 / 全問 から選択できます。</li>
+                <li><strong>章・単元の選択:</strong> 出題範囲を章ごとに選択します。各章を展開して単元単位での選択も可能です。「全選択」ボタンで章内の全単元を一括選択できます。</li>
+                <li><strong>フィルター:</strong>「未回答のみ」などのフィルターで出題範囲を絞り込めます。</li>
+            </ul>
+            <div class="manual-note">
+                <i class="fas fa-info-circle"></i>利用可能な章・単元は、担当者（マネージャー）が設定した範囲に限定されます。
+            </div>
+
+            <h3 id="sec-quiz-modes">出題モード</h3>
+            <table class="feature-table">
+                <thead>
+                    <tr>
+                        <th>モード</th>
+                        <th>説明</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>通常モード</td>
+                        <td>選択した範囲からランダムに出題されます。</td>
+                    </tr>
+                    <tr>
+                        <td>克服モード</td>
+                        <td>過去に間違えた苦手問題を集中的に出題します。</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3 id="sec-quiz-answer">解答方法</h3>
+            <ol>
+                <li>問題文が表示されます。</li>
+                <li>「答えを見る」ボタンをタップすると、正解が表示されます。</li>
+                <li>自分の回答と照らし合わせて、「正解」または「不正解」ボタンを押して自己判定します。</li>
+                <li>全問終了後、結果画面に正答率がグラフで表示されます。</li>
+            </ol>
+            <div class="manual-note">
+                <i class="fas fa-info-circle"></i>文字サイズは画面右下の「＋」「−」ボタンで調整できます（パソコン・タブレットのみ）。
+            </div>
+            <div class="manual-tip">
+                <i class="fas fa-lightbulb"></i>結果画面にある「論述チャレンジ」から関連する論述問題に直接挑戦できます。
+            </div>
+
+            <h3 id="sec-quiz-voice">音声入力</h3>
+            <p>マイクボタンを使って、声で解答することができます。</p>
+            <ol>
+                <li>問題カード画面に表示される赤いマイクボタンをタップします。</li>
+                <li>解答を声に出して読み上げます（日本語認識）。</li>
+                <li>AIが音声を認識し、正解と自動的に照合して正誤判定を行います。</li>
+            </ol>
+            <div class="manual-note">
+                <i class="fas fa-info-circle"></i>音声入力は Chrome や Safari など、Web Speech API に対応したブラウザでのみ利用可能です。
+            </div>
+            <a href="#toc" class="back-to-toc"><i class="fas fa-arrow-up me-1"></i>目次に戻る</a>
+        </section>
+
+        <!-- 4. 今日の10問 -->
+        <section class="manual-section" id="sec-daily">
+            <h2>4. 今日の10問</h2>
+            <p>毎日更新される日替わりクイズです。全ユーザー共通の問題が出題されます。</p>
+            <ul>
+                <li>メイン画面に「今日の10問」カードが表示されます。</li>
+                <li>1日1回挑戦可能です。</li>
+                <li>結果は記録され、部屋全体での成績を確認できます。</li>
+            </ul>
+            <div class="manual-note">
+                <i class="fas fa-info-circle"></i>今日の10問は管理者が設定・配信する問題が出題されます。
+            </div>
+            <a href="#toc" class="back-to-toc"><i class="fas fa-arrow-up me-1"></i>目次に戻る</a>
+        </section>
+
+        <!-- 5. 苦手問題 -->
+        <section class="manual-section" id="sec-weak">
+            <h2>5. 苦手問題</h2>
+            <p>過去の学習結果をもとに、正答率の低い問題を「苦手問題」として自動集計します。</p>
+            <ul>
+                <li>メニューの「苦手問題」からアクセスできます。</li>
+                <li>苦手問題の一覧をカテゴリ別に確認できます。</li>
+                <li>一問一答の「克服モード」と連携して、苦手問題に集中して取り組めます。</li>
+            </ul>
+            <a href="#toc" class="back-to-toc"><i class="fas fa-arrow-up me-1"></i>目次に戻る</a>
+        </section>
+
+        <!-- 6. 論述問題演習 -->
+        <section class="manual-section" id="sec-essay">
+            <h2>6. 論述問題演習</h2>
+            <p>大学入試レベルの論述問題に挑戦し、AIによる自動添削を受けられる機能です。</p>
+
+            <h3 id="sec-essay-browse">問題の閲覧</h3>
+            <ul>
+                <li><strong>章別一覧:</strong> 学習中の章に対応した論述問題を表示します。</li>
+                <li><strong>大学別一覧:</strong> カスタム検索ページで、出典大学ごとに問題を絞り込めます。キーワード検索やフィルター機能も搭載しています。</li>
+                <li>各問題には出典大学名・出題年・難易度が表示されます。</li>
+            </ul>
+            <div class="manual-note">
+                <i class="fas fa-info-circle"></i>閲覧可能な問題は、担当者（マネージャー）が各部屋ごとに公開設定を行っています。
+            </div>
+
+            <h3 id="sec-essay-ai">AI添削機能</h3>
+            <p>Google Gemini APIを活用したAI添削機能です。</p>
+            <ol>
+                <li>論述問題の画面下部にある解答欄にテキストを入力します。</li>
+                <li>「AI添削を受ける」ボタンをクリックすると、AIが採点・添削します。</li>
+                <li>改善点などがフィードバックされます。</li>
+            </ol>
+            <div class="manual-warn">
+                <i class="fas fa-exclamation-triangle"></i>AI添削の結果はあくまで参考情報です。実際の入試採点とは異なる場合があります。
+            </div>
+
+            <h3 id="sec-essay-ocr">手書きOCR</h3>
+            <p>手書きの解答をカメラで撮影し、テキストに変換する機能です。</p>
+            <ol>
+                <li>論述問題画面の「プリント読込」タブをタップします。</li>
+                <li>手書き解答の画像をアップロードします。</li>
+                <li>AIが文字認識（OCR）を行い、テキストに変換します。</li>
+                <li>変換結果を確認・修正した上で、AI添削に進めます。</li>
+            </ol>
+
+            <h3 id="sec-essay-correction">添削リクエスト</h3>
+            <p>AI添削とは別に、管理者に直接添削をリクエストすることも可能です。</p>
+            <ul>
+                <li>「添削依頼」から解答を送信します。</li>
+                <li>管理者が手動で添削を行い、コメントが返されます。</li>
+                <li>「添削履歴」ページから過去の添削結果を確認できます。</li>
+            </ul>
+            <a href="#toc" class="back-to-toc"><i class="fas fa-arrow-up me-1"></i>目次に戻る</a>
+        </section>
+
+        <!-- 7. 年代順並び替え -->
+        <section class="manual-section" id="sec-chrono">
+            <h2>7. 年代順並び替え問題</h2>
+            <p>歴史上の出来事を正しい年代順に並び替える問題です。</p>
+            <ol>
+                <li>セクション（章）を選択します。</li>
+                <li>表示された歴史イベントカードをドラッグ＆ドロップで年代順に並べます。</li>
+                <li>「解答する」ボタンで判定されます。</li>
+            </ol>
+            <table class="feature-table">
+                <thead>
+                    <tr>
+                        <th>難易度</th>
+                        <th>説明</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>易</td>
+                        <td>基本的な出来事の順序問題</td>
+                    </tr>
+                    <tr>
+                        <td>標準</td>
+                        <td>標準的な難易度</td>
+                    </tr>
+                    <tr>
+                        <td>難</td>
+                        <td>細かい年代の知識が必要</td>
+                    </tr>
+                    <tr>
+                        <td>最難関</td>
+                        <td>上級者向けの高難度問題</td>
+                    </tr>
+                </tbody>
+            </table>
+            <a href="#toc" class="back-to-toc"><i class="fas fa-arrow-up me-1"></i>目次に戻る</a>
+        </section>
+
+        <!-- 8. 地図クイズ -->
+        <section class="manual-section" id="sec-map">
+            <h2>8. 地図クイズ</h2>
+            <p>歴史地図上の場所を特定するクイズです。</p>
+            <ol>
+                <li>ジャンルを選択してクイズを開始します。</li>
+                <li>地図と問題文が表示されます。</li>
+                <li>地図上の正しい場所をクリック（タップ）して解答します。</li>
+                <li>正解・不正解がフィードバックされ、正しい位置が表示されます。</li>
+            </ol>
+            <p>全問正解すると「習得」として記録されます。</p>
+            <a href="#toc" class="back-to-toc"><i class="fas fa-arrow-up me-1"></i>目次に戻る</a>
+        </section>
+
+        <!-- 9. RPGモード -->
+        <section class="manual-section" id="sec-rpg">
+            <h2>9. RPGモード</h2>
+            <p>クイズに正解して敵を倒していく、ゲーミフィケーション機能です。</p>
+            <ol>
+                <li>特定のスコアに達成した際に表示されるRPGバナーをタップするとバトルが開始されます。</li>
+                <li>敵キャラクターが表示され、クイズに正解するとダメージを与えられます。</li>
+                <li>敵を倒すと「称号」を獲得でき、プロフィールに装着できます。</li>
+                <li>倒した敵は「再戦」で何度でも挑戦できます。</li>
+            </ol>
+            <div class="manual-tip">
+                <i class="fas fa-lightbulb"></i>獲得した称号は、設定によりナビゲーションバーのユーザー名の横に表示されます。
+            </div>
+            <a href="#toc" class="back-to-toc"><i class="fas fa-arrow-up me-1"></i>目次に戻る</a>
+        </section>
+
+        <!-- 10. 進捗管理 -->
+        <section class="manual-section" id="sec-progress">
+            <h2>10. 進捗管理・成績確認</h2>
+            <p>学習の進捗をグラフやランキングで可視化できます。</p>
+            <ul>
+                <li><strong>個人進捗:</strong> 章ごとの正答率、学習済み問題数をグラフで表示します。</li>
+                <li><strong>ランキング:</strong> 同じ部屋のユーザーとの成績比較ができます（部屋内ランキング）。</li>
+                <li><strong>月次スコア:</strong> 月ごとの学習成績の推移を確認できます。</li>
+                <li><strong>成績詳細:</strong> 章別・単元別の詳細な正答率を確認できます。</li>
+            </ul>
+            <p>進捗ページへは、ナビゲーションバーのグラフアイコンからアクセスできます。</p>
+            <a href="#toc" class="back-to-toc"><i class="fas fa-arrow-up me-1"></i>目次に戻る</a>
+        </section>
+
+        <!-- 11. 今日のニュース -->
+        <section class="manual-section" id="sec-news">
+            <h2>11. 今日のニュース</h2>
+            <p>時事ニュースを社会科学習に活かす機能です。</p>
+            <ul>
+                <li>外部報道機関のRSSフィードから最新ニュースを取得・表示します。</li>
+                <li>各ニュースにはAIが生成した「学びのポイント」が付与されます。</li>
+                <li><strong>アーカイブ:</strong> 過去のニュースをカレンダー形式で振り返ることができます。</li>
+                <li><strong>検索:</strong> キーワードで過去のニュースを検索できます。</li>
+            </ul>
+            <div class="manual-note">
+                <i class="fas fa-info-circle"></i>ニュース記事のリンクは外部サイトに遷移します。「学びのポイント」は当サービスのAIが独自に作成した学習支援コンテンツです。
+            </div>
+            <a href="#toc" class="back-to-toc"><i class="fas fa-arrow-up me-1"></i>目次に戻る</a>
+        </section>
+
+        <!-- 12. コラム -->
+        <section class="manual-section" id="sec-columns">
+            <h2>12. コラム</h2>
+            <p>歴史の背景を深く掘り下げた教育記事を読むことができます。</p>
+            <ul>
+                <li>ログインしなくても閲覧可能です。</li>
+                <li>「いいね」機能で気に入ったコラムにリアクションできます。</li>
+                <li>閲覧数が記録され、人気のコラムを把握できます。</li>
+            </ul>
+            <a href="#toc" class="back-to-toc"><i class="fas fa-arrow-up me-1"></i>目次に戻る</a>
+        </section>
+
+        <!-- 13. 勉強法・Tips -->
+        <section class="manual-section" id="sec-tips">
+            <h2>13. 勉強法・Tips</h2>
+            <p>学習に役立つ勉強法やアドバイスを閲覧・共有できます。</p>
+            <ul>
+                <li>ユーザーが投稿したTipsが一覧で表示されます。</li>
+                <li>タグで分類されており、関心のある分野を絞り込めます。</li>
+                <li>「いいね」で参考になったTipsにリアクションできます。</li>
+            </ul>
+            <a href="#toc" class="back-to-toc"><i class="fas fa-arrow-up me-1"></i>目次に戻る</a>
+        </section>
+
+        <!-- 14. お知らせ -->
+        <section class="manual-section" id="sec-announcements">
+            <h2>14. お知らせ</h2>
+            <p>管理者からのお知らせ・アナウンスを確認できます。</p>
+            <ul>
+                <li>新しいお知らせがある場合、メイン画面にバナーが表示されます。</li>
+                <li>閲覧済みのお知らせは既読として記録されます。</li>
+            </ul>
+            <a href="#toc" class="back-to-toc"><i class="fas fa-arrow-up me-1"></i>目次に戻る</a>
+        </section>
+
+        <!-- 15. 通知機能 -->
+        <section class="manual-section" id="sec-notification">
+            <h2>15. 通知機能</h2>
+            <p>ブラウザのプッシュ通知に対応しています。</p>
+            <ul>
+                <li>設定メニューから通知のON/OFFを切り替えられます。</li>
+                <li>新しいお知らせ、添削結果の返却などをプッシュ通知で受け取れます。</li>
+                <li>通知を有効にするには、ブラウザの通知許可が必要です。</li>
+            </ul>
+            <div class="manual-tip">
+                <i class="fas fa-lightbulb"></i>PWAとしてホーム画面に追加すると、より確実に通知を受け取れます。
+            </div>
+            <a href="#toc" class="back-to-toc"><i class="fas fa-arrow-up me-1"></i>目次に戻る</a>
+        </section>
+
+        <!-- 16. PWA -->
+        <section class="manual-section" id="sec-pwa">
+            <h2>16. PWA（アプリとしての利用）</h2>
+            <p>{{ app_name }} はPWA（Progressive Web App）に対応しています。スマートフォンのホーム画面に追加すると、ネイティブアプリのように利用できます。</p>
+            <h3>ホーム画面への追加方法</h3>
+            <table class="feature-table">
+                <thead>
+                    <tr>
+                        <th>ブラウザ</th>
+                        <th>手順</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Safari（iPhone）</td>
+                        <td>共有ボタン → 「ホーム画面に追加」をタップ</td>
+                    </tr>
+                    <tr>
+                        <td>Chrome（Android）</td>
+                        <td>メニュー（…） → 「ホーム画面に追加」をタップ</td>
+                    </tr>
+                    <tr>
+                        <td>Chrome（PC）</td>
+                        <td>アドレスバー右のインストールアイコンをクリック</td>
+                    </tr>
+                </tbody>
+            </table>
+            <a href="#toc" class="back-to-toc"><i class="fas fa-arrow-up me-1"></i>目次に戻る</a>
+        </section>
+
+        <!-- 19. サンプルクイズ -->
+        <section class="manual-section" id="sec-sample">
+            <h2>17. サンプルクイズ（ログイン不要）</h2>
+            <p>トップページ（ランディングページ）にて、ログインせずに10問の4択クイズに挑戦できます。</p>
+            <ul>
+                <li>ランダムに10問が出題されます。</li>
+                <li>学習データの記録は行われません。</li>
+                <li>サービスの雰囲気を体験するためのお試し機能です。</li>
+            </ul>
+            <a href="#toc" class="back-to-toc"><i class="fas fa-arrow-up me-1"></i>目次に戻る</a>
+        </section>
+
+        <!-- 20. よくある質問 -->
+        <section class="manual-section" id="sec-faq">
+            <h2>18. よくある質問</h2>
+
+            <h3>Q. パスワードを忘れました</h3>
+            <p>A. ログインページの「パスワードを忘れた方」リンクからリセットをリクエストしてください。管理者の承認後、新しいパスワードを設定できます。</p>
+
+            <h3>Q. 出題範囲が限定されています</h3>
+            <p>A. 部屋の担当者（マネージャー）が出題範囲を設定しています。授業の進度に合わせて範囲が拡張されますので、担当者にご確認ください。</p>
+
+            <h3>Q. AI添削が利用できません</h3>
+            <p>A. AI添削機能は管理者がONに設定している場合のみ利用可能です。また、サーバー側の設定（APIキー）が必要です。利用できない場合は管理者にお問い合わせください。</p>
+
+            <h3>Q. RPGモードが表示されません</h3>
+            <p>A. RPGモードは管理者が機能をONにしている部屋でのみ利用できます。担当者または管理者にお問い合わせください。</p>
+
+            <h3>Q. 通知が届きません</h3>
+            <p>A. 以下を確認してください：</p>
+            <ol>
+                <li>ブラウザの通知設定で当サイトの通知が「許可」になっているか</li>
+                <li>設定メニューで通知がONになっているか</li>
+                <li>端末の通知設定でブラウザの通知がONになっているか</li>
+            </ol>
+
+            <h3>Q. スマートフォンで文字が小さいです</h3>
+            <p>A. ピンチイン・ピンチアウトで拡大縮小できます。また、PWAとしてホーム画面に追加すると、より快適に利用できます。</p>
+            <a href="#toc" class="back-to-toc"><i class="fas fa-arrow-up me-1"></i>目次に戻る</a>
+        </section>
+
+        <!-- フッター -->
+        <div class="text-center mt-5 mb-4">
+            <a href="{{ url_for('index') }}" class="btn btn-outline-primary me-2">
+                <i class="fas fa-home me-2"></i>トップページに戻る
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
