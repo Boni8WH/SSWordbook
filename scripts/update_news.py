@@ -55,7 +55,7 @@ def save_to_db(archive_date, data):
         return False
 
 def get_prev_titles_from_db():
-    """DBから過去3回分の記事タイトルを取得"""
+    """DBから過去7日分の記事タイトルを取得"""
     database_url = os.environ.get('DATABASE_URL', '')
     if not database_url:
         return []
@@ -66,7 +66,7 @@ def get_prev_titles_from_db():
         engine = sqlalchemy.create_engine(database_url)
         with engine.connect() as conn:
             rows = conn.execute(
-                sqlalchemy.text("SELECT data_json FROM news_archive ORDER BY updated_at DESC LIMIT 3")
+                sqlalchemy.text("SELECT data_json FROM news_archive ORDER BY date DESC LIMIT 7")
             ).fetchall()
         titles = []
         for row in rows:
@@ -82,6 +82,49 @@ def get_prev_titles_from_db():
     except Exception as e:
         print(f"⚠️ DB履歴取得エラー: {e}")
         return []
+
+
+def get_prev_titles_from_local():
+    """ローカルの news_history.json から過去記事タイトルを取得"""
+    history_path = os.path.join(basedir, 'data', 'news_history.json')
+    if not os.path.exists(history_path):
+        return []
+    try:
+        with open(history_path, 'r', encoding='utf-8') as f:
+            history = json.load(f)
+        titles = []
+        for entry in history:
+            for t in entry.get('titles', []):
+                if t:
+                    titles.append(t)
+        return titles
+    except Exception:
+        return []
+
+
+def update_news_history(archive_date, articles):
+    """news_history.json に今回の記事タイトルを記録（日付単位、最大7日分保持）"""
+    history_path = os.path.join(basedir, 'data', 'news_history.json')
+    try:
+        history = []
+        if os.path.exists(history_path):
+            with open(history_path, 'r', encoding='utf-8') as f:
+                history = json.load(f)
+        # 同じ日付のエントリは上書き
+        history = [e for e in history if e.get('date') != archive_date]
+        history.append({
+            'date': archive_date,
+            'titles': [a.get('title', '') for a in articles if a.get('title')],
+            'updated_at': datetime.now(JST).isoformat()
+        })
+        # 日付の新しい順に並べて最大7日分に絞る
+        history.sort(key=lambda e: e.get('date', ''), reverse=True)
+        history = history[:7]
+        with open(history_path, 'w', encoding='utf-8') as f:
+            json.dump(history, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"⚠️ news_history.json 更新失敗: {e}")
+
 
 JST = pytz.timezone('Asia/Tokyo')
 
@@ -196,19 +239,12 @@ def get_gemini_summary(news_items):
         # ニュース項目をプロンプト用に整形（全件渡す）
         news_text = "\n".join([f"- [{item['source']}] {item['title']} (PubDate: {item.get('pub_date')}): {item['description']} (URL: {item['link']})" for item in news_items])
         
-        # 過去3回分の選出記事タイトルを取得して、重複を避ける
+        # 過去7日分の選出記事タイトルを取得して、重複を避ける
         prev_articles_text = "なし"
         prev_titles = get_prev_titles_from_db()
         if not prev_titles:
-            # DBが使えない場合はローカルファイルから
-            json_path = os.path.join(basedir, 'data', 'featured_article.json')
-            if os.path.exists(json_path):
-                try:
-                    with open(json_path, 'r', encoding='utf-8') as f:
-                        prev_data = json.load(f)
-                        prev_titles = [a.get('title') for a in prev_data.get('articles', [])]
-                except Exception:
-                    pass
+            # DBが使えない場合はローカル履歴ファイルから
+            prev_titles = get_prev_titles_from_local()
         if prev_titles:
             prev_articles_text = ", ".join(t for t in prev_titles if t)
 
@@ -338,6 +374,9 @@ def update_news():
 
         # DBに保存（最優先）
         save_to_db(archive_date, data)
+
+        # ローカル履歴を更新（重複排除に使用）
+        update_news_history(archive_date, data['articles'])
 
         # ローカルファイルにも保存（キャッシュ）
         try:
