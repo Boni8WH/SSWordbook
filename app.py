@@ -11767,20 +11767,26 @@ def admin_upload_users():
         
         # ファイルサイズチェック
         if len(content) > 10 * 1024 * 1024:  # 10MB制限
+            if is_json:
+                return jsonify({'status': 'error', 'message': 'CSVファイルが大きすぎます（10MB以下にしてください）。'}), 400
             flash('CSVファイルが大きすぎます（10MB以下にしてください）。', 'danger')
             return redirect(url_for('admin_page'))
-        
+
         content_str = content.decode('utf-8')
         lines = content_str.strip().split('\n')
-        
+
         # 行数制限
         if len(lines) > 10000:  # 10000行制限
+            if is_json:
+                return jsonify({'status': 'error', 'message': 'CSVファイルの行数が多すぎます（10000行以下にしてください）。'}), 400
             flash('CSVファイルの行数が多すぎます（10000行以下にしてください）。', 'danger')
             return redirect(url_for('admin_page'))
-        
+
         print(f"📊 ファイルサイズ: {len(content)}bytes, 行数: {len(lines)}")
-        
+
         if len(lines) < 2:
+            if is_json:
+                return jsonify({'status': 'error', 'message': 'CSVファイルにデータがありません。'}), 400
             flash('CSVファイルにデータがありません。', 'danger')
             return redirect(url_for('admin_page'))
         
@@ -11954,6 +11960,8 @@ def admin_upload_users():
         import traceback
         traceback.print_exc()
         db.session.rollback()
+        if is_json:
+            return jsonify({'status': 'error', 'message': f'CSV処理エラー: {str(e)}'}), 500
         flash(f'CSV処理エラー: {str(e)} (処理時間: {error_time:.1f}秒)', 'danger')
 
     return redirect(url_for('admin_page'))
