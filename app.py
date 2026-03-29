@@ -11737,16 +11737,24 @@ def admin_delete_room_csv(filename):
 
 @app.route('/admin/upload_users', methods=['POST'])
 def admin_upload_users():
+    is_json = request.args.get('json') == 'true'
+
     if not session.get('admin_logged_in'):
+        if is_json:
+            return jsonify({'status': 'error', 'message': '管理者権限がありません。再ログインしてください。'}), 401
         flash('管理者権限がありません。', 'danger')
         return redirect(url_for('login_page'))
 
     if 'file' not in request.files:
+        if is_json:
+            return jsonify({'status': 'error', 'message': 'ファイルが選択されていません。'}), 400
         flash('ファイルが選択されていません。', 'danger')
         return redirect(url_for('admin_page'))
 
     file = request.files['file']
     if file.filename == '' or not file.filename.endswith('.csv'):
+        if is_json:
+            return jsonify({'status': 'error', 'message': 'CSVファイルを選択してください。'}), 400
         flash('CSVファイルを選択してください。', 'danger')
         return redirect(url_for('admin_page'))
 
@@ -11814,8 +11822,8 @@ def admin_upload_users():
                                 continue
                                 
                             values = [v.strip() for v in data_line.split(',')]
-                            if len(values) < 4:
-                                error_msg = f"行{line_num}: データが不完全です（最低4列必要です）"
+                            if len(values) < 3:
+                                error_msg = f"行{line_num}: データが不完全です（最低3列必要です）"
                                 errors.append(error_msg)
                                 registration_status['errors'].append(error_msg)
                                 continue
@@ -11850,7 +11858,7 @@ def admin_upload_users():
                             ).first()
                             
                             if existing_user:
-                                if existing_user._individual_password_hash == individual_password_hash:
+                                if individual_password_hash and existing_user._individual_password_hash == individual_password_hash:
                                      error_msg = f"行{line_num}: 部屋{room_number}・出席番号{student_id}で同じ個別パスワードのアカウントが既に存在します"
                                      errors.append(error_msg)
                                      registration_status['errors'].append(error_msg)

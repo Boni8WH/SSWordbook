@@ -9318,7 +9318,12 @@
                 method: 'POST',
                 body: formData
             })
-                .then(response => response.json())
+                .then(response => {
+                    if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) {
+                        throw new Error('サーバーエラーが発生しました。セッションが切れている可能性があります。ページを再読み込みしてください。');
+                    }
+                    return response.json();
+                })
                 .then(data => {
                     if (data.status === 'success') {
                         // ポーリング開始
