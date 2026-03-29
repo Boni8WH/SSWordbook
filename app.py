@@ -11772,7 +11772,14 @@ def admin_upload_users():
             flash('CSVファイルが大きすぎます（10MB以下にしてください）。', 'danger')
             return redirect(url_for('admin_page'))
 
-        content_str = content.decode('utf-8')
+        # UTF-8 → Shift-JIS(CP932) の順でデコードを試行
+        try:
+            content_str = content.decode('utf-8-sig')  # BOM付きUTF-8にも対応
+        except UnicodeDecodeError:
+            try:
+                content_str = content.decode('cp932')
+            except UnicodeDecodeError:
+                content_str = content.decode('utf-8', errors='replace')
         lines = content_str.strip().split('\n')
 
         # 行数制限
