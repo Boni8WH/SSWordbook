@@ -451,13 +451,13 @@ class User(db.Model):
     # RPG Intro Flag
     rpg_intro_seen = db.Column(db.Boolean, default=False, nullable=False)
 
-    # 🆕 お知らせ最終閲覧日時
+    # お知らせ最終閲覧日時
     last_announcement_viewed_at = db.Column(db.DateTime, nullable=True)
 
-    # 🆕 コラム既読状態
+    # コラム既読状態
     read_columns = db.Column(JSONEncodedDict, default=[], nullable=False)
 
-    # 🆕 担当者フラグ
+    # 担当者フラグ
     is_manager = db.Column(db.Boolean, default=False, nullable=False)
 
     # 担当者権限の永続化用 (JSON形式の文字列として保存: {"room_num": "hash", ...})
@@ -593,12 +593,12 @@ class RoomSetting(db.Model):
     is_suspended = db.Column(db.Boolean, nullable=False, default=False)
     suspended_at = db.Column(db.DateTime, nullable=True)
 
-    # 🆕 論述特化ルーム設定 (Deprecated - kept for backwards compatibility during migration)
+    # 論述特化ルーム設定 (Deprecated - kept for backwards compatibility during migration)
     is_essay_room = db.Column(db.Boolean, default=False, nullable=False)
-    # 🆕 すべて解放ルーム設定 (Deprecated - kept for backwards compatibility during migration)
+    #  すべて解放ルーム設定 (Deprecated - kept for backwards compatibility during migration)
     is_all_unlocked = db.Column(db.Boolean, default=False, nullable=False)
 
-    # 🆕 機能別個別トグル
+    # 機能別個別トグル
     feature_daily_quiz = db.Column(db.Boolean, default=True, nullable=False)     # 今日の10問
     feature_weak_questions = db.Column(db.Boolean, default=True, nullable=False) # 苦手問題
     feature_essay_problems = db.Column(db.Boolean, default=True, nullable=False) # 論述問題集
@@ -612,7 +612,7 @@ class RoomSetting(db.Model):
     feature_rpg = db.Column(db.Boolean, default=True, nullable=False)            # RPGモード
     feature_correction = db.Column(db.Boolean, default=True, nullable=False)     # 論述添削依頼
 
-    # 🆕 管理者ページ用パスワードハッシュ
+    # 管理者ページ用パスワードハッシュ
     management_password_hash = db.Column(db.String(255), nullable=True)
 
     def set_management_password(self, password):
@@ -649,7 +649,7 @@ class RoomCsvFile(db.Model):
     upload_date = db.Column(db.DateTime, default=lambda: datetime.now(JST))
     description = db.Column(db.Text)
     
-    # 🆕 アップロードした担当者 (User ID)
+    # アップロードした担当者 (User ID)
     created_by_manager_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
     
     def __repr__(self):
@@ -738,13 +738,13 @@ class RpgEnemy(db.Model):
     
     # 画像関連 (ファイル名/URL + DB保存用バイナリ)
     icon_image = db.Column(db.String(255)) # ファイル名またはURL
-    icon_image_content = deferred(db.Column(db.LargeBinary)) # 🆕 DB保存用
-    icon_image_mimetype = db.Column(db.String(50)) # 🆕 MIMEタイプ
+    icon_image_content = deferred(db.Column(db.LargeBinary)) # DB保存用
+    icon_image_mimetype = db.Column(db.String(50)) # MIMEタイプ
     
     badge_name = db.Column(db.String(100))
     badge_image = db.Column(db.String(255)) # ファイル名またはFAクラス
-    badge_image_content = deferred(db.Column(db.LargeBinary)) # 🆕 DB保存用
-    badge_image_mimetype = db.Column(db.String(50)) # 🆕 MIMEタイプ
+    badge_image_content = deferred(db.Column(db.LargeBinary)) #  DB保存用
+    badge_image_mimetype = db.Column(db.String(50)) #  MIMEタイプ
 
     # 討伐後画像 (Status画面用)
     defeated_image = db.Column(db.String(255)) 
@@ -758,7 +758,7 @@ class RpgEnemy(db.Model):
     intro_dialogue = db.Column(db.Text)
     defeat_dialogue = db.Column(db.Text) # Keep for backward compatibility or simple use
     
-    # 🆕 Relationship for multiple post-battle dialogues
+    # Relationship for multiple post-battle dialogues
     dialogues = db.relationship('RpgEnemyDialogue', backref='enemy', cascade='all, delete-orphan', order_by='RpgEnemyDialogue.display_order')
 
     # クリア条件
@@ -772,7 +772,7 @@ class RpgEnemy(db.Model):
     
     # 出現条件 (NEW)
     appearance_required_score = db.Column(db.Integer, default=0, nullable=False)
-    is_manual_order = db.Column(db.Boolean, default=False) # 🆕 手動表示順を使用するかどうか
+    is_manual_order = db.Column(db.Boolean, default=False) # 手動表示順を使用するかどうか
 
     def to_dict(self):
         return {
@@ -785,7 +785,7 @@ class RpgEnemy(db.Model):
             'description': self.description,
             'intro_dialogue': self.intro_dialogue,
             'defeat_dialogue': self.defeat_dialogue,
-            # 🆕 Include structured dialogues
+            # Include structured dialogues
             'dialogues': [{'content': d.content, 'expression': d.expression} for d in self.dialogues],
             'time_limit': self.time_limit,
             'clear_correct_count': self.clear_correct_count,
@@ -795,7 +795,7 @@ class RpgEnemy(db.Model):
             'appearance_required_score': self.appearance_required_score,
             'is_manual_order': self.is_manual_order,
             'defeated_image': self.defeated_image,
-            # 🆕 画像配信用URL
+            # 画像配信用URL
             'icon_url': url_for('serve_rpg_image', enemy_id=self.id, image_type='icon'),
             'badge_url': url_for('serve_rpg_image', enemy_id=self.id, image_type='badge'),
             'defeated_url': url_for('serve_rpg_image', enemy_id=self.id, image_type='defeated')
@@ -834,7 +834,7 @@ class MapLocation(db.Model):
     x_coordinate = db.Column(db.Float, nullable=False) # % (0.0-100.0)
     y_coordinate = db.Column(db.Float, nullable=False) # % (0.0-100.0)
     
-    # 🆕 領域指定 (円形・楕円)
+    # 領域指定 (円形・楕円)
     shape_type = db.Column(db.String(20), default='point') # 'point', 'circle', 'ellipse'
     radius = db.Column(db.Float, default=0.0) # % (Legacy: used for circle radius)
     radius_x = db.Column(db.Float, default=0.0) # % (Horizontal radius)
@@ -859,7 +859,7 @@ class MapQuizLog(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False)
     map_location_id = db.Column(db.Integer, db.ForeignKey('mq_location.id', ondelete='CASCADE'), nullable=False)
-    map_quiz_problem_id = db.Column(db.Integer, db.ForeignKey('mq_problem.id', ondelete='CASCADE'), nullable=True) # 🆕 問題ID
+    map_quiz_problem_id = db.Column(db.Integer, db.ForeignKey('mq_problem.id', ondelete='CASCADE'), nullable=True) #  問題ID
     is_correct = db.Column(db.Boolean, nullable=False)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))
 
@@ -873,7 +873,7 @@ class MapQuizComplete(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False)
     map_image_id = db.Column(db.Integer, db.ForeignKey('mq_image.id', ondelete='CASCADE'), nullable=False)
-    problem_count = db.Column(db.Integer, default=0) # 🆕 登録時の問題数
+    problem_count = db.Column(db.Integer, default=0) #  登録時の問題数
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))
 
     __table_args__ = (db.UniqueConstraint('user_id', 'map_image_id', name='unique_user_map_complete'),)
@@ -1204,7 +1204,7 @@ def _add_all_unlocked_column_to_room_setting():
     except Exception as e:
         print(f"⚠️ RoomSettingマイグレーションエラー (is_all_unlocked): {e}")
 
-# 🆕 コラム用モデル
+# コラム用モデル
 class Column(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     school_type = db.Column(db.String(10), nullable=False) # 'middle' or 'high'
@@ -1324,7 +1324,7 @@ def _create_study_tip_tables():
                     conn.commit()
                 print("✅ StudyTip: author_name カラム追加完了")
             if 'chapter' in columns:
-                # chapter カラムは残しておいても問題ないが、新規では使わない
+                # chapter カラムは既存データとして残存
                 pass
         if 'study_tip_like' not in table_names:
             print("🔄 StudyTipLikeテーブルを作成します...")
@@ -1770,7 +1770,7 @@ class CsvFileContent(db.Model):
     word_count = db.Column(db.Integer, default=0)
     upload_date = db.Column(db.DateTime, default=lambda: datetime.now(JST))
     
-    # 🆕 アップロードした担当者 (User ID)
+    #  アップロードした担当者 (User ID)
     created_by_manager_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
 
     def get_csv_data(self):
@@ -1825,7 +1825,7 @@ class UserStats(db.Model):
                 )
                 db.session.add(stats)
                 db.session.flush()
-                # 新規作成時は即座に統計を計算する
+                # 統計を計算する
                 stats.update_stats()
                 db.session.commit()
         return stats
@@ -2045,7 +2045,7 @@ class EssayProblem(db.Model):
     answer = db.Column(db.Text, nullable=False)
     answer_length = db.Column(db.Integer, nullable=False)
     enabled = db.Column(db.Boolean, default=True, nullable=False)
-    # 🆕 半角数字2文字を1文字扱いにするフラグ
+    #  半角数字2文字を1文字扱いにするフラグ
     count_half_width_digits_as_half = db.Column(db.Boolean, default=False, nullable=False)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))
@@ -2108,7 +2108,7 @@ class EssayProgress(db.Model):
     understood = db.Column(db.Boolean, default=False, nullable=False)
     difficulty_rating = db.Column(db.Integer)
     memo = db.Column(db.Text)
-    draft_answer = db.Column(db.Text)  # ← 追加: 下書き保存用
+    draft_answer = db.Column(db.Text)  # 下書き保存用
     review_flag = db.Column(db.Boolean, default=False, nullable=False)
     viewed_at = db.Column(db.DateTime)
     understood_at = db.Column(db.DateTime)
@@ -2413,7 +2413,7 @@ database_url = os.environ.get('DATABASE_URL')
 if database_url:
     logger.info("🐘 PostgreSQL設定を適用中...")
     
-    # PostgreSQL用のURLフォーマット修正
+    # PostgreSQL用のURLフォーマットへの対応
     if database_url.startswith('postgres://'):
         database_url = database_url.replace('postgres://', 'postgresql://', 1)
     
@@ -2458,7 +2458,7 @@ class Announcement(db.Model):
     date = db.Column(db.DateTime, default=datetime.utcnow)
     target_rooms = db.Column(db.String(500), default='all') # all, or "101,102"
     
-    # 🆕 作成した担当者 (User ID)
+    #  作成した担当者 (User ID)
     created_by_manager_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
     is_active = db.Column(db.Boolean, default=True, nullable=False)
     updated_at = db.Column(db.DateTime, onupdate=datetime.utcnow)
@@ -2539,7 +2539,7 @@ scheduler.init_app(app)
 # スケジューラーは後で起動（関数定義後）
 scheduler.start()
 
-# スケジューラーにジョブ追加
+# スケジューラーにジョブ登録
 if not scheduler.get_job('daily_reminder'):
     scheduler.add_job(id='daily_reminder', func=check_daily_quiz_reminders, trigger='cron', minute='*')
 
@@ -3421,7 +3421,7 @@ def emergency_fix_user_schema():
                     print(f"🔧 古い制約を削除します: {constraint_name}")
                     conn.execute(text(f'ALTER TABLE "user" DROP CONSTRAINT {constraint_name}'))
 
-            # 新しい複合ユニーク制約を追加
+            # 複合ユニーク制約を適用
             print("🔧 新しい複合ユニーク制約を追加します...")
             conn.execute(text('ALTER TABLE "user" ADD CONSTRAINT uq_room_student_id UNIQUE (room_number, student_id)'))
             conn.execute(text('ALTER TABLE "user" ADD CONSTRAINT uq_room_username UNIQUE (room_number, username)'))
@@ -3478,8 +3478,8 @@ def change_username_page():
             
             # 重複チェック（個別パスワードハッシュも考慮）
             existing_user = User.query.filter_by(
-                room_number=current_user.room_number,  # 修正: current_user.room_numberを使用
-                username=new_username  # 修正: usernameで重複チェック（student_idは不要）
+                room_number=current_user.room_number,  # current_user.room_numberを使用
+                username=new_username  # usernameで重複チェック（student_idは不要）
             ).filter(
                 User.id != current_user.id  # 自分自身は除外
             ).first()
@@ -3532,7 +3532,7 @@ def migrate_database():
                 columns = [col['name'] for col in inspector.get_columns('user')]
                 # print(f"📋 既存のUserテーブルカラム: {columns}")
                 
-                # 🆕 制限状態管理用カラムを追加
+                # 制限状態管理用カラム
                 if 'restriction_triggered' not in columns:
                     print("🔧 restriction_triggeredカラムを追加します...")
                     with db.engine.connect() as conn:
@@ -3551,11 +3551,11 @@ def migrate_database():
                 if 'original_username' not in columns:
                     print("🔧 original_usernameカラムを追加します...")
                     with db.engine.connect() as conn:
-                        # 新しいカラムを追加
+                        # カラムを定義
                         conn.execute(text('ALTER TABLE "user" ADD COLUMN original_username VARCHAR(80)'))
                         # 既存ユーザーの original_username を現在の username で初期化
                         conn.execute(text('UPDATE "user" SET original_username = username WHERE original_username IS NULL'))
-                        # NOT NULL制約を追加
+                        # NOT NULL制約を適用
                         conn.execute(text('ALTER TABLE "user" ALTER COLUMN original_username SET NOT NULL'))
                         conn.commit()
                     print("✅ original_usernameカラムを追加しました。")
@@ -3688,7 +3688,7 @@ def migrate_database():
                             conn.commit()
                         print(f"✅ {col_name}カラムを追加しました。")
                 
-                # ★ ロゴ画像カラムの追加
+                # ロゴ画像カラム
                 if 'logo_image_content' not in columns:
                     print("🔧 logo_image_contentカラムを追加します...")
                     with db.engine.connect() as conn:
@@ -4030,13 +4030,13 @@ def create_tables_and_admin_user():
             _create_rpg_enemy_table()
             # _seed_initial_rpg_enemy() # 確実に初期データを投入 - 無効化
             _add_score_column_to_rpg_enemy() # NEW
-            _add_email_notification_columns_to_user() # 🆕 メール通知カラム追加
-            _add_equipped_title_column_to_user() # 🆕 追加
-            _add_rpg_intro_seen_column_to_user() # 🆕 RPGイントロ表示フラグ追加（管理者ユーザークエリ前に実行必須）
-            _add_announcement_viewed_column_to_user() # 🆕 お知らせ閲覧日時カラム追加
-            _create_user_announcement_reads_table() # 🆕 お知らせ個別既読テーブル作成
-            _create_rpg_rematch_history_table() # 🆕 再戦履歴テーブル作成
-            _create_map_quiz_log_table()       # 🆕 地図クイズログテーブル作成
+            _add_email_notification_columns_to_user() # メール通知カラム
+            _add_equipped_title_column_to_user() # 称号カラム
+            _add_rpg_intro_seen_column_to_user() # RPGイントロ表示フラグ（管理者ユーザークエリ前に実行必須）
+            _add_announcement_viewed_column_to_user() # お知らせ閲覧日時カラム
+            _create_user_announcement_reads_table() #  お知らせ個別既読テーブル作成
+            _create_rpg_rematch_history_table() #  再戦履歴テーブル作成
+            _create_map_quiz_log_table()       #  地図クイズログテーブル作成
             
             # 管理者ユーザー確認/作成
             try:
@@ -4087,7 +4087,7 @@ def create_tables_and_admin_user():
                 # ★マイグレーション実行
                 _add_logo_columns_to_app_info()
                 _add_rpg_image_columns_safe()
-                _add_manager_columns() # 🆕
+                _add_manager_columns() # 
                 
                 app_info = AppInfo.get_current_info()
                 logger.info("✅ アプリ情報を確認/作成しました")
@@ -4381,7 +4381,7 @@ def admin_manual_create_stats_table():
 def check_data_persistence():
     """データの永続化状況をチェック"""
     try:
-        with app.app_context():  # ★ アプリケーションコンテキストを追加
+        with app.app_context():  # アプリケーションコンテキストを使用
             user_count = User.query.count()
             admin_count = User.query.filter_by(room_number='ADMIN').count()
             room_settings_count = RoomSetting.query.count()
@@ -5022,7 +5022,7 @@ def admin_fix_progress_issue():
     try:
         print("🔧 進捗ページ問題の修正を開始...")
         
-        # 1. ranking_display_count カラムを追加
+        # 1. ranking_display_count カラムを定義
         with db.engine.connect() as conn:
             # カラムの存在を確認
             try:
@@ -8285,7 +8285,7 @@ def api_load_quiz_progress():
         if not current_user:
             return jsonify(status='error', message='ユーザーが見つかりません。'), 404
 
-        # 🆕 制限状態も含めて返す
+        #  制限状態も含めて返す
         restriction_state = current_user.get_restriction_state()
         
         return jsonify(
@@ -8293,7 +8293,7 @@ def api_load_quiz_progress():
             problemHistory=current_user.get_problem_history(),
             incorrectWords=current_user.get_incorrect_words(),
             quizProgress={},
-            restrictionState=restriction_state  # 🆕 制限状態を追加
+            restrictionState=restriction_state  #  制限状態を追加
         )
     except Exception as e:
         print(f"Error in api_load_quiz_progress: {e}")
@@ -10479,8 +10479,8 @@ def admin_page():
                 'user_count': users_in_room,
                 'is_suspended': getattr(rs, 'is_suspended', False),  # 一時停止状態
                 'suspended_at': getattr(rs, 'suspended_at', None),     # 一時停止日時
-                'is_essay_room': getattr(rs, 'is_essay_room', False),  # 🆕 論述特化ルーム
-                'is_all_unlocked': getattr(rs, 'is_all_unlocked', False),  # 🆕 すべて解放
+                'is_essay_room': getattr(rs, 'is_essay_room', False),  #  論述特化ルーム
+                'is_all_unlocked': getattr(rs, 'is_all_unlocked', False),  #  すべて解放
                 'feature_daily_quiz': getattr(rs, 'feature_daily_quiz', True),
                 'feature_weak_questions': getattr(rs, 'feature_weak_questions', True),
                 'feature_essay_problems': getattr(rs, 'feature_essay_problems', True),
@@ -10589,7 +10589,7 @@ def admin_page():
             },
             'announcements': announcements,
             'room_settings': room_settings,
-            'pending_correction_count': pending_correction_count,  # 🆕 添削依頼未対応件数
+            'pending_correction_count': pending_correction_count,  #  添削依頼未対応件数
             **context
         }
         
@@ -10947,11 +10947,11 @@ def admin_add_user():
             # 通常ユーザー
             room_number = request.form.get('room_number', '').strip()
             student_id = request.form.get('student_id', '').strip()
-            individual_password = request.form.get('individual_password')
+            individual_password = request.form.get('individual_password', '').strip()
             username = request.form.get('username', '').strip()
 
-            if not all([room_number, student_id, individual_password, username]):
-                flash('すべての項目を入力してください。', 'danger')
+            if not all([room_number, student_id, username]):
+                flash('部屋番号・出席番号・アカウント名は必須です。', 'danger')
                 return redirect(url_for('admin_page'))
 
         # ユーザーの重複チェック
@@ -10959,7 +10959,7 @@ def admin_add_user():
             room_number=room_number,
             student_id=student_id,
         ).first()
-        
+
         if existing_user:
             if is_manager:
                 flash(f'担当者 {username} は既に存在します。', 'warning')
@@ -10977,28 +10977,33 @@ def admin_add_user():
         )
         # 部屋パスワードはダミー値を設定
         new_user.set_room_password('dummy')
-        new_user.set_individual_password(individual_password)
-        
+        # パスワードが指定されていれば設定、なければ仮登録（ログイン不可）
+        if individual_password:
+            new_user.set_individual_password(individual_password)
+        else:
+            new_user._individual_password_hash = None
+
         new_user.problem_history = {}
         new_user.incorrect_words = []
-        
+
         new_user.last_login = datetime.now(JST)
 
         db.session.add(new_user)
         db.session.commit()
-        
+
         # 部屋設定の自動作成
         if not RoomSetting.query.filter_by(room_number=room_number).first():
             default_room_setting = RoomSetting(room_number=room_number)
             db.session.add(default_room_setting)
             db.session.commit()
-            
+
             # ★ 論述問題の公開設定を初期化（非公開）
             initialize_essay_visibility(room_number)
-            
+
             flash(f'部屋 {room_number} の設定をデフォルトで作成しました。', 'info')
 
-        flash(f'ユーザー {username} (部屋: {room_number}, 出席番号: {student_id}) を登録しました。', 'success')
+        status = '仮登録' if not individual_password else '登録'
+        flash(f'ユーザー {username} (部屋: {room_number}, 出席番号: {student_id}) を{status}しました。', 'success')
         return redirect(url_for('admin_page'))
 
     except Exception as e:
@@ -11017,10 +11022,17 @@ def authenticate_user(room_number, student_id, individual_password):
     ).all()
     
     for user in potential_users:
+        # パスワード未設定（仮登録）のアカウントはスキップ
+        if not user._individual_password_hash:
+            continue
         # 個別パスワードのみをチェック
-        if user.check_individual_password(individual_password):
+        result = user.check_individual_password(individual_password)
+        app.logger.info(f"[AUTH] user={user.username}, student_id={user.student_id}, "
+                        f"check_result={result}, "
+                        f"hash_prefix={user._individual_password_hash[:30]}...")
+        if result:
             return user
-    
+
     return None
 
 @app.route('/admin/reset_intro_flag/<int:user_id>', methods=['POST'])
@@ -11137,7 +11149,7 @@ def admin_bulk_delete_users():
         MonthlyResultViewed.query.filter(MonthlyResultViewed.user_id.in_(user_ids)).delete(synchronize_session=False)
         UserStats.query.filter(UserStats.user_id.in_(user_ids)).delete(synchronize_session=False)
         EssayProgress.query.filter(EssayProgress.user_id.in_(user_ids)).delete(synchronize_session=False)
-        # 🆕 追加分
+        #  追加分
         UserAnnouncementRead.query.filter(UserAnnouncementRead.user_id.in_(user_ids)).delete(synchronize_session=False)
         ChronologicalProgress.query.filter(ChronologicalProgress.user_id.in_(user_ids)).delete(synchronize_session=False)
         EssayCorrectionRequest.query.filter(EssayCorrectionRequest.user_id.in_(user_ids)).delete(synchronize_session=False)
@@ -11815,19 +11827,23 @@ def admin_upload_users():
                                 student_id = values[2]
                                 individual_password = values[3]
                                 username = values[4]
+                            elif len(values) == 3:
+                                # パスワード省略フォーマット (3列): 部屋番号, 出席番号, アカウント名
+                                room_number, student_id, username = values[:3]
+                                individual_password = ''
                             else:
                                 # 新フォーマット (4列): 部屋番号, 出席番号, 個別パスワード, アカウント名
                                 room_number, student_id, individual_password, username = values[:4]
-                            
-                            # 必須項目チェック
-                            if not all([room_number, student_id, individual_password, username]):
-                                error_msg = f"行{line_num}: 必須項目が不足しています"
+
+                            # 必須項目チェック（パスワードは任意）
+                            if not all([room_number, student_id, username]):
+                                error_msg = f"行{line_num}: 必須項目（部屋番号・出席番号・アカウント名）が不足しています"
                                 errors.append(error_msg)
                                 registration_status['errors'].append(error_msg)
                                 continue
 
                             # 重複チェック
-                            individual_password_hash = generate_password_hash(individual_password, method='pbkdf2:sha256', salt_length=8)
+                            individual_password_hash = generate_password_hash(individual_password, method='pbkdf2:sha256', salt_length=8) if individual_password else None
                             existing_user = User.query.filter_by(
                                 room_number=room_number,
                                 student_id=student_id
@@ -12017,9 +12033,9 @@ def download_users_template_csv():
     # ヘッダー行
     cw.writerow(['部屋番号', '出席番号', '個別パスワード', 'アカウント名'])
     
-    # サンプルデータを追加
-    cw.writerow(['101', '1', 'TemplarsGoldIsMine', 'フィリップ4世'])
-    cw.writerow(['101', '2', 'RomeIsEternal', 'ボニファティウス8世'])
+    # サンプルデータを追加（パスワード空欄は仮登録）
+    cw.writerow(['101', '1', '', 'フィリップ4世'])
+    cw.writerow(['101', '2', '', 'ボニファティウス8世'])
     cw.writerow(['102', '1', 'LetsGoAvignon', 'クレメンス5世'])
     
     # ★ Shift_JISエンコーディングで文字化け対策
@@ -12034,6 +12050,153 @@ def download_users_template_csv():
     response = Response(output, mimetype=mimetype)
     response.headers["Content-Disposition"] = "attachment; filename=users_template.csv"
     return response
+
+@app.route('/admin/generate_login_pdf/<room_number>')
+def generate_login_pdf(room_number):
+    """部屋ごとの初期ログイン用PDF生成（B5サイズ、1人1ページ）"""
+    if not session.get('admin_logged_in'):
+        flash('管理者権限がありません。', 'danger')
+        return redirect(url_for('login_page'))
+
+    # 該当部屋のユーザーを取得（マネージャー除外、出席番号順）
+    users = User.query.filter_by(room_number=room_number).filter(
+        User.is_manager == False
+    ).order_by(
+        cast(User.student_id, Integer).asc(),
+        User.student_id.asc()
+    ).all()
+
+    if not users:
+        flash(f'部屋 {room_number} にユーザーが見つかりません。', 'warning')
+        return redirect(url_for('admin_page'))
+
+    import qrcode
+    from reportlab.lib.pagesizes import B5
+    from reportlab.lib.units import mm
+    from reportlab.pdfgen import canvas
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.cidfonts import UnicodeCIDFont
+
+    # 日本語フォント登録
+    pdfmetrics.registerFont(UnicodeCIDFont('HeiseiKakuGo-W5'))
+
+    buf = BytesIO()
+    c = canvas.Canvas(buf, pagesize=B5)
+    page_w, page_h = B5  # 182mm x 257mm
+
+    LOGIN_URL = 'https://bayt-al-hikmah.com/login'
+
+    # ロゴ情報を取得
+    app_info = AppInfo.get_current_info()
+    has_logo_image = (app_info.logo_type == 'image' and app_info.logo_image_content)
+    logo_reader = None
+    if has_logo_image:
+        from reportlab.lib.utils import ImageReader
+        logo_buf = BytesIO(app_info.logo_image_content)
+        logo_reader = ImageReader(logo_buf)
+
+    for user in users:
+        # ランダムパスワード生成（紛らわしい文字を除外した英数字8文字）
+        alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'
+        new_password = ''.join(secrets.choice(alphabet) for _ in range(8))
+
+        # パスワードをリセット
+        user.set_individual_password(new_password)
+        user.is_first_login = True
+
+        # デバッグ: パスワード検証の確認
+        verify_ok = user.check_individual_password(new_password)
+        app.logger.info(f"[PDF] user={user.username}, student_id={user.student_id}, "
+                        f"new_pw={new_password}, verify={verify_ok}, "
+                        f"hash_prefix={user._individual_password_hash[:30]}...")
+
+        # --- QRコード生成 ---
+        qr = qrcode.QRCode(version=1, box_size=10, border=2)
+        qr.add_data(LOGIN_URL)
+        qr.make(fit=True)
+        qr_img = qr.make_image(fill_color='black', back_color='white')
+        qr_buf = BytesIO()
+        qr_img.save(qr_buf, format='PNG')
+        qr_buf.seek(0)
+
+        from reportlab.lib.utils import ImageReader
+        qr_reader = ImageReader(qr_buf)
+
+        # --- ページ描画 ---
+        center_x = page_w / 2
+        y = page_h - 40 * mm
+
+        # タイトル: ロゴ画像があれば画像、なければアプリ名
+        if has_logo_image:
+            logo_h = 18 * mm
+            # アスペクト比を維持して高さ基準でリサイズ
+            iw, ih = logo_reader.getSize()
+            logo_w = logo_h * (iw / ih)
+            logo_buf.seek(0)
+            logo_reader = ImageReader(logo_buf)
+            c.drawImage(logo_reader, center_x - logo_w / 2, y - logo_h + 5 * mm,
+                        width=logo_w, height=logo_h, mask='auto')
+        else:
+            c.setFont('HeiseiKakuGo-W5', 18)
+            c.drawCentredString(center_x, y, app_info.app_name)
+        y -= 15 * mm
+
+        # 区切り線
+        c.setStrokeColorRGB(0.3, 0.3, 0.3)
+        c.setLineWidth(1)
+        c.line(25 * mm, y, page_w - 25 * mm, y)
+        y -= 18 * mm
+
+        # 情報表示
+        label_x = 30 * mm
+        value_x = 75 * mm
+        line_height = 14 * mm
+
+        items = [
+            ('部屋番号', room_number),
+            ('出席番号', user.student_id),
+            ('アカウント名', user.username),
+            ('初期パスワード', new_password),
+        ]
+
+        for label, value in items:
+            c.setFont('HeiseiKakuGo-W5', 11)
+            c.drawString(label_x, y, label)
+            c.setFont('HeiseiKakuGo-W5', 14)
+            c.drawString(value_x, y, str(value))
+            y -= line_height
+
+        # QRコード
+        y -= 5 * mm
+        qr_size = 40 * mm
+        qr_x = center_x - qr_size / 2
+        c.drawImage(qr_reader, qr_x, y - qr_size, width=qr_size, height=qr_size)
+        y -= qr_size + 8 * mm
+
+        c.setFont('HeiseiKakuGo-W5', 9)
+        c.drawCentredString(center_x, y, 'QRコードを読み取ってログイン画面へ')
+        y -= 12 * mm
+
+        # 注意書き
+        c.setStrokeColorRGB(0.3, 0.3, 0.3)
+        c.line(25 * mm, y, page_w - 25 * mm, y)
+        y -= 10 * mm
+        c.setFont('HeiseiKakuGo-W5', 9)
+        c.drawCentredString(center_x, y, '※ 初回ログイン後、パスワードの変更をおすすめします。')
+
+        c.showPage()
+
+    # DB保存
+    db.session.commit()
+
+    c.save()
+    buf.seek(0)
+
+    response = make_response(buf.getvalue())
+    response.headers['Content-Type'] = 'application/pdf'
+    response.headers['Content-Disposition'] = f'attachment; filename=login_cards_room_{room_number}.pdf'
+    return response
+
 
 @app.route('/admin/download_csv_template')
 def download_csv_template():
@@ -15738,7 +15901,7 @@ def to_katakana():
         if not data:
             return jsonify({'status': 'error', 'message': 'No data provided'}), 400
 
-        # 🆕 Multi-candidate mode (for Safari robustness)
+        #  Multi-candidate mode (for Safari robustness)
         if 'texts' in data and isinstance(data['texts'], list):
             results = []
             seen = set()
@@ -19125,7 +19288,7 @@ def get_sample_quiz():
         # デフォルトのwords.csvから読み込み
         word_data = []
         all_answers = []  # 選択肢生成用に全回答を収集
-        answers_by_category = {} # 🆕 カテゴリ別の回答リスト
+        answers_by_category = {} #  カテゴリ別の回答リスト
         
         try:
             with open('words.csv', 'r', encoding='utf-8-sig') as f:
@@ -19152,7 +19315,7 @@ def get_sample_quiz():
                     })
                     all_answers.append(answer)
                     
-                    # 🆕 カテゴリ別に回答を収集
+                    #  カテゴリ別に回答を収集
                     category = row.get('category', '')
                     if category:
                         if category not in answers_by_category:
@@ -19190,7 +19353,7 @@ def get_sample_quiz():
             else:
                 distractor_pool = []
                 
-                # 🆕 同じカテゴリの回答を優先的に候補に入れる
+                #  同じカテゴリの回答を優先的に候補に入れる
                 category = problem.get('category', '')
                 if category and category in answers_by_category:
                     # 同じカテゴリの回答のみ抽出（正解は除く）
@@ -21225,7 +21388,7 @@ def submit_rpg_result():
         rpg_state = RpgState(user_id=user_id)
         db.session.add(rpg_state)
     
-    is_rematch = data.get('is_rematch', False) # 🆕 再戦フラグ
+    is_rematch = data.get('is_rematch', False) #  再戦フラグ
     now = datetime.now(JST)
     
     if is_win:
@@ -21391,12 +21554,12 @@ def status():
             'boss_description': enemy.description,
             # 修正: 討伐後画像URL (Status Modal用)
             'defeated_icon': defeated_icon_url if (defeated_icon_url and enemy.defeated_image) else final_boss_icon,
-            'id': enemy.id, # 🆕 追加: フロントエンドで敵IDを参照するため
-            'time_limit': enemy.time_limit, # 🆕 プレビュー用
-            'pass_score': enemy.clear_correct_count, # 🆕 プレビュー用
-            'max_mistakes': enemy.clear_max_mistakes, # 🆕 プレビュー用
-            'intro_dialogue': enemy.intro_dialogue, # 🆕 プレビュー用
-            'difficulty': enemy.difficulty # 🆕 プレビュー用
+            'id': enemy.id, #  追加: フロントエンドで敵IDを参照するため
+            'time_limit': enemy.time_limit, #  プレビュー用
+            'pass_score': enemy.clear_correct_count, #  プレビュー用
+            'max_mistakes': enemy.clear_max_mistakes, #  プレビュー用
+            'intro_dialogue': enemy.intro_dialogue, #  プレビュー用
+            'difficulty': enemy.difficulty #  プレビュー用
         })
         if enemy.description:
             # HTML属性破壊を防ぐため改行を置換
@@ -22541,7 +22704,7 @@ def admin_add_rpg_enemy():
         db.session.add(new_enemy)
         db.session.commit()
 
-        # 🆕 Handle RpgEnemyDialogue rows for initial creation
+        #  Handle RpgEnemyDialogue rows for initial creation
         # Get lists of content and expression
         dialogue_contents = request.form.getlist('dialogue_content[]')
         dialogue_expressions = request.form.getlist('dialogue_expression[]')
@@ -22784,7 +22947,7 @@ def admin_edit_rpg_enemy(enemy_id):
                 enemy.defeated_image = unique_filename
             # 画像更新処理End
             
-        # 🆕 Dialogues Update
+        #  Dialogues Update
         # Clear existing
         try:
              # Using delete-orphan, simply removing from list might work, or explicit delete
@@ -22879,7 +23042,7 @@ def check_and_migrate_room_setting():
                     else:
                         conn.execute(text("ALTER TABLE room_setting ADD COLUMN is_essay_room BOOLEAN DEFAULT 0"))
                         
-                # 🆕 機能別個別トグルのマイグレーション
+                #  機能別個別トグルのマイグレーション
                 new_features = [
                     'feature_daily_quiz', 'feature_weak_questions', 'feature_essay_problems',
                     'feature_map_quiz', 'feature_chrono_quiz', 'feature_columns',
@@ -23124,7 +23287,7 @@ def check_room_restrictions():
     if not setting_data or not setting_data.get('is_essay_room'):
         return
 
-    # 🆕 すべて解放ルームなら制限しない
+    #  すべて解放ルームなら制限しない
     if setting_data.get('is_all_unlocked'):
         return
 
@@ -23462,7 +23625,7 @@ def admin_chrono_download_csv():
 check_and_create_correction_tables()
 
 with app.app_context():
-    _add_all_unlocked_column_to_room_setting() # 🆕
+    _add_all_unlocked_column_to_room_setting() # 
 
 def _create_map_quiz_tables():
     """Map Quiz related tables and columns migration"""

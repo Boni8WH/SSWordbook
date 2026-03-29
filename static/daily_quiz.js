@@ -299,7 +299,7 @@ function displayQuizResult(userResult, top5Ranking, userRank, totalParticipants,
         `;
     }
 
-    // --- 2. 月間ランキングHTMLの生成 (新規追加) ---
+    // --- 2. 月間ランキングHTMLの生成 ---
     let monthlyRankingHTML = '<p class="text-muted text-center mt-2">今月のスコア獲得者はまだいません。</p>';
     if (monthlyTop5 && monthlyTop5.length > 0) {
         const monthlyBodyHTML = monthlyTop5.map(r => `
@@ -335,7 +335,7 @@ function displayQuizResult(userResult, top5Ranking, userRank, totalParticipants,
         `;
     }
 
-    // --- 3. 前回のランキングHTMLの生成 (新規追加) ---
+    // --- 3. 前回のランキングHTMLの生成 ---
     let previousRankingHTML = '<p class="text-muted text-center mt-2">前回のデータはありません。</p>';
     if (previousTop5 && previousTop5.length > 0) {
         const previousBodyHTML = previousTop5.map(r => `

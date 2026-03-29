@@ -774,7 +774,7 @@
                         <div class="card-body">
                             <p>ユーザーにお知らせを配信できます。最新5件が「i」ボタンの情報パネルに表示されます。</p>
 
-                            <!-- 新規お知らせ作成 -->
+                            <!-- お知らせ作成 -->
                             <div class="admin-panel"
                                 style="background-color: #fff3cd; border-left: 5px solid #ffc107; margin-bottom: 20px;">
                                 <h4><i class="fas fa-plus"></i> 新規お知らせ作成</h4>
@@ -1152,8 +1152,10 @@
                             <p><strong>CSVファイル形式要件:</strong></p>
                             <ul>
                                 <li>ヘッダー行: 部屋番号,出席番号,個別パスワード,アカウント名</li>
+                                <li>パスワード列は空欄可（仮登録扱い。PDF出力時に自動生成されます）</li>
+                                <li>3列（部屋番号,出席番号,アカウント名）でもOK</li>
                                 <li>文字エンコーディング: UTF-8</li>
-                                <li>例: 101,001,student001,成富兵庫茂安</li>
+                                <li>例: 101,001,,成富兵庫茂安（パスワード空欄で仮登録）</li>
                                 <li>同一アカウント名の登録も可能です（同一人物が複数部屋に参加する場合）</li>
                             </ul>
                             <a href="{{ url_for('download_users_template_csv') }}" class="btn btn-outline-info btn-sm">
@@ -1228,7 +1230,8 @@
                             </div>
                             <div class="input-group">
                                 <label for="new_individual_password">個別パスワード:</label>
-                                <input type="password" id="new_individual_password" name="individual_password" required>
+                                <input type="password" id="new_individual_password" name="individual_password" placeholder="空欄で仮登録（PDF出力時に自動生成）">
+                                <small class="form-text text-muted">※空欄の場合は仮登録となり、ログインできません。PDF出力でパスワードが発行されます。</small>
                             </div>
                             <div class="input-group">
                                 <label for="new_username">アカウント名:</label>
@@ -1290,6 +1293,31 @@
                                     <label for="userSearchInput">ユーザー検索:</label>
                                     <input type="text" id="userSearchInput" class="form-control form-control-sm"
                                         placeholder="名前、出席番号で検索...">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 初期ログイン用PDF出力 -->
+                        <div class="card shadow-sm mb-4 mt-4" style="border-left: 4px solid #6f42c1;">
+                            <div class="card-body">
+                                <h5><i class="fas fa-file-pdf text-danger"></i> 初期ログイン用PDF出力</h5>
+                                <p class="text-muted mb-2">
+                                    部屋を選択すると、その部屋の全ユーザーの初期ログイン用紙（B5）をPDFで一括出力します。<br>
+                                    <strong class="text-danger">※ PDF生成時にパスワードがリセットされます。</strong>
+                                </p>
+                                <div class="d-flex align-items-end gap-2">
+                                    <div>
+                                        <label for="pdfRoomSelect" class="form-label">対象の部屋:</label>
+                                        <select id="pdfRoomSelect" class="form-control form-control-sm">
+                                            <option value="">-- 部屋を選択 --</option>
+                                            {% for room_num in room_numbers|sort %}
+                                            <option value="{{ room_num }}">部屋 {{ room_num }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <button type="button" class="btn btn-danger btn-sm" onclick="generateLoginPdf()">
+                                        <i class="fas fa-download"></i> PDF出力
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -1841,7 +1869,7 @@
                     <div class="card-body">
                         <p>RPGモードで登場する敵キャラクター（ボス）を追加編集できます。</p>
 
-                        <!-- 新規登録フォーム -->
+                        <!-- 登録フォーム -->
                         <div class="admin-panel"
                             style="background-color: #fce4ec; border-left: 5px solid #e91e63; margin-bottom: 20px;">
                             <h4><i class="fas fa-plus-circle"></i> 新規ボス追加</h4>
@@ -3193,7 +3221,7 @@
                             </div>
                         </div>
 
-                        <!-- 全データ修正（従来機能・バックアップ用） -->
+                        <!-- 全データ修正（バックアップ用） -->
                         <div class="admin-panel"
                             style="background-color: #ffebee; border-left: 5px solid #f44336; margin-top: 20px;">
                             <h4>⚠️ 全データ修正（バックアップ用）</h4>
@@ -5729,7 +5757,7 @@
                                 <small class="form-text text-muted">文字数が表示されます</small>
                             </div>
 
-                            <!-- 画像管理セクションを追加 -->
+                            <!-- 画像管理セクション -->
                             <div class="mb-3">
                                 <label class="form-label"><strong><i class="fas fa-image"></i> 問題画像</strong></label>
                                 <div class="image-management-section" id="imageManagement_${problem.id}">
@@ -9361,6 +9389,19 @@
                 '全員リセット',
                 'btn-warning'
             );
+        }
+
+        function generateLoginPdf() {
+            const roomSelect = document.getElementById('pdfRoomSelect');
+            const room = roomSelect.value;
+            if (!room) {
+                alert('部屋を選択してください。');
+                return;
+            }
+            if (!confirm(`部屋 ${room} の全ユーザーの初期パスワードがリセットされ、PDF が生成されます。\n\n本当に実行しますか？`)) {
+                return;
+            }
+            window.location.href = `/admin/generate_login_pdf/${encodeURIComponent(room)}`;
         }
     </script>
 

@@ -15,22 +15,22 @@ let incorrectCount = 0;
 let totalQuestions = 0;
 let problemHistory = {};
 let incorrectWords = [];
-let currentSessionAnswered = new Set(); // 今回のセッションで回答した問題のIDを記録
+let currentSessionAnswered = new Set();
 let quizStartTime;
 let isAnswerButtonDisabled = false;
 let answerButtonTimeout = null;
 let hasBeenRestricted = false; // 一度でも制限されたかのフラグ
 let restrictionReleased = false; // 制限が解除されたかのフラグ
-let isStrategicRetreat = false; // 戦略的撤退（強制終了）が発生したかのフラグ
+let isStrategicRetreat = false; // 強制終了が発生したかのフラグ
 let pendingReloadAfterRelease = false; // 制限解除後のリロード待ちフラグ
 
 
 window.word_data = [];
 let word_data = window.word_data;
-let voice_vocab_data = []; // 🆕 音声認識用の軽量データ用変数を分離
+let voice_vocab_data = []; // 音声認識用の軽量データ用変数を分離
 
 // ==========================================
-// 🆕 Load Full Vocabulary for Voice Recognition
+// Load Full Vocabulary for Voice Recognition
 // ==========================================
 function fetchFullVocabulary() {
     fetch('/api/get_full_vocabulary')
@@ -173,7 +173,6 @@ if (typeof window.chapterDataFromFlask === 'undefined') {
 
 // 「全て選択」ボタンのテキストと色を更新する関数（スマホ対応版）
 function updateSelectAllButtonText(button, isAllSelected) {
-    // ★ 修正: null チェックを追加
     if (!button) {
         console.warn('updateSelectAllButtonText: button parameter is null or undefined');
         return;
@@ -216,7 +215,7 @@ function initializeMobileOptimizations() {
             }
         });
 
-        // テーブルにラッパーを追加してスクロール対応
+        // テーブルにラッパーを適用してスクロール対応
         const tables = document.querySelectorAll('.progress-container table, .user-list-table');
         tables.forEach(table => {
             // ランキングテーブルでないことを確認
@@ -404,7 +403,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (window.appInfoFromFlask && window.appInfoFromFlask.isLoggedIn) {
             loadUserData();
             loadWordDataFromServer();
-            checkAnnouncementStatus(); // 🆕 お知らせ状態チェック
+            checkAnnouncementStatus(); // お知らせ状態チェック
         } else {
             console.log("Not logged in, skipping data load.");
         }
@@ -467,7 +466,7 @@ function loadUserData() {
         });
 }
 
-// 🆕 制限状態をサーバーに保存する関数を追加
+// 制限状態をサーバーに保存する関数
 function saveRestrictionState() {
     const restrictionData = {
         hasBeenRestricted: hasBeenRestricted,
@@ -502,7 +501,7 @@ function loadWordDataFromServer() {
         .then(data => {
             let loadedData = null;
 
-            // 修正: APIは配列を直接返す場合がある
+            // APIは配列を直接返す場合がある
             if (Array.isArray(data)) {
                 loadedData = data;
             } else if (data.status === 'success' && data.word_data) {
@@ -515,7 +514,7 @@ function loadWordDataFromServer() {
 
             if (loadedData) {
                 // 必須フィールドのチェック（クライアント側でもフィルタリング）
-                // ★修正: 空白のみのデータも除外
+                // 空白のみのデータも除外
                 word_data = loadedData.filter(w => w.question && w.answer && w.question.trim() !== '' && w.answer.trim() !== '');
 
                 console.log(`✅ User Word Data Loaded: ${word_data.length} words`); // Debug Log
@@ -534,7 +533,7 @@ function loadWordDataFromServer() {
                 if (typeof updateStarProblemUI === 'function') {
                     updateStarProblemUI();
                 }
-                // ★追加：データロード後に制限状態を再評価
+                // データロード後に制限状態を再評価
                 updateIncorrectOnlySelection();
                 updateSelectionTotalCount(); // カウント更新
             }, 500);
@@ -579,15 +578,14 @@ function updateUnitCheckboxStates() {
                     const checkbox = document.getElementById(`unit-${chapterNum}-${unitNum}`);
                     if (checkbox) {
                         // Z問題の特別処理
-                        const isSpecialProblem = unitNum.toUpperCase() === 'Z';  // 変更
+                        const isSpecialProblem = unitNum.toUpperCase() === 'Z';
                         let isEnabled = unit.enabled;
 
                         if (isSpecialProblem) {
                             // Z問題の解放状態をリアルタイムでチェック
-                            isEnabled = unit.enabled && checkSpecialUnlockClientSide(chapterNum);  // 関数名変更
+                            isEnabled = unit.enabled && checkSpecialUnlockClientSide(chapterNum);
                         }
 
-                        // 以下既存の処理...
                         if (!isEnabled) {
                             const unitItem = checkbox.closest('.unit-item');
                             if (unitItem) {
@@ -649,8 +647,8 @@ function checkSpecialUnlockClientSide(chapterNum) {
     return true;
 }
 
-// ======================// ===================================
-// フォントサイズ調整機能 (Refined)
+// ===================================
+// フォントサイズ調整機能
 // ===================================
 
 const decreaseFontBtn = document.getElementById('decreaseFontSize');
@@ -797,7 +795,7 @@ function updateIncorrectOnlySelection() {
     const resetBtn = document.getElementById('resetSelectionButton');
     const mainHeader = document.querySelector('.question-count-selection .section-header-styled');
 
-    // ★修正：有効な苦手問題数を使用
+    // 有効な苦手問題数を使用
     const weakProblemCount = getValidWeakProblemCount();
 
     let stateChanged = false;
@@ -815,7 +813,7 @@ function updateIncorrectOnlySelection() {
 
     if (hasBeenRestricted && !restrictionReleased && weakProblemCount <= 10) {
         restrictionReleased = true;
-        pendingReloadAfterRelease = true; // ★追記: 解除されたらリロード待ちにする
+        pendingReloadAfterRelease = true; // 解除されたらリロード待ちにする
         stateChanged = true;
     }
 
@@ -985,7 +983,7 @@ function updateIncorrectOnlySelection() {
         }
     }
 
-    // ★追記: 表示を同期させる（制限中の「全20問」などの表示を反映）
+    // 表示を同期させる（制限中の「全20問」などの表示を反映）
     updateSelectionTotalCount();
 }
 
@@ -1005,7 +1003,7 @@ function setupEventListeners() {
             if (voiceAnswerBtnMobile) {
                 voiceAnswerBtnMobile.style.display = 'inline-flex';
                 voiceAnswerBtnMobile.addEventListener('click', startVoiceRecognition);
-                // モバイル・タブレット向けに touchstart も追加
+                // モバイル・タブレット向けに touchstart も対応
                 // passive: false にして preventDefault を許可する
                 voiceAnswerBtnMobile.addEventListener('touchstart', function (e) {
                     startVoiceRecognition(e);
@@ -1212,7 +1210,7 @@ function getSelectedQuestions() {
 function getFilteredQuestions() {
     let quizQuestions = [];
     // 常にDOMから現在の状態を取得
-    // ★修正: checkboxの状態をチェック
+    // checkboxの状態をチェック
     const isIncorrectOnly = document.getElementById('incorrectOnlyCheckbox2')?.checked || false;
 
     // ★重要: チェックボックスの状態を直接取得
@@ -1223,7 +1221,6 @@ function getFilteredQuestions() {
     const isUnmasteredOnly = unmasteredCheckbox ? unmasteredCheckbox.checked : false;
 
     if (isIncorrectOnly) {
-        // 苦手問題モードの場合
         // 苦手問題モードの場合
         quizQuestions = word_data.filter(word => {
             const wordIdentifier = generateProblemId(word);
@@ -1327,7 +1324,7 @@ function flashMessage(message, category) {
 
     const container = document.querySelector('.container') || document.body;
 
-    // 重複チェック（現在表示中のもの）
+    // 重複チェック
     const existingAlerts = container.querySelectorAll('.alert');
     for (const alert of existingAlerts) {
         if (alert.textContent.includes(message)) {
@@ -1380,15 +1377,15 @@ function startQuiz() {
             showAnswerButton.style.pointerEvents = 'auto';
         }
 
-        // ★追記: 途中介入（戦略的撤退）で無効化されたボタンを確実に有効化する
+        // 途中介入（戦略的撤退）で無効化されたボタンを確実に有効化する
         if (correctButton) correctButton.disabled = false;
         if (incorrectButton) incorrectButton.disabled = false;
 
         const weakProblemCount = getValidWeakProblemCount();
         const rawWeakProblemCount = incorrectWords.length; // 表示用などに元の数も保持
-        // ★修正: 'incorrectOnly' 文字列ではなく、数値を取得
+        // 'incorrectOnly' 文字列ではなく、数値を取得
         const selectedQuestionCount = getSelectedQuestionCount();
-        // ★修正: checkboxの状態をチェック
+        // checkboxの状態をチェック
         let isIncorrectOnly = document.getElementById('incorrectOnlyCheckbox2')?.checked || false;
 
         const isCurrentlyRestricted = hasBeenRestricted && !restrictionReleased;
@@ -1396,19 +1393,18 @@ function startQuiz() {
         const isUnmasteredOnly = document.getElementById('unmasteredOnlyCheckbox')?.checked || false;
 
         if (isCurrentlyRestricted && !isIncorrectOnly) {
-            // ★追加: 制限中だが、有効な苦手問題が0問の場合（データの不整合など）
+            // 制限中だが、有効な苦手問題が0問の場合（データの不整合など）
             // 自動的に制限を解除して、通常モードで開始できるようにする
             if (weakProblemCount === 0) {
                 console.warn('⚠️ 制限中ですが有効な苦手問題が0問です。制限を自動解除します。');
                 hasBeenRestricted = false;
                 restrictionReleased = true;
-                pendingReloadAfterRelease = true; // ★追記
+                pendingReloadAfterRelease = true;
                 saveRestrictionState(); // サーバーに保存
 
                 flashMessage('有効な苦手問題が見つからないため、制限を解除しました。', 'info');
 
                 // 状態更新のためにリロードせず、そのまま処理を続行させる（再帰呼び出しは避ける）
-                // UI更新
                 updateIncorrectOnlySelection();
 
                 // 続行許可（下の処理へ）
@@ -1486,7 +1482,7 @@ function startQuiz() {
         }
 
         // 問題数の制限（苦手問題モード関係なく制限するようになった）
-        // ★修正: 苦手問題モードでもカウント制限を行う
+        // 苦手問題モードでもカウント制限を行う
         if (selectedQuestionCount !== 'all') {
             const count = parseInt(selectedQuestionCount);
             if (!isNaN(count) && quizQuestions.length > count) {
@@ -1526,7 +1522,7 @@ function startQuiz() {
         // weakWordsListSection reference removed
         if (noWeakWordsMessage) noWeakWordsMessage.classList.add('hidden');
 
-        // ★追加: コラムを非表示にする
+        // コラムを非表示にする
         toggleTodaysColumn(false);
 
         updateProgressBar();
@@ -1539,9 +1535,6 @@ function startQuiz() {
 }
 
 function restartWeakProblemsQuiz() {
-
-
-    // ★既存のお祝いメッセージがあれば削除
     const existingCelebration = document.querySelector('.no-weak-problems-celebration');
     if (existingCelebration) {
         existingCelebration.remove();
@@ -1560,7 +1553,7 @@ function restartWeakProblemsQuiz() {
 
     if (currentWeakProblems.length === 0) {
         // 克服対象の問題がなくなった場合
-        // ★修正: 本当に克服したのか、全てクールダウン中なのかを判定
+        // 本当に克服したのか、全てクールダウン中なのかを判定
         const allCooldown = incorrectWords.length > 0;
         showNoWeakProblemsMessage(allCooldown);
         return;
@@ -1581,7 +1574,7 @@ function restartWeakProblemsQuiz() {
     // 新しい苦手問題セットでクイズを開始
     currentQuizData = shuffleArray(currentWeakProblems);
 
-    // ★修正: 前回と同じ問題数制限を適用する
+    // 前回と同じ問題数制限を適用する
     const selectedQuestionCount = lastQuizSettings.questionCount;
     if (selectedQuestionCount && selectedQuestionCount !== 'all' && selectedQuestionCount !== 'incorrectOnly') {
         const count = parseInt(selectedQuestionCount);
@@ -1601,7 +1594,7 @@ function restartWeakProblemsQuiz() {
     if (quizResultArea) quizResultArea.classList.add('hidden');
     if (cardArea) cardArea.classList.remove('hidden');
 
-    // ★追加: コラムを非表示にする
+    // コラムを非表示にする
     toggleTodaysColumn(false);
 
     updateProgressBar();
@@ -1616,7 +1609,6 @@ function clearPreviousCelebrationMessages() {
 }
 
 function showNoWeakProblemsMessage(isAllCooldown = false) {
-    // ★重要：既存のお祝いメッセージを削除
     const existingCelebration = document.querySelector('.no-weak-problems-celebration');
     if (existingCelebration) {
         existingCelebration.remove();
@@ -1724,7 +1716,7 @@ function showNextQuestion() {
 
             questionElement.textContent = currentWord.question;
 
-            // ★新機能: 「あと1回で克服」インジケーターを表示
+            // 「あと1回で克服」インジケーターを表示
             // 既存のインジケーターがあれば削除
             const existingIndicator = document.getElementById('mastery-indicator');
             if (existingIndicator) existingIndicator.remove();
@@ -1764,7 +1756,7 @@ function showNextQuestion() {
 }
 
 function showAnswer() {
-    // ★新機能：無効化中は処理を停止
+    // 無効化中は処理を停止
     if (isAnswerButtonDisabled) {
 
         return;
@@ -1828,7 +1820,7 @@ function handleAnswer(isCorrect) {
         incorrectCount++;
         problemHistory[wordIdentifier].incorrect_attempts++;
 
-        // ★修正: 既にリストに入っている かつ 以前に正解したことがある問題のみクールダウン
+        // 既にリストに入っている かつ 以前に正解したことがある問題のみクールダウン
         const isAlreadyWeak = incorrectWords.includes(wordIdentifier);
         const wasProgressing = (problemHistory[wordIdentifier].correct_streak > 0);
 
@@ -1843,12 +1835,12 @@ function handleAnswer(isCorrect) {
         }
     }
 
-    // ★修正：1問ごとに即座に保存（統計更新対応版）
+    // 1問ごとに即座に保存（統計更新対応版）
     saveQuizProgressToServer().then(() => {
         // 制限状態の即座更新
         setTimeout(() => {
             updateIncorrectOnlySelection();
-            checkMidQuizIntervention(); // ★新機能：途中経過での制限・演出チェック
+            checkMidQuizIntervention(); // 途中経過での制限・演出チェック
         }, 300);
 
     }).catch((error) => {
@@ -1938,7 +1930,7 @@ function triggerStrategicRetreat() {
     setTimeout(() => {
         if (inkContainer) {
             inkContainer.classList.remove('hidden');
-            spawnInkBlots(inkContainer, 20); // 少し数を増やしてサイズを小さく
+            spawnInkBlots(inkContainer, 20);
         }
     }, 150);
 
@@ -2100,7 +2092,6 @@ function createSakura(container) {
 function showQuizTimeProgressNotification(weakCount) {
     // 制限状態に関わる重要な変化のみ通知
     const wasRestricted = hasBeenRestricted && !restrictionReleased;
-    // ★修正：有効な苦手問題数を使用
     const currentWeakCount = getValidWeakProblemCount();
 
     // 制限解除の瞬間のみ通知
@@ -2249,8 +2240,7 @@ function showQuizResult() {
 
     displayIncorrectWordsForCurrentQuiz();
 
-    // ★追加：制限解除チェック（最終確認）
-    // ★修正：有効な苦手問題数を使用
+    // 制限解除チェック（最終確認）
     const currentWeakCount = getValidWeakProblemCount();
     const wasRestricted = hasBeenRestricted && !restrictionReleased;
 
@@ -2281,26 +2271,26 @@ function showQuizResult() {
         if (explanationDiv) explanationDiv.style.display = 'block';
     }
 
-    // ★追加: 戦略的撤退時は「論述チャレンジ」を非表示にして処理をスキップ
+    // 戦略的撤退時は「論述チャレンジ」を非表示にして処理をスキップ
     if (isStrategicRetreat) {
         const recommendedSection = document.getElementById('recommendedEssaysSection');
         if (recommendedSection) recommendedSection.classList.add('hidden');
         return;
     }
 
-    // 1. 今回出題された全ての問題の【答え】と【章】を収集する <--- ★変更点
+    // 1. 今回出題された全ての問題の【答え】と【章】を収集する
     const sessionKeywords = new Set();
-    const sessionChapters = new Set(); // <--- ★章を保存するSetを追加
+    const sessionChapters = new Set();
 
     currentQuizData.forEach(word => {
-        // 答えをキーワードとして追加
+        // 答えをキーワードとして使用
         if (word.answer && word.answer.length > 1) {
             sessionKeywords.add(word.answer);
         }
-        // 章を追加 <--- ★ここから追加
+        // 章を登録
         if (word.chapter) {
             sessionChapters.add(word.chapter);
-        } // <--- ★ここまで追加
+        }
     });
 
     // 2. おすすめ論述問題の表示エリアを一度リセット
@@ -2312,15 +2302,15 @@ function showQuizResult() {
     // 3. 収集したキーワードがあれば、APIに問い合わせる
     if (sessionKeywords.size > 0) {
         const keywordsArray = Array.from(sessionKeywords);
-        const chaptersArray = Array.from(sessionChapters); // <--- ★章の配列を作成
+        const chaptersArray = Array.from(sessionChapters);
 
-        // ★ローディング表示を追加
+        // ローディング表示を表示
         recommendedContainer.innerHTML = '<li class="loading-message"><i class="fas fa-spinner fa-spin"></i> 関連する論述問題を検索中・・・</li>';
         recommendedSection.classList.remove('hidden');
 
         fetch('/api/find_related_essays', {
             method: 'POST',
-            headers: { // <--- この headers の3行を追加してください
+            headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({ keywords: keywordsArray, chapters: chaptersArray }),
@@ -2413,7 +2403,7 @@ function calculateAccurateRangeTotal() {
     }).length;
 }
 
-// 不正解問題表示関数の修正版
+// 不正解問題表示関数
 function displayIncorrectWordsForCurrentQuiz() {
     if (!incorrectWordsContainer) return;
 
@@ -2472,7 +2462,7 @@ function toggleIncorrectAnswer(index) {
 }
 
 function backToSelectionScreen() {
-    // ★新機能: 制限解除後の初回戻り時のみリロード
+    // 制限解除後の初回戻り時のみリロード
     if (pendingReloadAfterRelease) {
         pendingReloadAfterRelease = false;
         location.reload();
@@ -2485,7 +2475,7 @@ function backToSelectionScreen() {
     // ★ボタンテキストをデフォルトにリセット
     resetRestartButtonToDefault();
 
-    // ★新機能：タイムアウトをクリア
+    // タイムアウトをクリア
     if (answerButtonTimeout) {
         clearTimeout(answerButtonTimeout);
         answerButtonTimeout = null;
@@ -2498,7 +2488,7 @@ function backToSelectionScreen() {
     // weakWordsListSection reference removed
     if (noWeakWordsMessage) noWeakWordsMessage.classList.add('hidden');
 
-    // ★追加: コラムを再表示する
+    // コラムを再表示する
     toggleTodaysColumn(true);
 
     // ★重要：範囲選択画面に戻った時に制限状態を更新（少し遅延）
@@ -2507,7 +2497,7 @@ function backToSelectionScreen() {
         updateIncorrectOnlySelection();
 
         // ★条件付きリセット：制限解除されている場合のみUIをリセット
-        // ★修正：有効な苦手問題数を使用
+        // 有効な苦手問題数を使用
         const currentWeakCount = getValidWeakProblemCount();
         const isCurrentlyRestricted = hasBeenRestricted && !restrictionReleased;
 
@@ -2653,7 +2643,7 @@ function restartQuiz() {
     // 新しい問題セットでクイズを再開始
     currentQuizData = shuffleArray(newQuizQuestions);
 
-    // ★修正: 前回と同じ問題数制限を適用する
+    // 前回と同じ問題数制限を適用する
     const selectedQuestionCount = lastQuizSettings.questionCount;
     if (selectedQuestionCount && selectedQuestionCount !== 'all' && selectedQuestionCount !== 'incorrectOnly') {
         const count = parseInt(selectedQuestionCount);
@@ -2762,7 +2752,7 @@ function resetRestartButtonToDefault() {
 function toggleTodaysColumn(show) {
     const columnWidget = document.getElementById('todaysColumnWidget');
     const newsWidget = document.getElementById('dailyNewsWidget');
-    
+
     if (columnWidget) {
         if (show) {
             columnWidget.classList.remove('hidden');
@@ -2771,7 +2761,7 @@ function toggleTodaysColumn(show) {
             columnWidget.style.display = 'none';
         }
     }
-    
+
     if (newsWidget) {
         if (show) {
             newsWidget.style.display = 'block';
@@ -2834,7 +2824,7 @@ function saveQuizProgressToServer() {
         incorrectWords: incorrectWords
     };
 
-    // ★修正：Promiseを返すように変更
+    // Promiseを返すように変更
     return fetch('/api/save_progress_debug', {
         method: 'POST',
         headers: {
@@ -2913,20 +2903,20 @@ async function openInfoPanel() {
         // お知らせを取得して表示 (awaitして確実にリストを表示)
         await fetchAnnouncements();
 
-        // 🆕 未読バッジがあれば消して既読APIを叩く
+        // 未読バッジがあれば消して既読APIを叩く
         if (infoIcon && infoIcon.classList.contains('has-new')) {
             infoIcon.classList.remove('has-new');
             markAnnouncementsAsViewed();
         }
 
-        // 外側クリックイベントを追加（少し遅延させて即座に閉じるのを防ぐ）
+        // 外側クリックイベント（少し遅延させて即座に閉じるのを防ぐ）
         setTimeout(() => {
             document.addEventListener('click', handleOutsideClick);
         }, 100);
     }
 }
 
-// 🆕 お知らせ状態チェック関数
+// お知らせ状態チェック関数
 async function checkAnnouncementStatus() {
     if (!infoIcon) return;
 
@@ -2944,7 +2934,7 @@ async function checkAnnouncementStatus() {
     }
 }
 
-// 🆕 お知らせ既読化関数
+// お知らせ既読化関数
 async function markAnnouncementsAsViewed() {
     try {
         await fetch('/api/announcements/mark_viewed', { method: 'POST' });
@@ -3273,7 +3263,7 @@ function fallbackCopyToClipboard(text) {
 // モバイル対応イベントリスナー
 // =========================================================
 
-// リサイズイベントの追加
+// リサイズイベントの処理
 window.addEventListener('resize', handleResize);
 
 // 横向き・縦向き変更への対応
@@ -3326,13 +3316,13 @@ function monitorPerformance() {
     }
 }
 
-// タッチデバイス対応（追加）
+// タッチデバイス対応
 function handleTouchOutside(event) {
     // タッチイベントでも同様の処理
     handleOutsideClick(event);
 }
 
-// タッチデバイス用のイベントも追加
+// タッチデバイス用のイベント対応
 function addTouchListeners() {
     if ('ontouchstart' in window) {
         document.addEventListener('touchstart', handleTouchOutside);
@@ -3576,7 +3566,7 @@ window.setRestrictionState = setRestrictionState;
 window.resetRestrictionState = resetRestrictionState;
 window.debugRestrictionState = debugRestrictionState;
 
-// グローバル関数として追加（開発者ツールで実行可能）
+// グローバル関数（開発者ツールで実行可能）
 window.investigateIdCollisions = function () {
 
 
@@ -3935,7 +3925,7 @@ function urlBase64ToUint8Array(base64String) {
    RPG Mode Logic
    ========================================= */
 
-let currentPostBattleDialogues = []; // 🆕 Store dialogues from result
+let currentPostBattleDialogues = []; // Store dialogues from result
 let rpgGameData = null;
 let rpgCurrentIndex = 0;
 let rpgCorrectCount = 0;
@@ -4078,7 +4068,7 @@ const btnRpgCancel = document.getElementById('btnRpgCancel');
 if (btnRpgCancel) btnRpgCancel.addEventListener('click', closeRpgModal);
 
 const btnRpgClose = document.getElementById('btnRpgClose');
-if (btnRpgClose) btnRpgClose.addEventListener('click', handleRpgResultDismiss); // 🆕 Custom handler
+if (btnRpgClose) btnRpgClose.addEventListener('click', handleRpgResultDismiss); // Custom handler
 
 const btnRpgStart = document.getElementById('btnRpgStart');
 if (btnRpgStart) btnRpgStart.addEventListener('click', startRpgGame);
@@ -4095,7 +4085,7 @@ function closeRpgModal() {
     clearInterval(rpgTimerInterval);
 }
 
-// 🆕 Dismiss Logic
+// Dismiss Logic
 function handleRpgResultDismiss() {
     // Check for post-battle dialogues
     if (currentPostBattleDialogues && currentPostBattleDialogues.length > 0) {
@@ -4126,7 +4116,7 @@ function finishRpgIntro() {
         .then(data => { });
 }
 
-let rpgIncorrectCount = 0; // 新規追加: ミス回数カウント
+let rpgIncorrectCount = 0; // ミス回数カウント
 let rpgPassScore = 10;
 let rpgMaxMistakes = 3;
 let rpgStageId = 1;
@@ -4165,7 +4155,7 @@ function startRpgGame(enemyId = null) {
                     // Let's explicitly say: `${rpgMaxMistakes + 1}ミスで終了`
 
                     // Update Image
-                    // 修正: 永続化された画像URL(icon_url)を優先して使用
+                    // 永続化された画像URL(icon_url)を優先して使用
                     let iconUrl = data.boss_info.icon_url || data.boss_info.icon_image;
 
                     // フォールバック: URLでない場合のみ静的パスを付与 (互換性維持)
@@ -4431,7 +4421,7 @@ function finishRpgGame(isWin) {
                         if (winDialog) winDialog.textContent = `"${data.defeat_dialogue}"`;
                     }
 
-                    // 🆕 Store Dialogues
+                    // Store Dialogues
                     if (data.dialogues) {
                         currentPostBattleDialogues = data.dialogues;
                     } else {
@@ -4463,7 +4453,7 @@ function finishRpgGame(isWin) {
 // RPG Intro & Dialogue Logic (Shared)
 // =========================================================
 
-let activeScenario = []; // 🆕 Dynamic scenario
+let activeScenario = []; // Dynamic scenario
 const rpgIntroDefaultScenario = [
     {
         text: "ほ、ほわあぁ……目が回るのです……。\nようやく実体化できたのですホー！",
@@ -4522,7 +4512,7 @@ function checkAndPlayRpgIntro() {
     if (!window.appInfoFromFlask || !window.appInfoFromFlask.isLoggedIn) return; // Login check
 
     // 範囲選択画面にいるかチェック
-    const ts = new Date().getTime(); // 🆕 Cache busting
+    const ts = new Date().getTime(); // Cache busting
     fetch('/api/check_rpg_intro_eligibility?t=' + ts)
         .then(response => response.json())
         .then(data => {
@@ -4569,7 +4559,7 @@ function playRpgIntroSequence(scenarioData) {
     }, 500);
 }
 
-// 🆕 Post-Battle Dialogue Player (No Glitch)
+// Post-Battle Dialogue Player (No Glitch)
 function playPostBattleDialogue(dialogues) {
     // Map backend dialogue to scenario format
     const scenario = dialogues.map(d => ({
@@ -4933,7 +4923,7 @@ function startVoiceRecognition(e) {
         // Correct Answer Data
         const currentData = currentQuizData[currentQuestionIndex];
         const correctAnswer = currentData.answer;
-        const correctReading = currentData.reading || ""; // 🆕 Reading from CSV
+        const correctReading = currentData.reading || ""; // Reading from CSV
 
         const SpeechGrammarList = window.SpeechGrammarList || window.webkitSpeechGrammarList;
 
@@ -4954,7 +4944,7 @@ function startVoiceRecognition(e) {
                                 if (clean.length > 0) allAnswers.add(clean);
                             });
                         }
-                        // 🆕 Add Reading
+                        // Add Reading
                         if (w.reading) {
                             // Handle comma in reading
                             const parts = w.reading.split(/[,]+/);
@@ -4986,7 +4976,7 @@ function startVoiceRecognition(e) {
             // Raw answer (cleaned)
             variations.add(correctAnswer.replace(/[;]/g, ''));
 
-            // 🆕 Reading (Highest Priority)
+            // Reading (Highest Priority)
             if (correctReading) {
                 // Split by comma OR slash to ensure individual words are added
                 const readingParts = correctReading.split(/[\/,]+/);
@@ -5127,7 +5117,7 @@ function startVoiceRecognition(e) {
                         if (clean.length > 0) globalVoiceDictionary.add(clean);
                     });
                 }
-                // 🆕 Reading
+                // Reading
                 if (w.reading) {
                     const parts = w.reading.split(/[\/,]+/);
                     parts.forEach(p => {
@@ -5160,7 +5150,7 @@ function startVoiceRecognition(e) {
         s = s.replace(/(\d)千(\d+)/g, '$1$2').replace(/(\d)千/g, '$1000').replace(/千(\d+)/g, '1$1').replace(/千/g, '1000');
         s = s.replace(/(\d)万(\d+)/g, '$1$2').replace(/(\d)万/g, '$10000').replace(/万(\d+)/g, '1$1').replace(/万/g, '10000');
 
-        // 🆕 Unify Kana (Hiragana -> Katakana) for consistent matching
+        // Unify Kana (Hiragana -> Katakana) for consistent matching
         s = s.replace(/[\u3041-\u3096]/g, function (ch) {
             return String.fromCharCode(ch.charCodeAt(0) + 0x60);
         });
@@ -5176,7 +5166,7 @@ function startVoiceRecognition(e) {
 
         const currentData = currentQuizData[currentQuestionIndex];
         const correctAnswer = currentData.answer;
-        const correctReading = currentData.reading || ""; // 🆕
+        const correctReading = currentData.reading || ""; //
 
         // Normalization wrapper
         const normalize = normalizeString;
@@ -5204,16 +5194,16 @@ function startVoiceRecognition(e) {
                 });
             }
 
-            // 🆕 Add Reading variations (Comma separated)
+            // Add Reading variations (Comma separated)
             if (targetReading) {
                 const rParts = targetReading.split(/[,]+/);
                 rParts.forEach(r => {
-                    const n = normalize(r); // 修正: n を定義
+                    const n = normalize(r); // n を定義
                     if (n) validSet.add(n);
                 });
             }
 
-            // 🆕 Calculate Skeleton for Input
+            // Calculate Skeleton for Input
             const inputSkeleton = getConsonantSkeleton(cleanTranscript);
 
             // 2. Check against All Valid Options
@@ -5225,7 +5215,7 @@ function startVoiceRecognition(e) {
                     return { match: true, type: 'exact' };
                 }
 
-                // 🆕 Consonant Skeleton Match (Ignoring Vowels)
+                // Consonant Skeleton Match (Ignoring Vowels)
                 // Only apply for longer words (length >= 5) to avoid short word collisions (e.g. Kita vs Kata)
                 if (target.length >= 5) {
                     const targetSkeleton = getConsonantSkeleton(target);
@@ -5241,7 +5231,7 @@ function startVoiceRecognition(e) {
                 } else {
                     const dist = levenshteinDistance(cleanTranscript, target);
 
-                    // 🆕 Adjusted Threshold based on User Feedback
+                    // Adjusted Threshold based on User Feedback
                     // "Strictness" caused issues, so we relax it for longer words (0.2 -> 0.4)
                     // But keep it "not abnormally wide" for short words (length 4 allows 1 error, not 3).
                     let threshold;
@@ -5252,7 +5242,7 @@ function startVoiceRecognition(e) {
                     }
 
                     if (dist <= threshold) {
-                        // 🆕 User Request: 1 char mistake -> Exact match (for length >= 3)
+                        // User Request: 1 char mistake -> Exact match (for length >= 3)
                         if (dist <= 1 && target.length >= 3) {
                             return { match: true, type: 'exact' };
                         }
@@ -5427,7 +5417,7 @@ function startVoiceRecognition(e) {
         const checkTranscriptMatch = (text) => {
             const clean = normalize(text);
 
-            // 🆕 Calculate Skeleton for Input
+            // Calculate Skeleton for Input
             const inputSkeleton = getConsonantSkeleton(clean);
 
             // Helper: Check if string contains target (Exact or Fuzzy)
@@ -5440,7 +5430,7 @@ function startVoiceRecognition(e) {
                 // If any window has small edit distance, return true.
                 if (needle.length < 2) return false; // Too short for fuzzy
 
-                // 🆕 Adjusted Threshold for Substring
+                // Adjusted Threshold for Substring
                 let threshold;
                 if (needle.length <= 4) {
                     threshold = 1;
@@ -5537,7 +5527,7 @@ function startVoiceRecognition(e) {
         if (matchFound) {
             executeSuccess(matchedCandidate, matchType);
         } else {
-            // 🆕 Fallback: Server-side Katakana Conversion (Batch)
+            // Fallback: Server-side Katakana Conversion (Batch)
             if (candidates.length > 0) {
                 // Take top 5 candidates to increase hit rate (especially for Safari/No-Grammar)
                 const fallbackCandidates = candidates.slice(0, 5);
