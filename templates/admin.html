@@ -9319,10 +9319,9 @@
                 body: formData
             })
                 .then(response => {
-                    if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) {
-                        throw new Error('サーバーエラーが発生しました。セッションが切れている可能性があります。ページを再読み込みしてください。');
-                    }
-                    return response.json();
+                    return response.json().catch(() => {
+                        throw new Error('サーバーからの応答を解析できませんでした（ステータス: ' + response.status + '）。ページを再読み込みしてください。');
+                    });
                 })
                 .then(data => {
                     if (data.status === 'success') {
@@ -9335,7 +9334,8 @@
                 })
                 .catch(error => {
                     console.error('Error:', error);
-                    showInfoModal('エラー', 'アップロード中にエラーが発生しました。', 'error');
+                    const msg = error.message || 'アップロード中にエラーが発生しました。';
+                    showInfoModal('エラー', msg, 'error');
                     document.getElementById('uploadProgressContainer').style.display = 'none';
                 });
         }
