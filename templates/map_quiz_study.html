@@ -1,0 +1,427 @@
+{% extends "base.html" %}
+{% block title %}暗記モード - {{ map_name }} - {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid p-0" style="height: calc(100vh - 56px); display: flex; flex-direction: column;">
+    <!-- Header -->
+    <div class="py-2 px-3 shadow-sm"
+        style="flex-shrink: 0; z-index: 1000; background-color: #ffffff !important; color: #212529 !important; border-bottom: 1px solid #dee2e6;">
+        <div class="container-fluid d-flex justify-content-between align-items-center">
+            <div style="flex: 1;">
+                <span class="badge bg-info text-dark mb-1"><i class="fas fa-eye me-1"></i>暗記モード</span>
+                <h5 class="mb-0 fw-bold" style="font-size: 1rem;">{{ map_name }}</h5>
+            </div>
+            <div class="text-end ms-3">
+                <a href="{{ url_for('map_quiz_index') }}" class="btn btn-sm btn-outline-secondary">戻る</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Map Area -->
+    <div class="position-relative flex-grow-1 bg-secondary overflow-hidden" id="gameArea"
+        style="cursor: grab; touch-action: none;">
+        <div id="mapWrapper" style="transform-origin: 0 0; position: absolute; top: 0; left: 0;">
+            <img id="gameMapImage" src="" style="display: block; max-width: none;" draggable="false">
+            <div id="gamePinsContainer"></div>
+        </div>
+
+        <!-- Zoom Controls -->
+        <div class="position-absolute bottom-0 end-0 mb-4 me-3 d-flex flex-column gap-2" style="z-index: 500;">
+            <button class="btn btn-light shadow rounded-circle p-0 d-flex align-items-center justify-content-center"
+                style="width: 40px; height: 40px;" onclick="zoomMap(1.2)" title="拡大">
+                <i class="fas fa-plus"></i>
+            </button>
+            <button class="btn btn-light shadow rounded-circle p-0 d-flex align-items-center justify-content-center"
+                style="width: 40px; height: 40px;" onclick="zoomMap(0.8)" title="縮小">
+                <i class="fas fa-minus"></i>
+            </button>
+        </div>
+
+        <!-- Difficulty Filter Panel -->
+        <div class="position-absolute top-0 start-0 mt-2 ms-2" style="z-index: 500;">
+            <div class="bg-white rounded-3 shadow-sm p-2" style="backdrop-filter: blur(8px); background: rgba(255,255,255,0.92);">
+                <div class="d-flex flex-wrap gap-2 align-items-center">
+                    <div class="form-check form-switch mb-0 d-flex align-items-center">
+                        <input class="form-check-input" type="checkbox" id="toggle-diff-1" checked onchange="filterPins()" style="border-color: #2ecc71; cursor: pointer;">
+                        <label class="form-check-label ms-1 small fw-bold" for="toggle-diff-1" style="color: #2ecc71; cursor: pointer;">易</label>
+                    </div>
+                    <div class="form-check form-switch mb-0 d-flex align-items-center">
+                        <input class="form-check-input" type="checkbox" id="toggle-diff-2" checked onchange="filterPins()" style="border-color: #3498db; cursor: pointer;">
+                        <label class="form-check-label ms-1 small fw-bold" for="toggle-diff-2" style="color: #3498db; cursor: pointer;">標準</label>
+                    </div>
+                    <div class="form-check form-switch mb-0 d-flex align-items-center">
+                        <input class="form-check-input" type="checkbox" id="toggle-diff-3" checked onchange="filterPins()" style="border-color: #e74c3c; cursor: pointer;">
+                        <label class="form-check-label ms-1 small fw-bold" for="toggle-diff-3" style="color: #e74c3c; cursor: pointer;">難</label>
+                    </div>
+                    <div class="form-check form-switch mb-0 d-flex align-items-center">
+                        <input class="form-check-input" type="checkbox" id="toggle-diff-4" checked onchange="filterPins()" style="border-color: #9b59b6; cursor: pointer;">
+                        <label class="form-check-label ms-1 small fw-bold" for="toggle-diff-4" style="color: #9b59b6; cursor: pointer;">最難関</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const MAP_ID = {{ map_id }};
+    let studyData = null;
+
+    // Zoom/Pan State
+    let scale = 1;
+    let panning = false;
+    let pointX = 0;
+    let pointY = 0;
+    let startX = 0;
+    let startY = 0;
+
+    const gameArea = document.getElementById('gameArea');
+    const mapWrapper = document.getElementById('mapWrapper');
+
+    document.addEventListener('DOMContentLoaded', function () {
+        initStudy();
+        initPanZoom();
+    });
+
+    async function initStudy() {
+        try {
+            const response = await fetch(`/api/map_quiz/map/${MAP_ID}/study_data`);
+            const data = await response.json();
+
+            if (data.status === 'error') throw new Error(data.message);
+
+            studyData = data;
+
+            const gameMapImage = document.getElementById('gameMapImage');
+
+            const onMapLoad = () => {
+                fitMapToScreen();
+                renderPins();
+            };
+
+            gameMapImage.onload = onMapLoad;
+            gameMapImage.onerror = () => console.error("Failed to load map image");
+            gameMapImage.src = `/serve_map_image/${data.map.filename}`;
+
+            if (gameMapImage.complete && gameMapImage.naturalWidth !== 0) {
+                onMapLoad();
+            }
+
+            window.addEventListener('resize', () => {
+                requestAnimationFrame(() => fitMapToScreen());
+            });
+
+            renderPins();
+
+        } catch (e) {
+            alert('ロードエラー: ' + e.message);
+        }
+    }
+
+    function renderPins() {
+        const container = document.getElementById('gamePinsContainer');
+        container.innerHTML = '';
+
+        const img = document.getElementById('gameMapImage');
+        const mapNaturalW = img.naturalWidth || 1000;
+
+        if (!studyData) return;
+
+        studyData.locations.forEach(loc => {
+            const pinBtn = document.createElement('div');
+            pinBtn.className = 'game-pin';
+            pinBtn.id = `pin-${loc.id}`;
+            pinBtn.dataset.difficulties = JSON.stringify(loc.difficulties);
+            pinBtn.style.position = 'absolute';
+            pinBtn.style.left = `${loc.x}%`;
+            pinBtn.style.top = `${loc.y}%`;
+            pinBtn.style.width = '0';
+            pinBtn.style.height = '0';
+            pinBtn.style.overflow = 'visible';
+            pinBtn.style.cursor = 'pointer';
+            pinBtn.onclick = (e) => onPinClick(e, loc.id);
+
+            // Icon (for points)
+            let iconHtml = '';
+            if (loc.shape_type !== 'circle') {
+                iconHtml = `<i class="fas fa-map-marker-alt text-danger fa-lg" style="position: absolute; left: 0; top: 0; transform: translate(-50%, -100%); filter: drop-shadow(0 2px 3px rgba(0,0,0,0.5)); transition: all 0.2s; z-index: 2;"></i>`;
+            }
+
+            // Circle/Ellipse Region
+            let regionHtml = '';
+            if ((loc.shape_type === 'circle' || loc.shape_type === 'ellipse') && (loc.radius > 0 || loc.radius_x > 0)) {
+                const rx = loc.radius_x || loc.radius || 0;
+                const ry = loc.radius_y || loc.radius || 0;
+                const rot = loc.rotation || 0;
+
+                if (rx > 0 || ry > 0) {
+                    const finalRx = rx > 0 ? rx : ry;
+                    const finalRy = ry > 0 ? ry : rx;
+                    const width = (finalRx / 100) * mapNaturalW * 2;
+                    const height = (finalRy / 100) * mapNaturalW * 2;
+
+                    regionHtml = `<div class="pin-region" data-rotation="${rot}" style="
+                        position: absolute;
+                        left: 50%; top: 50%;
+                        width: ${width}px; height: ${height}px;
+                        transform: translate(-50%, -50%) rotate(${rot}deg);
+                        border-radius: 50%;
+                        background-color: rgba(220, 53, 69, 0.2);
+                        border: 1px solid rgba(220, 53, 69, 0.5);
+                        z-index: 1;
+                        pointer-events: auto;
+                     "></div>`;
+                }
+            }
+
+            // Label (hidden by default, shown on click)
+            let labelHtml = '';
+            if (loc.name && loc.name.trim() !== "") {
+                const isRegion = (loc.shape_type === 'circle' || loc.shape_type === 'ellipse');
+                const labelStyle = isRegion
+                    ? 'position: absolute; left: 0; top: 0; transform: translate(-50%, -50%);'
+                    : 'position: absolute; left: 15px; top: -35px;';
+
+                labelHtml = `<div class="pin-label badge bg-light text-dark border shadow-sm" id="label-${loc.id}" style="${labelStyle} font-size: 14px; white-space: nowrap; display: none; z-index: 10;">${loc.name}</div>`;
+            }
+
+            pinBtn.innerHTML = regionHtml + `<div class="pin-marker-wrapper" style="position: absolute; left: 0; top: 0; z-index: 10;">${iconHtml + labelHtml}</div>`;
+            container.appendChild(pinBtn);
+        });
+
+        setTransform();
+        filterPins();
+    }
+
+    function onPinClick(e, locId) {
+        e.stopPropagation();
+        const label = document.getElementById(`label-${locId}`);
+        if (label) {
+            // Toggle label visibility
+            if (label.style.display === 'none') {
+                label.style.display = 'block';
+            } else {
+                label.style.display = 'none';
+            }
+        }
+    }
+
+    function filterPins() {
+        const activeDiffs = new Set();
+        for (let d = 1; d <= 4; d++) {
+            const toggle = document.getElementById(`toggle-diff-${d}`);
+            if (toggle && toggle.checked) activeDiffs.add(d);
+        }
+
+        document.querySelectorAll('.game-pin').forEach(pin => {
+            const diffs = JSON.parse(pin.dataset.difficulties || '[]');
+            // Show pin if any of its difficulties are active
+            const visible = diffs.some(d => activeDiffs.has(d));
+            pin.style.display = visible ? 'block' : 'none';
+            // Hide label when pin is hidden
+            if (!visible) {
+                const label = pin.querySelector('.pin-label');
+                if (label) label.style.display = 'none';
+            }
+        });
+    }
+
+    // Zoom/Pan (same as play page)
+    function calculateFitState() {
+        const img = document.getElementById('gameMapImage');
+        const container = document.getElementById('gameArea');
+        if (!img.naturalWidth) return null;
+
+        const containerW = container.clientWidth;
+        const containerH = container.clientHeight;
+        const imgW = img.naturalWidth;
+        const imgH = img.naturalHeight;
+
+        const scaleX = (containerW * 0.95) / imgW;
+        const scaleY = (containerH * 0.95) / imgH;
+        const targetScale = Math.min(scaleX, scaleY);
+
+        const scaledW = imgW * targetScale;
+        const scaledH = imgH * targetScale;
+
+        return {
+            scale: targetScale,
+            pointX: (containerW - scaledW) / 2,
+            pointY: (containerH - scaledH) / 2
+        };
+    }
+
+    function fitMapToScreen() {
+        const state = calculateFitState();
+        if (!state) return;
+        scale = state.scale;
+        pointX = state.pointX;
+        pointY = state.pointY;
+        startX = 0;
+        startY = 0;
+        setTransform();
+    }
+
+    function initPanZoom() {
+        gameArea.onmousedown = function (e) {
+            e.preventDefault();
+            startX = e.clientX - pointX;
+            startY = e.clientY - pointY;
+            panning = true;
+            gameArea.style.cursor = 'grabbing';
+        };
+
+        gameArea.onmouseup = function () {
+            panning = false;
+            gameArea.style.cursor = 'grab';
+        };
+
+        gameArea.onmousemove = function (e) {
+            e.preventDefault();
+            if (!panning) return;
+            pointX = e.clientX - startX;
+            pointY = e.clientY - startY;
+            setTransform();
+        };
+
+        gameArea.onwheel = function (e) {
+            e.preventDefault();
+            const xs = (e.clientX - pointX) / scale;
+            const ys = (e.clientY - pointY) / scale;
+            const delta = -e.deltaY;
+
+            (delta > 0) ? (scale *= 1.2) : (scale /= 1.2);
+            if (scale < 0.1) scale = 0.1;
+            if (scale > 5) scale = 5;
+
+            pointX = e.clientX - xs * scale;
+            pointY = e.clientY - ys * scale;
+            setTransform();
+        };
+
+        gameArea.addEventListener('touchstart', handleTouchStart, { passive: false });
+        gameArea.addEventListener('touchmove', handleTouchMove, { passive: false });
+        gameArea.addEventListener('touchend', handleTouchEnd);
+    }
+
+    let initialPinchDistance = null;
+    let initialScale = 1;
+
+    function handleTouchStart(e) {
+        if (e.touches.length === 1) {
+            const touch = e.touches[0];
+            startX = touch.clientX - pointX;
+            startY = touch.clientY - pointY;
+            panning = true;
+        } else if (e.touches.length === 2) {
+            panning = false;
+            initialPinchDistance = getDistance(e.touches);
+            initialScale = scale;
+        }
+    }
+
+    function handleTouchMove(e) {
+        e.preventDefault();
+        if (e.touches.length === 1 && panning) {
+            const touch = e.touches[0];
+            pointX = touch.clientX - startX;
+            pointY = touch.clientY - startY;
+            setTransform();
+        } else if (e.touches.length === 2 && initialPinchDistance) {
+            const currentDistance = getDistance(e.touches);
+            const zoomFactor = currentDistance / initialPinchDistance;
+            const center = getCenter(e.touches);
+            const wx = (center.x - pointX) / scale;
+            const wy = (center.y - pointY) / scale;
+
+            let newScale = initialScale * zoomFactor;
+            if (newScale < 0.1) newScale = 0.1;
+            if (newScale > 5) newScale = 5;
+            scale = newScale;
+
+            pointX = center.x - wx * scale;
+            pointY = center.y - wy * scale;
+            setTransform();
+        }
+    }
+
+    function handleTouchEnd(e) {
+        if (e.touches.length < 2) initialPinchDistance = null;
+        if (e.touches.length === 0) panning = false;
+    }
+
+    function getDistance(touches) {
+        const dx = touches[0].clientX - touches[1].clientX;
+        const dy = touches[0].clientY - touches[1].clientY;
+        return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    function getCenter(touches) {
+        return {
+            x: (touches[0].clientX + touches[1].clientX) / 2,
+            y: (touches[0].clientY + touches[1].clientY) / 2
+        };
+    }
+
+    function setTransform() {
+        mapWrapper.style.transform = "translate(" + pointX + "px, " + pointY + "px) scale(" + scale + ")";
+        const invScale = 1 / scale;
+        document.querySelectorAll('.pin-marker-wrapper').forEach(wrapper => {
+            wrapper.style.transform = `scale(${invScale})`;
+        });
+    }
+
+    function zoomMap(factor) {
+        const container = document.getElementById('gameArea');
+        const cx = container.clientWidth / 2;
+        const cy = container.clientHeight / 2;
+        const wx = (cx - pointX) / scale;
+        const wy = (cy - pointY) / scale;
+
+        scale *= factor;
+        if (scale < 0.1) scale = 0.1;
+        if (scale > 5) scale = 5;
+
+        pointX = cx - wx * scale;
+        pointY = cy - wy * scale;
+        setTransform();
+    }
+</script>
+
+<style>
+    body>.container {
+        max-width: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        width: 100% !important;
+    }
+
+    .form-check-input:checked {
+        background-color: currentColor;
+        border-color: currentColor;
+    }
+
+    #toggle-diff-1:checked {
+        background-color: #2ecc71;
+        border-color: #2ecc71;
+    }
+
+    #toggle-diff-2:checked {
+        background-color: #3498db;
+        border-color: #3498db;
+    }
+
+    #toggle-diff-3:checked {
+        background-color: #e74c3c;
+        border-color: #e74c3c;
+    }
+
+    #toggle-diff-4:checked {
+        background-color: #9b59b6;
+        border-color: #9b59b6;
+    }
+</style>
+
+{% block footer %}{% endblock %}
+{% block info_icon %}{% endblock %}
+{% endblock %}

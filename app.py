@@ -17077,6 +17077,50 @@ def map_quiz_index():
     
     return render_template('map_quiz_index.html', genres=active_genres, others_maps=others_maps)
 
+@app.route('/map_quiz/study/<int:map_id>')
+def map_quiz_study(map_id):
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    map_obj = MapImage.query.get_or_404(map_id)
+    if not map_obj.is_active and not session.get('is_admin'):
+        flash('この地図は現在非公開です', 'warning')
+        return redirect(url_for('map_quiz_index'))
+    return render_template('map_quiz_study.html', map_id=map_id, map_name=map_obj.name)
+
+@app.route('/api/map_quiz/map/<int:map_id>/study_data')
+def api_get_map_study_data(map_id):
+    map_obj = MapImage.query.get_or_404(map_id)
+    if not map_obj.is_active and not session.get('is_admin'):
+        return jsonify({'status': 'error', 'message': 'Map is private'})
+
+    locations = map_obj.locations
+    loc_data = []
+    for l in locations:
+        # Get distinct difficulties for this location's problems
+        difficulties = sorted(set(
+            p.difficulty for p in l.problems if p.difficulty is not None
+        ))
+        if not difficulties:
+            continue  # Skip locations with no problems
+        loc_data.append({
+            'id': l.id,
+            'x': l.x_coordinate,
+            'y': l.y_coordinate,
+            'name': l.name,
+            'shape_type': getattr(l, 'shape_type', 'point'),
+            'radius': getattr(l, 'radius', 0),
+            'radius_x': getattr(l, 'radius_x', 0),
+            'radius_y': getattr(l, 'radius_y', 0),
+            'rotation': getattr(l, 'rotation', 0),
+            'difficulties': difficulties
+        })
+
+    return jsonify({
+        'status': 'success',
+        'map': {'id': map_obj.id, 'name': map_obj.name, 'filename': map_obj.filename},
+        'locations': loc_data
+    })
+
 @app.route('/map_quiz/play/<int:map_id>')
 def map_quiz_play(map_id):
     map_obj = MapImage.query.get_or_404(map_id)

@@ -183,6 +183,11 @@
         border-left: 5px solid #9b59b6;
     }
 
+    .difficulty-card-btn.diff-study {
+        border-left: 5px solid #00b894;
+        background: linear-gradient(135deg, #ffffff 0%, #f0fff4 100%);
+    }
+
     .difficulty-card-btn.diff-all {
         border-left: 5px solid #34495e;
     }
@@ -201,6 +206,10 @@
 
     .difficulty-card-btn.diff-4:hover {
         border-color: #9b59b6;
+    }
+
+    .difficulty-card-btn.diff-study:hover {
+        border-color: #00b894;
     }
 
     .difficulty-card-btn.diff-all:hover {
@@ -227,6 +236,10 @@
 
     .diff-4 .diff-icon {
         color: #9b59b6;
+    }
+
+    .diff-study .diff-icon {
+        color: #00b894;
     }
 
     .diff-all .diff-icon {
@@ -280,6 +293,10 @@
 
     .diff-4 .difficulty-progress-fill {
         background: rgba(155, 89, 182, 0.08);
+    }
+
+    .diff-study .difficulty-progress-fill {
+        background: rgba(0, 184, 148, 0.08);
     }
 
     .diff-all .difficulty-progress-fill {
@@ -446,6 +463,15 @@
                 </div>
 
                 <div id="difficultyButtons" class="text-start" style="display: none;">
+                    <button id="study-mode-btn" class="difficulty-card-btn diff-study" onclick="openStudyMode()">
+                        <div class="diff-content-wrapper">
+                            <div><i class="fas fa-eye diff-icon"></i><span class="diff-name">暗記モード</span></div>
+                            <span class="mastery-badge"><span class="mastery-text" style="font-size: 0.75rem;">地点を覚える</span></span>
+                        </div>
+                    </button>
+
+                    <hr class="my-2" style="border-color: rgba(0,0,0,0.08);">
+
                     <button id="difficulty-btn-1" class="difficulty-card-btn diff-1" onclick="startMapQuiz(1)">
                         <div class="diff-content-wrapper">
                             <div><i class="fas fa-seedling diff-icon"></i><span class="diff-name">易</span></div>
@@ -565,6 +591,12 @@
             console.error(e);
             document.getElementById('difficultyLoading').innerText = '通信エラーが発生しました';
         }
+    }
+
+    function openStudyMode() {
+        if (!currentMapId) return;
+        let url = "{{ url_for('map_quiz_study', map_id=0) }}".replace('/0', '/' + currentMapId);
+        window.location.href = url;
     }
 
     function startMapQuiz(difficulty) {
