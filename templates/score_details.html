@@ -5,7 +5,7 @@
 <section class="score-details-section">
     <div class="header-section">
         <h2>📐 スコア算出方法</h2>
-        <p class="subtitle">信頼性重視の総合学習評価システムの詳細</p>
+        <p class="subtitle">公平性と信頼性を重視した総合学習評価システムの詳細</p>
         <div class="back-link">
             <a href="{{ url_for('progress_page') }}" class="btn btn-outline-primary btn-sm">
                 <i class="fas fa-arrow-left"></i> 進捗ページに戻る
@@ -20,6 +20,56 @@
             <div class="formula-main">
                 総合スコア = <span class="condition">マスタースコア + 正答率スコア + 継続性スコア + 精度ボーナス</span>
             </div>
+        </div>
+        <div style="margin-top: 12px; padding: 10px; background: #fff3e0; border-radius: 6px; border: 1px solid #ffe0b2;">
+            <strong>ポイント：</strong>正答率スコアと精度ボーナスには <strong>Wilson Score（信頼度調整）</strong>が適用されます。
+            回答数が少ないうちは正答率が保守的に評価されるため、たくさん問題を解くほど正当に評価されます。
+        </div>
+    </div>
+
+    <!-- Wilson Score 解説 -->
+    <div class="component-card" style="border-left-color: #9c27b0; margin-bottom: 30px;">
+        <div class="component-header">
+            <h4><span class="component-label" style="background: #9c27b0;">★</span> Wilson Score（信頼度調整）とは</h4>
+            <span class="feature-badge" style="background: #9c27b0; color: white;">公平性の要</span>
+        </div>
+        <p style="margin-bottom: 12px;">
+            少ない回答数での高正答率を「本当の実力」として過大評価しないための統計的手法です。
+            回答数が増えるほど、実際の正答率に近づきます。
+        </p>
+        <div class="formula-detail">
+            <code>調整後正答率 = Wilson Score 95%信頼区間の下限値</code>
+        </div>
+        <div style="margin-top: 12px;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+                <thead>
+                    <tr style="background: #f5f5f5;">
+                        <th style="padding: 8px; border: 1px solid #ddd; text-align: center;">回答数</th>
+                        <th style="padding: 8px; border: 1px solid #ddd; text-align: center;">実際の正答率</th>
+                        <th style="padding: 8px; border: 1px solid #ddd; text-align: center;">調整後正答率</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td style="padding: 6px; border: 1px solid #ddd; text-align: center;">5問</td>
+                        <td style="padding: 6px; border: 1px solid #ddd; text-align: center;">100%</td>
+                        <td style="padding: 6px; border: 1px solid #ddd; text-align: center; color: #e74c3c;"><strong>約57%</strong></td></tr>
+                    <tr><td style="padding: 6px; border: 1px solid #ddd; text-align: center;">10問</td>
+                        <td style="padding: 6px; border: 1px solid #ddd; text-align: center;">100%</td>
+                        <td style="padding: 6px; border: 1px solid #ddd; text-align: center; color: #e67e22;"><strong>約72%</strong></td></tr>
+                    <tr><td style="padding: 6px; border: 1px solid #ddd; text-align: center;">50問</td>
+                        <td style="padding: 6px; border: 1px solid #ddd; text-align: center;">100%</td>
+                        <td style="padding: 6px; border: 1px solid #ddd; text-align: center; color: #27ae60;"><strong>約93%</strong></td></tr>
+                    <tr><td style="padding: 6px; border: 1px solid #ddd; text-align: center;">500問</td>
+                        <td style="padding: 6px; border: 1px solid #ddd; text-align: center;">80%</td>
+                        <td style="padding: 6px; border: 1px solid #ddd; text-align: center; color: #27ae60;"><strong>約76%</strong></td></tr>
+                    <tr><td style="padding: 6px; border: 1px solid #ddd; text-align: center;">1000問</td>
+                        <td style="padding: 6px; border: 1px solid #ddd; text-align: center;">85%</td>
+                        <td style="padding: 6px; border: 1px solid #ddd; text-align: center; color: #27ae60;"><strong>約83%</strong></td></tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="example-box" style="margin-top: 12px;">
+            回答数が多いほど調整後の正答率は実際の値に近づくため、<strong>コツコツ学習した人が正当に評価</strong>されます。
         </div>
     </div>
 
@@ -49,23 +99,24 @@
         <!-- 2. 正答率スコア -->
         <div class="component-card accuracy-card">
             <div class="component-header">
-                <h4><span class="component-label">2</span> 正答率スコア（段階的連続計算）</h4>
-                <span class="feature-badge">急上昇式</span>
+                <h4><span class="component-label">2</span> 正答率スコア（信頼度調整済み）</h4>
+                <span class="feature-badge">Wilson Score適用</span>
             </div>
             <div class="formula-detail">
-                <code>90%以上: 500 + (正答率 - 0.9) × 800</code><br>
-                <code>80-89%: 350 + (正答率 - 0.8) × 1500</code><br>
-                <code>70-79%: 200 + (正答率 - 0.7) × 1500</code><br>
-                <code>60-69%: 100 + (正答率 - 0.6) × 1000</code><br>
-                <code>60%未満: 正答率 × 166.67</code>
+                <code>※ 正答率にはWilson Score調整が適用されます</code><br>
+                <code>90%以上: 500 + (調整後正答率 - 0.9) × 800</code><br>
+                <code>80-89%: 350 + (調整後正答率 - 0.8) × 1500</code><br>
+                <code>70-79%: 200 + (調整後正答率 - 0.7) × 1500</code><br>
+                <code>60-69%: 100 + (調整後正答率 - 0.6) × 1000</code><br>
+                <code>60%未満: 調整後正答率 × 166.67</code>
             </div>
             <ul class="explanation-list">
-                <li><strong>段階設定</strong>：正答率の区間ごとに異なる傾斜</li>
+                <li><strong>信頼度調整</strong>：回答数が少ない場合、正答率は低めに見積もられる</li>
                 <li><strong>80%の壁</strong>：80%以上で大幅スコアアップ</li>
                 <li><strong>連続計算</strong>：区間内でも細かく評価</li>
             </ul>
             <div class="example-box">
-                <strong>例：</strong> 正答率85% → 350 + (0.85 - 0.8) × 1500 = 350 + 75 = <strong>425点</strong>
+                <strong>例：</strong> 1000回答で正答率85% → 調整後約83% → 350 + (0.83 - 0.8) × 1500 = 350 + 45 = <strong>395点</strong>
             </div>
         </div>
 
@@ -76,38 +127,39 @@
                 <span class="balance-badge">積み上げ式</span>
             </div>
             <div class="formula-detail">
-                <code>継続性スコア = √(総回答数) × 3</code>
+                <code>継続性スコア = √(総回答数) × 5</code>
             </div>
             <ul class="explanation-list">
                 <li><strong>平方根関数</strong>：回答数が増えるほど緩やかに上昇</li>
                 <li><strong>継続重視</strong>：コツコツ学習を着実に評価</li>
-                <li><strong>適度な評価</strong>：過度な量産を抑制</li>
+                <li><strong>適度な評価</strong>：過度な量産を抑制しつつ、学習量をしっかり反映</li>
             </ul>
             <div class="example-box">
-                <strong>例：</strong> 400回答 → √400 × 3 = 20 × 3 = <strong>60点</strong>
+                <strong>例：</strong> 400回答 → √400 × 5 = 20 × 5 = <strong>100点</strong>
             </div>
         </div>
 
         <!-- 4. 精度ボーナス -->
         <div class="component-card" style="border-left-color: #e74c3c;">
             <div class="component-header">
-                <h4><span class="component-label">4</span> 精度ボーナス（高正答率への追加評価）</h4>
-                <span class="feature-badge" style="background: #e74c3c;">ボーナス</span>
+                <h4><span class="component-label">4</span> 精度ボーナス（信頼度調整済み）</h4>
+                <span class="feature-badge" style="background: #e74c3c;">Wilson Score適用</span>
             </div>
             <div class="formula-detail">
-                <code>95%以上: 150 + (正答率 - 0.95) × 1000</code><br>
-                <code>90-94%: 100 + (正答率 - 0.9) × 1000</code><br>
-                <code>85-89%: 50 + (正答率 - 0.85) × 1000</code><br>
-                <code>80-84%: (正答率 - 0.8) × 1000</code><br>
+                <code>※ 正答率にはWilson Score調整が適用されます</code><br>
+                <code>95%以上: 150 + (調整後正答率 - 0.95) × 1000</code><br>
+                <code>90-94%: 100 + (調整後正答率 - 0.9) × 1000</code><br>
+                <code>85-89%: 50 + (調整後正答率 - 0.85) × 1000</code><br>
+                <code>80-84%: (調整後正答率 - 0.8) × 1000</code><br>
                 <code>80%未満: 0</code>
             </div>
             <ul class="explanation-list">
-                <li><strong>高精度報酬</strong>：80%以上の正答率で発動</li>
+                <li><strong>高精度報酬</strong>：調整後80%以上の正答率で発動</li>
                 <li><strong>段階ボーナス</strong>：95%以上で最大ボーナス</li>
-                <li><strong>品質重視</strong>：正確性への特別評価</li>
+                <li><strong>実力重視</strong>：十分な回答数で高正答率を維持した人だけが高ボーナスを獲得</li>
             </ul>
             <div class="example-box">
-                <strong>例：</strong> 正答率92% → 100 + (0.92 - 0.9) × 1000 = 100 + 20 = <strong>120点</strong>
+                <strong>例：</strong> 500回答で正答率92% → 調整後約90% → 100 + (0.90 - 0.9) × 1000 = <strong>100点</strong>
             </div>
         </div>
     </div>
@@ -119,26 +171,56 @@
             <div class="example-title">マスター250問、正解850回/1000回答の学習者の場合</div>
             <div class="calculation-steps">
                 <div class="step">
+                    <span class="step-label">★</span>
+                    <span class="step-calc">Wilson Score調整: 正答率85% → 調整後 <strong>約82.7%</strong>（1000回答なのでほぼそのまま）</span>
+                </div>
+                <div class="step">
                     <span class="step-label">1</span>
                     <span class="step-calc">マスタースコア: floor(250÷100)×250 + (50÷100)×125 = 500 + 62.5 =
                         <strong>562.5点</strong></span>
                 </div>
                 <div class="step">
                     <span class="step-label">2</span>
-                    <span class="step-calc">正答率スコア: 350 + (0.85-0.8)×1500 = 350 + 75 = <strong>425点</strong></span>
+                    <span class="step-calc">正答率スコア: 350 + (0.827-0.8)×1500 = 350 + 40.5 = <strong>390.5点</strong></span>
                 </div>
                 <div class="step">
                     <span class="step-label">3</span>
-                    <span class="step-calc">継続性スコア: √1000 × 3 = 31.6 × 3 = <strong>94.8点</strong></span>
+                    <span class="step-calc">継続性スコア: √1000 × 5 = 31.6 × 5 = <strong>158.1点</strong></span>
                 </div>
                 <div class="step">
                     <span class="step-label">4</span>
-                    <span class="step-calc">精度ボーナス: 50 + (0.85-0.85)×1000 = <strong>50点</strong></span>
+                    <span class="step-calc">精度ボーナス: (0.827-0.8)×1000 = <strong>27.0点</strong></span>
                 </div>
                 <div class="final-result">
                     <span class="result-label">総合スコア</span>
-                    <span class="result-calc">562.5 + 425 + 94.8 + 50 = <strong>1132.3点</strong></span>
+                    <span class="result-calc">562.5 + 390.5 + 158.1 + 27.0 = <strong>1138.1点</strong></span>
                 </div>
+            </div>
+        </div>
+
+        <!-- 不公平解消の比較例 -->
+        <div class="calculation-example" style="margin-top: 20px;">
+            <div class="example-title">少数回答 vs 大量回答の比較</div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px;">
+                <div style="padding: 15px; background: #ffebee; border-radius: 8px; border: 1px solid #ef9a9a;">
+                    <strong>10問だけ全問正解</strong><br>
+                    <small>Wilson調整後: 約72%</small><br>
+                    <small>マスター: 10問 (12.5点)</small><br>
+                    <small>正答率スコア: 約203点</small><br>
+                    <small>継続性: √10×5 = 約16点</small><br>
+                    <strong style="color: #c62828;">合計: 約232点</strong>
+                </div>
+                <div style="padding: 15px; background: #e8f5e9; border-radius: 8px; border: 1px solid #a5d6a7;">
+                    <strong>500問で正答率80%</strong><br>
+                    <small>Wilson調整後: 約76%</small><br>
+                    <small>マスター: 230問</small><br>
+                    <small>正答率スコア: 約290点</small><br>
+                    <small>継続性: √500×5 = 約112点</small><br>
+                    <strong style="color: #2e7d32;">合計: 約690点</strong>
+                </div>
+            </div>
+            <div class="example-box" style="margin-top: 12px;">
+                たくさん問題を解いた人が正当に評価されるようになっています。
             </div>
         </div>
     </div>
@@ -149,20 +231,25 @@
         <div class="philosophy-content">
             <p class="philosophy-main">
                 学習行動に応じてリアルタイムで変動する動的評価システム。<br>
-                段階的評価により明確な目標設定を促し、継続的な学習と高い正答率を両立して評価
+                Wilson Scoreによる信頼度調整で、回答数が少ない場合の過大評価を防ぎ、<br>
+                継続的に学習した人が正当に評価される公平な仕組みです。
             </p>
             <div class="fairness-features">
+                <div class="feature-item">
+                    <i class="fas fa-shield-alt text-info"></i>
+                    <span>Wilson Scoreで少数回答の過大評価を防止</span>
+                </div>
                 <div class="feature-item">
                     <i class="fas fa-chart-line text-success"></i>
                     <span>100問マスターごとの段階的大幅スコアアップ</span>
                 </div>
                 <div class="feature-item">
-                    <i class="fas fa-rocket text-warning"></i>
-                    <span>80%以上の正答率で急激なスコア上昇</span>
+                    <i class="fas fa-running text-warning"></i>
+                    <span>継続的な学習量をしっかり評価</span>
                 </div>
                 <div class="feature-item">
                     <i class="fas fa-award text-primary"></i>
-                    <span>高精度学習にボーナス付与</span>
+                    <span>高正答率の学習にボーナス付与</span>
                 </div>
             </div>
         </div>

@@ -20,6 +20,18 @@ import email.utils
 
 import ctypes  # For malloc_trim
 
+
+def wilson_lower_bound(correct, total, z=1.96):
+    """Wilson Score の下限値（信頼度調整済み正答率）
+    回答数が少ないほど正答率を保守的に見積もる（95%信頼区間の下限）"""
+    if total == 0:
+        return 0.0
+    p = correct / total
+    denominator = 1 + z ** 2 / total
+    center = p + z ** 2 / (2 * total)
+    spread = z * math.sqrt((p * (1 - p) + z ** 2 / (4 * total)) / total)
+    return (center - spread) / denominator
+
 from pywebpush import webpush, WebPushException
 from dotenv import load_dotenv
 
@@ -1912,21 +1924,21 @@ class UserStats(db.Model):
             # 網羅率計算
             self.coverage_rate = (self.mastered_count / total_questions_for_room * 100) if total_questions_for_room > 0 else 0
             
-            # 動的スコアシステムによる計算
+            # 動的スコアシステムによる計算（Wilson Score 信頼度調整版）
             if total_attempts == 0:
                 self.balance_score = 0
                 self.mastery_score = 0
                 self.reliability_score = 0
                 self.activity_score = 0
             else:
-                # 正答率を計算
-                accuracy_rate = total_correct / total_attempts
-                
+                # Wilson Score 調整済み正答率（回答数が少ないほど保守的に評価）
+                accuracy_rate = wilson_lower_bound(total_correct, total_attempts)
+
                 # 1. マスタースコア（段階的 + 連続的）
                 mastery_base = (self.mastered_count // 100) * 250
                 mastery_progress = ((self.mastered_count % 100) / 100) * 125
                 self.mastery_score = mastery_base + mastery_progress
-                
+
                 # 2. 正答率スコア（段階的連続計算）
                 if accuracy_rate >= 0.9:
                     self.reliability_score = 500 + (accuracy_rate - 0.9) * 800
@@ -1938,10 +1950,10 @@ class UserStats(db.Model):
                     self.reliability_score = 100 + (accuracy_rate - 0.6) * 1000
                 else:
                     self.reliability_score = accuracy_rate * 166.67
-                
+
                 # 3. 継続性スコア（活動量評価）
-                self.activity_score = math.sqrt(total_attempts) * 3
-                
+                self.activity_score = math.sqrt(total_attempts) * 5
+
                 # 4. 精度ボーナス（高正答率への追加評価）
                 precision_bonus = 0
                 if accuracy_rate >= 0.95:
@@ -1952,7 +1964,7 @@ class UserStats(db.Model):
                     precision_bonus = 50 + (accuracy_rate - 0.85) * 1000
                 elif accuracy_rate >= 0.8:
                     precision_bonus = (accuracy_rate - 0.8) * 1000
-                
+
                 # 総合スコア
                 raw_score = self.mastery_score + self.reliability_score + self.activity_score + precision_bonus
                 
@@ -7173,29 +7185,30 @@ def admin_fallback_ranking_calculation(room_number, start_time):
                             user_total_attempts += problem_total_attempts
                             user_total_correct += correct_attempts
                             
+                            # マスター判定：正答率80%以上
                             if problem_total_attempts > 0:
                                 accuracy_rate = (correct_attempts / problem_total_attempts) * 100
                                 if accuracy_rate >= 80.0:
                                     mastered_problem_ids.add(problem_id)
-            
+
             user_mastered_count = len(mastered_problem_ids)
             coverage_rate = (user_mastered_count / total_questions_for_room_ranking * 100) if total_questions_for_room_ranking > 0 else 0
 
-            # 動的スコアシステムによる計算
-            if total_attempts == 0:
+            # 動的スコアシステムによる計算（Wilson Score 信頼度調整版）
+            if user_total_attempts == 0:
                 comprehensive_score = 0
                 mastery_score = 0
                 reliability_score = 0
                 activity_score = 0
             else:
-                # 正答率を計算
-                accuracy_rate = total_correct / total_attempts
-                
+                # Wilson Score 調整済み正答率
+                accuracy_rate = wilson_lower_bound(user_total_correct, user_total_attempts)
+
                 # 1. マスタースコア（段階的 + 連続的）
                 mastery_base = (user_mastered_count // 100) * 250
                 mastery_progress = ((user_mastered_count % 100) / 100) * 125
                 mastery_score = mastery_base + mastery_progress
-                
+
                 # 2. 正答率スコア（段階的連続計算）
                 if accuracy_rate >= 0.9:
                     reliability_score = 500 + (accuracy_rate - 0.9) * 800
@@ -7207,10 +7220,10 @@ def admin_fallback_ranking_calculation(room_number, start_time):
                     reliability_score = 100 + (accuracy_rate - 0.6) * 1000
                 else:
                     reliability_score = accuracy_rate * 166.67
-                
+
                 # 3. 継続性スコア（活動量評価）
-                activity_score = math.sqrt(total_attempts) * 3
-                
+                activity_score = math.sqrt(user_total_attempts) * 5
+
                 # 4. 精度ボーナス（高正答率への追加評価）
                 precision_bonus = 0
                 if accuracy_rate >= 0.95:
@@ -7221,7 +7234,7 @@ def admin_fallback_ranking_calculation(room_number, start_time):
                     precision_bonus = 50 + (accuracy_rate - 0.85) * 1000
                 elif accuracy_rate >= 0.8:
                     precision_bonus = (accuracy_rate - 0.8) * 1000
-                
+
                 # 総合スコア
                 comprehensive_score = mastery_score + reliability_score + activity_score + precision_bonus
 
@@ -9988,30 +10001,31 @@ def fallback_ranking_calculation(current_user, start_time):
                             
                             total_attempts += problem_total_attempts
                             total_correct += correct_attempts
-                            
+
+                            # マスター判定：正答率80%以上
                             if problem_total_attempts > 0:
                                 accuracy_rate = (correct_attempts / problem_total_attempts) * 100
                                 if accuracy_rate >= 80.0:
                                     mastered_problem_ids.add(problem_id)
-            
+
             user_mastered_count = len(mastered_problem_ids)
             coverage_rate = (user_mastered_count / total_questions_for_room_ranking * 100) if total_questions_for_room_ranking > 0 else 0
 
-            # 動的スコアシステムによる計算
+            # 動的スコアシステムによる計算（Wilson Score 信頼度調整版）
             if total_attempts == 0:
                 comprehensive_score = 0
                 mastery_score = 0
                 reliability_score = 0
                 activity_score = 0
             else:
-                # 正答率を計算
-                accuracy_rate = total_correct / total_attempts
-                
+                # Wilson Score 調整済み正答率
+                accuracy_rate = wilson_lower_bound(total_correct, total_attempts)
+
                 # 1. マスタースコア（段階的 + 連続的）
                 mastery_base = (user_mastered_count // 100) * 250
                 mastery_progress = ((user_mastered_count % 100) / 100) * 125
                 mastery_score = mastery_base + mastery_progress
-                
+
                 # 2. 正答率スコア（段階的連続計算）
                 if accuracy_rate >= 0.9:
                     reliability_score = 500 + (accuracy_rate - 0.9) * 800
@@ -10023,10 +10037,10 @@ def fallback_ranking_calculation(current_user, start_time):
                     reliability_score = 100 + (accuracy_rate - 0.6) * 1000
                 else:
                     reliability_score = accuracy_rate * 166.67
-                
+
                 # 3. 継続性スコア（活動量評価）
-                activity_score = math.sqrt(total_attempts) * 3
-                
+                activity_score = math.sqrt(total_attempts) * 5
+
                 # 4. 精度ボーナス（高正答率への追加評価）
                 precision_bonus = 0
                 if accuracy_rate >= 0.95:
@@ -10037,7 +10051,7 @@ def fallback_ranking_calculation(current_user, start_time):
                     precision_bonus = 50 + (accuracy_rate - 0.85) * 1000
                 elif accuracy_rate >= 0.8:
                     precision_bonus = (accuracy_rate - 0.8) * 1000
-                
+
                 # 総合スコア
                 comprehensive_score = mastery_score + reliability_score + activity_score + precision_bonus
 
