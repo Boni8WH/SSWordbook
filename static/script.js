@@ -15,6 +15,7 @@ let incorrectCount = 0;
 let totalQuestions = 0;
 let problemHistory = {};
 let incorrectWords = [];
+let isUserDataLoaded = false; // loadUserData完了フラグ
 let currentSessionAnswered = new Set();
 let quizStartTime;
 let isAnswerButtonDisabled = false;
@@ -437,6 +438,7 @@ function loadUserData() {
             if (data.status === 'success') {
                 problemHistory = data.problemHistory || {};
                 incorrectWords = data.incorrectWords || [];
+                isUserDataLoaded = true;
 
                 if (data.restrictionState) {
                     hasBeenRestricted = data.restrictionState.hasBeenRestricted || false;
@@ -2819,6 +2821,11 @@ function resetSelections() {
 // API呼び出しヘルパー
 // =========================================================
 function saveQuizProgressToServer() {
+    if (!isUserDataLoaded) {
+        console.warn('⚠️ ユーザーデータ未読み込みのため保存をスキップ');
+        return Promise.reject(new Error('ユーザーデータが読み込まれていません'));
+    }
+
     const dataToSave = {
         problemHistory: problemHistory,
         incorrectWords: incorrectWords

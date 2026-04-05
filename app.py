@@ -8327,13 +8327,25 @@ def save_quiz_progress():
         if not current_user:
             return jsonify(status='error', message='ユーザーが見つかりません。'), 404
 
+        # 安全弁：既存の履歴が大幅に減少する上書きを防止
+        old_history = current_user.get_problem_history()
+        old_count = len(old_history)
+        new_count = len(received_problem_history)
+
+        if old_count > 50 and new_count < old_count * 0.5:
+            print(f"⚠️ 履歴上書き防止 ({current_user.username}): {old_count}件 → {new_count}件 への大幅減少を拒否")
+            return jsonify(
+                status='error',
+                message=f'データ保護: 既存の履歴({old_count}件)が大幅に減少する保存({new_count}件)はブロックされました。ページを再読み込みしてください。'
+            ), 409
+
         # 学習履歴を保存（統計更新なし）
         current_user.set_problem_history(received_problem_history)
         current_user.set_incorrect_words(received_incorrect_words)
-        
+
         # 一括コミット
         db.session.commit()
-        
+
         return jsonify(status='success', message='進捗を保存しました。')
         
     except Exception as e:
@@ -8499,13 +8511,24 @@ def save_quiz_progress_debug():
         # 保存前の状態を記録
         old_history = current_user.get_problem_history()
         old_incorrect = current_user.get_incorrect_words()
-        
+        old_count = len(old_history)
+        new_count = len(received_problem_history)
+
         print(f"\n=== 進捗保存デバッグ ({current_user.username}) ===")
-        print(f"保存前の履歴数: {len(old_history)}")
-        print(f"受信した履歴数: {len(received_problem_history)}")
+        print(f"保存前の履歴数: {old_count}")
+        print(f"受信した履歴数: {new_count}")
         print(f"保存前の苦手問題数: {len(old_incorrect)}")
         print(f"受信した苦手問題数: {len(received_incorrect_words)}")
-        
+
+        # 安全弁：既存の履歴が大幅に減少する上書きを防止
+        if old_count > 50 and new_count < old_count * 0.5:
+            print(f"⚠️ 履歴上書き防止: {old_count}件 → {new_count}件 への大幅減少を拒否")
+            print("=== 進捗保存デバッグ終了（ブロック） ===\n")
+            return jsonify(
+                status='error',
+                message=f'データ保護: 既存の履歴({old_count}件)が大幅に減少する保存({new_count}件)はブロックされました。ページを再読み込みしてください。'
+            ), 409
+
         # 新しく追加された履歴を特定
         new_entries = {}
         for problem_id, history in received_problem_history.items():
@@ -8516,7 +8539,7 @@ def save_quiz_progress_debug():
                 print(f"更新履歴: {problem_id}")
                 print(f"  旧: {old_history[problem_id]}")
                 print(f"  新: {history}")
-        
+
         print(f"新規追加される履歴数: {len(new_entries)}")
 
         # 実際に保存
@@ -9601,6 +9624,93 @@ def admin_force_clean_user(username):
         flash(f'削除エラー: {str(e)}', 'danger')
     
     return redirect(url_for('admin_page'))
+
+@app.route('/admin/restore_user_from_backup/<username>', methods=['POST'])
+def admin_restore_user_from_backup(username):
+    """バックアップDBからユーザーのproblem_historyを復元"""
+    if not session.get('admin_logged_in'):
+        return jsonify({'status': 'error', 'message': '管理者権限がありません。'}), 403
+
+    backup_db_url = request.json.get('backup_db_url') if request.is_json else None
+    if not backup_db_url:
+        return jsonify({'status': 'error', 'message': 'backup_db_urlが必要です。'}), 400
+
+    try:
+        import psycopg2
+
+        # バックアップDBに接続して履歴を取得
+        backup_conn = psycopg2.connect(backup_db_url, sslmode='require')
+        backup_cur = backup_conn.cursor()
+        backup_cur.execute(
+            'SELECT problem_history, incorrect_words FROM "user" WHERE username = %s',
+            (username,)
+        )
+        backup_row = backup_cur.fetchone()
+        backup_cur.close()
+        backup_conn.close()
+
+        if not backup_row:
+            return jsonify({'status': 'error', 'message': f'バックアップDBにユーザー {username} が見つかりません。'}), 404
+
+        backup_history = backup_row[0]
+        backup_incorrect = backup_row[1]
+
+        # 文字列の場合はJSONとしてパース
+        if isinstance(backup_history, str):
+            backup_history = json.loads(backup_history)
+        if backup_history is None:
+            backup_history = {}
+        if isinstance(backup_incorrect, str):
+            backup_incorrect = json.loads(backup_incorrect)
+        if backup_incorrect is None:
+            backup_incorrect = []
+
+        # 本番のユーザーを取得
+        user = User.query.filter_by(username=username).first()
+        if not user:
+            return jsonify({'status': 'error', 'message': f'本番DBにユーザー {username} が見つかりません。'}), 404
+
+        current_history = user.get_problem_history()
+        current_count = len(current_history)
+        backup_count = len(backup_history)
+
+        # バックアップの方が多い場合のみ復元（マージ: バックアップをベースに、現在の方が新しいものは保持）
+        if backup_count <= current_count:
+            return jsonify({
+                'status': 'info',
+                'message': f'バックアップの履歴({backup_count}件)は現在({current_count}件)以下のため復元不要です。'
+            })
+
+        # マージ: バックアップをベースに、現在の履歴で上書き（現在の方が新しいため）
+        merged_history = dict(backup_history)
+        for pid, hist in current_history.items():
+            merged_history[pid] = hist
+
+        user.set_problem_history(merged_history)
+
+        # 統計を再計算
+        user_stats = UserStats.get_or_create(user.id)
+        if user_stats:
+            user_stats.update_stats()
+
+        db.session.commit()
+
+        return jsonify({
+            'status': 'success',
+            'message': f'{username} の履歴を復元しました。',
+            'details': {
+                'before': current_count,
+                'backup': backup_count,
+                'after_merge': len(merged_history),
+                'new_score': user_stats.balance_score if user_stats else None
+            }
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        import traceback
+        traceback.print_exc()
+        return jsonify({'status': 'error', 'message': f'復元エラー: {str(e)}'}), 500
 
 # ====================================================================
 # 進捗ページ
