@@ -3221,6 +3221,24 @@
                             </div>
                         </div>
 
+                        <!-- 年度別ランキング管理 -->
+                        <div class="admin-panel"
+                            style="background-color: #e8f5e9; border-left: 5px solid #4caf50; margin-bottom: 20px;">
+                            <h4>📅 年度別ランキング管理</h4>
+                            <p>
+                                令和{{ reiwa_year }}年度ランキングの基準となるスナップショットを作成します。<br>
+                                <strong>実行タイミング：</strong>新年度開始時（4月1日頃）に一度だけ実行してください。<br>
+                                <strong>仕組み：</strong>現在の全ユーザーの学習履歴を保存し、以降の差分がランキングスコアになります。<br>
+                                <strong>⚠️ 注意：</strong>同じ年度では2回目以降はスキップされます（既存データは上書きされません）。
+                            </p>
+                            <div id="yearly-snapshot-result" style="display:none; margin-bottom: 10px;"></div>
+                            <div style="margin-top: 15px;">
+                                <button type="button" class="btn btn-success" onclick="takeYearlySnapshot()">
+                                    <i class="fas fa-camera"></i> 令和{{ reiwa_year }}年度スナップショットを作成
+                                </button>
+                            </div>
+                        </div>
+
                         <!-- 全データ修正（バックアップ用） -->
                         <div class="admin-panel"
                             style="background-color: #ffebee; border-left: 5px solid #f44336; margin-top: 20px;">
@@ -4567,6 +4585,41 @@
         // ========================================
         // 4. データベース管理系の関数
         // ========================================
+
+        // 年度別スナップショット作成
+        function takeYearlySnapshot() {
+            const resultDiv = document.getElementById('yearly-snapshot-result');
+            const btn = event.target;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 作成中...';
+
+            fetch('/admin/take_yearly_snapshot', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ year: new Date().getMonth() >= 3 ? new Date().getFullYear() : new Date().getFullYear() - 1 })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    resultDiv.style.display = 'block';
+                    resultDiv.className = 'alert alert-success';
+                    resultDiv.innerHTML = `✅ ${data.year}年度スナップショット作成完了：新規作成 ${data.created}件、スキップ ${data.skipped}件`;
+                } else {
+                    resultDiv.style.display = 'block';
+                    resultDiv.className = 'alert alert-danger';
+                    resultDiv.innerHTML = `❌ エラー: ${data.message}`;
+                }
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-camera"></i> スナップショットを作成';
+            })
+            .catch(err => {
+                resultDiv.style.display = 'block';
+                resultDiv.className = 'alert alert-danger';
+                resultDiv.innerHTML = `❌ 通信エラー: ${err.message}`;
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-camera"></i> スナップショットを作成';
+            });
+        }
 
         // 無効履歴の削除
         function cleanInvalidHistory(event) {

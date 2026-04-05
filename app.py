@@ -2013,6 +2013,24 @@ class RpgState(db.Model):
     def __repr__(self):
         return f'<RpgState User:{self.user_id} Bonus:{self.permanent_bonus_percent}%>'
 
+class YearlyBaseline(db.Model):
+    """年度別スコア計算のためのベースラインスナップショット"""
+    __tablename__ = 'yearly_baseline'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False)
+    year = db.Column(db.Integer, nullable=False)  # 年度 e.g. 2026
+    baseline_history = db.Column(JSONEncodedDict, default={})
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))
+
+    __table_args__ = (
+        db.UniqueConstraint('user_id', 'year', name='uq_user_year_baseline'),
+    )
+    user = db.relationship('User', backref=db.backref('yearly_baselines', passive_deletes=True))
+
+    def __repr__(self):
+        return f'<YearlyBaseline User:{self.user_id} Year:{self.year}>'
+
+
 # 論述問題の部屋別公開設定モデル
 
 class EssayVisibilitySetting(db.Model):
@@ -9864,17 +9882,25 @@ def progress_page():
         print("=== 進捗ページ（高速版）処理完了 ===\n")
 
         context = get_template_context()
-        
+
+        # 現在の年度を計算（4月始まり）
+        today = datetime.now(JST)
+        current_fiscal_year = today.year if today.month >= 4 else today.year - 1
+        reiwa_year = current_fiscal_year - 2018  # 令和換算
+
         # ★重要：ランキングデータは空で渡す（Ajax で後から取得）
         return render_template('progress.html',
                                current_user=current_user,
                                user_progress_by_chapter=sorted_chapter_progress,
                                # ランキング関連は空・None で初期化
-                               top_5_ranking=[],  
+                               top_5_ranking=[],
                                current_user_stats=None,
                                current_user_rank=None,
                                total_users_in_room=0,
                                ranking_display_count=5,
+                               # 年度情報
+                               current_fiscal_year=current_fiscal_year,
+                               reiwa_year=reiwa_year,
                                # 非同期ローディング用フラグ
                                async_loading=True,
                                **context)
@@ -10038,6 +10064,226 @@ def api_ranking_data():
             return fallback_ranking_calculation(current_user, time.time())
         except:
             return jsonify(status='error', message=f'ランキング取得エラー: {str(e)}'), 500
+
+
+def compute_score_from_history(history, problem_id_map, parsed_max_enabled_unit_num, total_questions_for_room):
+    """指定された履歴辞書からスコアを計算して返す"""
+    total_attempts = 0
+    total_correct = 0
+    mastered_problem_ids = set()
+
+    for problem_id, hist in history.items():
+        matched_word = problem_id_map.get(problem_id)
+        if not matched_word:
+            continue
+        if not matched_word['enabled']:
+            continue
+        if parse_unit_number(matched_word['number']) > parsed_max_enabled_unit_num:
+            continue
+        correct_attempts = hist.get('correct_attempts', 0)
+        incorrect_attempts = hist.get('incorrect_attempts', 0)
+        problem_total = correct_attempts + incorrect_attempts
+        total_attempts += problem_total
+        total_correct += correct_attempts
+        if problem_total > 0 and (correct_attempts / problem_total) >= 0.8:
+            mastered_problem_ids.add(problem_id)
+
+    mastered_count = len(mastered_problem_ids)
+    coverage_rate = (mastered_count / total_questions_for_room * 100) if total_questions_for_room > 0 else 0
+    accuracy_rate_raw = (total_correct / total_attempts * 100) if total_attempts > 0 else 0
+
+    if total_attempts == 0:
+        return {
+            'total_attempts': 0, 'total_correct': 0, 'accuracy_rate': 0.0,
+            'coverage_rate': 0.0, 'mastered_count': 0, 'balance_score': 0.0,
+            'mastery_score': 0.0, 'reliability_score': 0.0, 'activity_score': 0.0
+        }
+
+    wr = wilson_lower_bound(total_correct, total_attempts)
+    mastery_base = (mastered_count // 100) * 250
+    mastery_progress = ((mastered_count % 100) / 100) * 125
+    mastery_score = mastery_base + mastery_progress
+
+    if wr >= 0.9:
+        reliability_score = 500 + (wr - 0.9) * 800
+    elif wr >= 0.8:
+        reliability_score = 350 + (wr - 0.8) * 1500
+    elif wr >= 0.7:
+        reliability_score = 200 + (wr - 0.7) * 1500
+    elif wr >= 0.6:
+        reliability_score = 100 + (wr - 0.6) * 1000
+    else:
+        reliability_score = wr * 166.67
+
+    activity_score = math.sqrt(total_attempts) * 5
+
+    precision_bonus = 0
+    if wr >= 0.95:
+        precision_bonus = 150 + (wr - 0.95) * 1000
+    elif wr >= 0.9:
+        precision_bonus = 100 + (wr - 0.9) * 1000
+    elif wr >= 0.85:
+        precision_bonus = 50 + (wr - 0.85) * 1000
+    elif wr >= 0.8:
+        precision_bonus = (wr - 0.8) * 1000
+
+    balance_score = mastery_score + reliability_score + activity_score + precision_bonus
+
+    return {
+        'total_attempts': total_attempts,
+        'total_correct': total_correct,
+        'accuracy_rate': round(accuracy_rate_raw, 1),
+        'coverage_rate': round(coverage_rate, 1),
+        'mastered_count': mastered_count,
+        'balance_score': round(balance_score, 1),
+        'mastery_score': round(mastery_score, 1),
+        'reliability_score': round(reliability_score, 1),
+        'activity_score': round(activity_score, 1)
+    }
+
+
+@app.route('/api/yearly_ranking_data')
+def api_yearly_ranking_data():
+    """年度別ランキングデータを取得（ベースラインとの差分で計算）"""
+    try:
+        if 'user_id' not in session:
+            return jsonify(status='error', message='認証されていません。'), 401
+
+        current_user = User.query.get(session['user_id'])
+        if not current_user:
+            return jsonify(status='error', message='ユーザーが見つかりません。'), 404
+
+        year = request.args.get('year', 2026, type=int)
+        room_number = current_user.room_number
+
+        word_data = load_word_data_for_room(room_number)
+        room_setting = RoomSetting.query.filter_by(room_number=room_number).first()
+        max_unit_str = room_setting.max_enabled_unit_number if room_setting else "9999"
+        parsed_max = parse_unit_number(max_unit_str)
+
+        problem_id_map = {get_problem_id(w): w for w in word_data}
+        total_questions = sum(
+            1 for w in word_data
+            if w['enabled'] and parse_unit_number(w['number']) <= parsed_max
+        )
+
+        all_users = User.query.filter_by(room_number=room_number)\
+            .filter(User.username != 'admin').all()
+
+        # 対象年度のベースラインを一括取得
+        user_ids = [u.id for u in all_users]
+        baselines = {
+            b.user_id: b.baseline_history or {}
+            for b in YearlyBaseline.query.filter(
+                YearlyBaseline.user_id.in_(user_ids),
+                YearlyBaseline.year == year
+            ).all()
+        }
+
+        ranking_data = []
+        for user_obj in all_users:
+            baseline_history = baselines.get(user_obj.id, {})
+            current_history = user_obj.get_problem_history()
+
+            # 差分を計算（ベースライン以降の学習分のみ）
+            yearly_history = {}
+            for pid, hist in current_history.items():
+                base = baseline_history.get(pid, {'correct_attempts': 0, 'incorrect_attempts': 0})
+                yc = max(0, hist.get('correct_attempts', 0) - base.get('correct_attempts', 0))
+                yi = max(0, hist.get('incorrect_attempts', 0) - base.get('incorrect_attempts', 0))
+                if yc + yi > 0:
+                    yearly_history[pid] = {'correct_attempts': yc, 'incorrect_attempts': yi}
+
+            scores = compute_score_from_history(yearly_history, problem_id_map, parsed_max, total_questions)
+            user_data = {
+                'username': user_obj.username,
+                'title': user_obj.equipped_rpg_enemy.badge_name if user_obj.equipped_rpg_enemy else None,
+                **scores
+            }
+            ranking_data.append(user_data)
+
+        ranking_data.sort(key=lambda x: (x['balance_score'], x['total_attempts']), reverse=True)
+
+        current_user_stats = None
+        current_user_rank = None
+        for index, ud in enumerate(ranking_data, 1):
+            if ud['username'] == current_user.username:
+                current_user_stats = ud
+                current_user_rank = index
+                break
+
+        # 累計スコアも返す（個人用）
+        cumulative_stats = None
+        user_stats = UserStats.query.filter_by(user_id=current_user.id).first()
+        if user_stats:
+            rpg_state = RpgState.query.filter_by(user_id=current_user.id).first()
+            rpg_bonus_score = 0
+            bonus_percent = 0
+            if rpg_state and rpg_state.permanent_bonus_percent > 0:
+                bonus_percent = rpg_state.permanent_bonus_percent
+                raw_score = user_stats.balance_score / (1 + bonus_percent / 100.0)
+                rpg_bonus_score = user_stats.balance_score - raw_score
+            cumulative_stats = {
+                'total_attempts': user_stats.total_attempts,
+                'total_correct': user_stats.total_correct,
+                'accuracy_rate': user_stats.accuracy_rate,
+                'coverage_rate': user_stats.coverage_rate,
+                'mastered_count': user_stats.mastered_count,
+                'balance_score': user_stats.balance_score,
+                'mastery_score': user_stats.mastery_score,
+                'reliability_score': user_stats.reliability_score,
+                'activity_score': user_stats.activity_score,
+                'rpg_bonus_score': rpg_bonus_score,
+                'rpg_bonus_percent': bonus_percent
+            }
+
+        return jsonify(
+            status='success',
+            year=year,
+            ranking_data=ranking_data[:5],
+            all_ranking_data=ranking_data,
+            current_user_stats=current_user_stats,
+            current_user_rank=current_user_rank,
+            total_users_in_room=len(ranking_data),
+            ranking_display_count=5,
+            cumulative_stats=cumulative_stats,
+            has_baseline=current_user.id in baselines
+        )
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify(status='error', message=str(e)), 500
+
+
+@app.route('/admin/take_yearly_snapshot', methods=['POST'])
+@admin_required
+def admin_take_yearly_snapshot():
+    """全ユーザーの年度別ベースラインスナップショットを作成"""
+    try:
+        data = request.get_json() or {}
+        year = data.get('year', 2026)
+        users = User.query.filter(User.username != 'admin').all()
+        created = 0
+        skipped = 0
+        for user in users:
+            existing = YearlyBaseline.query.filter_by(user_id=user.id, year=year).first()
+            if existing:
+                skipped += 1
+                continue
+            baseline = YearlyBaseline(
+                user_id=user.id,
+                year=year,
+                baseline_history=user.get_problem_history()
+            )
+            db.session.add(baseline)
+            created += 1
+        db.session.commit()
+        print(f"✅ 年度スナップショット完了: {year}年度, 作成={created}件, スキップ={skipped}件")
+        return jsonify(status='success', year=year, created=created, skipped=skipped)
+    except Exception as e:
+        db.session.rollback()
+        return jsonify(status='error', message=str(e)), 500
 
 
 def fallback_ranking_calculation(current_user, start_time):

@@ -22,12 +22,36 @@
 
     <!-- ユーザー統計（ランキング枠の外） -->
     <div class="current-user-stats" id="current-user-stats" style="display: none;">
-        <h4>📊 あなたのスコア詳細</h4>
-        <div class="progress-stats-grid" id="stats-grid">
-            <!-- JavaScript で動的に挿入 -->
+        <!-- タブ切替ヘッダー -->
+        <div class="stats-tab-header">
+            <button class="stats-tab-btn active" id="tab-btn-yearly" onclick="switchStatsTab('yearly')">
+                📅 令和{{ reiwa_year }}年度スコア
+            </button>
+            <button class="stats-tab-btn" id="tab-btn-cumulative" onclick="switchStatsTab('cumulative')">
+                📊 累計スコア
+            </button>
         </div>
-        <div class="progress-basic-stats" id="basic-stats">
-            <!-- JavaScript で動的に挿入 -->
+
+        <!-- 年度別スコア -->
+        <div id="stats-panel-yearly">
+            <h4>📅 令和{{ reiwa_year }}年度スコア詳細</h4>
+            <div class="progress-stats-grid" id="yearly-stats-grid">
+                <!-- JavaScript で動的に挿入 -->
+            </div>
+            <div class="progress-basic-stats" id="yearly-basic-stats">
+                <!-- JavaScript で動的に挿入 -->
+            </div>
+        </div>
+
+        <!-- 累計スコア -->
+        <div id="stats-panel-cumulative" style="display: none;">
+            <h4>📊 累計スコア詳細</h4>
+            <div class="progress-stats-grid" id="cumulative-stats-grid">
+                <!-- JavaScript で動的に挿入 -->
+            </div>
+            <div class="progress-basic-stats" id="cumulative-basic-stats">
+                <!-- JavaScript で動的に挿入 -->
+            </div>
         </div>
     </div>
 
@@ -37,17 +61,15 @@
         <div class="progress-ranking-header mb-3">
             <div class="progress-ranking-title-section">
                 <div class="d-flex align-items-center flex-wrap">
-                    <h3 class="mb-0 me-3">ランキング (部屋：{{ current_user.room_number }})</h3>
+                    <h3 class="mb-0 me-3" id="ranking-title">令和{{ reiwa_year }}年度ランキング (部屋：{{ current_user.room_number }})</h3>
                     <a href="{{ url_for('score_details') }}" class="btn btn-outline-secondary btn-sm"
                         style="font-size: 0.8rem;">
                         <i class="fas fa-calculator"></i> 算出方法
                     </a>
                 </div>
-                <p class="text-muted mt-2 mb-0">同じ部屋のユーザー内での上位ランキングを表示しています。</p>
+                <p class="text-muted mt-2 mb-0" id="ranking-subtitle">4月以降の学習成果によるランキングです。</p>
             </div>
         </div>
-
-
 
         <!-- ランキングローディング表示 -->
         <div id="ranking-loading" class="text-center py-4">
@@ -154,6 +176,8 @@
 </section>
 
 <script>
+    const REIWA_YEAR = {{ reiwa_year }};
+
     // 章別進捗の展開/折りたたみ
     function toggleChapterProgress(chapterNum) {
         const unitsDiv = document.getElementById('units-' + chapterNum);
@@ -168,22 +192,36 @@
         }
     }
 
-    // ランキングデータの非同期読み込み
+    // スコアタブ切替
+    function switchStatsTab(tab) {
+        const yearlyPanel = document.getElementById('stats-panel-yearly');
+        const cumulativePanel = document.getElementById('stats-panel-cumulative');
+        const yearlyBtn = document.getElementById('tab-btn-yearly');
+        const cumulativeBtn = document.getElementById('tab-btn-cumulative');
+
+        if (tab === 'yearly') {
+            yearlyPanel.style.display = 'block';
+            cumulativePanel.style.display = 'none';
+            yearlyBtn.classList.add('active');
+            cumulativeBtn.classList.remove('active');
+        } else {
+            yearlyPanel.style.display = 'none';
+            cumulativePanel.style.display = 'block';
+            yearlyBtn.classList.remove('active');
+            cumulativeBtn.classList.add('active');
+        }
+    }
+
+    // ランキングデータの非同期読み込み（年度別）
     async function loadRankingData() {
         try {
-
-
-            // ローディング表示
             document.getElementById('ranking-loading').style.display = 'block';
             document.getElementById('ranking-error').style.display = 'none';
             document.getElementById('ranking-table-container').style.display = 'none';
 
-            // 正しいAPIエンドポイントを使用
-            const response = await fetch('/api/ranking_data', {
-                method: 'GET',  // POSTからGETに変更
-                headers: {
-                    'Content-Type': 'application/json',
-                }
+            const response = await fetch('/api/yearly_ranking_data?year={{ current_fiscal_year }}', {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' }
             });
 
             if (!response.ok) {
@@ -193,40 +231,30 @@
             const data = await response.json();
 
             if (data.status === 'success') {
-
-
-                // グローバル変数に表示制限数を保存
                 window.rankingDisplayCount = data.ranking_display_count;
 
-                // ランキングテーブルを更新（制限適用）
                 updateRankingTable(data.ranking_data);
-
-                // ユーザー統計を更新
-                updateUserStats(data.current_user_stats);
-
-                // ユーザー順位を更新
+                updateYearlyStats(data.current_user_stats);
+                updateCumulativeStats(data.cumulative_stats);
                 updateUserRank(data.current_user_rank, data.total_users_in_room);
 
-                // 表示切り替え
                 document.getElementById('ranking-loading').style.display = 'none';
                 document.getElementById('ranking-table-container').style.display = 'block';
                 document.getElementById('current-user-stats').style.display = 'block';
                 document.getElementById('user-rank-section').style.display = 'block';
 
-
-
+                if (!data.has_baseline) {
+                    document.getElementById('ranking-subtitle').textContent =
+                        '※ 年度ベースライン未設定のため全累計データが表示されています。管理者にお知らせください。';
+                }
             } else {
                 throw new Error(data.message || 'ランキングデータの取得に失敗しました');
             }
 
         } catch (error) {
             console.error('❌ ランキング読み込みエラー:', error);
-
-            // エラー表示
             document.getElementById('ranking-loading').style.display = 'none';
             document.getElementById('ranking-error').style.display = 'block';
-
-            // エラーメッセージを詳細表示
             const errorButton = document.querySelector('#ranking-error .btn');
             if (errorButton) {
                 errorButton.innerHTML = `<i class="fas fa-redo"></i> 再試行 (${error.message})`;
@@ -239,10 +267,8 @@
         const tbody = document.getElementById('ranking-table-body');
         tbody.innerHTML = '';
 
-        // rankingDataは既にサーバー側で制限されているが、念のためクライアント側でも制限
-        const limitedRankingData = rankingData.slice(0, window.rankingDisplayCount || 5);
-
-        limitedRankingData.forEach((user, index) => {
+        const limited = rankingData.slice(0, window.rankingDisplayCount || 5);
+        limited.forEach((user, index) => {
             const row = document.createElement('tr');
             row.innerHTML = `
             <td>${index + 1}</td>
@@ -260,14 +286,56 @@
         });
     }
 
-    // ユーザー統計を更新
-    function updateUserStats(userStats) {
-        if (!userStats) return;
+    // 年度別スコアを更新
+    function updateYearlyStats(userStats) {
+        if (!userStats) {
+            document.getElementById('yearly-stats-grid').innerHTML =
+                '<p class="text-muted">4月以降の学習データがまだありません。</p>';
+            return;
+        }
 
-        const statsGrid = document.getElementById('stats-grid');
+        const statsGrid = document.getElementById('yearly-stats-grid');
         statsGrid.innerHTML = `
         <div class="progress-stat-item">
-            <span class="progress-stat-label">総合スコア</span>
+            <span class="progress-stat-label">令和${REIWA_YEAR}年度スコア</span>
+            <span class="progress-stat-value progress-main-score">${userStats.balance_score.toFixed(1)}</span>
+        </div>
+        <div class="progress-stat-item">
+            <span class="progress-stat-label">マスタースコア</span>
+            <span class="progress-stat-value">${userStats.mastery_score.toFixed(1)}</span>
+            <small class="progress-stat-description">段階的評価 100問毎+250pt</small>
+        </div>
+        <div class="progress-stat-item">
+            <span class="progress-stat-label">正答率スコア</span>
+            <span class="progress-stat-value">${userStats.reliability_score.toFixed(1)}</span>
+            <small class="progress-stat-description">Wilson Score信頼度調整</small>
+        </div>
+        <div class="progress-stat-item">
+            <span class="progress-stat-label">継続性スコア</span>
+            <span class="progress-stat-value">${userStats.activity_score.toFixed(1)}</span>
+            <small class="progress-stat-description">√回答数 × 5</small>
+        </div>
+    `;
+
+        document.getElementById('yearly-basic-stats').innerHTML = `
+        <p><strong>令和${REIWA_YEAR}年度 基本統計:</strong>
+            回答数: ${userStats.total_attempts}回 |
+            正解数: ${userStats.total_correct}回 |
+            正答率: ${userStats.accuracy_rate.toFixed(1)}% |
+            マスター数: ${userStats.mastered_count}問 |
+            網羅率: ${userStats.coverage_rate.toFixed(1)}%
+        </p>
+    `;
+    }
+
+    // 累計スコアを更新
+    function updateCumulativeStats(userStats) {
+        if (!userStats) return;
+
+        const statsGrid = document.getElementById('cumulative-stats-grid');
+        statsGrid.innerHTML = `
+        <div class="progress-stat-item">
+            <span class="progress-stat-label">累計総合スコア</span>
             <span class="progress-stat-value progress-main-score">${userStats.balance_score.toFixed(1)}</span>
         </div>
         <div class="progress-stat-item">
@@ -292,13 +360,12 @@
         </div>
     `;
 
-        const basicStats = document.getElementById('basic-stats');
-        basicStats.innerHTML = `
-        <p><strong>基本統計:</strong> 
-            回答数: ${userStats.total_attempts}回 | 
-            正解数: ${userStats.total_correct}回 | 
-            正答率: ${userStats.accuracy_rate.toFixed(1)}% | 
-            マスター数: ${userStats.mastered_count}問 | 
+        document.getElementById('cumulative-basic-stats').innerHTML = `
+        <p><strong>累計 基本統計:</strong>
+            回答数: ${userStats.total_attempts}回 |
+            正解数: ${userStats.total_correct}回 |
+            正答率: ${userStats.accuracy_rate.toFixed(1)}% |
+            マスター数: ${userStats.mastered_count}問 |
             網羅率: ${userStats.coverage_rate.toFixed(1)}%
         </p>
     `;
@@ -334,8 +401,6 @@
 
     // ページ読み込み時にランキングデータを非同期取得
     document.addEventListener('DOMContentLoaded', function () {
-
-
         // 章の進捗バーを設定
         document.querySelectorAll('.chapter-progress-bar').forEach(function (bar) {
             const mastered = parseInt(bar.getAttribute('data-total-mastered') || '0');
@@ -352,13 +417,10 @@
             bar.style.width = Math.max(0, Math.min(100, percentage)) + '%';
         });
 
-
-
         // ランキングデータを非同期で取得
         setTimeout(() => {
-
             loadRankingData();
-        }, 100); // 100ms後に開始（画面描画完了を待つ）
+        }, 100);
     });
 </script>
 
@@ -401,13 +463,42 @@
         box-shadow: 0 6px 15px rgba(33, 150, 243, 0.15);
     }
 
+    /* タブヘッダー */
+    .stats-tab-header {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 20px;
+        border-bottom: 2px solid #90caf9;
+        padding-bottom: 10px;
+    }
+
+    .stats-tab-btn {
+        background: none;
+        border: 2px solid #90caf9;
+        border-radius: 8px 8px 0 0;
+        padding: 8px 20px;
+        font-size: 0.95em;
+        font-weight: 600;
+        color: #1565c0;
+        cursor: pointer;
+        transition: background 0.2s, color 0.2s;
+    }
+
+    .stats-tab-btn.active {
+        background: #1565c0;
+        color: #fff;
+        border-color: #1565c0;
+    }
+
+    .stats-tab-btn:hover:not(.active) {
+        background: #e3f2fd;
+    }
+
     .current-user-stats h4 {
         color: #1565c0;
         font-size: 1.4em;
         margin-bottom: 20px;
         text-align: center;
-        border-bottom: 2px solid #90caf9;
-        padding-bottom: 10px;
     }
 
     /* ランキングヘッダー（シンプル化） */
@@ -567,6 +658,11 @@
             margin-bottom: 15px;
         }
 
+        .stats-tab-btn {
+            padding: 6px 12px;
+            font-size: 0.85em;
+        }
+
         .progress-stats-grid {
             grid-template-columns: repeat(2, 1fr);
             gap: 6px;
@@ -650,42 +746,19 @@
     }
 
     @keyframes progressFadeIn {
-        from {
-            opacity: 0;
-        }
-
-        to {
-            opacity: 1;
-        }
+        from { opacity: 0; }
+        to { opacity: 1; }
     }
 
     @keyframes progressSlideUp {
-        from {
-            opacity: 0;
-            transform: translateY(20px);
-        }
-
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
     }
 
     @keyframes progressBounceIn {
-        0% {
-            opacity: 0;
-            transform: scale(0.8);
-        }
-
-        50% {
-            opacity: 0.8;
-            transform: scale(1.05);
-        }
-
-        100% {
-            opacity: 1;
-            transform: scale(1);
-        }
+        0% { opacity: 0; transform: scale(0.8); }
+        50% { opacity: 0.8; transform: scale(1.05); }
+        100% { opacity: 1; transform: scale(1); }
     }
 
     /* 章別進捗のスタイル（既存のstyle.cssからコピー） */
@@ -925,19 +998,15 @@
         overflow: hidden;
         text-overflow: ellipsis;
         padding: 0.4rem 0.3rem !important;
-        /* パディングも少し狭く */
         text-align: center;
-        /* 中央揃えで見やすく */
     }
 
-    /* 順位列は特に狭く */
     #ranking-table-container th:first-child,
     #ranking-table-container td:first-child {
         text-align: center;
         font-weight: bold;
     }
 
-    /* モバイルでの横スクロール改善 */
     @media (max-width: 768px) {
         #ranking-table-container .table-responsive {
             border: 1px solid #dee2e6;
