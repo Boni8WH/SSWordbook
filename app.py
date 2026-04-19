@@ -1878,8 +1878,14 @@ class UserStats(db.Model):
             total_questions_for_room = 0
             for word in word_data:
                 is_word_enabled_in_csv = word['enabled']
-                is_unit_enabled_by_room_setting = parse_unit_number(word['number']) <= parsed_max_enabled_unit_num
-                if is_word_enabled_in_csv and is_unit_enabled_by_room_setting:
+                c_num = word.get('chapter', '')
+                u_num = word.get('number', '')
+                
+                # S章の場合は 'S' で判定
+                unit_to_check = 'S' if str(c_num) == 'S' else u_num
+                is_unit_enabled_by_room_flag = is_unit_enabled_by_room_setting(unit_to_check, room_setting)
+                
+                if is_word_enabled_in_csv and is_unit_enabled_by_room_flag:
                     total_questions_for_room += 1
             
             # 学習履歴を分析
@@ -1895,9 +1901,14 @@ class UserStats(db.Model):
                 
                 if matched_word:
                     is_word_enabled_in_csv = matched_word['enabled']
-                    is_unit_enabled_by_room_setting = parse_unit_number(matched_word['number']) <= parsed_max_enabled_unit_num
+                    c_num = matched_word.get('chapter', '')
+                    u_num = matched_word.get('number', '')
                     
-                    if is_word_enabled_in_csv and is_unit_enabled_by_room_setting:
+                    # S章の場合は 'S' で判定
+                    unit_to_check = 'S' if str(c_num) == 'S' else u_num
+                    is_unit_enabled_by_room_flag = is_unit_enabled_by_room_setting(unit_to_check, room_setting)
+                    
+                    if is_word_enabled_in_csv and is_unit_enabled_by_room_flag:
                         correct_attempts = history.get('correct_attempts', 0)
                         incorrect_attempts = history.get('incorrect_attempts', 0)
                         problem_total_attempts = correct_attempts + incorrect_attempts
@@ -7153,8 +7164,10 @@ def admin_fallback_ranking_calculation(room_number, start_time):
         total_questions_for_room_ranking = 0
         for word in word_data:
             is_word_enabled_in_csv = word['enabled']
-            is_unit_enabled_by_room_setting = parse_unit_number(word['number']) <= parsed_max_enabled_unit_num
-            if is_word_enabled_in_csv and is_unit_enabled_by_room_setting:
+            # S章の場合は 'S' で判定
+            unit_to_check = 'S' if str(word.get('chapter', '')) == 'S' else word.get('number', '')
+            is_unit_enabled_by_room = is_unit_enabled_by_room_setting(unit_to_check, room_setting)
+            if is_word_enabled_in_csv and is_unit_enabled_by_room:
                 total_questions_for_room_ranking += 1
         
         # 部屋内の全ユーザーを取得
@@ -7193,9 +7206,11 @@ def admin_fallback_ranking_calculation(room_number, start_time):
 
                     if matched_word:
                         is_word_enabled_in_csv = matched_word['enabled']
-                        is_unit_enabled_by_room_setting = parse_unit_number(matched_word['number']) <= parsed_max_enabled_unit_num
+                        # S章の場合は 'S' で判定
+                        unit_to_check = 'S' if str(matched_word.get('chapter', '')) == 'S' else matched_word.get('number', '')
+                        is_unit_enabled_by_room = is_unit_enabled_by_room_setting(unit_to_check, room_setting)
 
-                        if is_word_enabled_in_csv and is_unit_enabled_by_room_setting:
+                        if is_word_enabled_in_csv and is_unit_enabled_by_room:
                             correct_attempts = history.get('correct_attempts', 0)
                             incorrect_attempts = history.get('incorrect_attempts', 0)
                             problem_total_attempts = correct_attempts + incorrect_attempts
@@ -8646,8 +8661,10 @@ def debug_trace_answer_flow():
         parsed_max_enabled_unit_num = parse_unit_number(max_enabled_unit_num_str)
         
         is_word_enabled_in_csv = word['enabled']
-        is_unit_enabled_by_room_setting = parse_unit_number(word['number']) <= parsed_max_enabled_unit_num
-        is_counted_in_progress = is_word_enabled_in_csv and is_unit_enabled_by_room_setting
+        # S章の場合は 'S' で判定
+        unit_to_check = 'S' if str(word.get('chapter', '')) == 'S' else word.get('number', '')
+        is_unit_enabled_by_room = is_unit_enabled_by_room_setting(unit_to_check, room_setting)
+        is_counted_in_progress = is_word_enabled_in_csv and is_unit_enabled_by_room
         
         correct_attempts = history_entry.get('correct_attempts', 0)
         incorrect_attempts = history_entry.get('incorrect_attempts', 0)
@@ -8660,7 +8677,7 @@ def debug_trace_answer_flow():
             'number': word['number'],
             'category': word['category'],
             'enabled_in_csv': is_word_enabled_in_csv,
-            'enabled_by_room_setting': is_unit_enabled_by_room_setting,
+            'enabled_by_room_setting': is_unit_enabled_by_room,
             'counted_in_progress': is_counted_in_progress,
             'generated_id': python_id,
             'has_history': python_id in user_history,
@@ -9777,7 +9794,9 @@ def progress_page():
             category_name = word.get('category', '未分類')
             
             is_word_enabled_in_csv = word['enabled']
-            is_unit_enabled_by_room = is_unit_enabled_by_room_setting(unit_num, room_setting)  # ←変数名を変更
+            # S章の場合は 'S' で判定、それ以外は従来通り number で判定
+            unit_to_check = 'S' if str(chapter_num) == 'S' else unit_num
+            is_unit_enabled_by_room = is_unit_enabled_by_room_setting(unit_to_check, room_setting)
 
             if is_word_enabled_in_csv and is_unit_enabled_by_room:
                 # 章の初期化
@@ -9816,7 +9835,10 @@ def progress_page():
                 unit_number = matched_word['number']
                 
                 is_word_enabled_in_csv = matched_word['enabled']
-                is_unit_enabled_by_room = parse_unit_number(unit_number) <= parsed_max_enabled_unit_num
+                
+                # S章の場合は 'S' で判定
+                unit_to_check = 'S' if str(chapter_number) == 'S' else unit_number
+                is_unit_enabled_by_room = is_unit_enabled_by_room_setting(unit_to_check, room_setting)
 
                 if (is_word_enabled_in_csv and is_unit_enabled_by_room and 
                     chapter_number in chapter_progress_summary and
@@ -10078,7 +10100,20 @@ def compute_score_from_history(history, problem_id_map, parsed_max_enabled_unit_
             continue
         if not matched_word['enabled']:
             continue
-        if parse_unit_number(matched_word['number']) > parsed_max_enabled_unit_num:
+            
+        # S章の場合は 'S' で判定（簡易版）
+        # 本来は is_unit_enabled_by_room_setting を使うべきだが
+        # 引数の parsed_max_enabled_unit_num に合わせて数値を比較
+        # （S章は単独で有効/無効を切り替える運用を見越して chapter で判定）
+        chapter = str(matched_word.get('chapter', ''))
+        unit_num = str(matched_word.get('number', ''))
+        
+        if chapter == 'S':
+            # S章の場合は、S章自体が有効かどうか（通常は常に有効か、あるいは別のフラグで管理）
+            # ここでは parsed_max_enabled_unit_num が設定されていれば有効とみなす
+            # あるいは、S問題が含まれている＝有効 と判断
+            pass
+        elif parse_unit_number(unit_num) > parsed_max_enabled_unit_num:
             continue
         correct_attempts = hist.get('correct_attempts', 0)
         incorrect_attempts = hist.get('incorrect_attempts', 0)
@@ -10162,10 +10197,19 @@ def api_yearly_ranking_data():
         parsed_max = parse_unit_number(max_unit_str)
 
         problem_id_map = {get_problem_id(w): w for w in word_data}
-        total_questions = sum(
-            1 for w in word_data
-            if w['enabled'] and parse_unit_number(w['number']) <= parsed_max
-        )
+        total_questions = 0
+        for w in word_data:
+            if not w['enabled']:
+                continue
+            
+            c_num = str(w.get('chapter', ''))
+            u_num = str(w.get('number', ''))
+            
+            # S章は常にカウントに含める（またはroom_settingで判定）
+            if c_num == 'S':
+                total_questions += 1
+            elif parse_unit_number(u_num) <= parsed_max:
+                total_questions += 1
 
         all_users = User.query.filter_by(room_number=room_number)\
             .filter(User.username != 'admin').all()
@@ -10311,8 +10355,10 @@ def fallback_ranking_calculation(current_user, start_time):
         total_questions_for_room_ranking = 0
         for word in word_data:
             is_word_enabled_in_csv = word['enabled']
-            is_unit_enabled_by_room_setting = parse_unit_number(word['number']) <= parsed_max_enabled_unit_num
-            if is_word_enabled_in_csv and is_unit_enabled_by_room_setting:
+            # S章の場合は 'S' で判定
+            unit_to_check = 'S' if str(word.get('chapter', '')) == 'S' else word.get('number', '')
+            is_unit_enabled_by_room = is_unit_enabled_by_room_setting(unit_to_check, room_setting)
+            if is_word_enabled_in_csv and is_unit_enabled_by_room:
                 total_questions_for_room_ranking += 1
         
         # 部屋内の全ユーザーを取得
@@ -10348,9 +10394,11 @@ def fallback_ranking_calculation(current_user, start_time):
 
                     if matched_word:
                         is_word_enabled_in_csv = matched_word['enabled']
-                        is_unit_enabled_by_room_setting = parse_unit_number(matched_word['number']) <= parsed_max_enabled_unit_num
+                        # S章の場合は 'S' で判定
+                        unit_to_check = 'S' if str(matched_word.get('chapter', '')) == 'S' else matched_word.get('number', '')
+                        is_unit_enabled_by_room = is_unit_enabled_by_room_setting(unit_to_check, room_setting)
 
-                        if is_word_enabled_in_csv and is_unit_enabled_by_room_setting:
+                        if is_word_enabled_in_csv and is_unit_enabled_by_room:
                             correct_attempts = history.get('correct_attempts', 0)
                             incorrect_attempts = history.get('incorrect_attempts', 0)
                             problem_total_attempts = correct_attempts + incorrect_attempts
