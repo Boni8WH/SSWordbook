@@ -10253,6 +10253,9 @@
                 
                 mapIds.forEach(mapId => {
                     const name = mapNames[mapId];
+                    // レポートの最初のデータから全問題数を取得（初期値として使用）
+                    const totalCount = (report.length > 0 && report[0].map_progress[mapId]) ? report[0].map_progress[mapId].total : 0;
+                    
                     const th = document.createElement('th');
                     th.textContent = name;
                     headerRow.appendChild(th);
@@ -10262,7 +10265,7 @@
                     col.innerHTML = `
                         <div class="input-group input-group-sm">
                             <span class="input-group-text">${name}</span>
-                            <input type="number" class="form-control map-threshold" data-map-id="${mapId}" value="0" min="0" onchange="updateMasterVisuals()">
+                            <input type="number" class="form-control map-threshold" data-map-id="${mapId}" value="${totalCount}" min="0" onchange="updateMasterVisuals()">
                         </div>
                     `;
                     thresholdContainer.appendChild(col);
