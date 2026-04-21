@@ -17394,7 +17394,7 @@ def api_map_quiz_progress_report():
             )
             SELECT m.user_id, loc.map_image_id, COUNT(m.map_quiz_problem_id) as count
             FROM mastered_ever m
-            JOIN mq_prob p ON m.map_quiz_problem_id = p.id
+            JOIN mq_problem p ON m.map_quiz_problem_id = p.id
             JOIN mq_location loc ON p.map_location_id = loc.id
             WHERE loc.map_image_id IN :mids
             GROUP BY m.user_id, loc.map_image_id
