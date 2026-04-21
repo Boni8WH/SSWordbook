@@ -17390,7 +17390,7 @@ def api_map_quiz_progress_report():
             mastered_ever AS (
                 SELECT DISTINCT user_id, map_quiz_problem_id
                 FROM streaks
-                WHERE is_correct = 1 AND c1 = 1 AND c2 = 1
+                WHERE is_correct AND c1 AND c2
             )
             SELECT m.user_id, loc.map_image_id, COUNT(m.map_quiz_problem_id) as count
             FROM mastered_ever m
