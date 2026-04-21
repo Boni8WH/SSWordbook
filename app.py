@@ -63,7 +63,7 @@ import html
 # import pykakasi (Removed to save 300MB memory)
 import MeCab
 import unidic_lite
-from sqlalchemy import inspect, text, func, case, cast, Integer
+from sqlalchemy import inspect, text, func, case, cast, Integer, bindparam
 from sqlalchemy.orm import joinedload, deferred
 from datetime import date, datetime, timedelta
 import random
@@ -88,7 +88,6 @@ def get_logic_date(dt):
     if dt.hour < 7:
         return (dt - timedelta(days=1)).date()
     return dt.date()
-
 
 # AWS S3設定
 S3_BUCKET = os.environ.get('S3_BUCKET', 'your-default-bucket')
@@ -17376,6 +17375,7 @@ def api_map_quiz_progress_report():
         user_ids_list = [u.id for u in users]
         
         # SQL Window Functionを使用して、過去の履歴から「3回連続正解」を一度でも達成した問題を抽出
+        # bindparam(expanding=True) を使用して IN 句のパラメータ展開を安全に行う
         mastery_query = text("""
             WITH streaks AS (
                 SELECT 
@@ -17398,11 +17398,14 @@ def api_map_quiz_progress_report():
             JOIN mq_location loc ON p.map_location_id = loc.id
             WHERE loc.map_image_id IN :mids
             GROUP BY m.user_id, loc.map_image_id
-        """)
+        """).bindparams(
+            bindparam('uids', expanding=True),
+            bindparam('mids', expanding=True)
+        )
         
         mastery_results = db.session.execute(mastery_query, {
-            'uids': tuple(user_ids_list), 
-            'mids': tuple(map_ids)
+            'uids': user_ids_list, 
+            'mids': map_ids
         })
         
         for user_id, map_id, count in mastery_results:
