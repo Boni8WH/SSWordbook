@@ -17371,20 +17371,41 @@ def api_map_quiz_progress_report():
                 .filter(MapLocation.map_image_id == map_id).scalar()
             map_problem_counts[map_id] = count or 0
 
-        # Get mastery counts for each user and each map
+        # Get mastery counts for each user and each map (ever achieved 3 consecutive correct)
         mastery_data = {} # {user_id: {map_id: count}}
+        user_ids_list = [u.id for u in users]
         
-        logs = db.session.query(
-            MapQuizLog.user_id,
-            MapLocation.map_image_id,
-            func.count(func.distinct(MapQuizLog.map_quiz_problem_id))
-        ).join(MapLocation, MapQuizLog.map_location_id == MapLocation.id)\
-         .filter(MapQuizLog.user_id.in_([u.id for u in users]))\
-         .filter(MapLocation.map_image_id.in_(map_ids))\
-         .filter(MapQuizLog.is_correct == True)\
-         .group_by(MapQuizLog.user_id, MapLocation.map_image_id).all()
+        # SQL Window Functionを使用して、過去の履歴から「3回連続正解」を一度でも達成した問題を抽出
+        mastery_query = text("""
+            WITH streaks AS (
+                SELECT 
+                    user_id,
+                    map_quiz_problem_id,
+                    is_correct,
+                    LAG(is_correct, 1) OVER (PARTITION BY user_id, map_quiz_problem_id ORDER BY created_at) as c1,
+                    LAG(is_correct, 2) OVER (PARTITION BY user_id, map_quiz_problem_id ORDER BY created_at) as c2
+                FROM mq_log
+                WHERE user_id IN :uids
+            ),
+            mastered_ever AS (
+                SELECT DISTINCT user_id, map_quiz_problem_id
+                FROM streaks
+                WHERE is_correct = 1 AND c1 = 1 AND c2 = 1
+            )
+            SELECT m.user_id, loc.map_image_id, COUNT(m.map_quiz_problem_id) as count
+            FROM mastered_ever m
+            JOIN mq_prob p ON m.map_quiz_problem_id = p.id
+            JOIN mq_location loc ON p.map_location_id = loc.id
+            WHERE loc.map_image_id IN :mids
+            GROUP BY m.user_id, loc.map_image_id
+        """)
         
-        for user_id, map_id, count in logs:
+        mastery_results = db.session.execute(mastery_query, {
+            'uids': tuple(user_ids_list), 
+            'mids': tuple(map_ids)
+        })
+        
+        for user_id, map_id, count in mastery_results:
             if user_id not in mastery_data:
                 mastery_data[user_id] = {}
             mastery_data[user_id][map_id] = count
