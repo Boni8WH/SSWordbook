@@ -535,6 +535,10 @@
                 <i class="fas fa-map-marked-alt me-2"></i> 地図クイズ管理
             </a>
 
+            <a class="sidebar-link" id="tab-link-map-progress" data-bs-toggle="pill" href="#section-map-progress" role="tab">
+                <i class="fas fa-chart-line me-2"></i> 地図取り組み状況
+            </a>
+
             <a class="sidebar-link" id="tab-link-chrono-management" data-bs-toggle="pill"
                 href="#section-chrono-management" role="tab">
                 <i class="fas fa-hourglass-half me-2"></i> 刻の系譜
@@ -2814,6 +2818,93 @@
                         <div id="noApprovedTipsMessage" class="text-center text-muted py-4" style="display:none;">
                             <i class="fas fa-inbox fa-2x mb-2 d-block" style="opacity:0.3;"></i>
                             <p>承認済みのTipsはありません</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tab-pane fade" id="section-map-progress" role="tabpanel">
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-white">
+                        <h3><i class="fas fa-chart-line"></i> 地図取り組み状況管理</h3>
+                    </div>
+                    <div class="card-body">
+                        <p>複数の部屋と地図を選択して、ユーザーごとの取り組み状況を確認・出力できます。</p>
+                        
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <div class="card bg-light">
+                                    <div class="card-body">
+                                        <h5 class="card-title text-primary"><i class="fas fa-door-open"></i> 部屋の選択</h5>
+                                        <div class="mb-2">
+                                            <button type="button" class="btn btn-xs btn-outline-secondary py-0" style="font-size: 0.7rem;" onclick="toggleAllCheckboxes('progressRoomCheck')">全選択/解除</button>
+                                        </div>
+                                        <div class="room-checkbox-list" style="max-height: 200px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; background: #fff; border-radius: 4px;">
+                                            {% set room_nums = admin_stats.unique_room_numbers %}
+                                            {% for room_num in room_nums %}
+                                            <div class="form-check">
+                                                <input class="form-check-input progressRoomCheck" type="checkbox" value="{{ room_num }}" id="roomCheck{{ room_num }}">
+                                                <label class="form-check-label small" for="roomCheck{{ room_num }}">部屋 {{ room_num }}</label>
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="card bg-light">
+                                    <div class="card-body">
+                                        <h5 class="card-title text-primary"><i class="fas fa-map-marked-alt"></i> 地図の選択</h5>
+                                        <div class="mb-2">
+                                            <button type="button" class="btn btn-xs btn-outline-secondary py-0" style="font-size: 0.7rem;" onclick="toggleAllCheckboxes('progressMapCheck')">全選択/解除</button>
+                                        </div>
+                                        <div class="map-checkbox-list" style="max-height: 200px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; background: #fff; border-radius: 4px;">
+                                            {% for map in all_maps %}
+                                            <div class="form-check">
+                                                <input class="form-check-input progressMapCheck" type="checkbox" value="{{ map.id }}" id="mapCheck{{ map.id }}" data-map-name="{{ map.name }}">
+                                                <label class="form-check-label small" for="mapCheck{{ map.id }}">{{ map.name }}</label>
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="text-center mb-4">
+                            <button type="button" class="btn btn-primary btn-lg" onclick="fetchMapProgressReport()">
+                                <i class="fas fa-sync-alt"></i> レポートを作成
+                            </button>
+                        </div>
+
+                        <div id="mapProgressReportArea" style="display: none;">
+                            <hr>
+                            <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                                <h5 class="mb-0"><i class="fas fa-table"></i> 取り組み状況一覧</h5>
+                                <button type="button" class="btn btn-success" onclick="exportMapProgressCSV()">
+                                    <i class="fas fa-file-csv"></i> CSVエクスポート
+                                </button>
+                            </div>
+
+                            <div id="thresholdInputs" class="mb-3 p-3 bg-light border rounded">
+                                <h6 class="border-bottom pb-2 mb-3"><i class="fas fa-sliders-h"></i> マスター閾値設定 (各単元での目標正解数)</h6>
+                                <div id="thresholdContainer" class="row g-2"></div>
+                            </div>
+
+                            <div class="table-responsive" style="max-height: 600px; overflow-y: auto;">
+                                <table class="table table-bordered table-hover sticky-header" id="mapProgressTable" style="font-size: 0.85rem;">
+                                    <thead class="table-dark">
+                                        <tr id="mapProgressHeader">
+                                            <th>学籍番号</th>
+                                            <th>名前</th>
+                                            <th>部屋</th>
+                                            <!-- 地図列が動的に入る -->
+                                            <th>マスター数</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="mapProgressBody"></tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -10095,6 +10186,181 @@
                     loadApprovedTips();
                 });
             }
+
+            // --- Map Progress logic ---
+            window.toggleAllCheckboxes = function(className) {
+                const checks = document.querySelectorAll('.' + className);
+                const allChecked = Array.from(checks).every(c => c.checked);
+                checks.forEach(c => c.checked = !allChecked);
+            };
+
+            let currentMapProgressReport = null;
+            let currentSelectedMapIds = [];
+
+            window.fetchMapProgressReport = async function() {
+                const roomNums = Array.from(document.querySelectorAll('.progressRoomCheck:checked')).map(c => c.value);
+                const mapIds = Array.from(document.querySelectorAll('.progressMapCheck:checked')).map(c => c.value);
+                
+                if (roomNums.length === 0 || mapIds.length === 0) {
+                    alert('部屋と地図を少なくとも1つずつ選択してください。');
+                    return;
+                }
+                
+                const fetchBtn = event.currentTarget;
+                const originalHtml = fetchBtn.innerHTML;
+                fetchBtn.disabled = true;
+                fetchBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 読込中...';
+
+                currentSelectedMapIds = mapIds;
+                
+                const params = new URLSearchParams();
+                roomNums.forEach(r => params.append('room_numbers[]', r));
+                mapIds.forEach(m => params.append('map_ids[]', m));
+                
+                try {
+                    const response = await fetch('/admin/api/map_quiz/progress_report?' + params.toString());
+                    const data = await response.json();
+                    
+                    if (data.status === 'success') {
+                        currentMapProgressReport = data.report;
+                        renderMapProgressReport(data.report, mapIds);
+                        document.getElementById('mapProgressReportArea').style.display = 'block';
+                        // Smooth scroll to results
+                        document.getElementById('mapProgressReportArea').scrollIntoView({ behavior: 'smooth' });
+                    } else {
+                        alert('エラー: ' + data.message);
+                    }
+                } catch (e) {
+                    console.error(e);
+                    alert('レポートの取得に失敗しました。');
+                } finally {
+                    fetchBtn.disabled = false;
+                    fetchBtn.innerHTML = originalHtml;
+                }
+            };
+
+            function renderMapProgressReport(report, mapIds) {
+                const headerRow = document.getElementById('mapProgressHeader');
+                const thresholdContainer = document.getElementById('thresholdContainer');
+                
+                let mapNames = {};
+                document.querySelectorAll('.progressMapCheck').forEach(c => {
+                    mapNames[c.value] = c.getAttribute('data-map-name');
+                });
+                
+                headerRow.innerHTML = '<th>学籍番号</th><th>名前</th><th>部屋</th>';
+                thresholdContainer.innerHTML = '';
+                
+                mapIds.forEach(mapId => {
+                    const name = mapNames[mapId];
+                    const th = document.createElement('th');
+                    th.textContent = name;
+                    headerRow.appendChild(th);
+                    
+                    const col = document.createElement('div');
+                    col.className = 'col-md-3 col-sm-6 mb-2';
+                    col.innerHTML = `
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text">${name}</span>
+                            <input type="number" class="form-control map-threshold" data-map-id="${mapId}" value="0" min="0" onchange="updateMasterVisuals()">
+                        </div>
+                    `;
+                    thresholdContainer.appendChild(col);
+                });
+                
+                const lastTh = document.createElement('th');
+                lastTh.textContent = 'マスター地図数';
+                headerRow.appendChild(lastTh);
+                
+                updateMasterVisuals();
+            }
+
+            window.updateMasterVisuals = function() {
+                if (!currentMapProgressReport) return;
+                
+                const body = document.getElementById('mapProgressBody');
+                body.innerHTML = '';
+                
+                const thresholds = {};
+                document.querySelectorAll('.map-threshold').forEach(input => {
+                    thresholds[input.getAttribute('data-map-id')] = parseInt(input.value) || 0;
+                });
+                
+                currentMapProgressReport.forEach(user => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `<td>${user.student_id}</td><td class="fw-bold">${user.username}</td><td class="text-center">${user.room_number}</td>`;
+                    
+                    let masteredMapsCount = 0;
+                    currentSelectedMapIds.forEach(mapId => {
+                        const progress = user.map_progress[mapId] || {mastered: 0, total: 0};
+                        const threshold = thresholds[mapId];
+                        const isMastered = threshold > 0 && progress.mastered >= threshold;
+                        if (isMastered) masteredMapsCount++;
+                        
+                        const cell = document.createElement('td');
+                        cell.className = 'text-center';
+                        cell.textContent = `${progress.mastered} / ${progress.total}`;
+                        if (isMastered) {
+                            cell.style.backgroundColor = '#fff3cd';
+                            cell.style.fontWeight = 'bold';
+                            cell.classList.add('table-warning');
+                        }
+                        tr.appendChild(cell);
+                    });
+                    
+                    const lastCell = document.createElement('td');
+                    lastCell.className = 'text-center fw-bold bg-light';
+                    lastCell.innerHTML = `<span class="badge bg-primary fs-6">${masteredMapsCount}</span> / ${currentSelectedMapIds.length}`;
+                    tr.appendChild(lastCell);
+                    body.appendChild(tr);
+                });
+            };
+
+            window.exportMapProgressCSV = function() {
+                if (!currentMapProgressReport) return;
+                
+                const thresholds = {};
+                document.querySelectorAll('.map-threshold').forEach(input => {
+                    thresholds[input.getAttribute('data-map-id')] = parseInt(input.value) || 0;
+                });
+                
+                let mapNames = {};
+                document.querySelectorAll('.progressMapCheck').forEach(c => {
+                    mapNames[c.value] = c.getAttribute('data-map-name');
+                });
+
+                let csvContent = "\uFEFF"; // UTF-8 BOM
+                let header = ["学籍番号", "名前", "部屋"];
+                currentSelectedMapIds.forEach(mapId => {
+                    header.push(mapNames[mapId]);
+                });
+                header.push("マスター地図数");
+                csvContent += header.join(",") + "\n";
+                
+                currentMapProgressReport.forEach(user => {
+                    let row = [`"${user.student_id}"`, `"${user.username}"`, `"${user.room_number}"`];
+                    let masteredMapsCount = 0;
+                    currentSelectedMapIds.forEach(mapId => {
+                        const progress = user.map_progress[mapId] || {mastered: 0, total: 0};
+                        const threshold = thresholds[mapId];
+                        const isMastered = threshold > 0 && progress.mastered >= threshold;
+                        if (isMastered) masteredMapsCount++;
+                        row.push(isMastered ? "1" : "0");
+                    });
+                    row.push(masteredMapsCount);
+                    csvContent += row.join(",") + "\n";
+                });
+                
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement("a");
+                const url = URL.createObjectURL(blob);
+                link.setAttribute("href", url);
+                link.setAttribute("download", `map_progress_${new Date().toISOString().slice(0,10)}.csv`);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            };
         })();
     </script>
     {% endblock %}

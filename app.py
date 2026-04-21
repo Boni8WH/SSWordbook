@@ -11008,6 +11008,7 @@ def admin_page():
             'announcements': announcements,
             'room_settings': room_settings,
             'pending_correction_count': pending_correction_count,  #  添削依頼未対応件数
+            'all_maps': MapImage.query.filter_by(is_active=True).order_by(MapImage.display_order).all(),
             **context
         }
         
@@ -17339,6 +17340,80 @@ def api_delete_problem(prob_id):
         return jsonify({'status': 'success'})
     except Exception as e:
         db.session.rollback()
+        return jsonify({'status': 'error', 'message': str(e)})
+
+@app.route('/admin/api/map_quiz/progress_report', methods=['GET'])
+def api_map_quiz_progress_report():
+    if not session.get('admin_logged_in') and not session.get('manager_logged_in'):
+        return jsonify({'status': 'error', 'message': 'Unauthorized'}), 403
+    
+    room_numbers = request.args.getlist('room_numbers[]')
+    map_ids = request.args.getlist('map_ids[]', type=int)
+    
+    if not room_numbers or not map_ids:
+        return jsonify({'status': 'error', 'message': 'Missing parameters'}), 400
+    
+    try:
+        # Get users in the specified rooms
+        if session.get('manager_logged_in'):
+            auth_rooms = session.get('manager_auth_rooms', [])
+            room_numbers = [r for r in room_numbers if r in auth_rooms]
+            if not room_numbers:
+                return jsonify({'status': 'error', 'message': 'No authorized rooms specified'}), 403
+
+        users = User.query.filter(User.room_number.in_(room_numbers)).order_by(User.room_number, User.student_id).all()
+        
+        # Get total problem counts for each map
+        map_problem_counts = {}
+        for map_id in map_ids:
+            count = db.session.query(func.count(MapQuizProblem.id))\
+                .join(MapLocation, MapQuizProblem.map_location_id == MapLocation.id)\
+                .filter(MapLocation.map_image_id == map_id).scalar()
+            map_problem_counts[map_id] = count or 0
+
+        # Get mastery counts for each user and each map
+        mastery_data = {} # {user_id: {map_id: count}}
+        
+        logs = db.session.query(
+            MapQuizLog.user_id,
+            MapLocation.map_image_id,
+            func.count(func.distinct(MapQuizLog.map_quiz_problem_id))
+        ).join(MapLocation, MapQuizLog.map_location_id == MapLocation.id)\
+         .filter(MapQuizLog.user_id.in_([u.id for u in users]))\
+         .filter(MapLocation.map_image_id.in_(map_ids))\
+         .filter(MapQuizLog.is_correct == True)\
+         .group_by(MapQuizLog.user_id, MapLocation.map_image_id).all()
+        
+        for user_id, map_id, count in logs:
+            if user_id not in mastery_data:
+                mastery_data[user_id] = {}
+            mastery_data[user_id][map_id] = count
+
+        # Format report
+        report = []
+        for user in users:
+            user_report = {
+                'id': user.id,
+                'student_id': user.student_id,
+                'username': user.username,
+                'room_number': user.room_number,
+                'map_progress': {}
+            }
+            for map_id in map_ids:
+                count = mastery_data.get(user.id, {}).get(map_id, 0)
+                user_report['map_progress'][map_id] = {
+                    'mastered': count,
+                    'total': map_problem_counts.get(map_id, 0)
+                }
+            report.append(user_report)
+            
+        return jsonify({
+            'status': 'success',
+            'report': report
+        })
+        
+    except Exception as e:
+        logger.error(f"Error generating map progress report: {e}")
         return jsonify({'status': 'error', 'message': str(e)})
 
 @app.route('/api/map_quiz/record_perfect', methods=['POST'])
