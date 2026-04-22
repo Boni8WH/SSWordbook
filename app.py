@@ -14,6 +14,7 @@ import io
 import pickle 
 import gc
 import psutil
+import threading
 import requests
 import xml.etree.ElementTree as ET
 import email.utils
@@ -56,6 +57,10 @@ CACHE_TTL = 300         # 5 minutes
 MAX_WORD_DATA_CACHE_SIZE = 5      # Limit number of large CSVs in memory
 MAX_ROOM_SETTING_CACHE_SIZE = 100 # Limit number of room settings in memory
 
+# ニュース更新状態の追跡
+NEWS_UPDATE_LOCK = threading.Lock()
+NEWS_UPDATE_IN_PROGRESS = False
+
 from io import StringIO, BytesIO
 from datetime import datetime, timedelta
 from html.parser import HTMLParser
@@ -70,7 +75,7 @@ import random
 import glob
 import pytz
 from pydantic import BaseModel, Field
-import threading
+# import threading
 from flask_apscheduler import APScheduler
 # .env-related imports already handled above
 
@@ -1643,9 +1648,9 @@ def update_world_news():
         # 重複排除
         unique_items = list({item['link']: item for item in all_items}.values())
         
-        # さらにトークン節約のため、全体で80件程度に絞る（多様性を維持しつつ）
-        if len(unique_items) > 80:
-            unique_items = unique_items[:80]
+        # さらにトークン節約のため、全体で45件程度に絞る（多様性を維持しつつ）
+        if len(unique_items) > 45:
+            unique_items = unique_items[:45]
             
         news_text = "\n".join([f"- [{item['source']}] {item['title']} ({item.get('pub_date')}): {item['description']} ({item['link']})" for item in unique_items])
         
@@ -1691,16 +1696,37 @@ def update_world_news():
 {news_text}
 """
         try:
-            response = client.models.generate_content(
-                model='gemini-2.0-flash',
-                contents=prompt,
-                config={
-                    'response_mime_type': 'application/json',
-                    'response_schema': NewsResponseSchema,
-                    'temperature': 0.3
-                }
-            )
-            data_json = json.loads(response.text)
+            # リトライ設定（429 Resource Exhausted対策）
+            max_retries = 3
+            retry_delay = 5 # seconds
+            
+            last_error = None
+            data_json = None
+            for attempt in range(max_retries):
+                try:
+                    response = client.models.generate_content(
+                        model='gemini-2.0-flash',
+                        contents=prompt,
+                        config={
+                            'response_mime_type': 'application/json',
+                            'response_schema': NewsResponseSchema,
+                            'temperature': 0.3
+                        }
+                    )
+                    data_json = json.loads(response.text)
+                    break # 成功したらループを抜ける
+                except Exception as e:
+                    last_error = e
+                    if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
+                        print(f"⚠️ Gemini API Quota Hit (Attempt {attempt+1}/{max_retries}). Retrying in {retry_delay}s...")
+                        time.sleep(retry_delay)
+                        retry_delay *= 2 # 指数バックオフ
+                    else:
+                        raise # その他のエラーは外側のexceptへ
+            else:
+                # リトライ上限に達した
+                print(f"❌ Gemini API News Update Error (Max retries reached): {last_error}")
+                return False, f"Gemini APIのリトライ上限に達しました: {str(last_error)}"
             
             now = datetime.now(JST)
             data = {
@@ -1749,8 +1775,10 @@ def update_world_news():
 
             return True, "ニュースを更新しました"
         except Exception as e:
-            print(f"⚠️ Gemini News Update Error: {e}")
-            return False, f"Gemini APIによる生成に失敗しました: {str(e)}"
+            print(f"⚠️ News Processing Error: {e}")
+            import traceback
+            traceback.print_exc()
+            return False, f"ニュース処理中にエラーが発生しました: {str(e)}"
 
 class PasswordResetToken(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -7778,6 +7806,34 @@ def news_page():
     context = get_template_context()
     try:
         record = NewsArchive.query.order_by(NewsArchive.updated_at.desc()).first()
+        
+        # 本日のニュースがあるかチェック（JST)
+        today_jst = datetime.now(JST).date()
+        is_today_news_missing = True
+        if record:
+            last_news_date = datetime.strptime(record.date, '%Y-%m-%d').date()
+            if last_news_date >= today_jst:
+                is_today_news_missing = False
+        
+        # 今日のがなくて、かつ7時以降ならバックグラウンドで更新を試みる
+        if is_today_news_missing and datetime.now(JST).hour >= 7:
+            global NEWS_UPDATE_IN_PROGRESS
+            with NEWS_UPDATE_LOCK:
+                if not NEWS_UPDATE_IN_PROGRESS:
+                    NEWS_UPDATE_IN_PROGRESS = True
+                    print("💡 本日のニュースが未取得のため、バックグラウンド更新を開始します...")
+                    def run_update():
+                        global NEWS_UPDATE_IN_PROGRESS
+                        try:
+                            update_world_news()
+                        finally:
+                            with NEWS_UPDATE_LOCK:
+                                NEWS_UPDATE_IN_PROGRESS = False
+                    
+                    thread = threading.Thread(target=run_update)
+                    thread.daemon = True
+                    thread.start()
+
         if not record:
             return render_template('news.html', news_data=None, **context)
 
