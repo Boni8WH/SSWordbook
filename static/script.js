@@ -1673,6 +1673,16 @@ function showNextQuestion() {
         voiceFeedback.classList.add('hidden');
     }
 
+    // 次の問題に進む際に手書きスペースをクリアし、スクロール位置をリセット
+    if (typeof window.clearHandwritingSpace === 'function') {
+        window.clearHandwritingSpace();
+    }
+    
+    const quizCard = document.querySelector('.card');
+    if (quizCard) {
+        quizCard.scrollTop = 0;
+    }
+
     // Reset Voice Success Lock
     isProcessingVoiceSuccess = false;
 
@@ -1764,7 +1774,13 @@ function showAnswer() {
         return;
     }
 
-    if (answerElement) answerElement.classList.remove('hidden');
+    if (answerElement) {
+        answerElement.classList.remove('hidden');
+        // 解答を表示した際に、解答エリアが確実に見えるように自動スクロール
+        setTimeout(() => {
+            answerElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 50);
+    }
     if (showAnswerButton) showAnswerButton.classList.add('hidden');
     if (correctButton) correctButton.classList.remove('hidden');
     if (incorrectButton) incorrectButton.classList.remove('hidden');
@@ -5595,3 +5611,139 @@ function startVoiceRecognition(e) {
         }
     }
 }
+
+// ==========================================
+// 手書きスペース (Handwriting Space) Logic
+// ==========================================
+document.addEventListener('DOMContentLoaded', () => {
+    const openMemoBtn = document.getElementById('openMemoBtn');
+    const memoAreaContainer = document.getElementById('memoAreaContainer');
+    const closeMemoBtn = document.getElementById('closeMemoBtn');
+    const clearMemoBtn = document.getElementById('clearMemoBtn');
+    const memoCanvas = document.getElementById('memoCanvas');
+    const splitContainer = document.querySelector('.quiz-split-container');
+    
+    if (!openMemoBtn || !memoAreaContainer || !memoCanvas) return;
+    
+    const ctx = memoCanvas.getContext('2d');
+    let isDrawing = false;
+    let isMemoOpen = false;
+
+    // キャンバスクリア関数をグローバルに露出（問題移動時に呼び出すため）
+    window.clearHandwritingSpace = function() {
+        if (memoCanvas.width > 0 && memoCanvas.height > 0) {
+            ctx.clearRect(0, 0, memoCanvas.width, memoCanvas.height);
+        }
+    };
+
+    // Canvas Size Setup
+    function resizeCanvas() {
+        if (!isMemoOpen) return;
+        const rect = memoCanvas.parentElement.getBoundingClientRect();
+        // 既存の描画内容を退避
+        let imageData = null;
+        if (memoCanvas.width > 0 && memoCanvas.height > 0) {
+            try {
+                imageData = ctx.getImageData(0, 0, memoCanvas.width, memoCanvas.height);
+            } catch(e) {}
+        }
+        
+        memoCanvas.width = rect.width;
+        memoCanvas.height = rect.height;
+        
+        // コンテキストの設定を再適用
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = '#2c3e50';
+        
+        // 退避した描画内容を戻す
+        if (imageData) {
+            ctx.putImageData(imageData, 0, 0);
+        }
+    }
+
+    // Toggle Memo
+    openMemoBtn.addEventListener('click', () => {
+        isMemoOpen = true;
+        memoAreaContainer.style.display = 'block';
+        if (splitContainer) splitContainer.classList.add('memo-open');
+        
+        setTimeout(() => {
+            memoAreaContainer.classList.remove('hidden');
+            resizeCanvas();
+        }, 10);
+    });
+
+    closeMemoBtn.addEventListener('click', () => {
+        isMemoOpen = false;
+        memoAreaContainer.classList.add('hidden');
+        if (splitContainer) splitContainer.classList.remove('memo-open');
+        
+        setTimeout(() => {
+            memoAreaContainer.style.display = 'none';
+        }, 300);
+    });
+
+    clearMemoBtn.addEventListener('click', () => {
+        window.clearHandwritingSpace();
+    });
+
+    // Drawing Logic
+    function getPointerPos(e) {
+        const rect = memoCanvas.getBoundingClientRect();
+        let clientX = e.clientX;
+        let clientY = e.clientY;
+        if (e.touches && e.touches.length > 0) {
+            clientX = e.touches[0].clientX;
+            clientY = e.touches[0].clientY;
+        }
+        return {
+            x: clientX - rect.left,
+            y: clientY - rect.top
+        };
+    }
+
+    function startDrawing(e) {
+        e.preventDefault();
+        isDrawing = true;
+        const pos = getPointerPos(e);
+        ctx.beginPath();
+        ctx.moveTo(pos.x, pos.y);
+    }
+
+    function draw(e) {
+        if (!isDrawing) return;
+        e.preventDefault();
+        const pos = getPointerPos(e);
+        ctx.lineTo(pos.x, pos.y);
+        ctx.stroke();
+    }
+
+    function stopDrawing() {
+        if (!isDrawing) return;
+        isDrawing = false;
+        ctx.closePath();
+    }
+
+    // Mouse Events
+    memoCanvas.addEventListener('mousedown', startDrawing);
+    memoCanvas.addEventListener('mousemove', draw);
+    memoCanvas.addEventListener('mouseup', stopDrawing);
+    memoCanvas.addEventListener('mouseout', stopDrawing);
+
+    // Touch Events
+    memoCanvas.addEventListener('touchstart', startDrawing, { passive: false });
+    memoCanvas.addEventListener('touchmove', draw, { passive: false });
+    memoCanvas.addEventListener('touchend', stopDrawing);
+    memoCanvas.addEventListener('touchcancel', stopDrawing);
+
+    // Handle Window Resize
+    let resizeTimer;
+    window.addEventListener('resize', () => {
+        if (isMemoOpen) {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(resizeCanvas, 100);
+        }
+    });
+});

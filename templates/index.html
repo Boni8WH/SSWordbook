@@ -1056,60 +1056,85 @@
 </script>
 
 <section class="card-area hidden">
-
-    <div class="progress-bar-container">
-        <div id="progressBar" class="progress-bar"></div>
-        <span id="questionNumberDisplay" class="question-number-display"></span>
-    </div>
-    <div class="card">
-        <div class="question-content">
-            <p id="question"></p>
-        </div>
-        <div class="answer-content">
-            <p id="answer" class="hidden"></p>
-        </div>
-    </div>
-    <div class="card-buttons">
-        <div style="display: flex; justify-content: space-between; align-items: flex-end; width: 100%;">
-            <div class="answer-buttons-container" style="flex-grow: 1; display: flex; gap: 10px; margin-right: 20px;">
-                <button id="showAnswerButton" class="primary-button">答えを見る</button>
-                <button id="correctButton" class="correct-button hidden">正解</button>
-                <button id="incorrectButton" class="incorrect-button hidden">不正解</button>
+    <div class="quiz-split-container">
+        <div class="quiz-main-content">
+            <div class="progress-bar-container">
+                <div id="progressBar" class="progress-bar"></div>
+                <span id="questionNumberDisplay" class="question-number-display"></span>
             </div>
-            <!-- PC用マイクボタン (Mobileでは非表示) -->
-            <button id="voiceAnswerBtn" class="voice-button voice-btn-pc"
-                style="display: none; width: 60px !important; height: 60px !important; min-width: 60px !important; min-height: 60px !important; border-radius: 50% !important; background-color: #e74c3c; border: none; color: white; font-size: 1.5em; align-items: center; justify-content: center; box-shadow: 0 4px 8px rgba(0,0,0,0.2); flex-shrink: 0 !important; flex: 0 0 60px !important; padding: 0 !important; transition: transform 0.2s;">
-                <i class="fas fa-microphone"></i>
-            </button>
-        </div>
-    </div>
-    <div id="voiceFeedback" class="voice-feedback hidden" style="margin-top: 10px; text-align: center; color: #666;">
-    </div>
-    <div class="back-to-selection-container"
-        style="display: flex; justify-content: space-between; align-items: center; width: 100%; gap: 10px;">
-        <div style="display: flex; align-items: center; flex-grow: 0;">
-            <button id="backToSelectionFromCardButton" class="secondary-button" style="margin: 0;">選択画面に戻る</button>
+            <div class="card">
+                <div class="card-inner-scroll">
+                    <div class="question-content">
+                        <p id="question"></p>
+                    </div>
+                    <div class="answer-content">
+                        <p id="answer" class="hidden"></p>
+                    </div>
+                </div>
+            </div>
+            <div class="card-buttons">
+                <div style="display: flex; justify-content: space-between; align-items: flex-end; width: 100%;">
+                    <div class="answer-buttons-container" style="flex-grow: 1; display: flex; gap: 10px; margin-right: 20px;">
+                        <button id="showAnswerButton" class="primary-button">答えを見る</button>
+                        <button id="correctButton" class="correct-button hidden">正解</button>
+                        <button id="incorrectButton" class="incorrect-button hidden">不正解</button>
+                    </div>
+                    <!-- PC用マイクボタン -->
+                    <button id="voiceAnswerBtn" class="voice-button voice-btn-pc"
+                        style="display: none; width: 60px !important; height: 60px !important; min-width: 60px !important; min-height: 60px !important; border-radius: 50% !important; background-color: #e74c3c; border: none; color: white; font-size: 1.5em; align-items: center; justify-content: center; box-shadow: 0 4px 8px rgba(0,0,0,0.2); flex-shrink: 0 !important; flex: 0 0 60px !important; padding: 0 !important; transition: transform 0.2s;">
+                        <i class="fas fa-microphone"></i>
+                    </button>
+                    <!-- 手書きスペースを開くボタン (PC/タブレット用) -->
+                    <button id="openMemoBtn" class="memo-btn-pc"
+                        style="margin-left: 10px; width: 60px !important; height: 60px !important; min-width: 60px !important; min-height: 60px !important; border-radius: 50% !important; background-color: #3498db; border: none; color: white; font-size: 1.5em; display: none; align-items: center; justify-content: center; box-shadow: 0 4px 8px rgba(0,0,0,0.2); flex-shrink: 0 !important; flex: 0 0 60px !important; padding: 0 !important; transition: transform 0.2s;" title="手書きスペースを開く">
+                        <i class="fas fa-pen"></i>
+                    </button>
+                </div>
+            </div>
+            <div id="voiceFeedback" class="voice-feedback hidden" style="margin-top: 10px; text-align: center; color: #666;">
+            </div>
+            <div class="back-to-selection-container"
+                style="display: flex; justify-content: space-between; align-items: center; width: 100%; gap: 10px;">
+                <div style="display: flex; align-items: center; flex-grow: 0;">
+                    <button id="backToSelectionFromCardButton" class="secondary-button" style="margin: 0;">選択画面に戻る</button>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <!-- Mobile Voice Button: Grouped with font controls for balance -->
+                    <button id="voiceAnswerBtnMobile" class="voice-button voice-btn-mobile"
+                        style="display: none; width: 44px !important; height: 44px !important; min-width: 44px !important; min-height: 44px !important; border-radius: 50%; background-color: #e74c3c; border: none; color: white; font-size: 1.1em; align-items: center; justify-content: center; box-shadow: 0 4px 8px rgba(0,0,0,0.2); flex-shrink: 0; z-index: 1000; pointer-events: auto; cursor: pointer;">
+                        <i class="fas fa-microphone"></i>
+                    </button>
+
+                    <div class="font-size-controls" style="margin: 0;">
+                        <span style="font-size: 0.8rem; color: #7f8c8d;">文字サイズ</span>
+                        <div class="btn-group" role="group">
+                            <button type="button" class="btn btn-sm btn-outline-secondary" id="decreaseFontSize"
+                                title="文字を小さくする"><i class="fas fa-minus"></i></button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" id="increaseFontSize"
+                                title="文字を大きくする"><i class="fas fa-plus"></i></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
 
-        <div style="display: flex; align-items: center; gap: 15px;">
-            <!-- Mobile Voice Button: Grouped with font controls for balance -->
-            <button id="voiceAnswerBtnMobile" class="voice-button voice-btn-mobile"
-                style="display: none; width: 44px !important; height: 44px !important; min-width: 44px !important; min-height: 44px !important; border-radius: 50%; background-color: #e74c3c; border: none; color: white; font-size: 1.1em; align-items: center; justify-content: center; box-shadow: 0 4px 8px rgba(0,0,0,0.2); flex-shrink: 0; z-index: 1000; pointer-events: auto; cursor: pointer;">
-                <i class="fas fa-microphone"></i>
-            </button>
-
-            <div class="font-size-controls" style="margin: 0;">
-                <span style="font-size: 0.8rem; color: #7f8c8d;">文字サイズ</span>
-                <div class="btn-group" role="group">
-                    <button type="button" class="btn btn-sm btn-outline-secondary" id="decreaseFontSize"
-                        title="文字を小さくする"><i class="fas fa-minus"></i></button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" id="increaseFontSize"
-                        title="文字を大きくする"><i class="fas fa-plus"></i></button>
+        <!-- 手書きスペースエリア (初期状態は非表示) -->
+        <div id="memoAreaContainer" class="memo-side-container hidden" style="display: none;">
+            <div class="memo-card">
+                <div class="memo-header">
+                    <h4><i class="fas fa-pen"></i> 手書きスペース</h4>
+                    <div class="memo-controls">
+                        <button id="clearMemoBtn" class="btn btn-sm btn-outline-danger" style="border-radius: 20px;"><i class="fas fa-eraser"></i> 消去</button>
+                        <button id="closeMemoBtn" class="btn btn-sm btn-outline-secondary" style="border-radius: 20px;"><i class="fas fa-times"></i> 閉じる</button>
+                    </div>
+                </div>
+                <div class="canvas-container">
+                    <canvas id="memoCanvas"></canvas>
                 </div>
             </div>
         </div>
     </div>
-
 </section>
 
 <section id="quizResult" class="quiz-result-area hidden">
@@ -1468,9 +1493,18 @@
     }
 
     /* Voice Button Responsive Visibility */
-    /* Default (PC): Show PC btn, Hide Mobile btn */
+    /* PC/Tablet: Show PC btn, Hide Mobile btn */
     .voice-btn-pc {
         display: flex !important;
+    }
+    
+    .memo-btn-pc {
+        display: flex !important;
+    }
+
+    .memo-btn-pc:hover {
+        transform: scale(1.05);
+        background-color: #2980b9 !important;
     }
 
     .voice-btn-mobile {
@@ -1481,6 +1515,14 @@
 
         /* Mobile: Hide PC btn, Show Mobile btn */
         .voice-btn-pc {
+            display: none !important;
+        }
+        
+        .memo-btn-pc {
+            display: none !important;
+        }
+        
+        .memo-side-container {
             display: none !important;
         }
 
@@ -1519,6 +1561,140 @@
     .answer-buttons-container button {
         flex: 1;
         /* Split width equally */
+    }
+
+    /* 手書きスペース用スタイル */
+    .quiz-split-container {
+        display: flex;
+        gap: 20px;
+        align-items: flex-start;
+        justify-content: center;
+        width: 100%;
+        max-width: 1200px; /* 広げておく */
+        margin: 0 auto;
+        transition: all 0.3s ease;
+    }
+
+    .quiz-main-content {
+        flex: 1;
+        max-width: 1000px;
+        width: 100%;
+        transition: all 0.3s ease;
+        display: flex;
+        flex-direction: column;
+        /* 画面の高さに収める (ヘッダー等を考慮) */
+        height: calc(100vh - 140px); 
+        max-height: 850px;
+        min-height: 450px;
+    }
+
+    .quiz-split-container.memo-open .quiz-main-content {
+        max-width: 650px;
+    }
+
+    /* カードをスクロール可能にし、中身を中央に配置 */
+    .card {
+        flex: 1;
+        overflow-y: auto;
+        display: block; /* FlexからBlockに変更してスクロールの挙動を安定させる */
+        min-height: 0 !important;
+        margin-bottom: 15px !important;
+        padding: 0 !important; /* 内部ラッパーで余白をとる */
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05) !important;
+        border-radius: 15px !important;
+        scrollbar-width: thin; /* Firefox用 */
+        scrollbar-color: #cbd5e0 transparent;
+    }
+
+    /* カスタムスクロールバー (Chrome/Edge/Safari用) */
+    .card::-webkit-scrollbar {
+        width: 6px;
+    }
+    .card::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    .card::-webkit-scrollbar-thumb {
+        background-color: #cbd5e0;
+        border-radius: 10px;
+    }
+
+    /* 内部のレイアウト用ラッパー */
+    .card-inner-scroll {
+        min-height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-start; /* 上寄せにすることで余白の違和感を解消 */
+        padding: 60px 40px; /* 上部に適度な余白を確保 */
+        box-sizing: border-box;
+    }
+
+    /* 問題・解答テキストの余白調整 */
+    .question-content {
+        margin-bottom: 30px !important;
+        width: 100%;
+    }
+
+    .answer-content {
+        margin-top: 10px !important;
+        width: 100%;
+        border-top: 1px dashed #edf2f7;
+        padding-top: 20px;
+    }
+
+    .card-buttons {
+        flex-shrink: 0;
+        margin-top: 0 !important;
+        margin-bottom: 15px !important;
+        padding: 5px 0;
+    }
+
+    .back-to-selection-container {
+        flex-shrink: 0;
+        margin-top: auto;
+        padding-top: 10px;
+        border-top: 1px dashed #edf2f7;
+    }
+
+    /* 手書きスペースも高さに合わせる */
+    .memo-side-container {
+        flex: 1;
+        max-width: 500px;
+        width: 100%;
+        height: calc(100vh - 140px);
+        max-height: 850px;
+        animation: slideInRight 0.3s ease;
+    }
+
+    .memo-card {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        border-radius: 20px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.8);
+        padding: 20px;
+        position: relative;
+        top: 0;
+    }
+
+    .canvas-container {
+        flex: 1;
+        border: 2px dashed #cbd5e0;
+        border-radius: 12px;
+        background: #fdfdfc;
+        cursor: crosshair;
+        overflow: hidden;
+        height: auto !important;
+        position: relative;
+    }
+
+    .canvas-container canvas {
+        width: 100%;
+        height: 100%;
+        display: block;
+        touch-action: none;
     }
 
     /* ===== リザルト画面のプレミアムスタイリング ===== */
