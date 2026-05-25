@@ -11533,6 +11533,35 @@ def admin_reset_intro_flag(user_id):
         flash(f'フラグリセット中にエラーが発生しました: {str(e)}', 'danger')
         return redirect(url_for('admin_page'))
 
+@app.route('/admin/reset_user_password/<int:user_id>', methods=['POST'])
+def admin_reset_user_password(user_id):
+    """個別のユーザーのパスワードをリセット"""
+    try:
+        if not session.get('admin_logged_in'):
+            flash('管理者権限がありません。', 'danger')
+            return redirect(url_for('login_page'))
+
+        user = User.query.get(user_id)
+        if not user:
+            flash(f'ユーザーID {user_id} が見つかりません。', 'danger')
+            return redirect(url_for('admin_page'))
+
+        new_password = request.form.get('new_password')
+        if not new_password:
+            flash('新しいパスワードが指定されていません。', 'warning')
+            return redirect(url_for('admin_page'))
+
+        user.set_individual_password(new_password)
+        db.session.commit()
+        
+        flash(f'ユーザー {user.username} のパスワードを変更しました。', 'success')
+        return redirect(url_for('admin_page'))
+
+    except Exception as e:
+        db.session.rollback()
+        flash(f'パスワード変更中にエラーが発生しました: {str(e)}', 'danger')
+        return redirect(url_for('admin_page'))
+
 @app.route('/admin/reset_intro_flag_all', methods=['POST'])
 def admin_reset_intro_flag_all():
     """全ユーザーのRPG導入フラグをリセット"""

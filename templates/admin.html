@@ -1389,6 +1389,11 @@
                                                         data-username="{{ user.username }}">
                                                         <i class="fas fa-undo"></i> Introリセット
                                                     </button>
+                                                    <button type="button" class="btn btn-secondary btn-sm reset-password-btn"
+                                                        data-user-id="{{ user.id }}"
+                                                        data-username="{{ user.username }}">
+                                                        <i class="fas fa-key"></i> PWリセット
+                                                    </button>
                                                 </div>
                                             </td>
                                         </tr>
@@ -4288,6 +4293,33 @@
                             'btn-info'
                         );
                     }
+                }
+
+                // パスワードリセット
+                if (event.target.closest('.reset-password-btn')) {
+                    event.preventDefault();
+                    const button = event.target.closest('.reset-password-btn');
+                    const userId = button.getAttribute('data-user-id');
+                    const username = button.getAttribute('data-username');
+
+                    if (userId && username) {
+                        const newPassword = prompt(`ユーザー「${username}」の新しいパスワードを入力してください:\n(空欄の場合はキャンセルされます)`);
+                        if (newPassword) {
+                            const form = document.createElement('form');
+                            form.method = 'POST';
+                            form.action = `/admin/reset_user_password/${userId}`;
+                            
+                            const input = document.createElement('input');
+                            input.type = 'hidden';
+                            input.name = 'new_password';
+                            input.value = newPassword;
+                            
+                            form.appendChild(input);
+                            document.body.appendChild(form);
+                            form.submit();
+                        }
+                    }
+                }
                 }
             });
 

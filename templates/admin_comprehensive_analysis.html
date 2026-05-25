@@ -4,7 +4,7 @@
 {% block content %}
 <div class="container mt-4">
     <h2>🔍 包括的ストレージ分析</h2>
-    
+
     <div class="row mb-4">
         <div class="col-md-4">
             <div class="card text-center">
@@ -36,7 +36,7 @@
             </div>
         </div>
     </div>
-    
+
     <!-- テーブル別詳細 -->
     <div class="card mb-4">
         <div class="card-header">
@@ -60,7 +60,8 @@
                             <td>{{ analysis.table_analysis.users.total_size_mb }}MB</td>
                             <td>
                                 平均: {{ analysis.table_analysis.users.avg_size_kb }}KB/人<br>
-                                最大: {{ analysis.table_analysis.users.max_user }} ({{ analysis.table_analysis.users.max_size_kb }}KB)
+                                最大: {{ analysis.table_analysis.users.max_user }} ({{
+                                analysis.table_analysis.users.max_size_kb }}KB)
                             </td>
                         </tr>
                         <tr>
@@ -102,7 +103,7 @@
             </div>
         </div>
     </div>
-    
+
     <!-- 差分の説明 -->
     <div class="card mb-4">
         <div class="card-header">
@@ -117,7 +118,7 @@
                 <li><strong>システムファイル:</strong> ログファイル、一時ファイル、キャッシュ</li>
                 <li><strong>Renderプラットフォーム:</strong> 実行環境、監視システムなど</li>
             </ul>
-            
+
             {% if analysis.difference_mb > 70 %}
             <div class="alert alert-warning">
                 <strong>⚠️ 注意:</strong> 差分が70MB以上です。アプリ本体が大きくなっている可能性があります。
@@ -129,7 +130,7 @@
             {% endif %}
         </div>
     </div>
-    
+
     <div class="text-center">
         <a href="{{ url_for('admin_page') }}" class="btn btn-secondary">← 管理者ページに戻る</a>
         <button type="button" onclick="location.reload()" class="btn btn-outline-info">🔄 再分析</button>
