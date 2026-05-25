@@ -1,0 +1,21 @@
+{
+    "name": "BAYT AL-ḤIKMAH",
+    "short_name": "ḤIKMAH",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#ffffff",
+    "theme_color": "#4a90e2",
+    "icons": [
+        {
+            "src": "/static/NapoleonIcon.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "/static/pergamon/normal_logo.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        }
+    ]
+}

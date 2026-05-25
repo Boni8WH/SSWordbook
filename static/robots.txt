@@ -1,0 +1,6 @@
+User-agent: *
+Disallow: /admin/
+Disallow: /essay/problem/
+Allow: /
+Allow: /columns
+Sitemap: https://bayt-al-hikmah.com/sitemap.xml
