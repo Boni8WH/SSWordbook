@@ -274,7 +274,7 @@ def get_gemini_summary(news_items):
 """
         # Pydanticモデルを使って出力を強制する
         response = client.models.generate_content(
-            model='gemini-2.0-flash',
+            model='gemini-3.5-flash',
             contents=prompt,
             config={
                 'response_mime_type': 'application/json',
