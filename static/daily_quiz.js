@@ -33,6 +33,7 @@ function createDailyQuizModal() {
                         <h5 class="modal-title"><i class="fas fa-stopwatch"></i> 今日の10問</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
+                    <div id="dailyQuizStreakBanner" class="text-center" style="background: rgba(241, 196, 15, 0.1); border-bottom: 1px solid #f1c40f; padding: 5px; display: none;"></div>
                     <div class="modal-body" id="dailyQuizContainer">
                         <div class="text-center">
                             <div class="spinner-border text-success" role="status">
@@ -75,6 +76,38 @@ async function initializeDailyQuiz() {
 
         if (data.status !== 'success') {
             throw new Error(data.message);
+        }
+
+        const streakBanner = document.getElementById('dailyQuizStreakBanner');
+        if (streakBanner) {
+            const baseStreak = data.streak || 0;
+            streakBanner.style.display = 'block';
+
+            if (!data.rpg_unlocked) {
+                // RPG未解放のティーザー表示
+                if (data.completed) {
+                    streakBanner.innerHTML = `<span style="color: #f1c40f; font-weight: bold; font-size: 0.9em;">🔥 連続クリア${baseStreak}日目！ 将来RPGモードが解放された時、ボス戦が${baseStreak}%有利になるぞ！</span>`;
+                } else {
+                    if (baseStreak > 0) {
+                        const nextStreak = baseStreak + 1;
+                        streakBanner.innerHTML = `<span style="color: #f1c40f; font-weight: bold; font-size: 0.9em;">🔥 現在${baseStreak}日連続！ 今日もクリアして、将来のRPGボス戦を${nextStreak}%有利にしよう！</span>`;
+                    } else {
+                        streakBanner.innerHTML = `<span style="color: #f1c40f; font-weight: bold; font-size: 0.9em;">🔥 毎日クリアすると、将来RPGモードが解放された時にボス戦が有利になるぞ！</span>`;
+                    }
+                }
+            } else {
+                // RPG解放済み
+                if (data.completed) {
+                    streakBanner.innerHTML = `<span style="color: #f1c40f; font-weight: bold; font-size: 0.9em;">🔥 連続クリア${baseStreak}日目！ RPGボス戦の制限時間が${baseStreak}%延長中！</span>`;
+                } else {
+                    if (baseStreak > 0) {
+                        const nextStreak = baseStreak + 1;
+                        streakBanner.innerHTML = `<span style="color: #f1c40f; font-weight: bold; font-size: 0.9em;">🔥 現在${baseStreak}日連続！ 今日もクリアして${nextStreak}%延長ボーナスをゲットしよう！</span>`;
+                    } else {
+                        streakBanner.innerHTML = `<span style="color: #f1c40f; font-weight: bold; font-size: 0.9em;">🔥 毎日クリアでRPGボス戦の制限時間が延長されるぞ！ まずは今日のクリアを目指そう！</span>`;
+                    }
+                }
+            }
         }
 
         if (data.completed) {

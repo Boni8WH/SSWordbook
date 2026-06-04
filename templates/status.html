@@ -40,6 +40,19 @@
                     <div class="stat-separator"></div>
 
                     <div class="stat-row">
+                        <span class="stat-label">今日の10問連続クリア</span>
+                        <span class="stat-value text-crimson">{{ streak }} 日</span>
+                    </div>
+
+                    <div class="stat-row mt-2">
+                        <span class="stat-label">時間延長ボーナス</span>
+                        <span class="stat-value highlight">+{{ time_bonus_percent }}%</span>
+                    </div>
+                    <div class="stat-description-small">RPGボス戦の制限時間が延長されます<br>(※毎日「今日の10問」クリアで最大30%まで増加)</div>
+
+                    <div class="stat-separator"></div>
+
+                    <div class="stat-row">
                         <span class="stat-label">討伐数</span>
                         <span class="stat-value text-crimson">{{ cleared_count }} 体</span>
                     </div>

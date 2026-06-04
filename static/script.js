@@ -4034,7 +4034,13 @@ function checkRpgStatus() {
 
                 if (data.time_limit) {
                     const timeEl = document.getElementById('rpgRuleTime');
-                    if (timeEl) timeEl.textContent = `制限時間 ${data.time_limit}秒`;
+                    if (timeEl) {
+                        if (data.streak > 0 && data.bonus_time_seconds > 0) {
+                            timeEl.innerHTML = `制限時間 ${data.base_time_limit}秒 <span style="color: #f1c40f; font-size: 0.9em; display:block; margin-top: 5px;">🔥 連続学習${data.streak}日ボーナス: +${data.bonus_time_seconds}秒！</span>`;
+                        } else {
+                            timeEl.textContent = `制限時間 ${data.time_limit}秒`;
+                        }
+                    }
                 }
 
                 if (data.clear_correct_count) {
@@ -4170,7 +4176,12 @@ function startRpgGame(enemyId = null) {
 
                     // Update UI Texts
                     document.getElementById('rpgBossName').textContent = data.boss_info.name;
-                    document.getElementById('rpgRuleTime').textContent = `制限時間 ${rpgTimeLeft}秒`;
+                    const timeEl = document.getElementById('rpgRuleTime');
+                    if (data.streak > 0 && data.bonus_time_seconds > 0) {
+                        timeEl.innerHTML = `制限時間 ${data.base_time_limit}秒 <span style="color: #f1c40f; font-size: 0.9em; display:block; margin-top: 5px;">🔥 連続学習${data.streak}日ボーナス: +${data.bonus_time_seconds}秒！</span>`;
+                    } else {
+                        timeEl.textContent = `制限時間 ${rpgTimeLeft}秒`;
+                    }
                     document.getElementById('rpgRuleCondition').textContent = `合格ライン ${rpgPassScore}問正解`;
                     document.getElementById('rpgRuleMistake').textContent = `${rpgMaxMistakes + 1}ミスで即終了`; // 3ミスでアウトなら表記は「3ミス」等。サーバーは「max_mistakes=2」を送るかも？
                     // app.py: clear_max_mistakes defaults to 2 (allowed). So 3rd mistake kills.

@@ -21789,6 +21789,12 @@ def get_rpg_status():
     if not target_boss:
         return jsonify({'available': False, 'reason': 'no_boss_found', 'current_score': balance_score})
     
+    # ストリークボーナスの計算
+    streak = calculate_user_streak(user_id)
+    bonus_percentage = min(streak * 0.01, 0.30)
+    bonus_time_seconds = int(target_boss.time_limit * bonus_percentage)
+    total_time_limit = target_boss.time_limit + bonus_time_seconds
+    
     return jsonify({
         'available': not is_cooldown, # クールダウン中でなければバナーを出す
         'is_cooldown': is_cooldown,
@@ -21799,7 +21805,10 @@ def get_rpg_status():
         'boss_icon': url_for('serve_rpg_image', enemy_id=target_boss.id, image_type='icon'),
         'difficulty': target_boss.difficulty,
         'intro_dialogue': target_boss.intro_dialogue,
-        'time_limit': target_boss.time_limit,
+        'time_limit': total_time_limit,
+        'base_time_limit': target_boss.time_limit,
+        'bonus_time_seconds': bonus_time_seconds,
+        'streak': streak,
         'clear_correct_count': target_boss.clear_correct_count,
         'clear_max_mistakes': target_boss.clear_max_mistakes,
         'current_score': balance_score
@@ -21835,6 +21844,44 @@ def get_current_boss(user_id, rpg_state=None):
             
     # 全てクリア済み
     return None
+
+def calculate_user_streak(user_id):
+    """ユーザーの「今日の10問」の連続クリア日数（ストリーク）を計算する"""
+    results = db.session.query(DailyQuiz.date)\
+        .join(DailyQuizResult, DailyQuiz.id == DailyQuizResult.quiz_id)\
+        .filter(DailyQuizResult.user_id == user_id)\
+        .order_by(DailyQuiz.date.desc())\
+        .distinct()\
+        .all()
+    
+    if not results:
+        return 0
+        
+    dates = [r[0] for r in results]
+    today = get_logic_date(datetime.now(JST))
+    
+    streak = 0
+    
+    # 連続の起点（今日か昨日からスタート）
+    if dates[0] == today:
+        current_check_date = today
+    elif dates[0] == today - timedelta(days=1):
+        current_check_date = dates[0]
+    else:
+        return 0
+        
+    for d in dates:
+        if d == current_check_date:
+            streak += 1
+            current_check_date -= timedelta(days=1)
+        elif d > current_check_date:
+            # 同じ日の重複データなどはスキップ
+            continue
+        else:
+            # 日付が飛んだらストリーク終了
+            break
+            
+    return streak
 
 @app.route('/api/rpg/start', methods=['POST'])
 def start_rpg_battle():
@@ -21960,11 +22007,20 @@ def start_rpg_battle():
     session['rpg_incorrect_count'] = 0
     session['rpg_battle_stage_id'] = target_boss.id
         
+    # ストリークボーナスの計算
+    streak = calculate_user_streak(user_id)
+    bonus_percentage = min(streak * 0.01, 0.30)  # 最大30%
+    bonus_time_seconds = int(target_boss.time_limit * bonus_percentage)
+    total_time_limit = target_boss.time_limit + bonus_time_seconds
+        
     return jsonify({
         'status': 'success',
         'stage_id': target_boss.id,
         'problems': final_problems,
-        'time_limit': target_boss.time_limit,
+        'time_limit': total_time_limit,
+        'base_time_limit': target_boss.time_limit,
+        'bonus_time_seconds': bonus_time_seconds,
+        'streak': streak,
         'pass_score': target_boss.clear_correct_count,
         'max_mistakes': target_boss.clear_max_mistakes,
         'boss_info': target_boss.to_dict(),
@@ -22255,12 +22311,17 @@ def status():
     ).all()
     rematched_today_ids = [r.enemy_id for r in today_rematches]
 
+    streak = calculate_user_streak(user.id)
+    time_bonus_percent = min(streak, 30)
+
     return render_template('status.html', 
                          current_user=user, 
                          earned_badges=all_badges, # 変数名を変更
                          bonus_percent=bonus_percent, 
                          cleared_count=cleared_count,
-                         rematched_today_ids=rematched_today_ids)
+                         rematched_today_ids=rematched_today_ids,
+                         streak=streak,
+                         time_bonus_percent=time_bonus_percent)
 
 @app.route('/admin/delete_room', methods=['POST'])
 def admin_delete_room():
@@ -22687,6 +22748,8 @@ def get_daily_quiz():
             
             user_result_data = {'score': user_result.score, 'time': f"{(user_result.time_taken_ms / 1000):.2f}秒"}
 
+            streak = calculate_user_streak(user.id)
+
             return jsonify({
                 'status': 'success',
                 'completed': True,
@@ -22699,7 +22762,9 @@ def get_daily_quiz():
                 'monthly_participants': monthly_participants,
                 'previous_top_5': previous_top_5,       # 前回のランキング追加
                 'previous_user_rank': previous_user_rank, # 前回のランキング追加
-                'previous_participants': previous_participants # 前回のランキング追加
+                'previous_participants': previous_participants, # 前回のランキング追加
+                'streak': streak,
+                'rpg_unlocked': UserStats.get_or_create(user.id).balance_score >= 1000
             })
 
     # --- (未回答の場合のクイズ生成ロジック) ---
@@ -22767,10 +22832,14 @@ def get_daily_quiz():
                 'choices': choices
             })
 
+    streak = calculate_user_streak(user.id)
+
     return jsonify({
         'status': 'success',
         'completed': False,
         'questions': quiz_questions,
+        'streak': streak,
+        'rpg_unlocked': UserStats.get_or_create(user.id).balance_score >= 1000,
         'monthly_top_5': monthly_top_5,
         'monthly_user_rank': monthly_user_rank,
         'monthly_participants': monthly_participants
@@ -22911,7 +22980,9 @@ def submit_daily_quiz():
             'monthly_participants': monthly_participants,
             'previous_top_5': previous_top_5,         # 前回のランキング追加
             'previous_user_rank': previous_user_rank,   # 前回のランキング追加
-            'previous_participants': previous_participants # 前回のランキング追加
+            'previous_participants': previous_participants, # 前回のランキング追加
+            'streak': calculate_user_streak(user.id),
+            'rpg_unlocked': UserStats.get_or_create(user.id).balance_score >= 1000
         })
 
     except Exception as e:

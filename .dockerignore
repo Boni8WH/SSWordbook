@@ -1,0 +1,7 @@
+.env
+__pycache__/
+*.pyc
+venv/
+.git/
+quiz_data.db
+uploads/

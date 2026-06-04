@@ -1,6 +1,24 @@
 version: '3.8'
 
 services:
+  # --- アプリケーション ---
+  web:
+    build: .
+    container_name: world_history_web
+    ports:
+      - "5000:5000"
+    environment:
+      # .env の代わり。dbコンテナに接続するように設定
+      - DATABASE_URL=postgresql://world_history_user:password@db:5432/world_history_db
+      - GEMINI_API_KEY=${GEMINI_API_KEY}  # 自身のPCの環境変数から取得
+      - FLASK_DEBUG=1
+#    volumes:
+#      # 手元でコードを編集したら即座に反映されるようにする
+#      - .:/app
+    depends_on:
+      - db
+
+  # --- データベース ---
   db:
     image: postgres:16
     container_name: world_history_db
