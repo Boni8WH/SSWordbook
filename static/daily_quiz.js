@@ -275,6 +275,18 @@ async function submitQuizResult(answers, time) {
 
         // レスポンスのデータを使って結果を表示
         if (data.status === 'success' && data.completed) {
+            // クイズ完了後にバナーを最新の連続日数で更新する
+            const streakBanner = document.getElementById('dailyQuizStreakBanner');
+            if (streakBanner) {
+                const baseStreak = data.streak || 0;
+                streakBanner.style.display = 'block';
+                if (!data.rpg_unlocked) {
+                    streakBanner.innerHTML = `<span style="color: #f1c40f; font-weight: bold; font-size: 0.9em;">🔥 連続クリア${baseStreak}日目！ 将来RPGモードが解放された時、ボス戦が${baseStreak}%有利になるぞ！</span>`;
+                } else {
+                    streakBanner.innerHTML = `<span style="color: #f1c40f; font-weight: bold; font-size: 0.9em;">🔥 連続クリア${baseStreak}日目！ RPGボス戦の制限時間が${baseStreak}%延長中！</span>`;
+                }
+            }
+
             displayQuizResult(data.user_result, data.top_5_ranking, data.user_rank, data.total_participants,
                 data.monthly_top_5, data.monthly_user_rank, data.monthly_participants,
                 data.previous_top_5, data.previous_user_rank, data.previous_participants);
