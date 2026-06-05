@@ -177,21 +177,27 @@
 
                             <div class="table-controls mb-3">
                                 <div class="row">
-                                    <div class="col-md-6">
+                                    <div class="col-md-4 mb-2 mb-md-0">
                                         <div class="input-group">
                                             <span class="input-group-text"><i class="fas fa-search"></i></span>
                                             <input type="text" id="ranking-search" class="form-control"
                                                 placeholder="ユーザー名で検索...">
                                         </div>
                                     </div>
-                                    <div class="col-md-6">
-                                        <div class="d-flex gap-2">
-                                            <select id="ranking-sort" class="form-select">
+                                    <div class="col-md-8">
+                                        <div class="d-flex gap-2 justify-content-md-end flex-wrap">
+                                            <div class="btn-group flex-shrink-0" role="group">
+                                                <input type="radio" class="btn-check" name="nameDisplayMode" id="nameCurrentMode" value="current" checked onchange="toggleNameDisplayMode()">
+                                                <label class="btn btn-outline-secondary text-nowrap" for="nameCurrentMode" title="現在の名前"><i class="fas fa-user"></i> 現在名</label>
+                                                <input type="radio" class="btn-check" name="nameDisplayMode" id="nameOriginalMode" value="original" onchange="toggleNameDisplayMode()">
+                                                <label class="btn btn-outline-secondary text-nowrap" for="nameOriginalMode" title="初期登録名"><i class="fas fa-id-card"></i> 初期名</label>
+                                            </div>
+                                            <select id="ranking-sort" class="form-select" style="max-width: 150px;">
                                                 <option value="score" selected>スコア順</option>
                                                 <option value="accuracy">正答率順</option>
                                                 <option value="attempts">回答数順</option>
                                             </select>
-                                            <button class="btn btn-outline-secondary" onclick="toggleSortOrder()">
+                                            <button class="btn btn-outline-secondary flex-shrink-0" onclick="toggleSortOrder()">
                                                 <i class="fas fa-sort-amount-down" id="sort-icon"></i>
                                             </button>
                                         </div>
@@ -335,6 +341,10 @@
     let currentViewMode = 'dropdown';
     let currentSortOrder = 'desc';
     let allRooms = [];
+    let currentNameDisplayMode = 'current';
+    let dailyRankingData = [];
+    let monthlyCumulativeData = [];
+    let monthlyAttemptsDataList = [];
 
     // ========================================
     // 2. ページ初期化
@@ -691,7 +701,7 @@
 
             // 各値の安全な取得
             const rank = index + 1;
-            const username = user.username || 'Unknown';
+            const displayUsername = currentNameDisplayMode === 'original' ? (user.original_username || user.username || 'Unknown') : (user.username || 'Unknown');
             const totalAttempts = user.total_attempts || 0;
             const totalCorrect = user.total_correct || 0;
             const accuracyRate = (user.accuracy_rate || 0).toFixed(1);
@@ -707,7 +717,7 @@
                 ${index === 1 ? '<i class="fas fa-medal text-secondary ms-1"></i>' : ''}
                 ${index === 2 ? '<i class="fas fa-medal text-info ms-1"></i>' : ''}
             </td>
-            <td class="sticky-col-2"><strong>${username}</strong></td>
+            <td class="sticky-col-2"><strong>${displayUsername}</strong></td>
             <td><span class="badge bg-primary">${totalAttempts}</span></td>
             <td><span class="badge bg-success">${totalCorrect}</span></td>
             <td>${accuracyRate}%</td>
@@ -741,9 +751,11 @@
                 row.classList.add('table-info');
             }
 
+            const displayUsername = currentNameDisplayMode === 'original' ? (user.original_username || user.username || 'Unknown') : (user.username || 'Unknown');
+            
             row.innerHTML = `
             <td>${user.rank}位</td>
-            <td><strong>${user.username}</strong></td>
+            <td><strong>${displayUsername}</strong></td>
             <td>${user.student_id}</td>
             <td><span class="badge bg-info">${user.total_score}</span></td>
         `;
@@ -880,6 +892,25 @@
         sortRankingTable();
     }
 
+    function toggleNameDisplayMode() {
+        const mode = document.querySelector('input[name="nameDisplayMode"]:checked').value;
+        currentNameDisplayMode = mode;
+        
+        // テーブルを再描画
+        if (currentRankingData) {
+            sortRankingTable();
+        }
+        if (dailyRankingData && dailyRankingData.length > 0) {
+            updateDailyRankingTable(dailyRankingData);
+        }
+        if (monthlyCumulativeData && monthlyCumulativeData.length > 0) {
+            updateMonthlyCumulativeRankingTable(monthlyCumulativeData);
+        }
+        if (monthlyAttemptsDataList && monthlyAttemptsDataList.length > 0) {
+            updateMonthlyAttemptsTable(monthlyAttemptsDataList);
+        }
+    }
+
     // ========================================
     // 8. ユーティリティ関数
     // ========================================
@@ -1006,10 +1037,12 @@
                 document.getElementById('daily-quiz-avg-score').textContent = data.stats.average_score_today.toFixed(2);
 
                 // 今日のランキングテーブルを更新
-                updateDailyRankingTable(data.daily_ranking);
+                dailyRankingData = data.daily_ranking;
+                updateDailyRankingTable(dailyRankingData);
 
                 // 月間取り組み回数テーブルを更新
-                updateMonthlyAttemptsTable(data.monthly_attempts);
+                monthlyAttemptsDataList = data.monthly_attempts;
+                updateMonthlyAttemptsTable(monthlyAttemptsDataList);
 
             } else {
                 throw new Error(data.message || '情報の取得に失敗しました');
@@ -1039,8 +1072,8 @@
             const data = await response.json();
 
             if (data.status === 'success') {
-
-                updateMonthlyCumulativeRankingTable(data.ranking);
+                monthlyCumulativeData = data.ranking;
+                updateMonthlyCumulativeRankingTable(monthlyCumulativeData);
             } else {
                 throw new Error(data.message || '情報の取得に失敗しました');
             }
@@ -1064,8 +1097,8 @@
             const data = await response.json();
 
             if (data.status === 'success') {
-
-                updateDailyRankingTable(data.ranking);
+                dailyRankingData = data.ranking;
+                updateDailyRankingTable(dailyRankingData);
             } else {
                 throw new Error(data.message || '情報の取得に失敗しました');
             }
@@ -1100,9 +1133,11 @@
                 row.classList.add('table-info'); // 3位
             }
 
+            const displayUsername = currentNameDisplayMode === 'original' ? (user.original_username || user.username || 'Unknown') : (user.username || 'Unknown');
+
             row.innerHTML = `
             <td>${user.rank}位</td>
-            <td><strong>${user.username}</strong></td>
+            <td><strong>${displayUsername}</strong></td>
             <td>${user.student_id}</td>
             <td><span class="badge bg-success">${user.score} / 10</span></td>
             <td>${user.time}</td>
@@ -1137,9 +1172,11 @@
                 row.classList.add('table-info'); // 3位
             }
 
+            const displayUsername = currentNameDisplayMode === 'original' ? (user.original_username || user.username || 'Unknown') : (user.username || 'Unknown');
+
             row.innerHTML = `
             <td>${rank}位</td>
-            <td><strong>${user.username}</strong></td>
+            <td><strong>${displayUsername}</strong></td>
             <td>${user.student_id}</td>
             <td><span class="badge bg-primary">${user.attempts_count}回</span></td>
         `;

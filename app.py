@@ -7117,6 +7117,7 @@ def api_admin_room_ranking(room_number):
         for stats in room_stats:
             user_data = {
                 'username': stats.user.username,
+                'original_username': stats.user.original_username if stats.user.original_username else stats.user.username,
                 'total_attempts': stats.total_attempts,
                 'total_correct': stats.total_correct,
                 'accuracy_rate': round(stats.accuracy_rate, 1),
@@ -7300,6 +7301,7 @@ def admin_fallback_ranking_calculation(room_number, start_time):
 
             user_data = {
                 'username': user_obj.username,
+                'original_username': user_obj.original_username if user_obj.original_username else user_obj.username,
                 'total_attempts': user_total_attempts,
                 'total_correct': user_total_correct,
                 'accuracy_rate': round((user_total_correct / user_total_attempts * 100), 1) if user_total_attempts > 0 else 0,
@@ -7382,6 +7384,7 @@ def api_admin_daily_quiz_info(room_number):
                 daily_ranking.append({
                     'rank': i,
                     'username': result.user.username,
+                    'original_username': result.user.original_username if result.user.original_username else result.user.username,
                     'student_id': result.user.student_id,
                     'score': result.score,
                     'time': f"{(result.time_taken_ms / 1000):.2f}秒"
@@ -7400,6 +7403,7 @@ def api_admin_daily_quiz_info(room_number):
 
         monthly_attempts = db.session.query(
             User.username,
+            User.original_username,
             User.student_id,
             func.count(DailyQuizResult.id).label('attempts_count')
         ).join(
@@ -7411,13 +7415,13 @@ def api_admin_daily_quiz_info(room_number):
             DailyQuiz.date >= first_day_of_month,
             DailyQuiz.date <= last_day_of_month
         ).group_by(
-            User.id, User.username, User.student_id
+            User.id, User.username, User.original_username, User.student_id
         ).order_by(
             func.count(DailyQuizResult.id).desc(), User.username
         ).all()
         
         monthly_attempts_data = [
-            {'username': row.username, 'student_id': row.student_id, 'attempts_count': row.attempts_count}
+            {'username': row.username, 'original_username': row.original_username if row.original_username else row.username, 'student_id': row.student_id, 'attempts_count': row.attempts_count}
             for row in monthly_attempts
         ]
 
@@ -7442,6 +7446,7 @@ def api_admin_monthly_cumulative_ranking(room_number, year, month):
     try:
         monthly_scores = db.session.query(
             User.username,
+            User.original_username,
             User.student_id,
             MonthlyScore.total_score
         ).join(
@@ -7456,7 +7461,7 @@ def api_admin_monthly_cumulative_ranking(room_number, year, month):
         ).all()
 
         ranking_data = [
-            {'rank': i + 1, 'username': row.username, 'student_id': row.student_id, 'total_score': row.total_score}
+            {'rank': i + 1, 'username': row.username, 'original_username': row.original_username if row.original_username else row.username, 'student_id': row.student_id, 'total_score': row.total_score}
             for i, row in enumerate(monthly_scores)
         ]
 
@@ -7488,6 +7493,7 @@ def api_admin_daily_ranking(room_number, year, month, day):
                 daily_ranking.append({
                     'rank': i,
                     'username': result.user.get_display_name(),
+                    'original_username': result.user.original_username if result.user.original_username else result.user.get_display_name(),
                     'student_id': result.user.student_id,
                     'score': result.score,
                     'time': f"{(result.time_taken_ms / 1000):.2f}秒"
