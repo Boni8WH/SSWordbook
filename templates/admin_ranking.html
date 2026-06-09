@@ -31,6 +31,13 @@
                 </h5>
             </div>
             <div class="card-body">
+                <div class="form-check form-switch mb-3">
+                    <input class="form-check-input" type="checkbox" id="multi-room-toggle" onchange="toggleMultiRoomMode()">
+                    <label class="form-check-label fw-bold text-primary" for="multi-room-toggle">
+                        <i class="fas fa-cubes"></i> 複数の部屋を選択して一括表示・エクスポート
+                    </label>
+                </div>
+
                 <div class="view-toggle-section mb-3">
                     <div class="btn-group" role="group">
                         <input type="radio" class="btn-check" name="viewMode" id="dropdownMode" checked>
@@ -65,6 +72,26 @@
 
                 <div id="compact-selector" class="room-selector" style="display: none;">
                     <div class="rooms-compact" id="rooms-compact">
+                    </div>
+                </div>
+
+                <div id="multi-room-selector" class="room-selector" style="display: none;">
+                    <div class="mb-3">
+                        <label class="form-label d-block fw-bold"><i class="fas fa-check-square"></i> 対象の部屋を選択</label>
+                        <div class="btn-group mb-2" role="group">
+                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="selectAllRooms(true)">
+                                <i class="fas fa-check-double"></i> 全て選択
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="selectAllRooms(false)">
+                                <i class="fas fa-eraser"></i> 選択解除
+                            </button>
+                        </div>
+                        <div class="rooms-checkbox-grid d-flex flex-wrap gap-3 p-3 border rounded bg-light mb-3" id="rooms-checkboxes">
+                            <!-- Checkboxes dynamically populated -->
+                        </div>
+                        <button class="btn btn-primary" onclick="selectMultipleRooms()">
+                            <i class="fas fa-chart-bar"></i> 選択した部屋のランキングを表示
+                        </button>
                     </div>
                 </div>
 
@@ -187,17 +214,27 @@
                                     <div class="col-md-8">
                                         <div class="d-flex gap-2 justify-content-md-end flex-wrap">
                                             <div class="btn-group flex-shrink-0" role="group">
-                                                <input type="radio" class="btn-check" name="nameDisplayMode" id="nameCurrentMode" value="current" checked onchange="toggleNameDisplayMode()">
-                                                <label class="btn btn-outline-secondary text-nowrap" for="nameCurrentMode" title="現在の名前"><i class="fas fa-user"></i> 現在名</label>
-                                                <input type="radio" class="btn-check" name="nameDisplayMode" id="nameOriginalMode" value="original" onchange="toggleNameDisplayMode()">
-                                                <label class="btn btn-outline-secondary text-nowrap" for="nameOriginalMode" title="初期登録名"><i class="fas fa-id-card"></i> 初期名</label>
+                                                <input type="radio" class="btn-check" name="nameDisplayMode"
+                                                    id="nameCurrentMode" value="current" checked
+                                                    onchange="toggleNameDisplayMode()">
+                                                <label class="btn btn-outline-secondary text-nowrap"
+                                                    for="nameCurrentMode" title="現在の名前"><i class="fas fa-user"></i>
+                                                    現在名</label>
+                                                <input type="radio" class="btn-check" name="nameDisplayMode"
+                                                    id="nameOriginalMode" value="original"
+                                                    onchange="toggleNameDisplayMode()">
+                                                <label class="btn btn-outline-secondary text-nowrap"
+                                                    for="nameOriginalMode" title="初期登録名"><i class="fas fa-id-card"></i>
+                                                    初期名</label>
                                             </div>
                                             <select id="ranking-sort" class="form-select" style="max-width: 150px;">
                                                 <option value="score" selected>スコア順</option>
                                                 <option value="accuracy">正答率順</option>
                                                 <option value="attempts">回答数順</option>
+                                                <option value="student_id">出席番号順</option>
                                             </select>
-                                            <button class="btn btn-outline-secondary flex-shrink-0" onclick="toggleSortOrder()">
+                                            <button class="btn btn-outline-secondary flex-shrink-0"
+                                                onclick="toggleSortOrder()">
                                                 <i class="fas fa-sort-amount-down" id="sort-icon"></i>
                                             </button>
                                         </div>
@@ -211,6 +248,8 @@
                                             <tr>
                                                 <th class="sticky-col-1">順位</th>
                                                 <th class="sticky-col-2">名前</th>
+                                                <th>部屋</th>
+                                                <th>出席番号</th>
                                                 <th>回答数</th>
                                                 <th>正解数</th>
                                                 <th>正答率</th>
@@ -337,6 +376,7 @@
     // 1. グローバル変数とアプリケーション状態
     // ========================================
     let selectedRoom = null;
+    let selectedRooms = [];
     let currentRankingData = null;
     let currentViewMode = 'dropdown';
     let currentSortOrder = 'desc';
@@ -366,8 +406,8 @@
         if (datePicker) {
             datePicker.valueAsDate = new Date();
             datePicker.addEventListener('change', () => {
-                if (selectedRoom) {
-                    loadDailyRankingForDate(selectedRoom, datePicker.value);
+                if (selectedRooms && selectedRooms.length === 1) {
+                    loadDailyRankingForDate(selectedRooms[0], datePicker.value);
                 }
             });
         }
@@ -434,8 +474,7 @@
         // 各表示モードを更新
         updateDropdownSelector(rooms);
         updateCompactSelector(rooms);
-
-
+        updateMultiRoomSelector(rooms);
     }
 
     function updateDropdownSelector(rooms) {
@@ -472,6 +511,89 @@
             button.onclick = () => selectRoom(room.room_number, room.user_count);
             container.appendChild(button);
         });
+    }
+
+    function updateMultiRoomSelector(rooms) {
+        const container = document.getElementById('rooms-checkboxes');
+        if (!container) return;
+
+        container.innerHTML = '';
+
+        rooms.forEach(room => {
+            const div = document.createElement('div');
+            div.className = 'form-check form-check-inline m-2';
+            div.innerHTML = `
+                <input class="form-check-input room-checkbox" type="checkbox" id="chk-room-${room.room_number}" value="${room.room_number}">
+                <label class="form-check-label" for="chk-room-${room.room_number}">
+                    部屋 ${room.room_number} <small class="text-muted">(${room.user_count}人)</small>
+                </label>
+            `;
+            container.appendChild(div);
+        });
+    }
+
+    function toggleMultiRoomMode() {
+        const isMulti = document.getElementById('multi-room-toggle').checked;
+        const dropdownSelector = document.getElementById('dropdown-selector');
+        const compactSelector = document.getElementById('compact-selector');
+        const multiRoomSelector = document.getElementById('multi-room-selector');
+        const viewToggle = document.querySelector('.view-toggle-section');
+
+        if (isMulti) {
+            if (viewToggle) viewToggle.style.display = 'none';
+            if (dropdownSelector) dropdownSelector.style.display = 'none';
+            if (compactSelector) compactSelector.style.display = 'none';
+            if (multiRoomSelector) multiRoomSelector.style.display = 'block';
+            clearRoomSelection();
+        } else {
+            if (viewToggle) viewToggle.style.display = 'block';
+            if (multiRoomSelector) multiRoomSelector.style.display = 'none';
+            switchViewMode(currentViewMode);
+            clearRoomSelection();
+        }
+    }
+
+    function selectAllRooms(status) {
+        document.querySelectorAll('.room-checkbox').forEach(chk => {
+            chk.checked = status;
+        });
+    }
+
+    function selectMultipleRooms() {
+        const checkedBoxes = document.querySelectorAll('.room-checkbox:checked');
+        const roomNumbers = Array.from(checkedBoxes).map(chk => chk.value);
+
+        if (roomNumbers.length === 0) {
+            alert('部屋を少なくとも1つ選択してください。');
+            return;
+        }
+
+        selectedRoom = null;
+        selectedRooms = roomNumbers;
+
+        showSelectedRoomsInfo(roomNumbers);
+        loadRankingForMultipleRooms(roomNumbers);
+    }
+
+    function showSelectedRoomsInfo(roomNumbers) {
+        const selectedRoomInfo = document.getElementById('selected-room-info');
+        const selectedRoomName = document.getElementById('selected-room-name');
+        const selectedRoomUsers = document.getElementById('selected-room-users');
+
+        if (selectedRoomInfo && selectedRoomName && selectedRoomUsers) {
+            selectedRoomName.textContent = roomNumbers.map(r => `部屋 ${r}`).join(', ');
+
+            let totalUsers = 0;
+            roomNumbers.forEach(num => {
+                const roomObj = allRooms.find(r => r.room_number === num);
+                if (roomObj) {
+                    totalUsers += roomObj.user_count;
+                }
+            });
+
+            selectedRoomUsers.textContent = totalUsers;
+            selectedRoomInfo.style.display = 'block';
+        }
     }
 
     function displayRoomError(message) {
@@ -512,6 +634,7 @@
     function selectRoom(roomNumber, userCount = 0) {
 
         selectedRoom = roomNumber;
+        selectedRooms = [roomNumber];
 
         // 全選択状態をリセット
         resetAllSelections();
@@ -536,6 +659,11 @@
         document.querySelectorAll('.room-button-compact').forEach(btn => {
             btn.classList.remove('btn-primary');
             btn.classList.add('btn-outline-primary');
+        });
+
+        // 複数選択チェックボックスをリセット
+        document.querySelectorAll('.room-checkbox').forEach(chk => {
+            chk.checked = false;
         });
     }
 
@@ -566,6 +694,7 @@
 
     function clearRoomSelection() {
         selectedRoom = null;
+        selectedRooms = [];
         currentRankingData = null;
 
         // 選択状態をリセット
@@ -579,8 +708,6 @@
 
         // 表示をリセット
         showRankingSection('initial');
-
-
     }
 
     // ========================================
@@ -588,8 +715,6 @@
     // ========================================
     async function loadRankingForRoom(roomNumber, forceRefresh = false) {
         try {
-
-
             // 表示をリセット
             showRankingSection('loading');
 
@@ -608,7 +733,17 @@
             const clientTime = endTime - startTime;
 
             if (data.status === 'success') {
+                // Show daily quiz tab
+                const dailyQuizTab = document.getElementById('daily-quiz-tab');
+                if (dailyQuizTab) {
+                    dailyQuizTab.parentElement.style.display = 'block';
+                }
 
+                // Assign rank and room number
+                data.ranking_data.forEach((user, index) => {
+                    user.rank = index + 1;
+                    user.room_number = roomNumber;
+                });
 
                 currentRankingData = data.ranking_data;
                 displayRanking(data.ranking_data, data.statistics);
@@ -624,6 +759,94 @@
             console.error('❌ ランキング取得エラー:', error);
 
             // エラー表示
+            showRankingSection('error');
+            const errorMessage = document.getElementById('ranking-error-message');
+            if (errorMessage) {
+                errorMessage.textContent = error.message;
+            }
+        }
+    }
+
+    async function loadRankingForMultipleRooms(roomNumbers, forceRefresh = false) {
+        try {
+            showRankingSection('loading');
+
+            const startTime = performance.now();
+
+            // Hide "今日の10問" tab
+            const dailyQuizTab = document.getElementById('daily-quiz-tab');
+            if (dailyQuizTab) {
+                dailyQuizTab.parentElement.style.display = 'none';
+            }
+
+            // Switch to overall ranking if daily quiz is active
+            const activeTab = document.querySelector('#rankingTab .nav-link.active');
+            if (activeTab && activeTab.id === 'daily-quiz-tab') {
+                const overallTab = document.getElementById('overall-ranking-tab');
+                if (overallTab) {
+                    overallTab.click();
+                }
+            }
+
+            // Fetch ranking data for each room in parallel
+            const promises = roomNumbers.map(async (roomNumber) => {
+                let url = `/api/admin/room_ranking/${roomNumber}`;
+                if (forceRefresh) {
+                    url += '?refresh=true';
+                }
+                const response = await fetch(url);
+                const data = await response.json();
+                if (data.status !== 'success') {
+                    throw new Error(data.message || `部屋 ${roomNumber} のランキング取得に失敗しました`);
+                }
+                // Add room_number and student_id to each user record
+                return data.ranking_data.map(user => ({
+                    ...user,
+                    room_number: roomNumber
+                }));
+            });
+
+            const results = await Promise.all(promises);
+
+            // Flatten the array of arrays
+            let combinedRankingData = results.flat();
+
+            // Sort combined data by balance score (descending), then assign rank
+            combinedRankingData.sort((a, b) => {
+                const scoreA = a.balance_score || 0;
+                const scoreB = b.balance_score || 0;
+                return scoreB - scoreA;
+            });
+
+            combinedRankingData.forEach((user, index) => {
+                user.rank = index + 1;
+            });
+
+            currentRankingData = combinedRankingData;
+
+            // Calculate combined statistics
+            const totalUsers = combinedRankingData.length;
+            const totalAttempts = combinedRankingData.reduce((sum, user) => sum + (user.total_attempts || 0), 0);
+            const totalCorrect = combinedRankingData.reduce((sum, user) => sum + (user.total_correct || 0), 0);
+            const totalScores = combinedRankingData.map(user => user.balance_score || 0);
+
+            const statistics = {
+                total_users: totalUsers,
+                average_score: totalUsers > 0 ? (totalScores.reduce((sum, score) => sum + score, 0) / totalUsers) : 0,
+                max_score: totalScores.length > 0 ? Math.max(...totalScores) : 0,
+                total_attempts: totalAttempts,
+                total_correct: totalCorrect,
+                room_accuracy: totalAttempts > 0 ? (totalCorrect / totalAttempts * 100) : 0
+            };
+
+            const endTime = performance.now();
+            const clientTime = endTime - startTime;
+
+            displayRanking(combinedRankingData, statistics);
+            showRankingSection('table');
+
+        } catch (error) {
+            console.error('❌ 複数部屋ランキング取得エラー:', error);
             showRankingSection('error');
             const errorMessage = document.getElementById('ranking-error-message');
             if (errorMessage) {
@@ -691,16 +914,16 @@
             const row = document.createElement('tr');
 
             // 順位に応じてスタイルを適用
-            if (index === 0) {
+            const rank = user.rank || (index + 1);
+            if (rank === 1) {
                 row.classList.add('table-warning'); // 1位
-            } else if (index === 1) {
+            } else if (rank === 2) {
                 row.classList.add('table-secondary'); // 2位  
-            } else if (index === 2) {
+            } else if (rank === 3) {
                 row.classList.add('table-info'); // 3位
             }
 
             // 各値の安全な取得
-            const rank = index + 1;
             const displayUsername = currentNameDisplayMode === 'original' ? (user.original_username || user.username || 'Unknown') : (user.username || 'Unknown');
             const totalAttempts = user.total_attempts || 0;
             const totalCorrect = user.total_correct || 0;
@@ -713,11 +936,13 @@
             row.innerHTML = `
             <td class="sticky-col-1">
                 <span class="rank-badge">${rank}</span>
-                ${index === 0 ? '<i class="fas fa-crown text-warning ms-1"></i>' : ''}
-                ${index === 1 ? '<i class="fas fa-medal text-secondary ms-1"></i>' : ''}
-                ${index === 2 ? '<i class="fas fa-medal text-info ms-1"></i>' : ''}
+                ${rank === 1 ? '<i class="fas fa-crown text-warning ms-1"></i>' : ''}
+                ${rank === 2 ? '<i class="fas fa-medal text-secondary ms-1"></i>' : ''}
+                ${rank === 3 ? '<i class="fas fa-medal text-info ms-1"></i>' : ''}
             </td>
             <td class="sticky-col-2"><strong>${displayUsername}</strong></td>
+            <td>${user.room_number || '-'}</td>
+            <td>${user.student_id || '-'}</td>
             <td><span class="badge bg-primary">${totalAttempts}</span></td>
             <td><span class="badge bg-success">${totalCorrect}</span></td>
             <td>${accuracyRate}%</td>
@@ -752,7 +977,7 @@
             }
 
             const displayUsername = currentNameDisplayMode === 'original' ? (user.original_username || user.username || 'Unknown') : (user.username || 'Unknown');
-            
+
             row.innerHTML = `
             <td>${user.rank}位</td>
             <td><strong>${displayUsername}</strong></td>
@@ -832,8 +1057,10 @@
         const rows = tbody.querySelectorAll('tr');
 
         rows.forEach(row => {
-            const username = row.cells[1].textContent.toLowerCase();
-            const isMatch = username.includes(searchTerm);
+            const username = row.cells[1] ? row.cells[1].textContent.toLowerCase() : '';
+            const room = row.cells[2] ? row.cells[2].textContent.toLowerCase() : '';
+            const studentId = row.cells[3] ? row.cells[3].textContent.toLowerCase() : '';
+            const isMatch = username.includes(searchTerm) || room.includes(searchTerm) || studentId.includes(searchTerm);
             row.style.display = isMatch ? '' : 'none';
         });
     }
@@ -867,6 +1094,20 @@
                     return currentSortOrder === 'asc' ? attA - attB : attB - attA;
                 });
                 break;
+            case 'student_id':
+                sortedData.sort((a, b) => {
+                    const roomA = a.room_number || '';
+                    const roomB = b.room_number || '';
+                    if (roomA !== roomB) {
+                        return roomA.localeCompare(roomB, undefined, {numeric: true});
+                    }
+                    const idA = a.student_id || '';
+                    const idB = b.student_id || '';
+                    return currentSortOrder === 'asc' ? 
+                        idA.localeCompare(idB, undefined, {numeric: true}) : 
+                        idB.localeCompare(idA, undefined, {numeric: true});
+                });
+                break;
             default:
                 // デフォルトはスコア順（降順）
                 sortedData.sort((a, b) => {
@@ -877,6 +1118,7 @@
                 break;
         }
 
+        currentRankingData = sortedData;
         updateRankingTable(sortedData);
     }
 
@@ -895,7 +1137,7 @@
     function toggleNameDisplayMode() {
         const mode = document.querySelector('input[name="nameDisplayMode"]:checked').value;
         currentNameDisplayMode = mode;
-        
+
         // テーブルを再描画
         if (currentRankingData) {
             sortRankingTable();
@@ -940,16 +1182,19 @@
     }
 
     function refreshAllData() {
-
-
         // 部屋一覧を再取得
         loadRoomList();
 
         // 選択中の部屋があればランキングも更新
-        if (selectedRoom) {
+        if (selectedRooms && selectedRooms.length === 1) {
+            const roomNum = selectedRooms[0];
             setTimeout(() => {
-                loadRankingForRoom(selectedRoom, true);
-                loadDailyQuizInfo(selectedRoom); // ★ 今日の10問情報も更新
+                loadRankingForRoom(roomNum, true);
+                loadDailyQuizInfo(roomNum); // ★ 今日の10問情報も更新
+            }, 500);
+        } else if (selectedRooms && selectedRooms.length > 1) {
+            setTimeout(() => {
+                loadRankingForMultipleRooms(selectedRooms, true);
             }, 500);
         }
     }
@@ -959,22 +1204,24 @@
     }
 
     function exportRankingData() {
-        if (!currentRankingData || !selectedRoom) {
+        if (!currentRankingData || !selectedRooms || selectedRooms.length === 0) {
             alert('エクスポートするデータがありません。');
             return;
         }
 
-
-
         try {
             // CSVデータを作成
-            const csvHeader = '\uFEFF' + '順位,名前,最終ログイン,回答数,正解数,正答率,マスター数,総合スコア,網羅率\n';
+            const csvHeader = '\uFEFF' + '順位,部屋,出席番号,名前,最終ログイン,回答数,正解数,正答率,マスター数,総合スコア,網羅率\n';
             const csvRows = currentRankingData.map((user, index) => {
                 const lastLogin = formatLastLogin(user.last_login);
+                const displayUsername = currentNameDisplayMode === 'original' ? (user.original_username || user.username || 'Unknown') : (user.username || 'Unknown');
+                const rank = user.rank || (index + 1);
 
                 return [
-                    index + 1,
-                    `"${user.username || 'Unknown'}"`, // ダブルクォートで囲む
+                    rank,
+                    `"${user.room_number || ''}"`,
+                    `"${user.student_id || ''}"`,
+                    `"${displayUsername}"`, // ダブルクォートで囲む
                     `"${lastLogin}"`,
                     user.total_attempts || 0,
                     user.total_correct || 0,
@@ -992,15 +1239,20 @@
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;
-            link.download = `ranking_room_${selectedRoom}_${new Date().toISOString().split('T')[0]}.csv`;
+            
+            let filename = '';
+            if (selectedRooms.length === 1) {
+                filename = `ranking_room_${selectedRooms[0]}_${new Date().toISOString().split('T')[0]}.csv`;
+            } else {
+                filename = `ranking_combined_${selectedRooms.join('-')}_${new Date().toISOString().split('T')[0]}.csv`;
+            }
+            link.download = filename;
             link.style.display = 'none';
 
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
             URL.revokeObjectURL(url);
-
-
 
         } catch (error) {
             console.error('❌ CSVエクスポートエラー:', error);
@@ -2322,8 +2574,6 @@
     .ranking-table tbody tr td:nth-child(2) {
         background-color: white !important;
     }
-
-    /* admin_ranking.html の <style> タグの末尾に追加 */
 
     /* ========================================
    12. 「今日の10問」ランキング表示の修正

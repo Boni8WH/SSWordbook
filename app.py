@@ -7118,6 +7118,8 @@ def api_admin_room_ranking(room_number):
             user_data = {
                 'username': stats.user.username,
                 'original_username': stats.user.original_username if stats.user.original_username else stats.user.username,
+                'student_id': stats.user.student_id,
+                'room_number': room_number,
                 'total_attempts': stats.total_attempts,
                 'total_correct': stats.total_correct,
                 'accuracy_rate': round(stats.accuracy_rate, 1),
@@ -7302,6 +7304,8 @@ def admin_fallback_ranking_calculation(room_number, start_time):
             user_data = {
                 'username': user_obj.username,
                 'original_username': user_obj.original_username if user_obj.original_username else user_obj.username,
+                'student_id': user_obj.student_id,
+                'room_number': room_number,
                 'total_attempts': user_total_attempts,
                 'total_correct': user_total_correct,
                 'accuracy_rate': round((user_total_correct / user_total_attempts * 100), 1) if user_total_attempts > 0 else 0,
