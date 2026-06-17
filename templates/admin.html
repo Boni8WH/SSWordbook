@@ -1400,6 +1400,12 @@
                                                         title="名前を初期設定に戻します">
                                                         <i class="fas fa-id-badge"></i> 名前リセット
                                                     </button>
+                                                    <button type="button" class="btn btn-success btn-sm send-message-btn"
+                                                        data-user-id="{{ user.id }}"
+                                                        data-username="{{ user.username }}"
+                                                        title="個別にメッセージを送信します">
+                                                        <i class="fas fa-envelope"></i> メッセージ
+                                                    </button>
                                                 </div>
                                             </td>
                                         </tr>
@@ -10420,5 +10426,79 @@
                 document.body.removeChild(link);
             };
         })();
+
+        // 個別メッセージ送信機能
+        document.addEventListener('DOMContentLoaded', function() {
+            const sendMessageModalEl = document.getElementById('sendMessageModal');
+            document.body.appendChild(sendMessageModalEl); // モーダルをbody直下に移動（z-indexの問題回避）
+            const sendMessageModal = new bootstrap.Modal(sendMessageModalEl);
+            const sendMessageForm = document.getElementById('sendMessageForm');
+            const targetUserIdInput = document.getElementById('targetUserId');
+            const targetUserNameSpan = document.getElementById('targetUserName');
+
+            // DataTablesなどで動的に生成されたボタンにも対応するためイベントデリゲーションを使用
+            document.body.addEventListener('click', function(e) {
+                const btn = e.target.closest('.send-message-btn');
+                if (btn) {
+                    const userId = btn.getAttribute('data-user-id');
+                    const userName = btn.getAttribute('data-username');
+                    targetUserIdInput.value = userId;
+                    targetUserNameSpan.textContent = userName;
+                    sendMessageForm.reset();
+                    sendMessageModal.show();
+                }
+            });
+
+            sendMessageForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                const formData = new FormData(this);
+                
+                fetch('{{ url_for("admin_send_message") }}', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        alert('メッセージを送信しました。対象ユーザーが次回indexページを開いた際に表示されます。');
+                        sendMessageModal.hide();
+                    } else {
+                        alert('送信に失敗しました: ' + (data.message || '不明なエラー'));
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('通信エラーが発生しました。');
+                });
+            });
+        });
     </script>
+
+    <!-- 個別メッセージ送信モーダル -->
+    <div class="modal fade" id="sendMessageModal" tabindex="-1" aria-labelledby="sendMessageModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form id="sendMessageForm">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="sendMessageModalLabel">個別メッセージ送信</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>対象ユーザー: <strong id="targetUserName"></strong></p>
+                        <input type="hidden" name="user_id" id="targetUserId">
+                        <div class="mb-3">
+                            <label for="messageContent" class="form-label">メッセージ内容</label>
+                            <textarea class="form-control" id="messageContent" name="message" rows="3" required placeholder="例: テストお疲れ様でした！次も頑張りましょう。"></textarea>
+                            <small class="text-muted">※送信したメッセージは、対象ユーザーの画面に一度だけ横スクロールで表示されます。</small>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+                        <button type="submit" class="btn btn-primary"><i class="fas fa-paper-plane"></i> 送信する</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     {% endblock %}

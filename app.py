@@ -482,6 +482,9 @@ class User(db.Model):
     # AI採点の一時答案保存（混雑時用）
     temp_answer_data = db.Column(db.Text, nullable=True)
 
+    # ユーザー個別メッセージ（一度だけ画面に流れるテキスト）
+    pending_message = db.Column(db.Text, nullable=True)
+
     @property
     def is_authenticated(self):
         return True
@@ -4058,6 +4061,20 @@ def create_user_stats_table_simple():
         print(f"❌ テーブル作成エラー: {e}")
         return False
 
+def _add_user_pending_message_column_safe():
+    """Userテーブルにpending_messageカラムを追加（安全版）"""
+    try:
+        with db.engine.connect() as conn:
+            inspector = inspect(db.engine)
+            if 'user' in inspector.get_table_names():
+                columns = [col['name'] for col in inspector.get_columns('user')]
+                if 'pending_message' not in columns:
+                    print("🔄 User: pending_messageを追加")
+                    conn.execute(text('ALTER TABLE "user" ADD COLUMN pending_message TEXT'))
+                conn.commit()
+    except Exception as e:
+        print(f"⚠️ User migration warning: {e}")
+
 def create_tables_and_admin_user():
     """データベース初期化関数（UserStats対応版）"""
     try:
@@ -4102,9 +4119,10 @@ def create_tables_and_admin_user():
             _add_equipped_title_column_to_user() # 称号カラム
             _add_rpg_intro_seen_column_to_user() # RPGイントロ表示フラグ（管理者ユーザークエリ前に実行必須）
             _add_announcement_viewed_column_to_user() # お知らせ閲覧日時カラム
-            _create_user_announcement_reads_table() #  お知らせ個別既読テーブル作成
-            _create_rpg_rematch_history_table() #  再戦履歴テーブル作成
-            _create_map_quiz_log_table()       #  地図クイズログテーブル作成
+            _create_user_announcement_reads_table() # お知らせ個別既読テーブル作成
+            _create_rpg_rematch_history_table() # 再戦履歴テーブル作成
+            _create_map_quiz_log_table()       # 地図クイズログテーブル作成
+            _add_user_pending_message_column_safe() # pending_messageカラム追加
             
             # 管理者ユーザー確認/作成
             try:
@@ -5715,7 +5733,8 @@ def index():
         # ★重要な修正：JavaScriptで使う変数名を変更
         return render_template('index.html',
                                 chapter_data=sorted_all_chapter_unit_status,
-                                vocab_data=vocab_data)
+                                vocab_data=vocab_data,
+                                pending_message=current_user.pending_message)
     
     except Exception as e:
         print(f"Error in index route: {e}")
@@ -24399,6 +24418,40 @@ def admin_chrono_download_csv():
         
     except Exception as e:
         return f"Error creating CSV: {e}", 500
+
+@app.route('/admin/send_message', methods=['POST'])
+@admin_required
+def admin_send_message():
+    try:
+        user_id = request.form.get('user_id')
+        message = request.form.get('message')
+        if not user_id or not message:
+            return jsonify({'status': 'error', 'message': 'Invalid parameters'}), 400
+        
+        user = User.query.get(user_id)
+        if not user:
+            return jsonify({'status': 'error', 'message': 'User not found'}), 404
+            
+        user.pending_message = message
+        db.session.commit()
+        return jsonify({'status': 'success', 'message': 'Message sent successfully'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/clear_message', methods=['POST'])
+def api_clear_message():
+    try:
+        if 'user_id' not in session:
+            return jsonify({'status': 'error', 'message': 'Unauthorized'}), 401
+        current_user = User.query.get(session['user_id'])
+        if current_user:
+            current_user.pending_message = None
+            db.session.commit()
+        return jsonify({'status': 'success'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 check_and_create_correction_tables()
 

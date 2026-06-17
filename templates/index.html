@@ -5,6 +5,41 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="stylesheet">
 <style>
+    /* ニコニコ風メッセージアニメーション */
+    .nico-message-container {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        pointer-events: none; /* クリックを透過 */
+        z-index: 9999;
+        overflow: hidden;
+    }
+
+    .nico-message-text {
+        position: absolute;
+        white-space: nowrap;
+        font-size: 3.5rem; /* 大きめのフォントサイズ */
+        font-weight: 900;
+        color: #ffffff;
+        text-shadow: 
+            2px 2px 0 #000, 
+            -2px -2px 0 #000, 
+            2px -2px 0 #000, 
+            -2px 2px 0 #000,
+            0 4px 10px rgba(0,0,0,0.6); /* 視認性を高める黒の縁取りとドロップシャドウ */
+        animation-name: nicoScroll;
+        animation-timing-function: linear;
+        animation-fill-mode: forwards;
+        transform: translateX(100vw);
+    }
+
+    @keyframes nicoScroll {
+        0% { transform: translateX(100vw); }
+        100% { transform: translateX(-150%); /* 完全に画面外に出るように長めに */ }
+    }
+
     /* 共通タイポグラフィ＆高級感 */
     .premium-title {
         color: #1a1a2e;
@@ -718,6 +753,34 @@
 {% endblock %}
 
 {% block content %}
+{% if pending_message %}
+<div id="pendingMessageContainer" class="nico-message-container">
+    <div class="nico-message-text" id="nicoMessageText">{{ pending_message }}</div>
+</div>
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const msgText = document.getElementById('nicoMessageText');
+        if (msgText) {
+            // 文字数に応じて流れる速度を調整 (基本8秒 + 1文字につき0.2秒)
+            const textLen = msgText.textContent.length;
+            const duration = Math.max(8, textLen * 0.2 + 6); 
+            msgText.style.animationDuration = duration + 's';
+            
+            // 高さのランダム化 (画面上部 15% 〜 40% の間)
+            const topPos = Math.floor(Math.random() * 25) + 15;
+            msgText.style.top = topPos + '%';
+
+            // メッセージを既読（消去）にする
+            fetch('{{ url_for("api_clear_message") }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            }).catch(e => console.error("Error clearing message:", e));
+        }
+    });
+</script>
+{% endif %}
 <section class="selection-area">
     <!-- RPG Trigger Banner -->
     {% if feature_rpg %}
