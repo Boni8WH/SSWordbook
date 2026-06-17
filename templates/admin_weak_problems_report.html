@@ -431,16 +431,17 @@
             color: #1a365d !important;
             border-bottom: 2px solid #1a365d !important;
             border-top: 1px solid #cbd5e0 !important;
-            padding: 10px 12px !important;
-            font-size: 10pt !important;
+            padding: 4px 6px !important;
+            font-size: 8.5pt !important;
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
         }
 
         .table td {
-            padding: 10px 12px !important;
+            padding: 4px 6px !important;
             border-bottom: 1px solid #e2e8f0 !important;
-            font-size: 10pt !important;
+            font-size: 8.5pt !important;
+            line-height: 1.2 !important;
         }
 
         .table tr {
@@ -695,9 +696,9 @@
             return `
                 <tr>
                     <td class="text-center fw-bold rank-cell ${rankClass}">${index + 1}</td>
-                    <td>${escapeHtml(p.question)}</td>
-                    <td><strong class="text-dark">${escapeHtml(p.answer)}</strong></td>
-                    <td>
+                    <td class="text-start">${escapeHtml(p.question)}</td>
+                    <td class="text-start"><strong class="text-dark">${escapeHtml(p.answer)}</strong></td>
+                    <td class="text-center">
                         <div class="accuracy-badge-container">
                             <span class="accuracy-text ${rangeClass}">${accuracy.toFixed(1)}%</span>
                             <div class="progress-bar-thin print-hide">
@@ -715,11 +716,11 @@
                 <table class="table table-striped table-hover align-middle">
                     <thead>
                         <tr>
-                            <th style="width: 70px;" class="text-center">順位</th>
-                            <th>問題（質問内容）</th>
-                            <th style="width: 250px;">正解の解答</th>
-                            <th style="width: 180px;">クラス平均正答率</th>
-                            <th style="width: 140px;" class="text-center">正解 / 回答回数</th>
+                            <th style="width: 50px;" class="text-center">順位</th>
+                            <th class="text-start">問題</th>
+                            <th style="width: 200px;" class="text-start">正解</th>
+                            <th style="width: 120px;" class="text-center">クラス平均正答率</th>
+                            <th style="width: 100px;" class="text-center">正解 / 解答数</th>
                         </tr>
                     </thead>
                     <tbody>

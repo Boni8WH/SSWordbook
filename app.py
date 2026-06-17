@@ -24780,8 +24780,8 @@ def api_admin_weak_problems_aggregated():
         if not target_rooms:
             return jsonify(status='error', message='対象の部屋が選択されていないか、権限がありません。'), 400
             
-        room_data = {}
-        global_stats = {}
+        room_word_data = {}
+        common_problem_ids = None
         
         for room_number in target_rooms:
             try:
@@ -24797,6 +24797,23 @@ def api_admin_weak_problems_aggregated():
                 problem_id = get_problem_id(word)
                 valid_problems[problem_id] = word
                 
+            room_word_data[room_number] = valid_problems
+            if common_problem_ids is None:
+                common_problem_ids = set(valid_problems.keys())
+            else:
+                common_problem_ids.intersection_update(valid_problems.keys())
+                
+        if common_problem_ids is None:
+            common_problem_ids = set()
+
+        room_data = {}
+        global_stats = {}
+        
+        for room_number in target_rooms:
+            if room_number not in room_word_data:
+                continue
+                
+            valid_problems = room_word_data[room_number]
             room_users = User.query.filter_by(room_number=room_number).filter(User.username != 'admin').all()
             
             problem_stats = {}
@@ -24811,11 +24828,12 @@ def api_admin_weak_problems_aggregated():
                         problem_stats[problem_id]['incorrect'] += stats.get('incorrect_attempts', 0)
                         problem_stats[problem_id]['total'] += (stats.get('correct_attempts', 0) + stats.get('incorrect_attempts', 0))
                         
-                        if problem_id not in global_stats:
-                            global_stats[problem_id] = {'correct': 0, 'incorrect': 0, 'total': 0, 'word': valid_problems[problem_id]}
-                        global_stats[problem_id]['correct'] += stats.get('correct_attempts', 0)
-                        global_stats[problem_id]['incorrect'] += stats.get('incorrect_attempts', 0)
-                        global_stats[problem_id]['total'] += (stats.get('correct_attempts', 0) + stats.get('incorrect_attempts', 0))
+                        if problem_id in common_problem_ids:
+                            if problem_id not in global_stats:
+                                global_stats[problem_id] = {'correct': 0, 'incorrect': 0, 'total': 0, 'word': valid_problems[problem_id]}
+                            global_stats[problem_id]['correct'] += stats.get('correct_attempts', 0)
+                            global_stats[problem_id]['incorrect'] += stats.get('incorrect_attempts', 0)
+                            global_stats[problem_id]['total'] += (stats.get('correct_attempts', 0) + stats.get('incorrect_attempts', 0))
             
             room_results = []
             for problem_id, stats in problem_stats.items():
