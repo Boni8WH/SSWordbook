@@ -217,25 +217,10 @@
                                     </div>
                                     <div class="col-md-8">
                                         <div class="d-flex gap-2 justify-content-md-end flex-wrap">
-                                            <div class="btn-group flex-shrink-0" role="group">
-                                                <input type="radio" class="btn-check" name="nameDisplayMode"
-                                                    id="nameCurrentMode" value="current" checked
-                                                    onchange="toggleNameDisplayMode()">
-                                                <label class="btn btn-outline-secondary text-nowrap"
-                                                    for="nameCurrentMode" title="現在の名前"><i class="fas fa-user"></i>
-                                                    現在名</label>
-                                                <input type="radio" class="btn-check" name="nameDisplayMode"
-                                                    id="nameOriginalMode" value="original"
-                                                    onchange="toggleNameDisplayMode()">
-                                                <label class="btn btn-outline-secondary text-nowrap"
-                                                    for="nameOriginalMode" title="初期登録名"><i class="fas fa-id-card"></i>
-                                                    初期名</label>
-                                            </div>
                                             <select id="ranking-sort" class="form-select" style="max-width: 150px;">
                                                 <option value="score" selected>スコア順</option>
                                                 <option value="accuracy">正答率順</option>
                                                 <option value="attempts">回答数順</option>
-                                                <option value="student_id">出席番号順</option>
                                                 <option value="last_action">最終アクション順</option>
                                             </select>
                                             <button class="btn btn-outline-secondary flex-shrink-0"
@@ -252,9 +237,9 @@
                                         <thead class="table-dark">
                                             <tr>
                                                 <th class="sticky-col-1">順位</th>
-                                                <th class="sticky-col-2">名前</th>
+                                                <th class="sticky-col-2">現在名</th>
+                                                <th>初期名</th>
                                                 <th>部屋</th>
-                                                <th>出席番号</th>
                                                 <th>回答数</th>
                                                 <th>正解数</th>
                                                 <th>正答率</th>
@@ -304,8 +289,8 @@
                                         <thead class="table-dark">
                                             <tr>
                                                 <th>順位</th>
-                                                <th>名前</th>
-                                                <th>出席番号</th>
+                                                <th>現在名</th>
+                                                <th>初期名</th>
                                                 <th>累計スコア</th>
                                             </tr>
                                         </thead>
@@ -327,8 +312,8 @@
                                         <thead class="table-dark">
                                             <tr>
                                                 <th>順位</th>
-                                                <th>名前</th>
-                                                <th>出席番号</th>
+                                                <th>現在名</th>
+                                                <th>初期名</th>
                                                 <th>スコア</th>
                                                 <th>タイム</th>
                                             </tr>
@@ -346,8 +331,8 @@
                                         <thead class="table-dark">
                                             <tr>
                                                 <th>順位</th>
-                                                <th>名前</th>
-                                                <th>出席番号</th>
+                                                <th>現在名</th>
+                                                <th>初期名</th>
                                                 <th>取り組み回数</th>
                                             </tr>
                                         </thead>
@@ -387,7 +372,6 @@
     let currentViewMode = 'dropdown';
     let currentSortOrder = 'desc';
     let allRooms = [];
-    let currentNameDisplayMode = 'current';
     let dailyRankingData = [];
     let monthlyCumulativeData = [];
     let monthlyAttemptsDataList = [];
@@ -930,7 +914,8 @@
             }
 
             // 各値の安全な取得
-            const displayUsername = currentNameDisplayMode === 'original' ? (user.original_username || user.username || 'Unknown') : (user.username || 'Unknown');
+            const currentName = user.username || 'Unknown';
+            const originalName = user.original_username || currentName;
             const totalAttempts = user.total_attempts || 0;
             const totalCorrect = user.total_correct || 0;
             const accuracyRate = (user.accuracy_rate || 0).toFixed(1);
@@ -946,9 +931,9 @@
                 ${rank === 2 ? '<i class="fas fa-medal text-secondary ms-1"></i>' : ''}
                 ${rank === 3 ? '<i class="fas fa-medal text-info ms-1"></i>' : ''}
             </td>
-            <td class="sticky-col-2"><strong>${displayUsername}</strong></td>
+            <td class="sticky-col-2"><strong>${currentName}</strong></td>
+            <td><span class="text-muted">${originalName}</span></td>
             <td>${user.room_number || '-'}</td>
-            <td>${user.student_id || '-'}</td>
             <td><span class="badge bg-primary">${totalAttempts}</span></td>
             <td><span class="badge bg-success">${totalCorrect}</span></td>
             <td>${accuracyRate}%</td>
@@ -983,12 +968,13 @@
                 row.classList.add('table-info');
             }
 
-            const displayUsername = currentNameDisplayMode === 'original' ? (user.original_username || user.username || 'Unknown') : (user.username || 'Unknown');
+            const currentName = user.username || 'Unknown';
+            const originalName = user.original_username || currentName;
 
             row.innerHTML = `
             <td>${user.rank}位</td>
-            <td><strong>${displayUsername}</strong></td>
-            <td>${user.student_id}</td>
+            <td><strong>${currentName}</strong></td>
+            <td><span class="text-muted">${originalName}</span></td>
             <td><span class="badge bg-info">${user.total_score}</span></td>
         `;
             tbody.appendChild(row);
@@ -1174,13 +1160,22 @@
         if (!loginTime) return 'なし';
 
         try {
-            const date = new Date(loginTime);
+            let timeStr = loginTime;
+            if (typeof timeStr === 'string' && !timeStr.endsWith('Z') && !timeStr.includes('+')) {
+                if (timeStr.match(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(\.\d+)?$/)) {
+                    timeStr = timeStr.replace(' ', 'T') + 'Z';
+                } else if (timeStr.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?$/)) {
+                    timeStr = timeStr + 'Z';
+                }
+            }
+            const date = new Date(timeStr);
             return date.toLocaleString('ja-JP', {
                 year: 'numeric',
                 month: '2-digit',
                 day: '2-digit',
                 hour: '2-digit',
-                minute: '2-digit'
+                minute: '2-digit',
+                timeZone: 'Asia/Tokyo'
             });
         } catch (error) {
             console.warn('日時フォーマットエラー:', error);
@@ -1225,17 +1220,18 @@
 
         try {
             // CSVデータを作成
-            const csvHeader = '\uFEFF' + '順位,部屋,出席番号,名前,最終ログイン,回答数,正解数,正答率,マスター数,総合スコア,網羅率\n';
+            const csvHeader = '\uFEFF' + '順位,部屋,現在名,初期名,最終ログイン,回答数,正解数,正答率,マスター数,総合スコア,網羅率\n';
             const csvRows = currentRankingData.map((user, index) => {
                 const lastLogin = formatLastLogin(user.last_login);
-                const displayUsername = currentNameDisplayMode === 'original' ? (user.original_username || user.username || 'Unknown') : (user.username || 'Unknown');
+                const currentName = user.username || 'Unknown';
+                const originalName = user.original_username || currentName;
                 const rank = user.rank || (index + 1);
 
                 return [
                     rank,
                     `"${user.room_number || ''}"`,
-                    `"${user.student_id || ''}"`,
-                    `"${displayUsername}"`, // ダブルクォートで囲む
+                    `"${currentName}"`,
+                    `"${originalName}"`,
                     `"${lastLogin}"`,
                     user.total_attempts || 0,
                     user.total_correct || 0,
@@ -1399,12 +1395,13 @@
                 row.classList.add('table-info'); // 3位
             }
 
-            const displayUsername = currentNameDisplayMode === 'original' ? (user.original_username || user.username || 'Unknown') : (user.username || 'Unknown');
+            const currentName = user.username || 'Unknown';
+            const originalName = user.original_username || currentName;
 
             row.innerHTML = `
             <td>${user.rank}位</td>
-            <td><strong>${displayUsername}</strong></td>
-            <td>${user.student_id}</td>
+            <td><strong>${currentName}</strong></td>
+            <td><span class="text-muted">${originalName}</span></td>
             <td><span class="badge bg-success">${user.score} / 10</span></td>
             <td>${user.time}</td>
         `;
@@ -1438,12 +1435,13 @@
                 row.classList.add('table-info'); // 3位
             }
 
-            const displayUsername = currentNameDisplayMode === 'original' ? (user.original_username || user.username || 'Unknown') : (user.username || 'Unknown');
+            const currentName = user.username || 'Unknown';
+            const originalName = user.original_username || currentName;
 
             row.innerHTML = `
             <td>${rank}位</td>
-            <td><strong>${displayUsername}</strong></td>
-            <td>${user.student_id}</td>
+            <td><strong>${currentName}</strong></td>
+            <td><span class="text-muted">${originalName}</span></td>
             <td><span class="badge bg-primary">${user.attempts_count}回</span></td>
         `;
             tbody.appendChild(row);
