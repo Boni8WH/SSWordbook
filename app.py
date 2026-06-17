@@ -7131,6 +7131,7 @@ def api_admin_room_ranking(room_number):
                 'reliability_score': round(stats.reliability_score, 1),
                 'activity_score': round(stats.activity_score, 1),
                 'last_login': stats.user.last_login.isoformat() if stats.user.last_login else None,
+                'last_updated': stats.last_updated.isoformat() if stats.last_updated else None,
                 'incorrect_count': len(stats.user.get_incorrect_words()) if stats.user else 0
             }
             
@@ -7316,7 +7317,8 @@ def admin_fallback_ranking_calculation(room_number, start_time):
                 'mastery_score': round(mastery_score, 1),
                 'reliability_score': round(reliability_score, 1),
                 'activity_score': round(activity_score, 1),
-                'last_login': user_obj.last_login.isoformat() if user_obj.last_login else None
+                'last_login': user_obj.last_login.isoformat() if user_obj.last_login else None,
+                'last_updated': user_obj.stats.last_updated.isoformat() if hasattr(user_obj, 'stats') and user_obj.stats and user_obj.stats.last_updated else None
             }
 
             ranking_data.append(user_data)
@@ -11542,6 +11544,32 @@ def admin_reset_intro_flag(user_id):
         db.session.rollback()
         flash(f'フラグリセット中にエラーが発生しました: {str(e)}', 'danger')
         return redirect(url_for('admin_page'))
+
+@app.route('/admin/reset_user_name/<int:user_id>', methods=['POST'])
+def admin_reset_user_name(user_id):
+    """ユーザーの名前を初期設定（original_username）にリセットする"""
+    try:
+        if not session.get('admin_logged_in'):
+            flash('管理者権限が必要です。', 'danger')
+            return redirect(url_for('login_page'))
+
+        user = User.query.get(user_id)
+        if not user:
+            flash(f'ユーザーID {user_id} が見つかりません。', 'danger')
+            return redirect(url_for('admin_page'))
+
+        old_name = user.username
+        user.username = user.original_username
+        user.username_changed_at = datetime.now(JST)
+        db.session.commit()
+        
+        flash(f'ユーザー {old_name} の名前を初期設定（{user.original_username}）にリセットしました。', 'success')
+    except Exception as e:
+        print(f"Error resetting user name: {e}")
+        db.session.rollback()
+        flash(f'名前のリセット中にエラーが発生しました: {e}', 'danger')
+        
+    return redirect(url_for('admin_page') + '#section-user-management')
 
 @app.route('/admin/reset_user_password/<int:user_id>', methods=['POST'])
 def admin_reset_user_password(user_id):

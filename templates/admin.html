@@ -1394,6 +1394,12 @@
                                                         data-username="{{ user.username }}">
                                                         <i class="fas fa-key"></i> PWリセット
                                                     </button>
+                                                    <button type="button" class="btn btn-dark btn-sm reset-name-btn"
+                                                        data-user-id="{{ user.id }}"
+                                                        data-username="{{ user.username }}"
+                                                        title="名前を初期設定に戻します">
+                                                        <i class="fas fa-id-badge"></i> 名前リセット
+                                                    </button>
                                                 </div>
                                             </td>
                                         </tr>
@@ -4315,6 +4321,23 @@
                             input.value = newPassword;
                             
                             form.appendChild(input);
+                            document.body.appendChild(form);
+                            form.submit();
+                        }
+                }
+
+                // 名前リセット
+                if (event.target.closest('.reset-name-btn')) {
+                    event.preventDefault();
+                    const button = event.target.closest('.reset-name-btn');
+                    const userId = button.getAttribute('data-user-id');
+                    const username = button.getAttribute('data-username');
+                    
+                    if (userId && username) {
+                        if (confirm(`ユーザー「${username}」の名前を初期設定にリセットしますか？\n(公序良俗に反する名前の場合などに使用します)`)) {
+                            const form = document.createElement('form');
+                            form.method = 'POST';
+                            form.action = `/admin/reset_user_name/${userId}`;
                             document.body.appendChild(form);
                             form.submit();
                         }

@@ -32,7 +32,8 @@
             </div>
             <div class="card-body">
                 <div class="form-check form-switch mb-3">
-                    <input class="form-check-input" type="checkbox" id="multi-room-toggle" onchange="toggleMultiRoomMode()">
+                    <input class="form-check-input" type="checkbox" id="multi-room-toggle"
+                        onchange="toggleMultiRoomMode()">
                     <label class="form-check-label fw-bold text-primary" for="multi-room-toggle">
                         <i class="fas fa-cubes"></i> 複数の部屋を選択して一括表示・エクスポート
                     </label>
@@ -79,14 +80,17 @@
                     <div class="mb-3">
                         <label class="form-label d-block fw-bold"><i class="fas fa-check-square"></i> 対象の部屋を選択</label>
                         <div class="btn-group mb-2" role="group">
-                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="selectAllRooms(true)">
+                            <button type="button" class="btn btn-outline-secondary btn-sm"
+                                onclick="selectAllRooms(true)">
                                 <i class="fas fa-check-double"></i> 全て選択
                             </button>
-                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="selectAllRooms(false)">
+                            <button type="button" class="btn btn-outline-secondary btn-sm"
+                                onclick="selectAllRooms(false)">
                                 <i class="fas fa-eraser"></i> 選択解除
                             </button>
                         </div>
-                        <div class="rooms-checkbox-grid d-flex flex-wrap gap-3 p-3 border rounded bg-light mb-3" id="rooms-checkboxes">
+                        <div class="rooms-checkbox-grid d-flex flex-wrap gap-3 p-3 border rounded bg-light mb-3"
+                            id="rooms-checkboxes">
                             <!-- Checkboxes dynamically populated -->
                         </div>
                         <button class="btn btn-primary" onclick="selectMultipleRooms()">
@@ -232,6 +236,7 @@
                                                 <option value="accuracy">正答率順</option>
                                                 <option value="attempts">回答数順</option>
                                                 <option value="student_id">出席番号順</option>
+                                                <option value="last_action">最終アクション順</option>
                                             </select>
                                             <button class="btn btn-outline-secondary flex-shrink-0"
                                                 onclick="toggleSortOrder()">
@@ -257,6 +262,7 @@
                                                 <th>総合スコア</th>
                                                 <th>網羅率</th>
                                                 <th>苦手問題</th>
+                                                <th>最終アクション</th>
                                             </tr>
                                         </thead>
                                         <tbody id="ranking-table-body">
@@ -950,6 +956,7 @@
             <td><strong class="text-primary">${balanceScore}</strong></td>
             <td>${coverageRate}%</td>
             <td><span class="badge bg-warning">${incorrectCount}</span></td>
+            <td>${formatLastLogin(user.last_updated || user.last_login)}</td>
         `;
 
             tbody.appendChild(row);
@@ -1099,13 +1106,20 @@
                     const roomA = a.room_number || '';
                     const roomB = b.room_number || '';
                     if (roomA !== roomB) {
-                        return roomA.localeCompare(roomB, undefined, {numeric: true});
+                        return roomA.localeCompare(roomB, undefined, { numeric: true });
                     }
                     const idA = a.student_id || '';
                     const idB = b.student_id || '';
-                    return currentSortOrder === 'asc' ? 
-                        idA.localeCompare(idB, undefined, {numeric: true}) : 
-                        idB.localeCompare(idA, undefined, {numeric: true});
+                    return currentSortOrder === 'asc' ?
+                        idA.localeCompare(idB, undefined, { numeric: true }) :
+                        idB.localeCompare(idA, undefined, { numeric: true });
+                });
+                break;
+            case 'last_action':
+                sortedData.sort((a, b) => {
+                    const timeA = new Date(a.last_updated || a.last_login || 0).getTime();
+                    const timeB = new Date(b.last_updated || b.last_login || 0).getTime();
+                    return currentSortOrder === 'asc' ? timeA - timeB : timeB - timeA;
                 });
                 break;
             default:
@@ -1239,7 +1253,7 @@
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;
-            
+
             let filename = '';
             if (selectedRooms.length === 1) {
                 filename = `ranking_room_${selectedRooms[0]}_${new Date().toISOString().split('T')[0]}.csv`;
@@ -1609,6 +1623,10 @@
         width: 100%;
         max-width: 100%;
         box-sizing: border-box;
+        position: sticky;
+        top: 0;
+        z-index: 1020;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     }
 
     .table-hover tbody tr:hover {
@@ -1623,7 +1641,7 @@
         color: white;
         white-space: nowrap;
         position: sticky;
-        top: 0;
+        top: 90px;
         z-index: 10;
     }
 
