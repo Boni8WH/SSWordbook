@@ -101,7 +101,7 @@
         color: #2d3748;
     }
 
-    .room-checkbox-btn:checked + .room-checkbox-label {
+    .room-checkbox-btn:checked+.room-checkbox-label {
         background: linear-gradient(135deg, #3182ce 0%, #2b6cb0 100%);
         color: #ffffff;
         border-color: transparent;
@@ -362,13 +362,13 @@
         }
 
         /* Hide all web components */
-        .print-hide, 
-        .controls-panel, 
-        .report-header-card, 
-        nav, 
-        .navbar, 
-        footer, 
-        .btn, 
+        .print-hide,
+        .controls-panel,
+        .report-header-card,
+        nav,
+        .navbar,
+        footer,
+        .btn,
         #sidebar {
             display: none !important;
         }
@@ -482,7 +482,7 @@
         <h1>学年・クラス別 苦手問題分析レポート</h1>
         <div class="print-meta-grid">
             <div>出力日時: <span id="printDateSpan"></span></div>
-            <div>学習進捗管理システム (SSWordbook)</div>
+            <div>{{ app_name }}</div>
         </div>
     </div>
 
@@ -505,13 +505,14 @@
     <!-- Controls Card -->
     <div class="controls-panel print-hide">
         <h5><i class="fas fa-filter"></i>レポート作成条件</h5>
-        
+
         <div class="rooms-selector-container">
             <label class="form-label fw-bold mb-1">集計対象のクラス（学習ルーム）を選択:</label>
             <div class="rooms-selector">
                 {% for room in available_rooms %}
                 <div>
-                    <input class="room-checkbox-btn room-checkbox" type="checkbox" value="{{ room }}" id="room_{{ room }}" checked>
+                    <input class="room-checkbox-btn room-checkbox" type="checkbox" value="{{ room }}"
+                        id="room_{{ room }}" checked>
                     <label class="room-checkbox-label" for="room_{{ room }}">
                         <i class="fas fa-door-open me-1 small"></i>{{ room }}
                     </label>
@@ -565,13 +566,13 @@
         const dateSpan = document.getElementById('printDateSpan');
         if (dateSpan) {
             const now = new Date();
-            const dateStr = now.getFullYear() + '年' + (now.getMonth() + 1) + '月' + now.getDate() + '日 ' + 
-                            String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+            const dateStr = now.getFullYear() + '年' + (now.getMonth() + 1) + '月' + now.getDate() + '日 ' +
+                String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
             dateSpan.textContent = dateStr;
         }
 
         // Trigger initial load if room checkbox exists
-        if(document.querySelectorAll('.room-checkbox').length > 0) {
+        if (document.querySelectorAll('.room-checkbox').length > 0) {
             generateReport();
         }
     });
@@ -731,11 +732,11 @@
 
     function escapeHtml(unsafe) {
         return (unsafe || '').toString()
-             .replace(/&/g, "&amp;")
-             .replace(/</g, "&lt;")
-             .replace(/>/g, "&gt;")
-             .replace(/"/g, "&quot;")
-             .replace(/'/g, "&#039;");
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
     }
 </script>
 {% endblock %}
