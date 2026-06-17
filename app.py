@@ -24731,3 +24731,151 @@ if __name__ == '__main__':
         logger.error(f"ðŸ’¥ èµ·å‹•å¤±æ•—: {e}")
         import traceback
         traceback.print_exc()
+@app.route('/admin/weak_problems_report')
+def admin_weak_problems_report():
+    if not session.get('admin_logged_in') and not session.get('manager_logged_in'):
+        flash('Œ ŒÀ‚ª‚ ‚è‚Ü‚¹‚ñB', 'danger')
+        return redirect(url_for('login_page'))
+        
+    is_super_admin = session.get('admin_logged_in')
+    is_manager = session.get('manager_logged_in')
+    
+    if is_manager and not is_super_admin:
+        auth_rooms = session.get('manager_auth_rooms', [])
+        available_rooms = auth_rooms
+    else:
+        rooms = db.session.query(User.room_number).distinct().all()
+        available_rooms = [r[0] for r in rooms if r[0]]
+        
+    available_rooms.sort()
+    
+    context = get_template_context()
+    context.update({
+        'available_rooms': available_rooms
+    })
+    return render_template('admin_weak_problems_report.html', **context)
+
+@app.route('/api/admin/weak_problems_aggregated', methods=['POST'])
+def api_admin_weak_problems_aggregated():
+    try:
+        if not session.get('admin_logged_in') and not session.get('manager_logged_in'):
+            return jsonify(status='error', message='Œ ŒÀ‚ª‚ ‚è‚Ü‚¹‚ñB'), 401
+            
+        data = request.get_json()
+        target_rooms = data.get('rooms', [])
+        limit = data.get('limit', 20)
+        try:
+            limit = int(limit)
+        except ValueError:
+            limit = 20
+            
+        is_super_admin = session.get('admin_logged_in')
+        is_manager = session.get('manager_logged_in')
+        
+        if is_manager and not is_super_admin:
+            auth_rooms = session.get('manager_auth_rooms', [])
+            target_rooms = [r for r in target_rooms if r in auth_rooms]
+            
+        if not target_rooms:
+            return jsonify(status='error', message='‘ÎÛ‚Ì•”‰®‚ª‘I‘ð‚³‚ê‚Ä‚¢‚È‚¢‚©AŒ ŒÀ‚ª‚ ‚è‚Ü‚¹‚ñB'), 400
+            
+        room_data = {}
+        global_stats = {}
+        
+        for room_number in target_rooms:
+            try:
+                word_data = load_word_data_for_room(room_number)
+            except Exception as e:
+                print(f"Error loading word data for {room_number}: {e}")
+                continue
+                
+            valid_problems = {}
+            for word in word_data:
+                if str(word.get('number', '')).upper() == 'Z':
+                    continue
+                problem_id = get_problem_id(word)
+                valid_problems[problem_id] = word
+                
+            room_users = User.query.filter_by(room_number=room_number).filter(User.username != 'admin').all()
+            
+            problem_stats = {}
+            
+            for user in room_users:
+                history = user.get_problem_history()
+                for problem_id, stats in history.items():
+                    if problem_id in valid_problems:
+                        if problem_id not in problem_stats:
+                            problem_stats[problem_id] = {'correct': 0, 'incorrect': 0, 'total': 0, 'word': valid_problems[problem_id]}
+                        problem_stats[problem_id]['correct'] += stats.get('correct_attempts', 0)
+                        problem_stats[problem_id]['incorrect'] += stats.get('incorrect_attempts', 0)
+                        problem_stats[problem_id]['total'] += (stats.get('correct_attempts', 0) + stats.get('incorrect_attempts', 0))
+                        
+                        if problem_id not in global_stats:
+                            global_stats[problem_id] = {'correct': 0, 'incorrect': 0, 'total': 0, 'word': valid_problems[problem_id]}
+                        global_stats[problem_id]['correct'] += stats.get('correct_attempts', 0)
+                        global_stats[problem_id]['incorrect'] += stats.get('incorrect_attempts', 0)
+                        global_stats[problem_id]['total'] += (stats.get('correct_attempts', 0) + stats.get('incorrect_attempts', 0))
+            
+            room_results = []
+            for problem_id, stats in problem_stats.items():
+                total = stats['total']
+                if total >= 5:
+                    correct = stats['correct']
+                    accuracy = correct / total
+                    if accuracy == 0 or accuracy == 1:
+                        is_reliable = True
+                    else:
+                        margin_of_error = 1.96 * math.sqrt((accuracy * (1 - accuracy)) / total)
+                        is_reliable = margin_of_error <= 0.2
+                        
+                    if is_reliable:
+                        word = stats['word']
+                        room_results.append({
+                            'problemId': problem_id,
+                            'question': word['question'],
+                            'answer': word['answer'],
+                            'accuracyRate': accuracy * 100,
+                            'totalAttempts': total,
+                            'correctAttempts': correct,
+                            'incorrectAttempts': stats['incorrect']
+                        })
+            
+            room_results.sort(key=lambda x: (x['accuracyRate'], -x['totalAttempts']))
+            room_data[room_number] = room_results[:limit]
+            
+        global_results = []
+        for problem_id, stats in global_stats.items():
+            total = stats['total']
+            if total >= 5:
+                correct = stats['correct']
+                accuracy = correct / total
+                if accuracy == 0 or accuracy == 1:
+                    is_reliable = True
+                else:
+                    margin_of_error = 1.96 * math.sqrt((accuracy * (1 - accuracy)) / total)
+                    is_reliable = margin_of_error <= 0.2
+                    
+                if is_reliable:
+                    word = stats['word']
+                    global_results.append({
+                        'problemId': problem_id,
+                        'question': word['question'],
+                        'answer': word['answer'],
+                        'accuracyRate': accuracy * 100,
+                        'totalAttempts': total,
+                        'correctAttempts': correct,
+                        'incorrectAttempts': stats['incorrect']
+                    })
+                    
+        global_results.sort(key=lambda x: (x['accuracyRate'], -x['totalAttempts']))
+        
+        return jsonify({
+            'status': 'success',
+            'room_data': room_data,
+            'aggregated_data': global_results[:limit]
+        })
+        
+    except Exception as e:
+        print(f"Error in api_admin_weak_problems_aggregated: {e}")
+        return jsonify(status='error', message=str(e)), 500
+

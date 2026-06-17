@@ -501,6 +501,10 @@
                 <i class="fas fa-bullhorn me-2"></i> お知らせ
             </a>
 
+            <a class="sidebar-link" id="tab-link-weak-problems" href="{{ url_for('admin_weak_problems_report') }}">
+                <i class="fas fa-chart-pie me-2"></i> みんなの苦手問題
+            </a>
+
             {% if not is_manager %}
             <a class="sidebar-link" id="tab-link-user-management" data-bs-toggle="pill" href="#section-user-management"
                 role="tab">
