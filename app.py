@@ -24453,6 +24453,18 @@ def api_clear_message():
         db.session.rollback()
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
+@app.route('/api/check_message', methods=['GET'])
+def api_check_message():
+    try:
+        if 'user_id' not in session:
+            return jsonify({'status': 'success', 'message': None})
+        current_user = User.query.get(session['user_id'])
+        if current_user and current_user.pending_message:
+            return jsonify({'status': 'success', 'message': current_user.pending_message})
+        return jsonify({'status': 'success', 'message': None})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
 check_and_create_correction_tables()
 
 with app.app_context():

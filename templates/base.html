@@ -385,6 +385,73 @@
 
 
     {% block scripts %}{% endblock %}
+
+    <script>
+        // メッセージポーリング機能
+        function checkAndShowMessage() {
+            fetch('{{ url_for("api_check_message") }}')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success' && data.message) {
+                        showMessage(data.message);
+                    }
+                })
+                .catch(err => console.error('Error checking message:', err));
+        }
+
+        function showMessage(messageText) {
+            // 既に表示中なら何もしない
+            if (document.getElementById('pendingMessageContainer')) return;
+
+            const container = document.createElement('div');
+            container.id = 'pendingMessageContainer';
+            container.className = 'nico-message-container';
+
+            const textDiv = document.createElement('div');
+            textDiv.className = 'nico-message-text';
+            textDiv.id = 'nicoMessageText';
+            textDiv.textContent = messageText;
+
+            container.appendChild(textDiv);
+            document.body.appendChild(container);
+
+            const textLen = messageText.length;
+            const duration = Math.max(8, textLen * 0.2 + 6);
+            textDiv.style.animationDuration = duration + 's';
+
+            const topPos = Math.floor(Math.random() * 25) + 15;
+            textDiv.style.top = topPos + '%';
+
+            // サーバー側でメッセージをクリア
+            fetch('{{ url_for("api_clear_message") }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            }).catch(e => console.error("Error clearing message:", e));
+
+            // アニメーション完了後にDOMから削除
+            setTimeout(() => {
+                if (container.parentNode) {
+                    container.parentNode.removeChild(container);
+                }
+            }, duration * 1000 + 1000);
+        }
+
+        // 初期チェック（{% if pending_message %}の代わり）
+        document.addEventListener("DOMContentLoaded", function() {
+            // 初回チェック
+            checkAndShowMessage();
+            
+            // 15秒ごとにポーリング（負荷軽減のため少し間隔を空ける）
+            setInterval(() => {
+                // タブがバックグラウンドにない（ユーザーが画面を見ている）場合のみチェックする
+                if (!document.hidden) {
+                    checkAndShowMessage();
+                }
+            }, 15000);
+        });
+    </script>
 </body>
 
 </html>

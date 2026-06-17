@@ -6749,3 +6749,38 @@ a.nav-link.btn.change-username-button:hover,
 #rpgResultTitle {
     opacity: 0;
 }
+
+/* ニコニコ風メッセージアニメーション */
+.nico-message-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    pointer-events: none; /* クリックを透過 */
+    z-index: 9999;
+    overflow: hidden;
+}
+
+.nico-message-text {
+    position: absolute;
+    white-space: nowrap;
+    font-size: 3.5rem; /* 大きめのフォントサイズ */
+    font-weight: 900;
+    color: #ffffff;
+    text-shadow: 
+        2px 2px 0 #000, 
+        -2px -2px 0 #000, 
+        2px -2px 0 #000, 
+        -2px 2px 0 #000,
+        0 4px 10px rgba(0,0,0,0.6); /* 視認性を高める黒の縁取りとドロップシャドウ */
+    animation-name: nicoScroll;
+    animation-timing-function: linear;
+    animation-fill-mode: forwards;
+    transform: translateX(100vw);
+}
+
+@keyframes nicoScroll {
+    0% { transform: translateX(100vw); }
+    100% { transform: translateX(-150%); /* 完全に画面外に出るように長めに */ }
+}
