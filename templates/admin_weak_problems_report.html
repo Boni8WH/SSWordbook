@@ -455,10 +455,15 @@
 
         .table th, .table td {
             border: 1px solid #000 !important;
-            padding: 3px 4px !important;
+            padding: 2px 3px !important;
             font-size: 8.5pt !important;
             color: #000 !important;
             background-color: transparent !important;
+        }
+
+        .problem-text {
+            font-size: 8pt !important;
+            line-height: 1.2 !important;
         }
 
         .table th {
@@ -876,7 +881,7 @@
                 <tr>
                     <td class="text-center fw-bold">${index + 1}</td>
                     <td class="text-start">
-                        <div class="fw-bold" style="font-size: 1rem; line-height: 1.3;">${escapeHtml(p.question)}</div>
+                        <div class="fw-bold problem-text" style="font-size: 0.95rem; line-height: 1.3;">${escapeHtml(p.question)}</div>
                     </td>
                     <td class="text-start">
                         <div class="answer-text fw-bold">${escapeHtml(p.answer)}</div>
@@ -899,11 +904,11 @@
                 <table class="table table-striped table-hover align-middle">
                     <thead>
                         <tr>
-                            <th style="width: 50px;" class="text-center">順位</th>
+                            <th style="width: 40px;" class="text-center px-1">順位</th>
                             <th class="text-start">問題</th>
-                            <th style="width: 200px;" class="text-start">正解</th>
-                            <th style="width: 120px;" class="text-center">クラス平均正答率</th>
-                            <th style="width: 100px;" class="text-center">正解 / 解答数</th>
+                            <th style="width: 140px;" class="text-start">正解</th>
+                            <th style="width: 60px;" class="text-center px-1">正答率</th>
+                            <th style="width: 80px;" class="text-center px-1">正解/解答</th>
                         </tr>
                     </thead>
                     <tbody>
