@@ -24763,49 +24763,77 @@ def admin_weak_problems_report():
         
     available_rooms.sort()
     
-    # 標準の単語データを読み込み、UI用に章・単元一覧を作成
-    word_data = load_word_data_from_source("words.csv")
-    units_by_chapter = {}
-    chapters_set = set()
-    
-    for word in word_data:
-        # Z問題などは除外
-        if str(word.get('number', '')).upper() == 'Z':
-            continue
-            
-        chapter = str(word.get('chapter', '0'))
-        number = str(word.get('number', '0'))
-        
-        if chapter not in units_by_chapter:
-            units_by_chapter[chapter] = []
-        if number not in [u['number'] for u in units_by_chapter[chapter]]:
-            # 単元の概要や最初の問題文などを表示名に使うと親切
-            question = str(word.get('question', ''))[:15] + "..." if len(str(word.get('question', ''))) > 15 else str(word.get('question', ''))
-            units_by_chapter[chapter].append({
-                'number': number,
-                'name': f"単元{number} ({question})"
-            })
-        chapters_set.add(chapter)
+    context = get_template_context()
+    context.update({
+        'available_rooms': available_rooms
+    })
+    return render_template('admin_weak_problems_report.html', **context)
 
-    # カスタムソート (S, 1, 2, ..., 10, ...)
+@app.route('/api/admin/weak_problems_report/config', methods=['GET'])
+def api_admin_weak_problems_config():
+    if not session.get('admin_logged_in') and not session.get('manager_logged_in'):
+        return jsonify(status='error', message='Unauthorized'), 401
+        
+    rooms = db.session.query(User.room_number).distinct().all()
+    available_rooms = [r[0] for r in rooms if r[0]]
+    
+    room_csv_map = {}
+    csv_files = set()
+    for room in available_rooms:
+        setting = get_room_settings_cached(room)
+        csv_filename = setting.get('csv_filename', 'words.csv') if setting else 'words.csv'
+        room_csv_map[room] = csv_filename
+        csv_files.add(csv_filename)
+        
+    csv_data = {}
+    
     def sort_key(c):
         if c == 'S': return (0, 0)
         try: return (1, int(c))
         except ValueError: return (2, c)
         
-    chapters = sorted(list(chapters_set), key=sort_key)
-    
-    # 各章内の単元もソート
-    for c in units_by_chapter:
-        units_by_chapter[c].sort(key=lambda x: int(x['number']) if str(x['number']).isdigit() else x['number'])
-    
-    context = get_template_context()
-    context.update({
-        'available_rooms': available_rooms,
-        'units_by_chapter': units_by_chapter,
-        'chapters': chapters
+    import os
+    for filename in csv_files:
+        if not os.path.exists(filename):
+            continue
+        try:
+            word_data = load_word_data_from_source(filename)
+            units_by_chapter = {}
+            chapters_set = set()
+            for word in word_data:
+                if str(word.get('number', '')).upper() == 'Z':
+                    continue
+                chapter = str(word.get('chapter', '0'))
+                number = str(word.get('number', '0'))
+                category = str(word.get('category', ''))
+                
+                if chapter not in units_by_chapter:
+                    units_by_chapter[chapter] = []
+                
+                if number not in [u['number'] for u in units_by_chapter[chapter]]:
+                    name_str = f"単元{number} ({category})" if category else f"単元{number}"
+                    units_by_chapter[chapter].append({
+                        'number': number,
+                        'name': name_str
+                    })
+                chapters_set.add(chapter)
+                
+            chapters = sorted(list(chapters_set), key=sort_key)
+            for c in units_by_chapter:
+                units_by_chapter[c].sort(key=lambda x: int(x['number']) if str(x['number']).isdigit() else x['number'])
+                
+            csv_data[filename] = {
+                'chapters': chapters,
+                'units_by_chapter': units_by_chapter
+            }
+        except Exception as e:
+            print(f"Error processing {filename}: {e}")
+            
+    return jsonify({
+        'status': 'success',
+        'room_csv_map': room_csv_map,
+        'csv_data': csv_data
     })
-    return render_template('admin_weak_problems_report.html', **context)
 
 @app.route('/api/admin/weak_problems_aggregated', methods=['POST'])
 def api_admin_weak_problems_aggregated():
@@ -24816,6 +24844,7 @@ def api_admin_weak_problems_aggregated():
         data = request.get_json()
         target_rooms = data.get('rooms', [])
         target_units = data.get('target_units', [])
+        csv_filename = data.get('csv_filename', 'words.csv')
         limit = data.get('limit', 20)
         try:
             limit = int(limit)
@@ -24836,7 +24865,10 @@ def api_admin_weak_problems_aggregated():
             return jsonify(status='error', message='対象の単元が選択されていません。'), 400
             
         # フロントエンドから指定された単元の問題のみを対象とする
-        word_data = load_word_data_from_source("words.csv")
+        word_data = load_word_data_from_source(csv_filename)
+        if not word_data:
+             return jsonify(status='error', message='問題データの読み込みに失敗しました。'), 500
+             
         valid_problems = {}
         for word in word_data:
             chapter = str(word.get('chapter', '0'))
@@ -24931,3 +24963,5 @@ def api_admin_weak_problems_aggregated():
     except Exception as e:
         print(f"Error in api_admin_weak_problems_aggregated: {e}")
         return jsonify(status='error', message=str(e)), 500
+
+
