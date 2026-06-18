@@ -24784,6 +24784,7 @@ def api_admin_weak_problems_aggregated():
         common_problem_ids = None
         
         for room_number in target_rooms:
+            room_setting = get_room_settings_cached(room_number)
             try:
                 word_data = load_word_data_for_room(room_number)
             except Exception as e:
@@ -24792,8 +24793,16 @@ def api_admin_weak_problems_aggregated():
                 
             valid_problems = {}
             for word in word_data:
+                # Z問題は集計から除外
                 if str(word.get('number', '')).upper() == 'Z':
                     continue
+                
+                # 公開設定（有効単元）のチェック
+                chapter = word.get('chapter', '0')
+                is_all_unlocked = getattr(room_setting, 'is_all_unlocked', False) if room_setting else False
+                if not is_all_unlocked and room_setting and not is_unit_enabled(chapter, room_setting):
+                    continue
+                    
                 problem_id = get_problem_id(word)
                 valid_problems[problem_id] = word
                 
