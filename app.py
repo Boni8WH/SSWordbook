@@ -24830,19 +24830,18 @@ def api_admin_weak_problems_aggregated():
             for user in room_users:
                 history = user.get_problem_history()
                 for problem_id, stats in history.items():
-                    if problem_id in valid_problems:
+                    if problem_id in common_problem_ids:
                         if problem_id not in problem_stats:
                             problem_stats[problem_id] = {'correct': 0, 'incorrect': 0, 'total': 0, 'word': valid_problems[problem_id]}
                         problem_stats[problem_id]['correct'] += stats.get('correct_attempts', 0)
                         problem_stats[problem_id]['incorrect'] += stats.get('incorrect_attempts', 0)
                         problem_stats[problem_id]['total'] += (stats.get('correct_attempts', 0) + stats.get('incorrect_attempts', 0))
                         
-                        if problem_id in common_problem_ids:
-                            if problem_id not in global_stats:
-                                global_stats[problem_id] = {'correct': 0, 'incorrect': 0, 'total': 0, 'word': valid_problems[problem_id]}
-                            global_stats[problem_id]['correct'] += stats.get('correct_attempts', 0)
-                            global_stats[problem_id]['incorrect'] += stats.get('incorrect_attempts', 0)
-                            global_stats[problem_id]['total'] += (stats.get('correct_attempts', 0) + stats.get('incorrect_attempts', 0))
+                        if problem_id not in global_stats:
+                            global_stats[problem_id] = {'correct': 0, 'incorrect': 0, 'total': 0, 'word': valid_problems[problem_id]}
+                        global_stats[problem_id]['correct'] += stats.get('correct_attempts', 0)
+                        global_stats[problem_id]['incorrect'] += stats.get('incorrect_attempts', 0)
+                        global_stats[problem_id]['total'] += (stats.get('correct_attempts', 0) + stats.get('incorrect_attempts', 0))
             
             room_results = []
             for problem_id, stats in problem_stats.items():
