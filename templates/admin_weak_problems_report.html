@@ -549,6 +549,50 @@
             </div>
         </div>
 
+        <div class="units-selector-container" style="margin-bottom: 25px;">
+            <label class="form-label fw-bold mb-1">集計対象の単元を選択</label>
+            
+            <div class="unit-tabs-wrapper" style="margin-top: 10px; margin-bottom: 15px; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+                <ul class="nav nav-tabs" id="unitTabs" role="tablist" style="background-color: #f7fafc; padding: 10px 10px 0 10px; border-bottom: 1px solid #e2e8f0;">
+                    {% for chapter in chapters %}
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link {% if loop.first %}active{% endif %}" id="tab-{{ chapter }}" data-bs-toggle="tab" data-bs-target="#pane-{{ chapter }}" type="button" role="tab" style="font-weight: 600; color: #4a5568; border-color: transparent; border-bottom: none; margin-bottom: -1px; {% if loop.first %}background-color: #fff; border-color: #e2e8f0 #e2e8f0 #fff; color: #3182ce;{% endif %}">
+                            {% if chapter == 'Z' %}Z問題{% elif chapter == 'S' %}S章{% else %}第{{ chapter }}章{% endif %}
+                        </button>
+                    </li>
+                    {% endfor %}
+                </ul>
+                <div class="tab-content" id="unitTabsContent" style="padding: 20px; background-color: #fff;">
+                    {% for chapter in chapters %}
+                    <div class="tab-pane fade {% if loop.first %}show active{% endif %}" id="pane-{{ chapter }}" role="tabpanel">
+                        <div class="mb-3 d-flex gap-2">
+                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="selectChapterUnits('{{ chapter }}')">この章をすべて選択</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="clearChapterUnits('{{ chapter }}')">この章をすべて解除</button>
+                        </div>
+                        <div class="d-flex flex-wrap gap-2">
+                            {% for unit in units_by_chapter.get(chapter, []) %}
+                            <div class="form-check form-check-inline m-0 p-0">
+                                <input class="btn-check unit-checkbox chapter-{{ chapter }}-unit" type="checkbox" value="{{ chapter }}-{{ unit.number }}" id="unit_{{ chapter }}_{{ unit.number }}">
+                                <label class="btn btn-outline-secondary btn-sm" for="unit_{{ chapter }}_{{ unit.number }}" style="border-radius: 20px; font-size: 0.85rem;">
+                                    {{ unit.name }}
+                                </label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="selector-actions">
+                <button type="button" class="btn btn-sm btn-outline-primary" onclick="selectAllUnits(true)">
+                    <i class="fas fa-check-double me-1"></i>全単元を選択
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="selectAllUnits(false)">
+                    <i class="fas fa-times me-1"></i>全単元を解除
+                </button>
+            </div>
+        </div>
+
         <div class="limit-selector-container">
             <label class="form-label fw-bold mb-2">表示する問題数:</label>
             <select class="form-select" id="problemLimit">
@@ -603,13 +647,67 @@
         });
     }
 
+    function selectAllUnits(select) {
+        document.querySelectorAll('.unit-checkbox').forEach(cb => {
+            cb.checked = select;
+        });
+    }
+
+    function selectChapterUnits(chapter) {
+        document.querySelectorAll(`.chapter-${chapter}-unit`).forEach(cb => cb.checked = true);
+    }
+
+    function clearChapterUnits(chapter) {
+        document.querySelectorAll(`.chapter-${chapter}-unit`).forEach(cb => cb.checked = false);
+    }
+
+    // Initialize Bootstrap tabs manually to ensure they work
+    document.addEventListener('DOMContentLoaded', function() {
+        var triggerTabList = [].slice.call(document.querySelectorAll('#unitTabs button[data-bs-toggle="tab"]'))
+        triggerTabList.forEach(function (triggerEl) {
+            triggerEl.addEventListener('click', function (event) {
+                event.preventDefault()
+                // Remove active classes from all tabs and panes
+                document.querySelectorAll('#unitTabs .nav-link').forEach(el => {
+                    el.classList.remove('active');
+                    el.style.backgroundColor = 'transparent';
+                    el.style.color = '#4a5568';
+                    el.style.borderColor = 'transparent';
+                });
+                document.querySelectorAll('#unitTabsContent .tab-pane').forEach(el => {
+                    el.classList.remove('show', 'active');
+                });
+                
+                // Add active class to clicked tab and corresponding pane
+                this.classList.add('active');
+                this.style.backgroundColor = '#fff';
+                this.style.color = '#3182ce';
+                this.style.borderColor = '#e2e8f0 #e2e8f0 #fff';
+                
+                const targetId = this.getAttribute('data-bs-target');
+                const targetPane = document.querySelector(targetId);
+                if (targetPane) {
+                    targetPane.classList.add('show', 'active');
+                }
+            })
+        })
+    });
+
     async function generateReport() {
         const checkboxes = document.querySelectorAll('.room-checkbox:checked');
         const selectedRooms = Array.from(checkboxes).map(cb => cb.value);
+        
+        const unitCheckboxes = document.querySelectorAll('.unit-checkbox:checked');
+        const selectedUnits = Array.from(unitCheckboxes).map(cb => cb.value);
+        
         const limit = document.getElementById('problemLimit').value;
 
         if (selectedRooms.length === 0) {
             alert('対象のクラスを1つ以上選択してください。');
+            return;
+        }
+        if (selectedUnits.length === 0) {
+            alert('集計対象の単元を1つ以上選択してください。');
             return;
         }
 
@@ -629,6 +727,7 @@
                 },
                 body: JSON.stringify({
                     rooms: selectedRooms,
+                    target_units: selectedUnits,
                     limit: parseInt(limit)
                 })
             });

@@ -1,4 +1,4 @@
-import os
+﻿import os
 import json
 import csv
 import re
@@ -24763,9 +24763,47 @@ def admin_weak_problems_report():
         
     available_rooms.sort()
     
+    # 標準の単語データを読み込み、UI用に章・単元一覧を作成
+    word_data = load_word_data_from_source("words.csv")
+    units_by_chapter = {}
+    chapters_set = set()
+    
+    for word in word_data:
+        # Z問題などは除外
+        if str(word.get('number', '')).upper() == 'Z':
+            continue
+            
+        chapter = str(word.get('chapter', '0'))
+        number = str(word.get('number', '0'))
+        
+        if chapter not in units_by_chapter:
+            units_by_chapter[chapter] = []
+        if number not in [u['number'] for u in units_by_chapter[chapter]]:
+            # 単元の概要や最初の問題文などを表示名に使うと親切
+            question = str(word.get('question', ''))[:15] + "..." if len(str(word.get('question', ''))) > 15 else str(word.get('question', ''))
+            units_by_chapter[chapter].append({
+                'number': number,
+                'name': f"単元{number} ({question})"
+            })
+        chapters_set.add(chapter)
+
+    # カスタムソート (S, 1, 2, ..., 10, ...)
+    def sort_key(c):
+        if c == 'S': return (0, 0)
+        try: return (1, int(c))
+        except ValueError: return (2, c)
+        
+    chapters = sorted(list(chapters_set), key=sort_key)
+    
+    # 各章内の単元もソート
+    for c in units_by_chapter:
+        units_by_chapter[c].sort(key=lambda x: int(x['number']) if str(x['number']).isdigit() else x['number'])
+    
     context = get_template_context()
     context.update({
-        'available_rooms': available_rooms
+        'available_rooms': available_rooms,
+        'units_by_chapter': units_by_chapter,
+        'chapters': chapters
     })
     return render_template('admin_weak_problems_report.html', **context)
 
@@ -24777,6 +24815,7 @@ def api_admin_weak_problems_aggregated():
             
         data = request.get_json()
         target_rooms = data.get('rooms', [])
+        target_units = data.get('target_units', [])
         limit = data.get('limit', 20)
         try:
             limit = int(limit)
@@ -24793,56 +24832,30 @@ def api_admin_weak_problems_aggregated():
         if not target_rooms:
             return jsonify(status='error', message='対象の部屋が選択されていないか、権限がありません。'), 400
             
-        room_word_data = {}
-        common_problem_ids = None
-        
-        for room_number in target_rooms:
-            room_setting = get_room_settings_cached(room_number)
-            try:
-                word_data = load_word_data_for_room(room_number)
-            except Exception as e:
-                print(f"Error loading word data for {room_number}: {e}")
-                continue
-                
-            valid_problems = {}
-            for word in word_data:
-                # Z問題は集計から除外
-                if str(word.get('number', '')).upper() == 'Z':
-                    continue
-                
-                # 公開設定（有効単元）のチェック
-                unit_to_check = 'S' if str(word.get('chapter', '')) == 'S' else word.get('number', '')
-                if not room_setting or not is_unit_enabled_by_room_setting(unit_to_check, room_setting):
-                    continue
-                    
+        if not target_units:
+            return jsonify(status='error', message='対象の単元が選択されていません。'), 400
+            
+        # フロントエンドから指定された単元の問題のみを対象とする
+        word_data = load_word_data_from_source("words.csv")
+        valid_problems = {}
+        for word in word_data:
+            chapter = str(word.get('chapter', '0'))
+            number = str(word.get('number', '0'))
+            if f"{chapter}-{number}" in target_units:
                 problem_id = get_problem_id(word)
                 valid_problems[problem_id] = word
-                
-            room_word_data[room_number] = valid_problems
-            if common_problem_ids is None:
-                common_problem_ids = set(valid_problems.keys())
-            else:
-                common_problem_ids.intersection_update(valid_problems.keys())
-                
-        if common_problem_ids is None:
-            common_problem_ids = set()
 
         room_data = {}
         global_stats = {}
         
         for room_number in target_rooms:
-            if room_number not in room_word_data:
-                continue
-                
-            valid_problems = room_word_data[room_number]
             room_users = User.query.filter_by(room_number=room_number).filter(User.username != 'admin').all()
             
             problem_stats = {}
-            
             for user in room_users:
                 history = user.get_problem_history()
                 for problem_id, stats in history.items():
-                    if problem_id in common_problem_ids:
+                    if problem_id in valid_problems:
                         if problem_id not in problem_stats:
                             problem_stats[problem_id] = {'correct': 0, 'incorrect': 0, 'total': 0, 'word': valid_problems[problem_id]}
                         problem_stats[problem_id]['correct'] += stats.get('correct_attempts', 0)
@@ -24864,6 +24877,7 @@ def api_admin_weak_problems_aggregated():
                     if accuracy == 0 or accuracy == 1:
                         is_reliable = True
                     else:
+                        import math
                         margin_of_error = 1.96 * math.sqrt((accuracy * (1 - accuracy)) / total)
                         is_reliable = margin_of_error <= 0.2
                         
