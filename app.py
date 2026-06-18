@@ -24798,9 +24798,9 @@ def api_admin_weak_problems_aggregated():
                     continue
                 
                 # 公開設定（有効単元）のチェック
-                chapter = word.get('chapter', '0')
+                unit_to_check = 'S' if str(word.get('chapter', '')) == 'S' else word.get('number', '')
                 is_all_unlocked = getattr(room_setting, 'is_all_unlocked', False) if room_setting else False
-                if not is_all_unlocked and room_setting and not is_unit_enabled_by_room_setting(chapter, room_setting):
+                if not is_all_unlocked and room_setting and not is_unit_enabled_by_room_setting(unit_to_check, room_setting):
                     continue
                     
                 problem_id = get_problem_id(word)
