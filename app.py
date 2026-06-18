@@ -1,4 +1,4 @@
-﻿import os
+import os
 import json
 import csv
 import re
@@ -24794,10 +24794,10 @@ def api_admin_weak_problems_config():
         
     import os
     for filename in csv_files:
-        if not os.path.exists(filename):
-            continue
         try:
             word_data = load_word_data_from_source(filename)
+            if not word_data:
+                continue
             units_by_chapter = {}
             chapters_set = set()
             for word in word_data:
