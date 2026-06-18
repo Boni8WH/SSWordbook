@@ -470,6 +470,10 @@
             vertical-align: middle !important;
         }
 
+        .answer-text {
+            color: #ff5722 !important; /* 赤シート対応（オレンジ寄りの赤） */
+        }
+
         .table tr {
             page-break-inside: avoid !important;
             break-inside: avoid !important;
@@ -712,7 +716,7 @@
                 <tr>
                     <td class="text-center fw-bold rank-cell ${rankClass}">${index + 1}</td>
                     <td class="text-start">${escapeHtml(p.question)}</td>
-                    <td class="text-start"><strong class="text-dark">${escapeHtml(p.answer)}</strong></td>
+                    <td class="text-start"><strong class="text-dark answer-text">${escapeHtml(p.answer)}</strong></td>
                     <td class="text-center">
                         <div class="accuracy-badge-container">
                             <span class="accuracy-text ${rangeClass}">${accuracy.toFixed(1)}%</span>
