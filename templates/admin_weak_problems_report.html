@@ -1,5 +1,5 @@
-﻿{% extends "base.html" %}
-{% block title %}縺ｿ繧薙↑縺ｮ闍ｦ謇句撫鬘後Ξ繝昴・繝・- {{ app_name }}{% endblock %}
+{% extends "base.html" %}
+{% block title %}みんなの苦手問題レポート - {{ app_name }}{% endblock %}
 
 {% block content %}
 <style>
@@ -363,7 +363,7 @@
             print-color-adjust: exact !important;
         }
 
-        /* 蜊ｰ蛻ｷ譎ゅ↓1繝壹・繧ｸ縺ｧ蛻・ｌ繧九・繧帝亟縺舌◆繧√・蜈ｨ菴薙Μ繧ｻ繝・ヨ */
+        /* 印刷時に1ページで切れるのを防ぐための全体リセット */
         html, body, .container, .report-container {
             height: auto !important;
             overflow: visible !important;
@@ -422,7 +422,7 @@
             background: none !important;
         }
 
-        /* 譛蛻昴・繧ｻ繧ｯ繧ｷ繝ｧ繝ｳ縺ｯ謾ｹ繝壹・繧ｸ縺励↑縺・*/
+        /* 最初のセクションは改ページしない */
         #reportContent .report-section:first-child {
             page-break-before: auto !important;
             break-before: auto !important;
@@ -471,7 +471,7 @@
         }
 
         .answer-text {
-            color: #ff5722 !important; /* 襍､繧ｷ繝ｼ繝亥ｯｾ蠢懶ｼ医が繝ｬ繝ｳ繧ｸ蟇・ｊ縺ｮ襍､・・*/
+            color: #ff5722 !important; /* 赤シート対応（オレンジ寄りの赤） */
         }
 
         .table tr {
@@ -499,9 +499,9 @@
 <div class="report-container">
     <!-- Print-only Metadata Header -->
     <div class="print-metadata">
-        <h1>蟄ｦ蟷ｴ繝ｻ繧ｯ繝ｩ繧ｹ蛻･ 闍ｦ謇句撫鬘悟・譫舌Ξ繝昴・繝・/h1>
+        <h1>学年・クラス別 苦手問題分析レポート</h1>
         <div class="print-meta-grid">
-            <div>蜃ｺ蜉帶律譎・ <span id="printDateSpan"></span></div>
+            <div>出力日時: <span id="printDateSpan"></span></div>
             <div>{{ app_name }}</div>
         </div>
     </div>
@@ -509,23 +509,25 @@
     <!-- Web Header Card -->
     <div class="report-header-card print-hide">
         <div>
-            <h2><i class="fas fa-chart-pie"></i>闍ｦ謇句撫鬘悟・譫舌Ξ繝昴・繝・/h2>
-            <p>蜷・け繝ｩ繧ｹ・亥ｭｦ鄙偵Ν繝ｼ繝・峨・隱､遲皮紫縺碁ｫ倥＞蝠城｡後ｒ謚ｽ蜃ｺ縺励∵欠蟆弱ｄ陬懃ｿ偵↓蠖ｹ遶九▽繝ｬ繝昴・繝医ｒ菴懈・縺励∪縺吶・/p>
+            <h2><i class="fas fa-chart-pie"></i>苦手問題分析レポート</h2>
+            <p>各クラス（学習ルーム）の誤答率が高い問題を抽出し、指導や補習に役立つレポートを作成します。</p>
         </div>
         <div class="d-flex gap-2">
             <a href="{{ url_for('admin_page') }}" class="btn btn-action-back">
-                <i class="fas fa-arrow-left me-1"></i>謌ｻ繧・            </a>
+                <i class="fas fa-arrow-left me-1"></i>戻る
+            </a>
             <button class="btn btn-action-print" onclick="window.print()">
-                <i class="fas fa-print me-1"></i>PDF縺ｧ菫晏ｭ・            </button>
+                <i class="fas fa-print me-1"></i>PDFで保存
+            </button>
         </div>
     </div>
 
     <!-- Controls Card -->
     <div class="controls-panel print-hide">
-        <h5><i class="fas fa-filter"></i>繝ｬ繝昴・繝井ｽ懈・譚｡莉ｶ</h5>
+        <h5><i class="fas fa-filter"></i>レポート作成条件</h5>
 
         <div class="rooms-selector-container">
-            <label class="form-label fw-bold mb-1">髮・ｨ亥ｯｾ雎｡縺ｮ繧ｯ繝ｩ繧ｹ・亥ｭｦ鄙偵Ν繝ｼ繝・峨ｒ驕ｸ謚・</label>
+            <label class="form-label fw-bold mb-1">集計対象のクラス（学習ルーム）を選択:</label>
             <div class="rooms-selector">
                 {% for room in available_rooms %}
                 <div>
@@ -539,9 +541,10 @@
             </div>
             <div class="selector-actions">
                 <button type="button" class="btn btn-sm btn-outline-primary" onclick="selectAllRooms(true)">
-                    <i class="fas fa-check-double me-1"></i>蜈ｨ驕ｸ謚・                </button>
+                    <i class="fas fa-check-double me-1"></i>全選択
+                </button>
                 <button type="button" class="btn btn-sm btn-outline-secondary" onclick="selectAllRooms(false)">
-                    <i class="fas fa-times me-1"></i>蜈ｨ隗｣髯､
+                    <i class="fas fa-times me-1"></i>全解除
                 </button>
             </div>
         </div>
@@ -555,18 +558,18 @@
         </div>
 
         <div class="limit-selector-container">
-            <label class="form-label fw-bold mb-2">陦ｨ遉ｺ縺吶ｋ蝠城｡梧焚:</label>
+            <label class="form-label fw-bold mb-2">表示する問題数:</label>
             <select class="form-select" id="problemLimit">
-                <option value="10">荳贋ｽ・0蝠・/option>
-                <option value="20" selected>荳贋ｽ・0蝠・/option>
-                <option value="30">荳贋ｽ・0蝠・/option>
-                <option value="50">荳贋ｽ・0蝠・/option>
+                <option value="10">上位10問</option>
+                <option value="20" selected>上位20問</option>
+                <option value="30">上位30問</option>
+                <option value="50">上位50問</option>
             </select>
         </div>
 
         <div class="panel-actions">
             <button class="btn btn-generate" onclick="generateReport()" id="generateBtn">
-                <i class="fas fa-sync-alt me-1"></i>繝ｬ繝昴・繝医ｒ菴懈・繝ｻ譖ｴ譁ｰ
+                <i class="fas fa-sync-alt me-1"></i>レポートを作成・更新
             </button>
         </div>
     </div>
@@ -576,7 +579,7 @@
         <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
             <span class="visually-hidden">Loading...</span>
         </div>
-        <p class="mt-3 text-muted fw-bold">繝・・繧ｿ繧帝寔險医＠縺ｦ縺・∪縺吶ょｰ代・♀蠕・■縺上□縺輔＞...</p>
+        <p class="mt-3 text-muted fw-bold">データを集計しています。少々お待ちください...</p>
     </div>
 
     <!-- Generated Report Container -->
@@ -922,4 +925,3 @@
     }
 </script>
 {% endblock %}
-
