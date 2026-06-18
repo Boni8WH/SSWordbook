@@ -24811,10 +24811,8 @@ def api_admin_weak_problems_aggregated():
                     continue
                 
                 # 公開設定（有効単元）のチェック
-                # 過去の遺物である is_all_unlocked が True になっている部屋が全公開になってしまうのを防ぐため、
-                # 純粋に is_unit_enabled_by_room_setting のみで判定する
                 unit_to_check = 'S' if str(word.get('chapter', '')) == 'S' else word.get('number', '')
-                if room_setting and not is_unit_enabled_by_room_setting(unit_to_check, room_setting):
+                if not room_setting or not is_unit_enabled_by_room_setting(unit_to_check, room_setting):
                     continue
                     
                 problem_id = get_problem_id(word)
