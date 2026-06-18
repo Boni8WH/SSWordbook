@@ -11896,6 +11896,10 @@ def admin_update_room_units_setting():
         room_setting.set_enabled_units(enabled_units)
         db.session.commit()
         
+        # 設定が変更されたのでキャッシュを無効化する
+        ROOM_SETTING_CACHE.pop(str(room_number), None)
+        print(f"DEBUG: Cache invalidated for room {room_number} after updating units")
+        
         print(f"✅ 部屋{room_number}の有効単元を更新: {len(enabled_units)}個")
         return jsonify(status='success', message=f'部屋{room_number}の単元設定を更新しました')
 
