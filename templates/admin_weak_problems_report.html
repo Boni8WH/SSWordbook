@@ -455,8 +455,8 @@
 
         .table th, .table td {
             border: 1px solid #000 !important;
-            padding: 5px 6px !important;
-            font-size: 9pt !important;
+            padding: 3px 4px !important;
+            font-size: 8.5pt !important;
             color: #000 !important;
             background-color: transparent !important;
         }
@@ -876,8 +876,7 @@
                 <tr>
                     <td class="text-center fw-bold">${index + 1}</td>
                     <td class="text-start">
-                        <div class="fw-bold mb-1" style="font-size: 1rem;">${escapeHtml(p.question)}</div>
-                        <div class="text-muted small">ID: ${escapeHtml(p.problemId)}</div>
+                        <div class="fw-bold" style="font-size: 1rem; line-height: 1.3;">${escapeHtml(p.question)}</div>
                     </td>
                     <td class="text-start">
                         <div class="answer-text fw-bold">${escapeHtml(p.answer)}</div>
@@ -886,7 +885,7 @@
                         <div class="accuracy-badge-container justify-content-center">
                             <div class="accuracy-text ${accuracyTextClass}">${p.accuracyRate.toFixed(1)}%</div>
                         </div>
-                        <div class="progress progress-bar-thin mt-2" style="height: 4px;">
+                        <div class="progress progress-bar-thin mt-1 print-hide" style="height: 4px;">
                             <div class="progress-bar bg-${accuracyColor}" role="progressbar" style="width: ${p.accuracyRate}%"></div>
                         </div>
                     </td>
