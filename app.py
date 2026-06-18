@@ -3299,20 +3299,29 @@ def is_unit_enabled_by_room_setting(unit_number, room_setting):
         return True
     
     try:
-        # 新しい方式：enabled_unitsを使用
-        if hasattr(room_setting, 'get_enabled_units'):
+        # 新しい方式：enabled_unitsを使用（カラムが存在する場合は常に優先）
+        if hasattr(room_setting, 'enabled_units'):
             enabled_units = room_setting.get_enabled_units()
-            if enabled_units:  # リストが空でない場合
-                unit_str = str(unit_number)
-                return unit_str in enabled_units
-        
-        # 従来の方式：max_enabled_unit_numberを使用（フォールバック）
-        if hasattr(room_setting, 'max_enabled_unit_number'):
-            max_unit_str = room_setting.max_enabled_unit_number
-            parsed_max_unit = parse_unit_number(max_unit_str)
-            parsed_current_unit = parse_unit_number(str(unit_number))
-            return parsed_current_unit <= parsed_max_unit
-        
+            # 空リストの場合は「すべて非公開」として扱うため、フォールバックせずに判定する
+            # ただし、初期状態で未設定のまま古い方式に依存している部屋を救済するため、
+            # max_enabled_unit_numberが"9999"以外の古い方式で、かつenabled_unitsが空の場合はフォールバックする
+            if enabled_units or room_setting.max_enabled_unit_number != "9999" and room_setting.max_enabled_unit_number != "-1":
+                if not enabled_units and room_setting.max_enabled_unit_number != "9999" and room_setting.max_enabled_unit_number != "-1":
+                    # 本当の古い方式
+                    max_unit_str = room_setting.max_enabled_unit_number
+                    parsed_max_unit = parse_unit_number(max_unit_str)
+                    parsed_current_unit = parse_unit_number(str(unit_number))
+                    return parsed_current_unit <= parsed_max_unit
+                else:
+                    unit_str = str(unit_number)
+                    return unit_str in enabled_units
+            
+            # enabled_unitsが空で、max_enabled_unit_numberが9999の場合は、
+            # 「明示的にすべて非公開にした」とみなして False を返す。
+            # （※もし初期状態を「全て公開」にしたい場合は、is_all_unlocked を使う運用とする）
+            if room_setting.max_enabled_unit_number == "9999" or room_setting.max_enabled_unit_number == "-1":
+                return False
+
         # どちらもない場合はデフォルトで全て有効
         return True
         
@@ -13903,7 +13912,7 @@ def essay_index():
         # 並び順：通常章 → 総合問題
         sorted_chapters = regular_chapters + combined_chapters
         
-        app.logger.info(f"📊 章並び順: {sorted_chapters}")
+        # app.logger.info(f"📊 章並び順: {sorted_chapters}")
         
         for chapter in sorted_chapters:
             types = visibility_settings[chapter]
@@ -13912,7 +13921,7 @@ def essay_index():
             has_visible_problems = any(is_visible for is_visible in types.values())
             
             if not has_visible_problems:
-                app.logger.info(f"⏭️ 第{chapter}章: 公開問題なし（スキップ）")
+                # app.logger.info(f"⏭️ 第{chapter}章: 公開問題なし（スキップ）")
                 continue
             
             # 章の統計を計算
@@ -13935,7 +13944,7 @@ def essay_index():
 
             
             if not visible_problems:
-                app.logger.info(f"⏭️ {chapter_name}: 実際の問題なし（スキップ）")
+                # app.logger.info(f"⏭️ {chapter_name}: 実際の問題なし（スキップ）")
                 continue
             
             # ユーザーの進捗を取得
@@ -13973,9 +13982,9 @@ def essay_index():
             }
             
             chapter_stats.append(chapter_stat)
-            app.logger.info(f"📈 {chapter_name}: {total_problems}問（閲覧:{viewed_problems}, 理解:{understood_problems}）")
+            # app.logger.info(f"📈 {chapter_name}: {total_problems}問（閲覧:{viewed_problems}, 理解:{understood_problems}）")
         
-        app.logger.info(f"✅ 論述問題章一覧を生成しました（{len(chapter_stats)}章）")
+        # app.logger.info(f"✅ 論述問題章一覧を生成しました（{len(chapter_stats)}章）")
         
         # 部屋設定を取得して論述専門部屋かどうかを判定
         room_setting = RoomSetting.query.filter_by(room_number=current_room).first()
@@ -14108,10 +14117,10 @@ def essay_university_index():
             if is_visible:
                 problems.append(problem)
         
-        app.logger.info(f"📊 公開設定適用: {len(all_problems)}件 → {len(problems)}件 (部屋: {current_room})")
+        # app.logger.info(f"📊 公開設定適用: {len(all_problems)}件 → {len(problems)}件 (部屋: {current_room})")
     else:
         problems = all_problems
-        app.logger.info(f"📊 公開設定なし: 全{len(problems)}件表示 (部屋: {current_room})")
+        # app.logger.info(f"📊 公開設定なし: 全{len(problems)}件表示 (部屋: {current_room})")
 
     # 各問題に進捗情報を付加（テンプレート表示用）
     # JOINしていない場合でも、個別に取得するか、あるいはJOIN済みのオブジェクトを利用するか
@@ -14165,7 +14174,7 @@ def essay_chapter(chapter):
             flash('ユーザーが見つかりません。', 'danger')
             return redirect(url_for('logout'))
 
-        print(f"📊 章別論述問題一覧 - 第{chapter}章, ユーザー: {current_user.username}, 部屋: {current_user.room_number}")
+        # print(f"📊 章別論述問題一覧 - 第{chapter}章, ユーザー: {current_user.username}, 部屋: {current_user.room_number}")
 
         # フィルターパラメータの取得
         type_filter = request.args.get('type', '').strip()
@@ -14174,7 +14183,7 @@ def essay_chapter(chapter):
         year_to = request.args.get('year_to', type=int)
         keyword = request.args.get('keyword', '').strip()
 
-        print(f"🔍 フィルター - タイプ: {type_filter}, 大学: {university_filter}, 年度: {year_from}-{year_to}, キーワード: {keyword}")
+        # print(f"🔍 フィルター - タイプ: {type_filter}, 大学: {university_filter}, 年度: {year_from}-{year_to}, キーワード: {keyword}")
 
         # 公開設定を考慮した問題取得（ユーザーIDを渡して進捗情報も取得）
         problems = get_filtered_essay_problems_with_visibility(
@@ -14188,7 +14197,7 @@ def essay_chapter(chapter):
             user_id=current_user.id  # ここでuser_idを渡す
         )
 
-        print(f"📋 公開設定適用後の問題数: {len(problems)}件")
+        # print(f"📋 公開設定適用後の問題数: {len(problems)}件")
 
         # フィルター用のデータを取得（公開設定対応版）
         filter_data = get_essay_filter_data_with_visibility(chapter, current_user.room_number)
@@ -14281,38 +14290,38 @@ def essay_problem(problem_id):
         else:
             problem.progress = default_progress
         
-        print(f"📊 個別問題表示 - ID: {problem_id}, 第{problem.chapter}章 タイプ{problem.type}, ユーザー: {current_user.username}, 部屋: {current_user.room_number}")
+        # print(f"📊 個別問題表示 - ID: {problem_id}, 第{problem.chapter}章 タイプ{problem.type}, ユーザー: {current_user.username}, 部屋: {current_user.room_number}")
         
         # 公開設定をチェック
         if not is_essay_problem_visible(current_user.room_number, problem.chapter, problem.type):
-            print(f"❌ 非公開問題へのアクセス - ID: {problem_id}, 第{problem.chapter}章 タイプ{problem.type}")
+            # print(f"❌ 非公開問題へのアクセス - ID: {problem_id}, 第{problem.chapter}章 タイプ{problem.type}")
             flash('この問題は現在公開されていません。', 'warning')
             return redirect(url_for('essay_index'))
         
-        print(f"✅ 公開問題へのアクセス - ID: {problem_id}")
+        # print(f"✅ 公開問題へのアクセス - ID: {problem_id}")
         
         # 前後の問題を取得（公開されているもののみ）
         prev_problem, next_problem = get_adjacent_problems_with_visibility(problem, current_user.room_number)
         
         # 画像関連の詳細デバッグ情報を出力
-        print(f"🖼️ 画像デバッグ開始 - 問題ID: {problem_id}")
+        # print(f"🖼️ 画像デバッグ開始 - 問題ID: {problem_id}")
         debug_essay_image_info(problem_id)
         
         # 画像パスを取得
         image_path = None
         has_image = has_essay_problem_image(problem_id)
         
-        print(f"📸 画像存在確認: {has_image}")
+        # print(f"📸 画像存在確認: {has_image}")
         
         if has_image:
             image_path = get_essay_problem_image_path(problem_id)
-            print(f"📸 生成された画像パス: {image_path}")
+            # print(f"📸 生成された画像パス: {image_path}")
             
             # 画像ファイルの物理的存在確認
             if image_path:
                 full_image_path = os.path.join('static', image_path)
                 image_exists = os.path.exists(full_image_path)
-                print(f"📸 画像ファイル物理的存在確認: {image_exists} (パス: {full_image_path})")
+                # print(f"📸 画像ファイル物理的存在確認: {image_exists} (パス: {full_image_path})")
                 
                 if not image_exists:
                     print(f"⚠️ 画像パスは生成されましたが、ファイルが存在しません: {full_image_path}")
@@ -15947,10 +15956,10 @@ def is_essay_problem_visible_sql(room_number, chapter, problem_type):
             row = result.fetchone()
             if row:
                 is_visible = row[0]
-                print(f"📊 公開設定確認 - 部屋{room_number} 第{chapter}章 タイプ{problem_type}: {'公開' if is_visible else '非公開'}")
+                # print(f"📊 公開設定確認 - 部屋{room_number} 第{chapter}章 タイプ{problem_type}: {'公開' if is_visible else '非公開'}")
                 return is_visible
             else:
-                print(f"⚠️ 公開設定なし - 部屋{room_number} 第{chapter}章 タイプ{problem_type}: デフォルト公開")
+                # print(f"⚠️ 公開設定なし - 部屋{room_number} 第{chapter}章 タイプ{problem_type}: デフォルト公開")
                 return True  # 設定がない場合はデフォルトで公開
     except Exception as e:
         print(f"Error checking essay visibility (SQL): {e}")
@@ -16084,7 +16093,7 @@ def get_filtered_essay_problems_with_visibility(chapter, room_number, type_filte
             problem.progress = progress_data
             problems.append(problem)
         
-        print(f"📋 公開設定適用後の問題数: {len(problems)}件, 進捗情報付与完了")
+        # print(f"📋 公開設定適用後の問題数: {len(problems)}件, 進捗情報付与完了")
         return problems
         
     except Exception as e:
@@ -16158,10 +16167,10 @@ def get_essay_chapter_stats_with_visibility(user_id, room_number):
             chapter_data['chapter'] = chapter_key
             sorted_chapters.append(chapter_data)
         
-        print(f"📊 章別統計（修正版）: {len(sorted_chapters)}章")
-        for chapter_data in sorted_chapters:
-            print(f"  {chapter_data['chapter_name']}: 総数={chapter_data['total_problems']}, "
-                  f"閲覧={chapter_data['viewed_problems']}, 理解={chapter_data['understood_problems']}")
+        # print(f"📊 章別統計（修正版）: {len(sorted_chapters)}章")
+        # for chapter_data in sorted_chapters:
+        #     print(f"  {chapter_data['chapter_name']}: 総数={chapter_data['total_problems']}, "
+        #           f"閲覧={chapter_data['viewed_problems']}, 理解={chapter_data['understood_problems']}")
         
         return sorted_chapters
         
