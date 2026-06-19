@@ -74,54 +74,91 @@ async function initializeDailyQuiz() {
         const response = await fetch('/api/daily_quiz/today');
         const data = await response.json();
 
-        if (data.status !== 'success') {
-            throw new Error(data.message);
-        }
-
-        const streakBanner = document.getElementById('dailyQuizStreakBanner');
-        if (streakBanner) {
-            const baseStreak = data.streak || 0;
-            streakBanner.style.display = 'block';
-
-            if (!data.rpg_unlocked) {
-                // RPG未解放のティーザー表示
-                if (data.completed) {
-                    streakBanner.innerHTML = `<span style="color: #f1c40f; font-weight: bold; font-size: 0.9em;">🔥 連続クリア${baseStreak}日目！ 将来RPGモードが解放された時、ボス戦が${baseStreak}%有利になるぞ！</span>`;
-                } else {
-                    if (baseStreak > 0) {
-                        const nextStreak = baseStreak + 1;
-                        streakBanner.innerHTML = `<span style="color: #f1c40f; font-weight: bold; font-size: 0.9em;">🔥 現在${baseStreak}日連続！ 今日もクリアして、将来のRPGボス戦を${nextStreak}%有利にしよう！</span>`;
-                    } else {
-                        streakBanner.innerHTML = `<span style="color: #f1c40f; font-weight: bold; font-size: 0.9em;">🔥 毎日クリアすると、将来RPGモードが解放された時にボス戦が有利になるぞ！</span>`;
+        if (data.status === 'need_room_selection') {
+            const rooms = data.rooms;
+            const buttonsHtml = rooms.map(room => `<button class="btn btn-outline-primary m-1 room-select-btn" data-room="${room}">${room}</button>`).join('');
+            document.getElementById('dailyQuizContainer').innerHTML = `
+                <div class="text-center">
+                    <h5 class="mb-3">どの部屋の「今日の10問」をやりますか？</h5>
+                    <div>${buttonsHtml}</div>
+                </div>
+            `;
+            document.querySelectorAll('.room-select-btn').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    const selectedRoom = e.target.getAttribute('data-room');
+                    document.getElementById('dailyQuizContainer').innerHTML = `
+                        <div class="text-center">
+                            <div class="spinner-border text-success" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-2">部屋 ${selectedRoom} の問題を取得中...</p>
+                        </div>
+                    `;
+                    try {
+                        const res = await fetch(`/api/daily_quiz/today?room_number=${encodeURIComponent(selectedRoom)}`);
+                        const newData = await res.json();
+                        handleQuizData(newData);
+                    } catch (err) {
+                        document.getElementById('dailyQuizContainer').innerHTML = `<div class="alert alert-danger">${err.message || '問題の取得に失敗しました。'}</div>`;
                     }
-                }
-            } else {
-                // RPG解放済み
-                if (data.completed) {
-                    streakBanner.innerHTML = `<span style="color: #f1c40f; font-weight: bold; font-size: 0.9em;">🔥 連続クリア${baseStreak}日目！ RPGボス戦の制限時間が${baseStreak}%延長中！</span>`;
-                } else {
-                    if (baseStreak > 0) {
-                        const nextStreak = baseStreak + 1;
-                        streakBanner.innerHTML = `<span style="color: #f1c40f; font-weight: bold; font-size: 0.9em;">🔥 現在${baseStreak}日連続！ 今日もクリアして${nextStreak}%延長ボーナスをゲットしよう！</span>`;
-                    } else {
-                        streakBanner.innerHTML = `<span style="color: #f1c40f; font-weight: bold; font-size: 0.9em;">🔥 毎日クリアでRPGボス戦の制限時間が延長されるぞ！ まずは今日のクリアを目指そう！</span>`;
-                    }
-                }
-            }
+                });
+            });
+            return;
         }
 
-        if (data.completed) {
-            // 既に回答済みの場合
-            displayQuizResult(data.user_result, data.top_5_ranking, data.user_rank, data.total_participants,
-                data.monthly_top_5, data.monthly_user_rank, data.monthly_participants,
-                data.previous_top_5, data.previous_user_rank, data.previous_participants);
-        } else {
-            // これから回答する場合
-            runQuiz(data.questions);
-        }
+        handleQuizData(data);
 
     } catch (error) {
         document.getElementById('dailyQuizContainer').innerHTML = `<div class="alert alert-danger">${error.message || '問題の取得に失敗しました。'}</div>`;
+    }
+}
+
+function handleQuizData(data) {
+    if (data.status !== 'success') {
+        document.getElementById('dailyQuizContainer').innerHTML = `<div class="alert alert-danger">${data.message || '問題の取得に失敗しました。'}</div>`;
+        return;
+    }
+
+    const streakBanner = document.getElementById('dailyQuizStreakBanner');
+    if (streakBanner) {
+        const baseStreak = data.streak || 0;
+        streakBanner.style.display = 'block';
+
+        if (!data.rpg_unlocked) {
+            // RPG未解放のティーザー表示
+            if (data.completed) {
+                streakBanner.innerHTML = `<span style="color: #f1c40f; font-weight: bold; font-size: 0.9em;">🔥 連続クリア${baseStreak}日目！ 将来RPGモードが解放された時、ボス戦が${baseStreak}%有利になるぞ！</span>`;
+            } else {
+                if (baseStreak > 0) {
+                    const nextStreak = baseStreak + 1;
+                    streakBanner.innerHTML = `<span style="color: #f1c40f; font-weight: bold; font-size: 0.9em;">🔥 現在${baseStreak}日連続！ 今日もクリアして、将来のRPGボス戦を${nextStreak}%有利にしよう！</span>`;
+                } else {
+                    streakBanner.innerHTML = `<span style="color: #f1c40f; font-weight: bold; font-size: 0.9em;">🔥 毎日クリアすると、将来RPGモードが解放された時にボス戦が有利になるぞ！</span>`;
+                }
+            }
+        } else {
+            // RPG解放済み
+            if (data.completed) {
+                streakBanner.innerHTML = `<span style="color: #f1c40f; font-weight: bold; font-size: 0.9em;">🔥 連続クリア${baseStreak}日目！ RPGボス戦の制限時間が${baseStreak}%延長中！</span>`;
+            } else {
+                if (baseStreak > 0) {
+                    const nextStreak = baseStreak + 1;
+                    streakBanner.innerHTML = `<span style="color: #f1c40f; font-weight: bold; font-size: 0.9em;">🔥 現在${baseStreak}日連続！ 今日もクリアして${nextStreak}%延長ボーナスをゲットしよう！</span>`;
+                } else {
+                    streakBanner.innerHTML = `<span style="color: #f1c40f; font-weight: bold; font-size: 0.9em;">🔥 毎日クリアでRPGボス戦の制限時間が延長されるぞ！ まずは今日のクリアを目指そう！</span>`;
+                }
+            }
+        }
+    }
+
+    if (data.completed) {
+        // 既に回答済みの場合
+        displayQuizResult(data.user_result, data.top_5_ranking, data.user_rank, data.total_participants,
+            data.monthly_top_5, data.monthly_user_rank, data.monthly_participants,
+            data.previous_top_5, data.previous_user_rank, data.previous_participants);
+    } else {
+        // これから回答する場合
+        runQuiz(data.questions);
     }
 }
 
@@ -306,13 +343,20 @@ async function submitQuizResult(answers, time) {
 function displayQuizResult(userResult, top5Ranking, userRank, totalParticipants, monthlyTop5, monthlyUserRank, monthlyParticipants, previousTop5, previousUserRank, previousParticipants) {
     const quizContainer = document.getElementById('dailyQuizContainer');
 
+    const formatUsername = (r) => {
+        if (r.is_admin) {
+            return `<span style="color: #d4af37; font-weight: bold; text-shadow: 0 0 5px rgba(212, 175, 55, 0.5); font-family: 'Times New Roman', serif;"><i class="fas fa-crown"></i> ${r.username}</span>`;
+        }
+        return r.username;
+    };
+
     // --- 1. 日次ランキングHTMLの生成 ---
     let dailyRankingHTML = '<p class="text-muted text-center mt-2">まだ誰も挑戦していません。</p>';
     if (top5Ranking && top5Ranking.length > 0) {
         const tableBodyHTML = top5Ranking.map(r => `
             <tr class="${r.rank === userRank.rank ? 'current-user-rank' : ''}">
                 <td>${r.rank}位</td>
-                <td><div class="text-truncate mx-auto" style="max-width: 100px;" title="${r.username}">${r.username}</div></td>
+                <td><div class="text-truncate mx-auto" style="max-width: 130px;" title="${r.username}">${formatUsername(r)}</div></td>
                 <td><div class="text-truncate mx-auto" style="max-width: 100px;" title="${r.title || ''}"><span class="${r.title ? 'premium-badge-title' : ''}">${r.title || '-'}</span></div></td>
                 <td>${r.score}/10</td>
                 <td>${r.time}</td>
@@ -326,7 +370,7 @@ function displayQuizResult(userResult, top5Ranking, userRank, totalParticipants,
                     <tr class="rank-ellipsis"><td colspan="5">...</td></tr>
                     <tr class="current-user-rank out-of-top5-rank">
                         <td>${userRank.rank}位</td>
-                        <td><div class="text-truncate mx-auto" style="max-width: 100px;" title="${userRank.username}">${userRank.username}</div></td>
+                        <td><div class="text-truncate mx-auto" style="max-width: 130px;" title="${userRank.username}">${formatUsername(userRank)}</div></td>
                         <td><div class="text-truncate mx-auto" style="max-width: 100px;" title="${userRank.title || ''}"><span class="${userRank.title ? 'premium-badge-title' : ''}">${userRank.title || '-'}</span></div></td>
                         <td>${userRank.score}/10</td>
                         <td>${userRank.time}</td>
@@ -350,7 +394,7 @@ function displayQuizResult(userResult, top5Ranking, userRank, totalParticipants,
         const monthlyBodyHTML = monthlyTop5.map(r => `
             <tr class="${(monthlyUserRank && r.rank === monthlyUserRank.rank) ? 'current-user-rank' : ''}">
                 <td>${r.rank}位</td>
-                <td><div class="text-truncate mx-auto" style="max-width: 100px;" title="${r.username}">${r.username}</div></td>
+                <td><div class="text-truncate mx-auto" style="max-width: 130px;" title="${r.username}">${formatUsername(r)}</div></td>
                 <td><div class="text-truncate mx-auto" style="max-width: 100px;" title="${r.title || ''}"><span class="${r.title ? 'premium-badge-title' : ''}">${r.title || '-'}</span></div></td>
                 <td>${r.score} pt</td>
             </tr>
@@ -363,7 +407,7 @@ function displayQuizResult(userResult, top5Ranking, userRank, totalParticipants,
                     <tr class="rank-ellipsis"><td colspan="4">...</td></tr>
                     <tr class="current-user-rank out-of-top5-rank">
                         <td>${monthlyUserRank.rank}位</td>
-                        <td><div class="text-truncate mx-auto" style="max-width: 100px;" title="${monthlyUserRank.username}">${monthlyUserRank.username}</div></td>
+                        <td><div class="text-truncate mx-auto" style="max-width: 130px;" title="${monthlyUserRank.username}">${formatUsername(monthlyUserRank)}</div></td>
                         <td><div class="text-truncate mx-auto" style="max-width: 100px;" title="${monthlyUserRank.title || ''}"><span class="${monthlyUserRank.title ? 'premium-badge-title' : ''}">${monthlyUserRank.title || '-'}</span></div></td>
                         <td>${monthlyUserRank.score} pt</td>
                     </tr>
@@ -386,7 +430,7 @@ function displayQuizResult(userResult, top5Ranking, userRank, totalParticipants,
         const previousBodyHTML = previousTop5.map(r => `
             <tr class="${(previousUserRank && r.rank === previousUserRank.rank) ? 'current-user-rank' : ''}">
                 <td>${r.rank}位</td>
-                <td><div class="text-truncate mx-auto" style="max-width: 100px;" title="${r.username}">${r.username}</div></td>
+                <td><div class="text-truncate mx-auto" style="max-width: 130px;" title="${r.username}">${formatUsername(r)}</div></td>
                 <td><div class="text-truncate mx-auto" style="max-width: 100px;" title="${r.title || ''}"><span class="${r.title ? 'premium-badge-title' : ''}">${r.title || '-'}</span></div></td>
                 <td>${r.score}/10</td>
                 <td>${r.time}</td>
@@ -400,7 +444,7 @@ function displayQuizResult(userResult, top5Ranking, userRank, totalParticipants,
                     <tr class="rank-ellipsis"><td colspan="5">...</td></tr>
                     <tr class="current-user-rank out-of-top5-rank">
                         <td>${previousUserRank.rank}位</td>
-                        <td><div class="text-truncate mx-auto" style="max-width: 100px;" title="${previousUserRank.username}">${previousUserRank.username}</div></td>
+                        <td><div class="text-truncate mx-auto" style="max-width: 130px;" title="${previousUserRank.username}">${formatUsername(previousUserRank)}</div></td>
                         <td><div class="text-truncate mx-auto" style="max-width: 100px;" title="${previousUserRank.title || ''}"><span class="${previousUserRank.title ? 'premium-badge-title' : ''}">${previousUserRank.title || '-'}</span></div></td>
                         <td>${previousUserRank.score}/10</td>
                         <td>${previousUserRank.time}</td>

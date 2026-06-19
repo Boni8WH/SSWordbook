@@ -2881,7 +2881,8 @@ def get_monthly_ranking(room_number, user_id, year, month):
             'rank': i,
             'username': score_entry.user.username,
             'title': score_entry.user.equipped_rpg_enemy.badge_name if score_entry.user.equipped_rpg_enemy else None,
-            'score': score_entry.total_score
+            'score': score_entry.total_score,
+            'is_admin': score_entry.user.room_number == 'ADMIN'
         }
         if i <= 5:
             monthly_top_5.append(rank_data)
@@ -3225,7 +3226,7 @@ def check_special_unlock_status(chapter, regular_problems, users):
         
         is_mastered_by_anyone = False
         for user in users:
-            if user.username == 'admin':
+            if user.room_number == 'ADMIN':
                 continue
             
             user_history = user.get_problem_history()
@@ -3370,7 +3371,7 @@ def fix_all_user_data():
     total_fixed_histories = 0
     
     for user in users:
-        if user.username == 'admin':
+        if user.room_number == 'ADMIN':
             continue
             
         print(f"\n🔧 修正開始: {user.username}")
@@ -5765,7 +5766,7 @@ def login_page():
             
             if admin_user and admin_user.check_individual_password(admin_password):
                 session['admin_logged_in'] = True
-                session['username'] = 'admin'
+                session['username'] = admin_user.username
                 session['user_id'] = admin_user.id
                 # 管理者の場合は全権限
                 session.pop('manager_logged_in', None)
@@ -7086,7 +7087,7 @@ def api_admin_room_ranking(room_number):
                 
                 count = 0
                 for user in users_in_room:
-                    if user.username == 'admin':
+                    if user.room_number == 'ADMIN':
                         continue
                     stats = UserStats.get_or_create(user.id)
                     # 最適化されたupdate_statsを呼び出し
@@ -7245,7 +7246,7 @@ def admin_fallback_ranking_calculation(room_number, start_time):
 
         # 全ユーザーのスコアを計算
         for user_obj in all_users_for_ranking:
-            if user_obj.username == 'admin':
+            if user_obj.room_number == 'ADMIN':
                 continue
                 
             user_total_attempts = 0
@@ -8954,7 +8955,7 @@ def analyze_unmatched_problems():
     }
     
     for user in users:
-        if user.username == 'admin':
+        if user.room_number == 'ADMIN':
             continue
             
         analysis_results['total_users'] += 1
@@ -9032,7 +9033,7 @@ def fix_unmatched_problems_only():
     total_unfixable_entries = 0
     
     for user in users:
-        if user.username == 'admin':
+        if user.room_number == 'ADMIN':
             continue
             
         print(f"\n🔧 ID修正開始: {user.username}")
@@ -9217,7 +9218,7 @@ def safe_clean_unmatched_history(dry_run=True, deletion_threshold=0.1):
     
     # 第1フェーズ: 影響分析
     for user in users:
-        if user.username == 'admin':
+        if user.room_number == 'ADMIN':
             continue
             
         # ユーザーの部屋に対応する有効IDを取得
@@ -9298,7 +9299,7 @@ def safe_clean_unmatched_history(dry_run=True, deletion_threshold=0.1):
     total_removed_incorrect = 0
     
     for user in users:
-        if user.username == 'admin':
+        if user.room_number == 'ADMIN':
             continue
             
         # キャッシュから有効IDを取得（分析フェーズでキャッシュ済みのはずだが念のため）
@@ -9376,7 +9377,7 @@ def clean_unmatched_history():
     total_removed_incorrect = 0
     
     for user in users:
-        if user.username == 'admin':
+        if user.room_number == 'ADMIN':
             continue
             
         print(f"\n🧹 履歴クリーニング: {user.username}")
@@ -9458,7 +9459,7 @@ def analyze_unmatched_history():
     }
     
     for user in users:
-        if user.username == 'admin':
+        if user.room_number == 'ADMIN':
             continue
             
         analysis_results['total_users'] += 1
@@ -11011,7 +11012,7 @@ def admin_page():
         # ユーザー情報を拡張（元のアカウント名と変更履歴を含む）
         user_list_with_details = []
         for user in users:
-            if user.username == 'admin':
+            if user.room_number == 'ADMIN':
                 continue
                 
             user_details = {
@@ -13181,7 +13182,7 @@ def admin_debug_progress():
         users = User.query.all()
         
         for user in users:
-            if user.username == 'admin':
+            if user.room_number == 'ADMIN':
                 continue
                 
             # 部屋ごとの単語データを取得
@@ -14450,7 +14451,7 @@ def submit_correction_request():
             db.session.add(img_record)
 
         # 管理者(Manager/Admin)への通知を作成
-        managers = User.query.filter((User.is_manager == True) | (User.username == 'admin')).all()
+        managers = User.query.filter((User.is_manager == True) | (User.room_number == 'ADMIN')).all()
         for mgr in managers:
             notif = Notification(
                 user_id=mgr.id,
@@ -14584,7 +14585,7 @@ def student_follow_up_reply(request_id):
         req.is_read_by_user = True  # 自分が送ったので既読扱い
         
         # 管理者に通知
-        managers = User.query.filter((User.is_manager == True) | (User.username == 'admin')).all()
+        managers = User.query.filter((User.is_manager == True) | (User.room_number == 'ADMIN')).all()
         for mgr in managers:
             notif = Notification(
                 user_id=mgr.id,
@@ -21354,7 +21355,7 @@ def admin_comprehensive_storage_analysis():
         max_user_name = ""
         
         for user in users:
-            if user.username == 'admin':
+            if user.room_number == 'ADMIN':
                 continue
             user_count += 1
             
@@ -22755,7 +22756,8 @@ def get_daily_ranking_data(quiz_id, current_user_id):
             'username': result.user.username, 
             'title': result.user.equipped_rpg_enemy.badge_name if result.user.equipped_rpg_enemy else None,
             'score': result.score, 
-            'time': f"{(result.time_taken_ms / 1000):.2f}秒"
+            'time': f"{(result.time_taken_ms / 1000):.2f}秒",
+            'is_admin': result.user.room_number == 'ADMIN'
         }
         if i <= 5: top_5_ranking.append(rank_entry)
         if result.user_id == current_user_id: current_user_rank_info = rank_entry
@@ -22772,11 +22774,19 @@ def get_daily_quiz():
     today = (datetime.now(JST) - timedelta(hours=7)).date()
     yesterday = today - timedelta(days=1)
 
+    target_room = request.args.get('room_number')
+    if user.room_number == 'ADMIN':
+        if not target_room:
+            rooms = [r.room_number for r in RoomSetting.query.filter(RoomSetting.room_number != 'ADMIN').all()]
+            return jsonify({'status': 'need_room_selection', 'rooms': rooms})
+    else:
+        target_room = user.room_number
+
     # --- ▼▼▼ 月間スコア集計トリガー ▼▼▼ ---
     try:
         yesterday_quiz = DailyQuiz.query.filter_by(
             date=yesterday, 
-            room_number=user.room_number, 
+            room_number=target_room, 
             monthly_score_processed=False
         ).first()
         
@@ -22787,13 +22797,13 @@ def get_daily_quiz():
         print(f"❌ 集計トリガーエラー: {score_e}")
     # --- ▲▲▲ 集計トリガーここまで ▲▲▲ ---
 
-    daily_quiz = DailyQuiz.query.filter_by(date=today, room_number=user.room_number).first()
+    daily_quiz = DailyQuiz.query.filter_by(date=today, room_number=target_room).first()
 
     # 月間ランキングデータを取得 (当月分)
     current_year = today.year
     current_month = today.month
     monthly_top_5, monthly_user_rank, monthly_participants = get_monthly_ranking(
-        user.room_number, user.id, current_year, current_month
+        target_room, user.id, current_year, current_month
     )
 
     # --- 前回のランキングデータを取得 (昨日とは限らない) ---
@@ -22804,7 +22814,7 @@ def get_daily_quiz():
     # 今日より前の日付で、最も新しいクイズを取得
     previous_quiz_obj = DailyQuiz.query.filter(
         DailyQuiz.date < today, 
-        DailyQuiz.room_number == user.room_number
+        DailyQuiz.room_number == target_room
     ).order_by(DailyQuiz.date.desc()).first()
 
     if previous_quiz_obj:
@@ -22839,8 +22849,8 @@ def get_daily_quiz():
 
     # --- (未回答の場合のクイズ生成ロジック) ---
     if not daily_quiz:
-        all_words = load_word_data_for_room(user.room_number)
-        room_setting = RoomSetting.query.filter_by(room_number=user.room_number).first()
+        all_words = load_word_data_for_room(target_room)
+        room_setting = RoomSetting.query.filter_by(room_number=target_room).first()
         
         public_words = []
         for word in all_words:
@@ -22855,20 +22865,20 @@ def get_daily_quiz():
         selected_problems = random.sample(public_words, 10)
         # DBにはハッシュ化したIDを保存するように変更
         problem_ids = [generate_problem_id(p) for p in selected_problems]
-        daily_quiz = DailyQuiz(date=today, room_number=user.room_number, problem_ids_json=json.dumps(problem_ids), monthly_score_processed=False)
+        daily_quiz = DailyQuiz(date=today, room_number=target_room, problem_ids_json=json.dumps(problem_ids), monthly_score_processed=False)
         db.session.add(daily_quiz)
         db.session.commit()
 
     # --- クイズデータの構築 (高速化版) ---
     problem_ids_in_db = daily_quiz.get_problem_ids()
-    all_words = load_word_data_for_room(user.room_number)
+    all_words = load_word_data_for_room(target_room)
     
     # 単語データをIDで逆引きできるようにマップ化 (O(N))
     # 移行期間のため、生IDとハッシュIDの両方で引けるようにする
     word_by_id = {}
     for w in all_words:
         rid = generate_raw_id(w)
-        hid = generate_problem_id(w) # これは内部でhashlibを使用
+        hid = generate_problem_id(w)
         word_by_id[rid] = w
         word_by_id[hid] = w
     
@@ -22931,7 +22941,14 @@ def check_daily_quiz_answer():
         return jsonify({'status': 'error', 'message': '問題インデックスが必要です'}), 400
         
     today = (datetime.now(JST) - timedelta(hours=7)).date()
-    daily_quiz = DailyQuiz.query.filter_by(date=today, room_number=user.room_number).first()
+
+    target_room = user.room_number
+    if target_room == 'ADMIN':
+        target_room = session.get('admin_daily_quiz_room')
+        if not target_room:
+            return jsonify({'status': 'error', 'message': '対象の部屋が選択されていません'}), 400
+
+    daily_quiz = DailyQuiz.query.filter_by(date=today, room_number=target_room).first()
     if not daily_quiz:
         return jsonify({'status': 'error', 'message': '今日のクイズが見つかりません'}), 404
         
@@ -22940,7 +22957,7 @@ def check_daily_quiz_answer():
         return jsonify({'status': 'error', 'message': '不正なインデックスです'}), 400
         
     problem_id = problem_ids[index]
-    all_words = load_word_data_for_room(user.room_number)
+    all_words = load_word_data_for_room(target_room)
     # 生IDとハッシュIDの両方で引けるようにマップ化
     word_by_id = {}
     for w in all_words:
@@ -22973,7 +22990,13 @@ def submit_daily_quiz():
     user_answers = data.get('answers') # クライアントからの回答リストを受け取る
     time_taken = data.get('time')
 
-    daily_quiz = DailyQuiz.query.filter_by(date=today, room_number=user.room_number).first()
+    target_room = user.room_number
+    if target_room == 'ADMIN':
+        target_room = session.get('admin_daily_quiz_room')
+        if not target_room:
+            return jsonify({'status': 'error', 'message': '対象の部屋が選択されていません'}), 400
+
+    daily_quiz = DailyQuiz.query.filter_by(date=today, room_number=target_room).first()
     if not daily_quiz:
         return jsonify({'status': 'error', 'message': '今日のクイズが見つかりません。'}), 404
 
@@ -22984,7 +23007,7 @@ def submit_daily_quiz():
         # サーバー側でスコアを計算 (クライアントからのスコアを信用しない)
         server_calculated_score = 0
         problem_ids_in_db = daily_quiz.get_problem_ids()
-        all_words = load_word_data_for_room(user.room_number)
+        all_words = load_word_data_for_room(target_room)
         
         # 生IDとハッシュIDの両方で引けるようにマップ化 (辞書1回作成で済ませる)
         word_by_id = {}
@@ -23021,7 +23044,7 @@ def submit_daily_quiz():
         current_year = today.year
         current_month = today.month
         monthly_top_5, monthly_user_rank, monthly_participants = get_monthly_ranking(
-            user.room_number, user.id, current_year, current_month
+            target_room, user.id, current_year, current_month
         )
 
         # --- 前回のランキングデータを取得 ---
@@ -23031,7 +23054,7 @@ def submit_daily_quiz():
         
         previous_quiz = DailyQuiz.query.filter(
             DailyQuiz.date < today, 
-            DailyQuiz.room_number == user.room_number
+            DailyQuiz.room_number == target_room
         ).order_by(DailyQuiz.date.desc()).first()
 
         if previous_quiz:
@@ -23327,7 +23350,7 @@ def admin_delete_room_score():
     success_count = 0
     try:
         for user in users:
-            if user.username == 'admin':
+            if user.room_number == 'ADMIN':
                 continue
             if delete_user_score_data(user):
                 # 統計再作成
@@ -24040,7 +24063,7 @@ def enforce_first_time_password_change():
     if not user:
         return
 
-    if user.username == 'admin' or getattr(user, 'is_manager', False):
+    if user.room_number == 'ADMIN' or getattr(user, 'is_manager', False):
         return
 
     if hasattr(user, 'is_first_login') and user.is_first_login:
@@ -24061,7 +24084,7 @@ def check_room_restrictions():
     if not user:
         return
         
-    if user.username == 'admin' or user.is_manager:
+    if user.room_number == 'ADMIN' or user.is_manager:
         return
 
     # 部屋設定を確認
