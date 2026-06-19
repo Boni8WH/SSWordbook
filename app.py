@@ -22779,6 +22779,7 @@ def get_daily_quiz():
         if not target_room:
             rooms = [r.room_number for r in RoomSetting.query.filter(RoomSetting.room_number != 'ADMIN').all()]
             return jsonify({'status': 'need_room_selection', 'rooms': rooms})
+        session['admin_daily_quiz_room'] = target_room
     else:
         target_room = user.room_number
 
