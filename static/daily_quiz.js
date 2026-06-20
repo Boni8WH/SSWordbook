@@ -13,9 +13,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
 let quizTimerInterval;
 let startTime;
+const showDynamicWarning = () => {
+    const banner = document.getElementById('dynamicWarningBanner');
+    if (banner) {
+        banner.innerHTML = `<div class="alert alert-danger py-1 px-2 my-2 text-center" style="font-size: 0.85em; margin-bottom: 10px; box-shadow: 0 0 10px rgba(231, 76, 60, 0.5);">
+            <i class="fas fa-exclamation-triangle"></i> ページを離れたりリロードすると今回の記録は無効になります！
+        </div>`;
+        banner.style.display = 'block';
+    }
+};
+
 const beforeUnloadHandler = (e) => {
+    showDynamicWarning();
     e.preventDefault();
     e.returnValue = '';
+};
+
+const mouseLeaveHandler = (e) => {
+    if (e.clientY <= 10) {
+        showDynamicWarning();
+    }
 };
 /**
  * クイズ用のモーダル（ポップアップ）を作成して表示
@@ -179,6 +196,7 @@ function runQuiz(questions) {
         modalElement.querySelector('.modal-footer .btn-secondary').style.display = 'none';
     }
     window.addEventListener('beforeunload', beforeUnloadHandler);
+    document.addEventListener('mouseleave', mouseLeaveHandler);
 
     function showQuestion() {
         if (currentQuestionIndex >= questions.length) {
@@ -195,6 +213,7 @@ function runQuiz(questions) {
                 <span class="quiz-progress-text">${currentQuestionIndex + 1} / ${questions.length}</span>
                 <span class="quiz-timer" id="quizTimer">0.00秒</span>
             </div>
+            <div id="dynamicWarningBanner" style="display: none;"></div>
             <div class="quiz-question-text">${q.question}</div>
             <div class="quiz-choices">
                 ${q.choices.map((choice, index) => `<button class="btn choice-btn" data-choice-index="${index}">${choice}</button>`).join('')}
@@ -293,6 +312,7 @@ async function submitQuizResult(answers, time) {
 
     // ページ離脱警告を解除し、閉じるボタンを有効化
     window.removeEventListener('beforeunload', beforeUnloadHandler);
+    document.removeEventListener('mouseleave', mouseLeaveHandler);
     const modalElement = document.getElementById('dailyQuizModal');
     if (modalElement) {
         // 非表示にしていたボタンを再度表示する
@@ -469,7 +489,7 @@ function displayQuizResult(userResult, top5Ranking, userRank, totalParticipants,
             <div class="result-summary">
                 <p>スコア: <span>${userResult.score} / 10</span></p>
                 <p>タイム: <span>${userResult.time}</span></p>
-                ${userRank ? `<p>本日の順位: <span>${userRank.rank}位</span> / ${totalParticipants}人中</p>` : ''}
+                ${userRank ? `<p>本日の順位: <span style="${userRank.is_invalid ? 'color: #e74c3c; font-size: 0.9em;' : ''}">${userRank.is_invalid ? '圏外 (再試行)' : userRank.rank + '位'}</span> ${userRank.is_invalid ? '' : '/ ' + totalParticipants + '人中'}</p>` : ''}
             </div>
 
             <hr class="result-divider">

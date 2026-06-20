@@ -565,9 +565,22 @@ class DailyQuizResult(db.Model):
     score = db.Column(db.Integer, nullable=False)  # 正解数
     time_taken_ms = db.Column(db.Integer, nullable=False)  # ミリ秒単位でのタイム
     completed_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))
+    is_valid_for_ranking = db.Column(db.Boolean, default=True, nullable=False, server_default='1')
 
     user = db.relationship('User', backref=db.backref('daily_quiz_results', lazy=True, cascade="all, delete-orphan"))
     quiz = db.relationship('DailyQuiz', backref=db.backref('results', lazy=True, cascade="all, delete-orphan"))
+
+class DailyQuizAttempt(db.Model):
+    """ユーザーが今日の10問を開始した記録を保存するテーブル（リロード対策）"""
+    __tablename__ = 'daily_quiz_attempt'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False)
+    quiz_id = db.Column(db.Integer, db.ForeignKey('daily_quiz.id', ondelete='CASCADE'), nullable=False)
+    started_at = db.Column(db.DateTime, default=lambda: datetime.now(JST))
+    is_valid = db.Column(db.Boolean, default=True, nullable=False)
+
+    __table_args__ = (db.UniqueConstraint('user_id', 'quiz_id', name='uq_daily_quiz_attempt_user_quiz'),)
+
 
 class MonthlyScore(db.Model):
     """月間の累計スコアを保存するテーブル"""
@@ -3088,7 +3101,7 @@ def process_daily_quiz_results_for_scoring(quiz_id):
 
         # print(f"月間スコア集計開始: クイズID {quiz_id} (日付: {quiz.date})")
         
-        results = DailyQuizResult.query.filter_by(quiz_id=quiz_id)\
+        results = DailyQuizResult.query.filter_by(quiz_id=quiz_id, is_valid_for_ranking=True)\
             .options(joinedload(DailyQuizResult.user))\
             .order_by(DailyQuizResult.score.desc(), DailyQuizResult.time_taken_ms.asc()).all()
 
@@ -22741,15 +22754,15 @@ def get_daily_ranking_data(quiz_id, current_user_id):
     """
     指定されたクイズIDの結果から、ランキング（トップ5とユーザー自身のランク）を取得するヘルパー関数
     """
-    all_results = DailyQuizResult.query.filter_by(quiz_id=quiz_id)\
+    all_valid_results = DailyQuizResult.query.filter_by(quiz_id=quiz_id, is_valid_for_ranking=True)\
         .options(joinedload(DailyQuizResult.user))\
         .order_by(DailyQuizResult.score.desc(), DailyQuizResult.time_taken_ms.asc()).all()
     
-    total_participants = len(all_results)
+    total_participants = len(all_valid_results)
     top_5_ranking = []
     current_user_rank_info = None
 
-    for i, result in enumerate(all_results, 1):
+    for i, result in enumerate(all_valid_results, 1):
         if not result.user: continue
         rank_entry = {
             'rank': i, 
@@ -22762,6 +22775,20 @@ def get_daily_ranking_data(quiz_id, current_user_id):
         if i <= 5: top_5_ranking.append(rank_entry)
         if result.user_id == current_user_id: current_user_rank_info = rank_entry
         
+    # もし current_user_rank_info が None なら、再試行等でランキング除外されているか確認
+    if not current_user_rank_info:
+        user_result = DailyQuizResult.query.filter_by(quiz_id=quiz_id, user_id=current_user_id).first()
+        if user_result and not user_result.is_valid_for_ranking:
+            current_user_rank_info = {
+                'rank': '-',
+                'username': user_result.user.username,
+                'title': user_result.user.equipped_rpg_enemy.badge_name if user_result.user.equipped_rpg_enemy else None,
+                'score': user_result.score,
+                'time': f"{(user_result.time_taken_ms / 1000):.2f}秒",
+                'is_admin': user_result.user.room_number == 'ADMIN',
+                'is_invalid': True
+            }
+
     return top_5_ranking, current_user_rank_info, total_participants
 
 @app.route('/api/daily_quiz/today')
@@ -22869,6 +22896,19 @@ def get_daily_quiz():
         daily_quiz = DailyQuiz(date=today, room_number=target_room, problem_ids_json=json.dumps(problem_ids), monthly_score_processed=False)
         db.session.add(daily_quiz)
         db.session.commit()
+
+    # --- クイズ開始の記録（リロード対策） ---
+    attempt = DailyQuizAttempt.query.filter_by(user_id=user.id, quiz_id=daily_quiz.id).first()
+    if not attempt:
+        # 初回アクセス
+        attempt = DailyQuizAttempt(user_id=user.id, quiz_id=daily_quiz.id, is_valid=True)
+        db.session.add(attempt)
+        db.session.commit()
+    else:
+        # 2回目以降のアクセス（リロードなど）は無効扱いにする
+        if attempt.is_valid:
+            attempt.is_valid = False
+            db.session.commit()
 
     # --- クイズデータの構築 (高速化版) ---
     problem_ids_in_db = daily_quiz.get_problem_ids()
@@ -23028,11 +23068,15 @@ def submit_daily_quiz():
                 if user_answer_obj and user_answer_obj.get('choice') == correct_answer:
                     server_calculated_score += 1
 
+        attempt = DailyQuizAttempt.query.filter_by(user_id=user.id, quiz_id=daily_quiz.id).first()
+        is_valid_attempt = attempt.is_valid if attempt else False
+
         new_result = DailyQuizResult(
             user_id=user.id,
             quiz_id=daily_quiz.id,
             score=server_calculated_score,
-            time_taken_ms=time_taken
+            time_taken_ms=time_taken,
+            is_valid_for_ranking=is_valid_attempt
         )
         db.session.add(new_result)
         db.session.commit()
@@ -24186,6 +24230,19 @@ def check_and_create_correction_tables():
                             conn.execute(text("ALTER TABLE essay_correction_requests ADD COLUMN is_read_by_user BOOLEAN DEFAULT 0"))
                         conn.commit()
                         print("✅ is_read_by_user column added.")
+                        
+            if inspector.has_table('daily_quiz_result'):
+                columns = [c['name'] for c in inspector.get_columns('daily_quiz_result')]
+                
+                with db.engine.connect() as conn:
+                    if 'is_valid_for_ranking' not in columns:
+                        print("Migrating: Adding is_valid_for_ranking column to daily_quiz_result")
+                        if db.engine.dialect.name == 'postgresql':
+                            conn.execute(text("ALTER TABLE daily_quiz_result ADD COLUMN is_valid_for_ranking BOOLEAN DEFAULT TRUE"))
+                        else:
+                            conn.execute(text("ALTER TABLE daily_quiz_result ADD COLUMN is_valid_for_ranking BOOLEAN DEFAULT 1 NOT NULL"))
+                        conn.commit()
+                        print("✅ is_valid_for_ranking column added.")
         except Exception as e:
             print(f"Error creating tables: {e}")
 
