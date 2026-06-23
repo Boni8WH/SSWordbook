@@ -23971,10 +23971,10 @@ def check_and_migrate_ai_tickets():
             with db.engine.connect() as conn:
                 if 'ai_tickets' not in columns:
                     print("Migrating: Adding ai_tickets column to user")
-                    conn.execute(text("ALTER TABLE user ADD COLUMN ai_tickets INTEGER DEFAULT 10 NOT NULL"))
+                    conn.execute(text('ALTER TABLE "user" ADD COLUMN ai_tickets INTEGER DEFAULT 10 NOT NULL'))
                 if 'last_ai_ticket_date' not in columns:
                     print("Migrating: Adding last_ai_ticket_date column to user")
-                    conn.execute(text("ALTER TABLE user ADD COLUMN last_ai_ticket_date DATE"))
+                    conn.execute(text('ALTER TABLE "user" ADD COLUMN last_ai_ticket_date DATE'))
                 conn.commit()
         except Exception as e:
             print(f"Migration check failed: {e}")
