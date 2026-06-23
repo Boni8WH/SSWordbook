@@ -485,6 +485,10 @@ class User(db.Model):
     # ユーザー個別メッセージ（一度だけ画面に流れるテキスト）
     pending_message = db.Column(db.Text, nullable=True)
 
+    # AIチケット制
+    ai_tickets = db.Column(db.Integer, default=10, nullable=False)
+    last_ai_ticket_date = db.Column(db.Date, nullable=True)
+
     @property
     def is_authenticated(self):
         return True
@@ -2771,9 +2775,26 @@ def inject_global_vars():
         room_number=session.get('room_number')
     )
     
+    # AIチケット残数を取得
+    ai_tickets_remaining = None
+    if 'user_id' in session and session['user_id']:
+        user = User.query.get(session['user_id'])
+        if user:
+            # 取得と同時に日付チェック（リセット処理）も行う
+            from datetime import datetime
+            import pytz
+            JST = pytz.timezone('Asia/Tokyo')
+            today = datetime.now(JST).date()
+            if user.last_ai_ticket_date != today:
+                user.ai_tickets = 10
+                user.last_ai_ticket_date = today
+                db.session.commit()
+            ai_tickets_remaining = user.ai_tickets
+
     return dict(
         get_logo_url=get_logo_url,
-        app_info_for_js=app_info_for_js
+        app_info_for_js=app_info_for_js,
+        ai_tickets_remaining=ai_tickets_remaining
     )
 
 def get_app_info_dict(user_id=None, username=None, room_number=None):
@@ -5338,6 +5359,15 @@ def api_search_essays_ai():
         
         if not keywords:
              return jsonify({'status': 'success', 'results': []})
+
+        # チケット消費チェック
+        if 'user_id' in session and session['user_id']:
+            user = User.query.get(session['user_id'])
+            if user and not consume_ai_ticket(user):
+                return jsonify({
+                    'status': 'error', 
+                    'message': '本日のAIチケットを使い切りました！明日の回復をお待ちください。'
+                }), 403
 
         # 1. DBフィルタリング
         # メモリ最適化: 必要なカラムのみ取得し、軽量なタプルとして扱う
@@ -15335,6 +15365,27 @@ class TextbookManager:
                          break
         return content, used_titles
 
+def check_and_reset_ai_tickets(user):
+    """日付をまたいでいればチケットを10にリセットする"""
+    from datetime import datetime
+    import pytz
+    JST = pytz.timezone('Asia/Tokyo')
+    today = datetime.now(JST).date()
+    if user.last_ai_ticket_date != today:
+        user.ai_tickets = 10
+        user.last_ai_ticket_date = today
+        db.session.commit()
+    return user.ai_tickets
+
+def consume_ai_ticket(user):
+    """チケットを1枚消費する。残量が0ならFalseを返す"""
+    check_and_reset_ai_tickets(user)
+    if user.ai_tickets > 0:
+        user.ai_tickets -= 1
+        db.session.commit()
+        return True
+    return False
+
 @app.route('/api/essay/grade', methods=['POST'])
 def essay_grade():
     """論述問題の添削を行う"""
@@ -15352,6 +15403,15 @@ def essay_grade():
     if not data:
         return jsonify({'status': 'error', 'message': 'No data provided'}), 400
         
+    # チケット消費チェック
+    if 'user_id' in session and session['user_id']:
+        user = User.query.get(session['user_id'])
+        if user and not consume_ai_ticket(user):
+            return jsonify({
+                'status': 'error', 
+                'message': '本日のAIチケットを使い切りました！\n残りの時間は自力で考えるか、先生に質問してみよう！'
+            }), 403
+
     feedback_style = data.get('feedback_style', 'concise')
     problem_id = data.get('problem_id')
     user_answer = data.get('user_answer')
@@ -23898,8 +23958,30 @@ def check_and_migrate_rpg_columns():
         except Exception as e:
             print(f"Migration check failed: {e}")
 
+def check_and_migrate_ai_tickets():
+    """Ensure User table has ai_tickets columns."""
+    from sqlalchemy import text, inspect
+    with app.app_context():
+        try:
+            inspector = inspect(db.engine)
+            if not inspector.has_table('user'):
+                return
+            
+            columns = [c['name'] for c in inspector.get_columns('user')]
+            with db.engine.connect() as conn:
+                if 'ai_tickets' not in columns:
+                    print("Migrating: Adding ai_tickets column to user")
+                    conn.execute(text("ALTER TABLE user ADD COLUMN ai_tickets INTEGER DEFAULT 10 NOT NULL"))
+                if 'last_ai_ticket_date' not in columns:
+                    print("Migrating: Adding last_ai_ticket_date column to user")
+                    conn.execute(text("ALTER TABLE user ADD COLUMN last_ai_ticket_date DATE"))
+                conn.commit()
+        except Exception as e:
+            print(f"Migration check failed: {e}")
+
 # Run migration check on startup
 check_and_migrate_rpg_columns()
+check_and_migrate_ai_tickets()
 
 def check_and_migrate_room_setting():
     """Ensure RoomSetting table has new columns."""

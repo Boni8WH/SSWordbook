@@ -3966,7 +3966,7 @@ document.addEventListener('DOMContentLoaded', () => {
 function checkRpgStatus() {
     if (!window.appInfoFromFlask || !window.appInfoFromFlask.isLoggedIn) return; // Login check
 
-    fetch('/api/rpg/status')
+    fetch('/api/rpg/status?t=' + new Date().getTime())
         .then(res => res.json())
         .then(data => {
             const banner = document.getElementById('rpgTriggerBanner');
