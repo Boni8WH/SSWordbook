@@ -219,6 +219,7 @@
                                         <div class="d-flex gap-2 justify-content-md-end flex-wrap">
                                             <select id="ranking-sort" class="form-select" style="max-width: 150px;">
                                                 <option value="score" selected>スコア順</option>
+                                                <option value="student_id">出席番号順</option>
                                                 <option value="accuracy">正答率順</option>
                                                 <option value="attempts">回答数順</option>
                                                 <option value="last_action">最終アクション順</option>
@@ -240,6 +241,7 @@
                                                 <th class="sticky-col-2">現在名</th>
                                                 <th>初期名</th>
                                                 <th>部屋</th>
+                                                <th>出席番号</th>
                                                 <th>回答数</th>
                                                 <th>正解数</th>
                                                 <th>正答率</th>
@@ -934,6 +936,7 @@
             <td class="sticky-col-2"><strong>${currentName}</strong></td>
             <td><span class="text-muted">${originalName}</span></td>
             <td>${user.room_number || '-'}</td>
+            <td><code>${user.student_id || '-'}</code></td>
             <td><span class="badge bg-primary">${totalAttempts}</span></td>
             <td><span class="badge bg-success">${totalCorrect}</span></td>
             <td>${accuracyRate}%</td>
@@ -1051,9 +1054,13 @@
 
         rows.forEach(row => {
             const username = row.cells[1] ? row.cells[1].textContent.toLowerCase() : '';
-            const room = row.cells[2] ? row.cells[2].textContent.toLowerCase() : '';
-            const studentId = row.cells[3] ? row.cells[3].textContent.toLowerCase() : '';
-            const isMatch = username.includes(searchTerm) || room.includes(searchTerm) || studentId.includes(searchTerm);
+            const originalName = row.cells[2] ? row.cells[2].textContent.toLowerCase() : '';
+            const room = row.cells[3] ? row.cells[3].textContent.toLowerCase() : '';
+            const studentId = row.cells[4] ? row.cells[4].textContent.toLowerCase() : '';
+            const isMatch = username.includes(searchTerm) || 
+                            originalName.includes(searchTerm) || 
+                            room.includes(searchTerm) || 
+                            studentId.includes(searchTerm);
             row.style.display = isMatch ? '' : 'none';
         });
     }
@@ -1089,13 +1096,13 @@
                 break;
             case 'student_id':
                 sortedData.sort((a, b) => {
-                    const roomA = a.room_number || '';
-                    const roomB = b.room_number || '';
+                    const roomA = String(a.room_number || '');
+                    const roomB = String(b.room_number || '');
                     if (roomA !== roomB) {
                         return roomA.localeCompare(roomB, undefined, { numeric: true });
                     }
-                    const idA = a.student_id || '';
-                    const idB = b.student_id || '';
+                    const idA = String(a.student_id || '');
+                    const idB = String(b.student_id || '');
                     return currentSortOrder === 'asc' ?
                         idA.localeCompare(idB, undefined, { numeric: true }) :
                         idB.localeCompare(idA, undefined, { numeric: true });
@@ -1220,7 +1227,7 @@
 
         try {
             // CSVデータを作成
-            const csvHeader = '\uFEFF' + '順位,部屋,現在名,初期名,最終ログイン,回答数,正解数,正答率,マスター数,総合スコア,網羅率\n';
+            const csvHeader = '\uFEFF' + '順位,部屋,出席番号,現在名,初期名,最終ログイン,回答数,正解数,正答率,マスター数,総合スコア,網羅率\n';
             const csvRows = currentRankingData.map((user, index) => {
                 const lastLogin = formatLastLogin(user.last_login);
                 const currentName = user.username || 'Unknown';
@@ -1230,6 +1237,7 @@
                 return [
                     rank,
                     `"${user.room_number || ''}"`,
+                    `"${user.student_id || ''}"`,
                     `"${currentName}"`,
                     `"${originalName}"`,
                     `"${lastLogin}"`,
