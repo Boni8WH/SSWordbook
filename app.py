@@ -13654,9 +13654,7 @@ def admin_api_chrono_reorder_chapters():
     if 'user_id' not in session:
         return jsonify({'status': 'error', 'message': 'ログインが必要です'}), 401
     
-    current_user_id = session.get('user_id')
-    user = User.query.get(current_user_id)
-    if not user or (user.username != 'admin' and not user.is_manager):
+    if not session.get('admin_logged_in') and not session.get('manager_logged_in'):
         return jsonify({'status': 'error', 'message': '権限がありません'}), 403
 
     try:
@@ -13689,9 +13687,7 @@ def admin_api_chrono_rename_chapter():
     if 'user_id' not in session:
         return jsonify({'status': 'error', 'message': 'ログインが必要です'}), 401
     
-    current_user_id = session.get('user_id')
-    user = User.query.get(current_user_id)
-    if not user or (user.username != 'admin' and not user.is_manager):
+    if not session.get('admin_logged_in') and not session.get('manager_logged_in'):
         return jsonify({'status': 'error', 'message': '権限がありません'}), 403
 
     try:
