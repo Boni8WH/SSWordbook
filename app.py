@@ -18630,12 +18630,17 @@ def admin_essay_upload_csv():
                 problem_id_str = normalized_row.get('id', '').strip()
                 existing_problem = None
                 
-                if not replace_existing and problem_id_str:
-                    try:
-                        problem_id = int(problem_id_str)
-                        existing_problem = EssayProblem.query.get(problem_id)
-                    except ValueError:
-                        pass # IDが数値でない場合は新規作成扱い
+                if not replace_existing:
+                    if problem_id_str:
+                        try:
+                            problem_id = int(problem_id_str)
+                            existing_problem = EssayProblem.query.get(problem_id)
+                        except ValueError:
+                            pass # IDが数値でない場合は新規作成扱い
+                    
+                    if not existing_problem:
+                        existing_problem = EssayProblem.query.filter_by(chapter=chapter, question=question).first()
+
                 
                 if existing_problem:
                     # 既存の問題を更新
@@ -22340,8 +22345,14 @@ def equip_rpg_title():
     data = request.json
     enemy_id = data.get('enemy_id')
     
-    if not enemy_id:
+    if enemy_id is None:
         return jsonify({'status': 'error', 'message': 'Enemy ID is required'}), 400
+        
+    if str(enemy_id) == '0' or str(enemy_id).lower() == 'none' or enemy_id == '':
+        user = User.query.get(user_id)
+        user.equipped_rpg_enemy_id = None
+        db.session.commit()
+        return jsonify({'status': 'success', 'message': '称号を外しました'})
         
     # Check if user has cleared this enemy
     rpg_state = RpgState.query.filter_by(user_id=user_id).first()
@@ -24517,47 +24528,77 @@ def admin_chrono_upload_csv():
             ChronologicalProblem.query.delete()
             
         added_count = 0
+        updated_count = 0
+        
+        has_id = headers and headers[0].lower() == 'id'
+        start_idx = 1 if has_id else 0
+        
         for row in reader:
-            if not row or len(row) < 7:
+            if not row:
+                continue
+                
+            if has_id and len(row) < 8:
+                continue
+            elif not has_id and len(row) < 7:
                 continue
             
-            chapter = row[0].strip()
-            university = row[1].strip() if len(row) > 1 else ''
-            year_str = row[2].strip() if len(row) > 2 else ''
+            problem_id_str = row[0].strip() if has_id else ''
+            
+            chapter = row[start_idx].strip()
+            university = row[start_idx+1].strip() if len(row) > start_idx+1 else ''
+            year_str = row[start_idx+2].strip() if len(row) > start_idx+2 else ''
             year = int(year_str) if year_str.isdigit() else None
-            diff_str = row[3].strip() if len(row) > 3 else '2'
+            diff_str = row[start_idx+3].strip() if len(row) > start_idx+3 else '2'
             difficulty = int(diff_str) if diff_str.isdigit() and 1 <= int(diff_str) <= 4 else 2
-            question = row[4].strip() if len(row) > 4 else ''
-            explanation = row[5].strip() if len(row) > 5 else ''
+            question = row[start_idx+4].strip() if len(row) > start_idx+4 else ''
+            explanation = row[start_idx+5].strip() if len(row) > start_idx+5 else ''
             
             # items are from index 6 onwards
             items = []
-            for i in range(6, len(row)):
+            for i in range(start_idx+6, len(row)):
                 text = row[i].strip()
                 if text:
                     items.append({
-                        'id': i - 5,
-                        'order': i - 5,
+                        'id': i - (start_idx+5),
+                        'order': i - (start_idx+5),
                         'text': text
                     })
             
             if len(items) < 2:
                 continue # Skip problems with < 2 items
                 
-            problem = ChronologicalProblem(
-                chapter=chapter,
-                university=university,
-                year=year,
-                difficulty=difficulty,
-                question=question,
-                explanation=explanation,
-                items=items
-            )
-            db.session.add(problem)
-            added_count += 1
+            existing_problem = None
+            if not replace_existing:
+                if problem_id_str and problem_id_str.isdigit():
+                    existing_problem = ChronologicalProblem.query.get(int(problem_id_str))
+                
+                if not existing_problem:
+                    existing_problem = ChronologicalProblem.query.filter_by(chapter=chapter, question=question).first()
+                    
+            if existing_problem:
+                existing_problem.chapter = chapter
+                existing_problem.university = university
+                existing_problem.year = year
+                existing_problem.difficulty = difficulty
+                existing_problem.question = question
+                existing_problem.explanation = explanation
+                existing_problem.items = items
+                updated_count += 1
+            else:
+                problem = ChronologicalProblem(
+                    chapter=chapter,
+                    university=university,
+                    year=year,
+                    difficulty=difficulty,
+                    question=question,
+                    explanation=explanation,
+                    items=items
+                )
+                db.session.add(problem)
+                added_count += 1
             
         db.session.commit()
-        return jsonify({'status': 'success', 'added': added_count})
+        return jsonify({'status': 'success', 'added': added_count, 'updated': updated_count})
         
     except Exception as e:
         db.session.rollback()
@@ -24572,10 +24613,11 @@ def admin_chrono_download_csv():
         writer = csv.writer(si)
         
         # Header
-        writer.writerow(['chapter', 'university', 'year', 'difficulty', 'question', 'explanation', 'item1', 'item2', 'item3', 'item4', 'item...'])
+        writer.writerow(['id', 'chapter', 'university', 'year', 'difficulty', 'question', 'explanation', 'item1', 'item2', 'item3', 'item4', 'item...'])
         
         for p in problems:
             row = [
+                p.id,
                 p.chapter,
                 p.university or '',
                 p.year or '',

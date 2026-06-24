@@ -560,7 +560,7 @@ function saveChronoProblem() {
 }
 
 function downloadChronoTemplate() {
-    const csvContent = "chapter,university,year,difficulty,question,explanation,item1,item2,item3,item4\n1,東大,2024,2,,,大化の改新,壬申の乱,平城京遷都,平安京遷都\n";
+    const csvContent = "id,chapter,university,year,difficulty,question,explanation,item1,item2,item3,item4\n,1,東大,2024,2,,,大化の改新,壬申の乱,平城京遷都,平安京遷都\n";
     const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
@@ -607,7 +607,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 .then(response => response.json())
                 .then(result => {
                     if (result.status === 'success') {
-                        showChronoToast(`${result.added}件の問題をインポートしました`, 'success');
+                        showChronoToast(`${result.added}件を追加、${result.updated || 0}件を更新しました`, 'success');
                         this.reset();
                         document.getElementById('chrono_filename_display').textContent = '';
                         loadChronoProblems(1);

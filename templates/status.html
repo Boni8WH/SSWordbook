@@ -153,9 +153,12 @@
                 </p>
             </div>
             <div class="modal-footer border-top-0 justify-content-center flex-column">
-                <div class="d-flex gap-2 w-75 mb-2">
+                <div class="d-flex flex-wrap gap-2 w-100 justify-content-center mb-2 px-3">
                     <button type="button" class="btn btn-warning flex-grow-1" id="equipTitleBtn" onclick="equipTitle()">
                         <i class="fas fa-crown me-2"></i>称号装備
+                    </button>
+                    <button type="button" class="btn btn-secondary flex-grow-1" id="unequipTitleBtn" onclick="unequipTitle()">
+                        <i class="fas fa-times me-2"></i>外す
                     </button>
                     <button type="button" class="btn btn-danger flex-grow-1" id="rematchBtn" onclick="confirmRematch()">
                         <i class="fas fa-swords me-2"></i>再戦
@@ -405,6 +408,41 @@
                     msg.textContent = '称号を装備しました！';
                     msg.className = 'text-success small mb-2';
                     // 短時間後にリロードして反映
+                    setTimeout(() => {
+                        location.reload();
+                    }, 1000);
+                } else {
+                    msg.textContent = data.message;
+                    msg.className = 'text-danger small mb-2';
+                    btn.disabled = false;
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                msg.textContent = 'エラーが発生しました';
+                msg.className = 'text-danger small mb-2';
+                btn.disabled = false;
+            });
+    }
+
+    function unequipTitle() {
+        const btn = document.getElementById('unequipTitleBtn');
+        const msg = document.getElementById('equipMessage');
+
+        btn.disabled = true;
+
+        fetch('/api/rpg/equip_title', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ enemy_id: 'none' })
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    msg.textContent = '称号を外しました！';
+                    msg.className = 'text-success small mb-2';
                     setTimeout(() => {
                         location.reload();
                     }, 1000);
