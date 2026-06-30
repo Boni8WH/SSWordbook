@@ -90,7 +90,7 @@
                             <th style="min-width: 100px; width: 100px;">名前</th>
                             <th style="min-width: 100px; width: 100px;">称号</th>
                             <th style="min-width: 65px; width: 65px;">回答数</th>
-                            <th style="min-width: 65px; width: 65px;">正解数</th>
+                            <th style="min-width: 65px; width: 65px;">正答値</th>
                             <th style="min-width: 65px; width: 65px;">正答率</th>
                             <th style="min-width: 85px; width: 85px;">総合スコア</th>
                             <th style="min-width: 65px; width: 65px;">網羅率</th>
@@ -276,8 +276,8 @@
             <td class="text-truncate" style="max-width: 120px;" title="${user.title || ''}">
                 <span class="${user.title ? 'premium-badge-title' : ''}">${user.title || '-'}</span>
             </td>
-            <td>${user.total_attempts}</td>
-            <td>${user.total_correct}</td>
+            <td>${Math.round(user.total_attempts || 0)}</td>
+            <td>${parseFloat((user.total_correct || 0).toFixed(1))}</td>
             <td>${user.accuracy_rate.toFixed(1)}%</td>
             <td><strong>${user.balance_score.toFixed(1)}</strong></td>
             <td>${user.coverage_rate.toFixed(1)}%</td>
@@ -319,8 +319,8 @@
 
         document.getElementById('yearly-basic-stats').innerHTML = `
         <p><strong>令和${REIWA_YEAR}年度 基本統計:</strong>
-            回答数: ${userStats.total_attempts}回 |
-            正解数: ${userStats.total_correct}回 |
+            回答数: ${Math.round(userStats.total_attempts)}回 |
+            正答値: ${parseFloat(userStats.total_correct.toFixed(1))} |
             正答率: ${userStats.accuracy_rate.toFixed(1)}% |
             マスター数: ${userStats.mastered_count}問 |
             網羅率: ${userStats.coverage_rate.toFixed(1)}%
@@ -362,8 +362,8 @@
 
         document.getElementById('cumulative-basic-stats').innerHTML = `
         <p><strong>累計 基本統計:</strong>
-            回答数: ${userStats.total_attempts}回 |
-            正解数: ${userStats.total_correct}回 |
+            回答数: ${Math.round(userStats.total_attempts)}回 |
+            正答値: ${parseFloat(userStats.total_correct.toFixed(1))} |
             正答率: ${userStats.accuracy_rate.toFixed(1)}% |
             マスター数: ${userStats.mastered_count}問 |
             網羅率: ${userStats.coverage_rate.toFixed(1)}%

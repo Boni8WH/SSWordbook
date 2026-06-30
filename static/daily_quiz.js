@@ -235,21 +235,8 @@ function runQuiz(questions) {
         quizContainer.querySelectorAll('.choice-btn').forEach(btn => btn.disabled = true);
 
         try {
-            // サーバーに正誤確認を問い合わせる
-            const response = await fetch('/api/daily_quiz/check', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    index: currentQuestionIndex,
-                    choice: selectedChoice
-                })
-            });
-            const data = await response.json();
-
-            if (data.status !== 'success') throw new Error(data.message);
-
-            const isCorrect = data.is_correct;
-            const correctAnswer = data.correct_answer;
+            const correctAnswer = currentQuestion.answer;
+            const isCorrect = (selectedChoice === correctAnswer);
 
             // 回答を記録
             userAnswers.push({

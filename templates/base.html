@@ -56,6 +56,101 @@
             margin-bottom: 0.1em;
             /* Subtle adjustment for Font Awesome icons which often feel slightly "top-heavy" */
         }
+
+        /* ===== ナビボタン 統一グラデーションスタイル ===== */
+        .nav-grad-btn {
+            border: none !important;
+            font-weight: 700;
+            background-size: 200% auto !important;
+            transition: box-shadow 0.2s, transform 0.15s;
+            animation: navGradShift 3s linear infinite;
+        }
+
+        .nav-grad-btn:hover {
+            transform: scale(1.08);
+        }
+
+        @keyframes navGradShift {
+            0% {
+                background-position: 0% center;
+            }
+
+            100% {
+                background-position: 200% center;
+            }
+        }
+
+        /* 進捗確認: 青グラデーション */
+        .progress-btn {
+            background: linear-gradient(135deg, #4facfe 0%, #2563eb 50%, #4facfe 100%) !important;
+            color: #fff !important;
+            box-shadow: 0 2px 8px rgba(79, 172, 254, 0.45);
+        }
+
+        .progress-btn:hover {
+            box-shadow: 0 4px 14px rgba(37, 99, 235, 0.65);
+            color: #fff !important;
+        }
+
+        /* 完璧問題: 金グラデーション */
+        .perfect-btn {
+            background: linear-gradient(135deg, #f7c948 0%, #e6a817 50%, #f7c948 100%) !important;
+            color: #5a3e00 !important;
+            box-shadow: 0 2px 8px rgba(230, 168, 23, 0.45);
+        }
+
+        .perfect-btn:hover {
+            box-shadow: 0 4px 14px rgba(230, 168, 23, 0.7);
+            color: #3a2800 !important;
+        }
+
+        /* 設定: スレートグラデーション */
+        .setting-btn {
+            background: linear-gradient(135deg, #8b96a8 0%, #5a6577 50%, #8b96a8 100%) !important;
+            color: #fff !important;
+            box-shadow: 0 2px 8px rgba(90, 101, 119, 0.4);
+        }
+
+        .setting-btn:hover {
+            box-shadow: 0 4px 14px rgba(90, 101, 119, 0.65);
+            color: #fff !important;
+        }
+
+        /* 担当者/管理: オレンジグラデーション */
+        .manager-btn {
+            background: linear-gradient(135deg, #ffa726 0%, #e65c00 50%, #ffa726 100%) !important;
+            color: #fff !important;
+            box-shadow: 0 2px 8px rgba(230, 92, 0, 0.4);
+        }
+
+        .manager-btn:hover {
+            box-shadow: 0 4px 14px rgba(230, 92, 0, 0.65);
+            color: #fff !important;
+        }
+
+        /* 表示名変更: パープルグラデーション */
+        .username-btn {
+            background: linear-gradient(135deg, #b388ff 0%, #7c3aed 50%, #b388ff 100%) !important;
+            color: #fff !important;
+            box-shadow: 0 2px 8px rgba(124, 58, 237, 0.4);
+        }
+
+        .username-btn:hover {
+            box-shadow: 0 4px 14px rgba(124, 58, 237, 0.65);
+            color: #fff !important;
+        }
+
+        /* ログアウト: 赤グラデーション */
+        .logout-btn {
+            background: linear-gradient(135deg, #ff6b6b 0%, #c0392b 50%, #ff6b6b 100%) !important;
+            color: #fff !important;
+            box-shadow: 0 2px 8px rgba(192, 57, 43, 0.4);
+        }
+
+        .logout-btn:hover {
+            box-shadow: 0 4px 14px rgba(192, 57, 43, 0.65);
+            color: #fff !important;
+        }
     </style>
 
     {% block head_extra %}{% endblock %}
@@ -85,13 +180,14 @@
                     {# 論述特化ルーム: シンプルなヘッダー（設定とログアウトのみ） #}
                     <ul class="navbar-nav ms-auto mobile-icon-nav">
                         <li class="nav-item">
-                            <button class="nav-link btn btn-outline-secondary btn-sm me-1" data-bs-toggle="modal"
+                            <button class="nav-link btn btn-sm me-1 nav-grad-btn setting-btn" data-bs-toggle="modal"
                                 data-bs-target="#settingsModal" title="設定">
                                 <i class="fas fa-cog"></i>
                             </button>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link btn btn-danger btn-sm" href="{{ url_for('logout') }}" title="ログアウト">
+                            <a class="nav-link btn btn-sm nav-grad-btn logout-btn" href="{{ url_for('logout') }}"
+                                title="ログアウト">
                                 <i class="fas fa-sign-out-alt"></i>
                             </a>
                         </li>
@@ -119,34 +215,34 @@
                     </div>
                     <ul class="navbar-nav mobile-icon-nav">
                         <li class="nav-item">
-                            <a class="nav-link btn btn-danger text-white btn-sm me-1"
-                                href="https://www.youtube.com/channel/UCf3wJznXaY9z7K2eAgZI98Q" target="_blank"
-                                rel="noopener noreferrer" title="YouTubeチャンネルを開く">
-                                <i class="fab fa-youtube"></i>
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link btn btn-primary btn-sm me-1" href="{{ url_for('progress_page') }}"
-                                title="進捗確認">
+                            <a class="nav-link btn btn-sm me-1 nav-grad-btn progress-btn"
+                                href="{{ url_for('progress_page') }}" title="進捗確認">
                                 <i class="fas fa-chart-line"></i>
                             </a>
                         </li>
                         <li class="nav-item">
-                            <button class="nav-link btn btn-outline-secondary btn-sm me-1" data-bs-toggle="modal"
+                            <a class="nav-link btn btn-sm me-1 nav-grad-btn perfect-btn"
+                                href="{{ url_for('perfect_list') }}" title="完璧問題">
+                                <i class="fas fa-check-double"></i>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link btn btn-sm me-1 nav-grad-btn setting-btn" data-bs-toggle="modal"
                                 data-bs-target="#settingsModal" title="設定">
                                 <i class="fas fa-cog"></i>
                             </button>
                         </li>
                         {% if session.get('student_id') == '0' %}
                         <li class="nav-item">
-                            <a class="nav-link btn btn-warning btn-sm me-1 text-dark"
+                            <a class="nav-link btn btn-sm me-1 nav-grad-btn manager-btn"
                                 href="{{ url_for('manager_auth_page') }}" title="担当者ページ">
                                 <i class="fas fa-user-tie"></i>
                             </a>
                         </li>
                         {% endif %}
                         <li class="nav-item">
-                            <a class="nav-link btn btn-danger btn-sm" href="{{ url_for('logout') }}" title="ログアウト">
+                            <a class="nav-link btn btn-sm nav-grad-btn logout-btn" href="{{ url_for('logout') }}"
+                                title="ログアウト">
                                 <i class="fas fa-sign-out-alt"></i>
                             </a>
                         </li>
@@ -161,19 +257,26 @@
                     </div>
                     <ul class="navbar-nav">
                         <li class="nav-item">
-                            <a class="nav-link btn btn-primary btn-sm me-1" href="{{ url_for('progress_page') }}"
-                                title="進捗確認">
+                            <a class="nav-link btn btn-sm me-1 nav-grad-btn progress-btn"
+                                href="{{ url_for('progress_page') }}" title="進捗確認">
                                 <i class="fas fa-chart-line"></i>
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link btn btn-warning btn-sm me-1" href="{{ url_for('admin_page') }}"
-                                title="管理者ページ">
+                            <a class="nav-link btn btn-sm me-1 nav-grad-btn perfect-btn"
+                                href="{{ url_for('perfect_list') }}" title="完璧問題">
+                                <i class="fas fa-check-double"></i>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link btn btn-sm me-1 nav-grad-btn manager-btn"
+                                href="{{ url_for('admin_page') }}" title="管理者ページ">
                                 <i class="fas fa-cog"></i>
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link btn btn-danger btn-sm" href="{{ url_for('logout') }}" title="ログアウト">
+                            <a class="nav-link btn btn-sm nav-grad-btn logout-btn" href="{{ url_for('logout') }}"
+                                title="ログアウト">
                                 <i class="fas fa-sign-out-alt"></i>
                             </a>
                         </li>
@@ -188,19 +291,20 @@
                     </div>
                     <ul class="navbar-nav">
                         <li class="nav-item">
-                            <a class="nav-link btn btn-outline-warning btn-sm me-1" href="{{ url_for('change_username_page') }}"
-                                title="表示名変更">
+                            <a class="nav-link btn btn-sm me-1 nav-grad-btn username-btn"
+                                href="{{ url_for('change_username_page') }}" title="表示名変更">
                                 <i class="fas fa-user-edit"></i>
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link btn btn-warning btn-sm me-1" href="{{ url_for('admin_page') }}"
-                                title="管理者ページ">
+                            <a class="nav-link btn btn-sm me-1 nav-grad-btn manager-btn"
+                                href="{{ url_for('admin_page') }}" title="管理者ページ">
                                 <i class="fas fa-cog"></i>
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link btn btn-danger btn-sm" href="{{ url_for('logout') }}" title="ログアウト">
+                            <a class="nav-link btn btn-sm nav-grad-btn logout-btn" href="{{ url_for('logout') }}"
+                                title="ログアウト">
                                 <i class="fas fa-sign-out-alt"></i>
                             </a>
                         </li>
@@ -445,10 +549,10 @@
         }
 
         // 初期チェック
-        document.addEventListener("DOMContentLoaded", function() {
+        document.addEventListener("DOMContentLoaded", function () {
             // 初回チェック
             checkAndShowMessage();
-            
+
             // 15秒ごとにポーリング（負荷軽減のため少し間隔を空ける）
             setInterval(() => {
                 // タブがバックグラウンドにない（ユーザーが画面を見ている）場合のみチェックする

@@ -1,0 +1,228 @@
+{% extends "base.html" %}
+{% block title %}アップデート情報 - {{ app_name }}{% endblock %}
+
+{% block content %}
+<section class="updates-section">
+    <div class="header-section">
+        <h2>📢 システムアップデート情報</h2>
+    </div>
+
+    <div class="timeline-container">
+        <!-- バージョン情報ヘッダー -->
+        <div class="version-header">
+            <span class="version-tag">Version 3.0</span>
+            <span class="update-date">2026年6月30日 アップデート</span>
+        </div>
+
+        <!-- 1. 正答率50%以上の問題形式変更 -->
+        <div class="update-card" style="border-left-color: #28a745;">
+            <div class="card-header">
+                <h3><i class="fas fa-random text-success text-icon"></i> 1. 正答率50%未満の問題形式変更</h3>
+                <span class="badge bg-success">仕様変更</span>
+            </div>
+            <p class="card-desc">正答率が50％未満の時は、４択問題形式になります。</p>
+            <ul class="detail-list">
+                <li>スコアの計算方法についての詳細は、<a href="{{ url_for('score_details') }}">こちら</a>で確認できます。</li>
+            </ul>
+        </div>
+
+        <!-- 2. 「完璧」チェック機能 -->
+        <div class="update-card" style="border-left-color: #ffc107;">
+            <div class="card-header">
+                <h3><i class="fas fa-star text-warning text-icon"></i> 2. 「完璧」チェック機能の追加</h3>
+                <span class="badge bg-warning text-dark">新機能</span>
+            </div>
+            <p class="card-desc">何度も解いて「絶対にもう大丈夫」という問題と遭遇しないようにする機能を追加しました。</p>
+            <ul class="detail-list">
+                <li>正誤判定の前に、期間を指定してチェックをつけると、その期間中問題が出題されなくなります（期間は指定するのが推奨です）。</li>
+                <li>「完璧問題」リストはヘッダー黄色いボタンから確認できます。</li>
+            </ul>
+        </div>
+
+        <!-- 3. 問題一覧機能 -->
+        <div class="update-card" style="border-left-color: #17a2b8;">
+            <div class="card-header">
+                <h3><i class="fas fa-list text-info text-icon"></i> 3. 問題一覧機能の追加</h3>
+                <span class="badge bg-info">新機能</span>
+            </div>
+            <p class="card-desc">どんな問題が登録されているか一目でわかるようになりました。</p>
+        </div>
+
+        <!-- 4. 一問一答の出題順指定 -->
+        <div class="update-card" style="border-left-color: #e74c3c;">
+            <div class="card-header">
+                <h3><i class="fas fa-sort-numeric-down text-danger text-icon"></i> 4. 一問一答の出題順指定</h3>
+                <span class="badge bg-danger">新機能</span>
+            </div>
+            <p class="card-desc">一問一答モードで、出題順を指定して学習できるようになりました。</p>
+        </div>
+
+        <!-- 5. 「今日の10問」レスポンス速度上昇 -->
+        <div class="update-card" style="border-left-color: #007bff;">
+            <div class="card-header">
+                <h3><i class="fas fa-tachometer-alt text-primary text-icon"></i> 5. 「今日の10問」のレスポンス速度上昇</h3>
+                <span class="badge bg-primary">改善</span>
+            </div>
+            <p class="card-desc">回答時のレスポンス速度が大幅に向上しました。</p>
+            <ul class="detail-list">
+                <li>開発者ツールを用いたカンニング防止のためにサーバーに解答を置いていたため通信に時間がかかっていましたが、別の工夫をしたことにより答え合わせのための通信が不要になりました。</li>
+            </ul>
+        </div>
+
+        <!-- その他 -->
+        <div class="update-card" style="border-left-color: #6c757d;">
+            <div class="card-header">
+                <h3><i class="fas fa-tools text-secondary text-icon"></i> その他</h3>
+                <span class="badge bg-secondary">その他</span>
+            </div>
+            <p class="card-desc">その他細かい修正をしています。随時更新する予定です。</p>
+            <ul class="detail-list">
+                <li>大型アプデのためバグが生じているかもしれません。もし見つけたら報告してください。</li>
+            </ul>
+        </div>
+    </div>
+</section>
+
+<style>
+    .updates-section {
+        max-width: 850px;
+        margin: 0 auto;
+        padding: 30px 20px;
+    }
+
+    .header-section {
+        text-align: center;
+        margin-bottom: 40px;
+        padding-bottom: 20px;
+        border-bottom: 3px solid #007bff;
+    }
+
+    .subtitle {
+        color: #6c757d;
+        font-size: 1.1rem;
+        margin-top: 10px;
+    }
+
+    .timeline-container {
+        position: relative;
+        padding-left: 20px;
+        border-left: 3px solid #dee2e6;
+    }
+
+    .version-header {
+        position: relative;
+        margin-bottom: 30px;
+        padding-left: 10px;
+    }
+
+    .version-header::before {
+        content: '';
+        position: absolute;
+        left: -31px;
+        top: 6px;
+        width: 19px;
+        height: 19px;
+        background: #007bff;
+        border: 4px solid #fff;
+        border-radius: 50%;
+        box-shadow: 0 0 0 3px #dee2e6;
+    }
+
+    .version-tag {
+        font-size: 1.5rem;
+        font-weight: bold;
+        color: #007bff;
+        background: #e7f3ff;
+        padding: 5px 12px;
+        border-radius: 20px;
+        margin-right: 15px;
+    }
+
+    .update-date {
+        font-size: 1rem;
+        color: #6c757d;
+    }
+
+    .update-card {
+        background: #fff;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 25px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        border-left: 5px solid #ccc;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .update-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+    }
+
+    .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    .card-header h3 {
+        font-size: 1.15rem;
+        font-weight: 600;
+        margin: 0;
+        color: #2c3e50;
+    }
+
+    .text-icon {
+        margin-right: 6px;
+    }
+
+    .card-desc {
+        color: #495057;
+        font-size: 0.95rem;
+        margin-bottom: 12px;
+        font-weight: 500;
+    }
+
+    .detail-list {
+        margin: 0;
+        padding-left: 20px;
+        color: #555;
+        font-size: 0.9rem;
+        line-height: 1.6;
+    }
+
+    .detail-list li {
+        margin-bottom: 6px;
+    }
+
+    .bg-purple {
+        background-color: #9c27b0;
+        color: white;
+    }
+
+    .style-purple {
+        color: #9c27b0;
+    }
+
+    /* レスポンシブ対応 */
+    @media (max-width: 576px) {
+        .card-header {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .version-header {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            align-items: flex-start;
+        }
+
+        .version-header::before {
+            left: -30px;
+        }
+    }
+</style>
+{% endblock %}

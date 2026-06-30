@@ -243,7 +243,7 @@
                                                 <th>部屋</th>
                                                 <th>出席番号</th>
                                                 <th>回答数</th>
-                                                <th>正解数</th>
+                                                <th>正答値</th>
                                                 <th>正答率</th>
                                                 <th>マスター数</th>
                                                 <th>総合スコア</th>
@@ -937,8 +937,8 @@
             <td><span class="text-muted">${originalName}</span></td>
             <td>${user.room_number || '-'}</td>
             <td><code>${user.student_id || '-'}</code></td>
-            <td><span class="badge bg-primary">${totalAttempts}</span></td>
-            <td><span class="badge bg-success">${totalCorrect}</span></td>
+            <td><span class="badge bg-primary">${Math.round(totalAttempts)}</span></td>
+            <td><span class="badge bg-success">${parseFloat(totalCorrect.toFixed(1))}</span></td>
             <td>${accuracyRate}%</td>
             <td><span class="badge bg-info">${masteredCount}</span></td>
             <td><strong class="text-primary">${balanceScore}</strong></td>
@@ -1227,7 +1227,7 @@
 
         try {
             // CSVデータを作成
-            const csvHeader = '\uFEFF' + '順位,部屋,出席番号,現在名,初期名,最終ログイン,回答数,正解数,正答率,マスター数,総合スコア,網羅率\n';
+            const csvHeader = '\uFEFF' + '順位,部屋,出席番号,現在名,初期名,最終ログイン,回答数,正答値,正答率,マスター数,総合スコア,網羅率\n';
             const csvRows = currentRankingData.map((user, index) => {
                 const lastLogin = formatLastLogin(user.last_login);
                 const currentName = user.username || 'Unknown';
@@ -1241,8 +1241,8 @@
                     `"${currentName}"`,
                     `"${originalName}"`,
                     `"${lastLogin}"`,
-                    user.total_attempts || 0,
-                    user.total_correct || 0,
+                    Math.round(user.total_attempts || 0),
+                    parseFloat((user.total_correct || 0).toFixed(1)),
                     (user.accuracy_rate || 0).toFixed(1) + '%',
                     user.mastered_count || 0,
                     (user.balance_score || 0).toFixed(1),

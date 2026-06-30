@@ -53,6 +53,9 @@
         border-bottom: 2px solid #f0f2f5;
         margin-bottom: 12px;
         padding-bottom: 6px;
+        gap: 8px;
+        min-width: 0;
+        flex-wrap: wrap;
     }
 
     .section-header-styled h3 {
@@ -60,14 +63,20 @@
         border: none;
         padding: 0;
         color: #2c3e50;
-        font-size: 1.4rem;
+        font-size: 1.15rem;
         display: flex;
         align-items: center;
-        gap: 10px;
+        gap: 8px;
+        flex: 1;
+        min-width: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
 
     .section-header-styled h3 i {
         color: #667eea;
+        flex-shrink: 0;
     }
 
     /* 克服モード: 燃えるフォント＆アニメーション */
@@ -213,6 +222,21 @@
         cursor: not-allowed;
     }
 
+    /* セグメントコントロール（出題順）がはみ出さないよう */
+    .segment-control {
+        overflow: visible !important;
+        max-width: 100%;
+        display: inline-flex;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    .order-btn {
+        font-size: 0.8rem !important;
+        padding: 5px 8px !important;
+        white-space: nowrap;
+    }
+
     /* 出題範囲の章リスト（カード型） */
     .chapters-container {
         display: flex;
@@ -221,8 +245,9 @@
         max-height: 45vh;
         /* スマホでボタンが押し出されないように制限 */
         overflow-y: auto;
-        padding-right: 5px;
-        /* スクロールバー用の余白 */
+        scrollbar-gutter: stable;
+        /* スクロールバーの有無で幅が変わらないように常にスペースを確保 */
+        padding-right: 0;
     }
 
     .chapter-item {
@@ -249,13 +274,15 @@
 
 
     .chapter-header {
-        padding: 10px 18px;
+        padding: 10px 14px;
         background: #fcfcfc;
         display: flex;
         justify-content: space-between;
         align-items: center;
+        gap: 8px;
         cursor: pointer;
         border-bottom: 1px solid transparent;
+        min-width: 0;
     }
 
     .chapter-item.active .chapter-header {
@@ -265,26 +292,34 @@
 
     .chapter-title {
         font-weight: 700;
-        font-size: 1.1rem;
+        font-size: 1.05rem;
         color: #2d3748;
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 
     .chapter-options {
         display: flex;
         align-items: center;
-        gap: 15px;
+        gap: 8px;
+        flex-shrink: 0;
     }
 
     .select-all-chapter-btn {
         background: rgba(102, 126, 234, 0.1);
         color: #667eea;
         border: none;
-        padding: 4px 12px;
+        padding: 4px 10px;
         border-radius: 20px;
-        font-size: 0.8rem;
+        font-size: 0.78rem;
         font-weight: 600;
         cursor: pointer;
         transition: all 0.2s ease;
+        white-space: nowrap;
+        flex-shrink: 0;
     }
 
     .select-all-chapter-btn:hover {
@@ -292,15 +327,16 @@
     }
 
     .unit-list {
-        padding: 0 20px;
+        padding: 0 14px;
         background: white;
     }
 
     .unit-item {
-        padding: 12px 0;
+        padding: 11px 0;
         border-bottom: 1px solid #f0f2f5;
         display: flex;
         align-items: center;
+        min-width: 0;
     }
 
     .unit-item:last-child {
@@ -310,16 +346,22 @@
     .unit-item input[type="checkbox"] {
         width: 18px;
         height: 18px;
-        margin-right: 12px;
+        min-width: 18px;
+        margin-right: 10px;
         cursor: pointer;
         accent-color: #667eea;
+        flex-shrink: 0;
     }
 
     .unit-item label {
         color: #4a5568;
         cursor: pointer;
         flex: 1;
-        font-size: 0.95rem;
+        min-width: 0;
+        font-size: 0.93rem;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 
     /* 学習開始ボタン（左パネル下部配置用） */
@@ -345,6 +387,99 @@
         transform: translateY(-2px);
         box-shadow: 0 10px 25px rgba(52, 152, 219, 0.45);
         color: white;
+    }
+
+    /* 検索・問題一覧ボタン */
+    #openSearchButton,
+    .btn-problem-list {
+        transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+        position: relative;
+        overflow: hidden;
+    }
+
+    #openSearchButton::after,
+    .btn-problem-list::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: rgba(255, 255, 255, 0);
+        transition: background 0.2s;
+        border-radius: inherit;
+    }
+
+    #openSearchButton:hover {
+        transform: translateY(-3px) scale(1.06);
+        box-shadow: 0 6px 18px rgba(102, 126, 234, 0.35) !important;
+        border-color: #667eea !important;
+        color: #667eea !important;
+        background: #f0f4ff !important;
+    }
+
+    .btn-problem-list:hover {
+        transform: translateY(-3px) scale(1.06);
+        box-shadow: 0 6px 18px rgba(52, 152, 219, 0.35) !important;
+        background: #2563eb !important;
+        color: #fff !important;
+        border-color: #2563eb !important;
+    }
+
+    /* モバイルファースト: デフォルト（スマホ）ではアイコンのみ表示 */
+    .range-header-actions .btn-label {
+        display: none;
+    }
+
+    .range-header-actions {
+        gap: 6px !important;
+        flex-shrink: 0;
+    }
+
+    .range-header-actions>* {
+        flex-shrink: 0;
+    }
+
+    /* 出題範囲ヘッダーのh3がつぶれないよう */
+    .range-selection-area .section-header-styled h3 {
+        flex: 1;
+        min-width: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    #startButton {
+        padding: 7px 12px !important;
+        font-size: 0.88rem !important;
+        white-space: nowrap;
+        flex-shrink: 0;
+        width: auto !important;
+    }
+
+    @media (max-width: 440px) {
+        .section-header-styled {
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .range-header-actions {
+            width: 100%;
+            justify-content: flex-end;
+        }
+
+        .range-selection-area .section-header-styled h3 {
+            width: 100%;
+        }
+    }
+
+    /* タブレット・PCサイズ以上 (576px〜) */
+    @media (min-width: 576px) {
+        .range-header-actions .btn-label {
+            display: inline;
+        }
+
+        #startButton {
+            padding: 8px 20px !important;
+            font-size: 1rem !important;
+        }
     }
 
     /* ナビゲーションリンク群（グリッドカード型） */
@@ -428,11 +563,13 @@
         margin-top: 20px;
         padding-top: 20px;
         border-top: 1px solid #edf2f7;
-        overflow: hidden;          /* トラックが親を押し広げないように */
+        overflow: hidden;
+        /* トラックが親を押し広げないように */
     }
 
     /* グリッド子要素がオーバーフローで列を壊さないようにする */
-    .question-count-and-auth {
+    .question-count-and-auth,
+    .range-selection-area {
         min-width: 0;
     }
 
@@ -629,7 +766,7 @@
         border: 1px solid rgba(255, 255, 255, 0.62);
         border-radius: 24px;
         box-shadow: 0 8px 32px rgba(0, 0, 0, 0.10),
-                    inset 0 1px 0 rgba(255, 255, 255, 0.75);
+            inset 0 1px 0 rgba(255, 255, 255, 0.75);
         position: relative;
     }
 
@@ -659,13 +796,45 @@
         will-change: transform;
     }
 
-    .dock-icon.daily   { background: linear-gradient(135deg, #2ecc71, #27ae60); box-shadow: 0 4px 14px rgba(46, 204, 113, 0.45); }
-    .dock-icon.weak    { background: linear-gradient(135deg, #e74c3c, #c0392b); box-shadow: 0 4px 14px rgba(231, 76, 60, 0.45); }
-    .dock-icon.essay   { background: linear-gradient(135deg, #3498db, #2980b9); box-shadow: 0 4px 14px rgba(52, 152, 219, 0.45); }
-    .dock-icon.map     { background: linear-gradient(135deg, #00b894, #00cec9); box-shadow: 0 4px 14px rgba(0, 184, 148, 0.45); }
-    .dock-icon.chrono  { background: linear-gradient(135deg, #f39c12, #e67e22); box-shadow: 0 4px 14px rgba(230, 126, 34, 0.45); }
-    .dock-icon.columns { background: linear-gradient(135deg, #8e44ad, #9b59b6); box-shadow: 0 4px 14px rgba(155, 89, 182, 0.45); }
-    .dock-icon.tips    { background: linear-gradient(135deg, #f1c40f, #f39c12); box-shadow: 0 4px 14px rgba(241, 196, 15, 0.45); }
+    .dock-icon.daily {
+        background: linear-gradient(135deg, #2ecc71, #27ae60);
+        box-shadow: 0 4px 14px rgba(46, 204, 113, 0.45);
+    }
+
+    .dock-icon.problem-list {
+        background: linear-gradient(135deg, #6366f1, #4f46e5);
+        box-shadow: 0 4px 14px rgba(99, 102, 241, 0.45);
+    }
+
+    .dock-icon.weak {
+        background: linear-gradient(135deg, #e74c3c, #c0392b);
+        box-shadow: 0 4px 14px rgba(231, 76, 60, 0.45);
+    }
+
+    .dock-icon.essay {
+        background: linear-gradient(135deg, #3498db, #2980b9);
+        box-shadow: 0 4px 14px rgba(52, 152, 219, 0.45);
+    }
+
+    .dock-icon.map {
+        background: linear-gradient(135deg, #00b894, #00cec9);
+        box-shadow: 0 4px 14px rgba(0, 184, 148, 0.45);
+    }
+
+    .dock-icon.chrono {
+        background: linear-gradient(135deg, #f39c12, #e67e22);
+        box-shadow: 0 4px 14px rgba(230, 126, 34, 0.45);
+    }
+
+    .dock-icon.columns {
+        background: linear-gradient(135deg, #8e44ad, #9b59b6);
+        box-shadow: 0 4px 14px rgba(155, 89, 182, 0.45);
+    }
+
+    .dock-icon.tips {
+        background: linear-gradient(135deg, #f1c40f, #f39c12);
+        box-shadow: 0 4px 14px rgba(241, 196, 15, 0.45);
+    }
 
     .dock-label {
         position: absolute;
@@ -714,6 +883,38 @@
             padding: 8px 16px 12px;
         }
     }
+
+    .segment-control {
+        display: inline-flex;
+        background: #edf2f7;
+        padding: 4px;
+        border-radius: 30px;
+        box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05);
+    }
+
+    .segment-control .filter-btn {
+        margin: 0;
+        border: none !important;
+        background: transparent;
+        padding: 5px 10px;
+        border-radius: 26px;
+        font-weight: 600;
+        font-size: 0.82rem;
+        color: #718096;
+        transition: all 0.3s ease;
+        box-shadow: none;
+        white-space: nowrap;
+    }
+
+    .segment-control input:checked+.filter-btn {
+        background: white !important;
+        color: #2d3748 !important;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .segment-control input:checked+.filter-btn i {
+        color: #2d3748 !important;
+    }
 </style>
 {% endblock %}
 
@@ -749,7 +950,7 @@
                     </h3>
                     <button id="resetSelectionButton"
                         class="btn btn-sm btn-light text-secondary rounded-pill px-3 shadow-sm"
-                        style="font-size: 0.85rem; background: #fff; border: 1px solid #edf2f7;">
+                        style="font-size: 0.8rem; background: #fff; border: 1px solid #edf2f7; white-space: nowrap; flex-shrink: 0;">
                         <i class="fas fa-undo-alt"></i> リセット
                     </button>
                 </div>
@@ -761,30 +962,70 @@
                     <span class="count-btn" data-value="3">全問</span>
                 </div>
                 <!-- オプションボタン -->
-                <div class="premium-filters">
-                    <div class="filter-toggle">
-                        <input type="checkbox" id="incorrectOnlyCheckbox2" class="filter-checkbox" {% if not
-                            session.get('user_id') %}disabled{% endif %}>
-                        <label for="incorrectOnlyCheckbox2"
-                            class="filter-btn {% if not session.get('user_id') %}disabled{% endif %}">
-                            <i class="fas fa-crosshairs text-danger"></i> 克服
-                        </label>
+                <div class="options-layout"
+                    style="display: flex; flex-direction: column; gap: 12px; align-items: center; margin-bottom: 20px;">
+                    <div class="filter-options"
+                        style="display: flex; gap: 8px; justify-content: center; flex-wrap: nowrap; width: 100%;">
+                        <div class="filter-toggle" style="flex: 1; min-width: 0;">
+                            <input type="checkbox" id="incorrectOnlyCheckbox2" class="filter-checkbox" {% if not
+                                session.get('user_id') %}disabled{% endif %}>
+                            <label for="incorrectOnlyCheckbox2"
+                                class="filter-btn {% if not session.get('user_id') %}disabled{% endif %}"
+                                style="display: flex; justify-content: center; align-items: center; width: 100%; padding: 7px 8px; font-size: 0.85rem;">
+                                <i class="fas fa-crosshairs text-danger"></i>&nbsp;克服
+                            </label>
+                        </div>
+                        <div class="filter-toggle" style="flex: 1; min-width: 0;">
+                            <input type="checkbox" id="unsolvedOnlyCheckbox" class="filter-checkbox" {% if not
+                                session.get('user_id') %}disabled{% endif %}>
+                            <label for="unsolvedOnlyCheckbox"
+                                class="filter-btn {% if not session.get('user_id') %}disabled{% endif %}"
+                                style="display: flex; justify-content: center; align-items: center; width: 100%; padding: 7px 8px; font-size: 0.85rem;">
+                                <i class="fas fa-question-circle text-primary"></i>&nbsp;未解答
+                            </label>
+                        </div>
+                        <div class="filter-toggle" style="flex: 1; min-width: 0;">
+                            <input type="checkbox" id="unmasteredOnlyCheckbox" class="filter-checkbox" {% if not
+                                session.get('user_id') %}disabled{% endif %}>
+                            <label for="unmasteredOnlyCheckbox"
+                                class="filter-btn {% if not session.get('user_id') %}disabled{% endif %}"
+                                style="display: flex; justify-content: center; align-items: center; width: 100%; padding: 7px 8px; font-size: 0.85rem;">
+                                <i class="fas fa-star-half-alt text-warning"></i>&nbsp;未マスター
+                            </label>
+                        </div>
                     </div>
-                    <div class="filter-toggle">
-                        <input type="checkbox" id="unsolvedOnlyCheckbox" class="filter-checkbox" {% if not
-                            session.get('user_id') %}disabled{% endif %}>
-                        <label for="unsolvedOnlyCheckbox"
-                            class="filter-btn {% if not session.get('user_id') %}disabled{% endif %}">
-                            <i class="fas fa-question-circle text-primary"></i> 未解答
-                        </label>
-                    </div>
-                    <div class="filter-toggle">
-                        <input type="checkbox" id="unmasteredOnlyCheckbox" class="filter-checkbox" {% if not
-                            session.get('user_id') %}disabled{% endif %}>
-                        <label for="unmasteredOnlyCheckbox"
-                            class="filter-btn {% if not session.get('user_id') %}disabled{% endif %}">
-                            <i class="fas fa-star-half-alt text-warning"></i> 未マスター
-                        </label>
+                    <!-- 出題順設定 -->
+                    <div class="order-selection"
+                        style="display: flex; flex-direction: column; justify-content: center; align-items: center; width: 100%;">
+                        <div class="segment-control">
+                            <div class="filter-toggle" style="margin: 0;">
+                                <input type="radio" name="questionOrder" value="random" id="orderRandom"
+                                    class="filter-checkbox" checked>
+                                <label for="orderRandom" class="filter-btn order-btn">
+                                    <i class="fas fa-random icon-random" style="color: #0d6efd;"></i> ランダム
+                                </label>
+                            </div>
+                            <div class="filter-toggle" style="margin: 0;">
+                                <input type="radio" name="questionOrder" value="ordered" id="orderOrdered"
+                                    class="filter-checkbox">
+                                <label for="orderOrdered" class="filter-btn order-btn">
+                                    <i class="fas fa-sort-numeric-down icon-ordered" style="color: #198754;"></i> 登録順
+                                </label>
+                            </div>
+                            <div class="filter-toggle" style="margin: 0;">
+                                <input type="radio" name="questionOrder" value="custom" id="orderCustom"
+                                    class="filter-checkbox">
+                                <label for="orderCustom" class="filter-btn order-btn">
+                                    <i class="fas fa-list-ol icon-custom" style="color: #e67e22;"></i> カスタム順
+                                </label>
+                            </div>
+                        </div>
+                        <div class="d-flex justify-content-center mt-2 w-100">
+                            <a href="/custom_order" class="btn btn-sm btn-outline-secondary"
+                                style="border-radius: 20px; font-size: 0.85rem;">
+                                <i class="fas fa-edit"></i> カスタム順を編集
+                            </a>
+                        </div>
                     </div>
                 </div>
                 <!-- 隠しラジオ（既存JS互換用） -->
@@ -801,16 +1042,21 @@
 
         <div class="range-selection-area">
             <div class="section-header-styled"
-                style="display: flex; justify-content: space-between; align-items: center;">
+                style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
                 <h3 style="margin-bottom: 0;"><i class="fas fa-book-open"></i> 出題範囲</h3>
-                <div style="display: flex; gap: 10px; align-items: center;">
+                <div class="range-header-actions" style="display: flex; gap: 10px; align-items: center;">
                     <button id="openSearchButton" class="btn btn-sm btn-light text-primary rounded-pill px-3 shadow-sm"
                         style="background:#fff; border: 1px solid #edf2f7; white-space: nowrap;">
-                        <i class="fas fa-search"></i> 検索
+                        <i class="fas fa-search"></i><span class="btn-label"> 検索</span>
                     </button>
+                    <a href="{{ url_for('problem_list_page') }}"
+                        class="btn btn-sm btn-outline-primary rounded-pill px-3 shadow-sm btn-problem-list"
+                        style="--bs-btn-bg: white; white-space: nowrap;">
+                        <i class="fas fa-list"></i><span class="btn-label"> 問題一覧</span>
+                    </a>
                     <button id="startButton" class="btn btn-start"
                         style="padding: 8px 20px !important; font-size: 1rem; border-radius: 20px; white-space: nowrap;">
-                        <i class="fas fa-play"></i> 開始
+                        <i class="fas fa-play"></i> START!
                     </button>
                 </div>
             </div>
@@ -857,7 +1103,8 @@
         </button>
         {% endif %}
         {% if feature_weak_questions %}
-        <a href="{{ url_for('weak_problems_page') }}" class="dock-item" {% if not session.get('user_id') %}style="display:none;"{% endif %}>
+        <a href="{{ url_for('weak_problems_page') }}" class="dock-item" {% if not session.get('user_id')
+            %}style="display:none;" {% endif %}>
             <div class="dock-icon weak"><i class="fas fa-crosshairs"></i></div>
             <span class="dock-label">苦手問題</span>
         </a>
@@ -1064,20 +1311,70 @@
             </div>
             <div class="card">
                 <div class="card-inner-scroll">
-                    <div class="question-content">
+                    <div id="timerBarContainer" class="hidden"
+                        style="width: 100%; height: 6px; background-color: #ecf0f1; border-radius: 3px; margin-bottom: 15px; overflow: hidden;">
+                        <div id="timerBar"
+                            style="height: 100%; width: 100%; background-color: #3498db; transition: width 0.1s linear, background-color 0.3s;">
+                        </div>
+                    </div>
+                    <div class="question-content" style="position: relative;">
+                        <!-- 新しく正答率表示要素を追加 -->
+                        <div id="globalAccuracyDisplay"
+                            style="position: absolute; top: -20px; right: 0px; background: rgba(0,0,0,0.6); color: white; padding: 2px 8px; border-radius: 10px; font-size: 0.75rem; display: none;">
+                            全体正答率: <span id="globalAccuracyValue">-</span>%
+                        </div>
                         <p id="question"></p>
                     </div>
                     <div class="answer-content">
                         <p id="answer" class="hidden"></p>
                     </div>
+                    <!-- 完璧チェックボックスをカードのコンテンツ内に配置してボタン位置のズレを解消 (左寄せ) -->
+                    <div id="perfectCheckContainer" class="hidden"
+                        style="margin-top: 25px; display: flex; align-items: center; justify-content: flex-start; gap: 10px; background: #f7fafc; padding: 10px 15px; border-radius: 12px; border: 1px dashed #cbd5e0; width: fit-content; margin-left: 0; margin-right: auto;">
+                        <label
+                            style="margin: 0; display: flex; align-items: center; gap: 6px; font-weight: bold; color: #4a5568; cursor: pointer; user-select: none;">
+                            <input type="checkbox" id="perfectCheckbox"
+                                style="width: 16px; height: 16px; cursor: pointer; accent-color: #38a169;">
+                            <i class="fas fa-check-circle text-success" style="font-size: 1.1rem;"></i> 完璧
+                        </label>
+                        <select id="perfectDurationSelect"
+                            style="font-size: 0.85rem; padding: 2px 6px; border-radius: 12px; border: 1px solid #cbd5e0; background: white; color: #4a5568; outline: none; cursor: pointer;">
+                            <option value="1month">1ヶ月除外</option>
+                            <option value="2weeks">2週間除外</option>
+                            <option value="1week">1週間除外</option>
+                            <option value="3days">3日間除外</option>
+                            <option value="forever">解除まで</option>
+                        </select>
+                    </div>
                 </div>
             </div>
             <div class="card-buttons">
-                <div style="display: flex; justify-content: space-between; align-items: flex-end; width: 100%;">
-                    <div class="answer-buttons-container" style="flex-grow: 1; display: flex; gap: 10px; margin-right: 20px;">
+                <div
+                    style="display: flex; justify-content: space-between; align-items: flex-end; width: 100%; flex-wrap: wrap;">
+                    <div id="selfEvaluationContainer" class="answer-buttons-container"
+                        style="flex-grow: 1; display: flex; gap: 10px; margin-right: 20px;">
                         <button id="showAnswerButton" class="primary-button">答えを見る</button>
                         <button id="correctButton" class="correct-button hidden">正解</button>
                         <button id="incorrectButton" class="incorrect-button hidden">不正解</button>
+                    </div>
+                    <div id="fourChoiceContainer" class="hidden"
+                        style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; width: 100%; flex-basis: 100%; margin: 0; padding: 0;">
+                        <div style="display: flex; width: 100%;">
+                            <button id="choiceBtn0" class="choice-btn"
+                                style="width: 100%; flex: 1; min-height: 80px; margin: 0;"></button>
+                        </div>
+                        <div style="display: flex; width: 100%;">
+                            <button id="choiceBtn1" class="choice-btn"
+                                style="width: 100%; flex: 1; min-height: 80px; margin: 0;"></button>
+                        </div>
+                        <div style="display: flex; width: 100%;">
+                            <button id="choiceBtn2" class="choice-btn"
+                                style="width: 100%; flex: 1; min-height: 80px; margin: 0;"></button>
+                        </div>
+                        <div style="display: flex; width: 100%;">
+                            <button id="choiceBtn3" class="choice-btn"
+                                style="width: 100%; flex: 1; min-height: 80px; margin: 0;"></button>
+                        </div>
                     </div>
                     <!-- PC用マイクボタン -->
                     <button id="voiceAnswerBtn" class="voice-button voice-btn-pc"
@@ -1086,17 +1383,20 @@
                     </button>
                     <!-- 手書きスペースを開くボタン (PC/タブレット用) -->
                     <button id="openMemoBtn" class="memo-btn-pc"
-                        style="margin-left: 10px; width: 60px !important; height: 60px !important; min-width: 60px !important; min-height: 60px !important; border-radius: 50% !important; background-color: #3498db; border: none; color: white; font-size: 1.5em; display: none; align-items: center; justify-content: center; box-shadow: 0 4px 8px rgba(0,0,0,0.2); flex-shrink: 0 !important; flex: 0 0 60px !important; padding: 0 !important; transition: transform 0.2s;" title="手書きスペースを開く">
+                        style="margin-left: 10px; width: 60px !important; height: 60px !important; min-width: 60px !important; min-height: 60px !important; border-radius: 50% !important; background-color: #3498db; border: none; color: white; font-size: 1.5em; display: none; align-items: center; justify-content: center; box-shadow: 0 4px 8px rgba(0,0,0,0.2); flex-shrink: 0 !important; flex: 0 0 60px !important; padding: 0 !important; transition: transform 0.2s;"
+                        title="手書きスペースを開く">
                         <i class="fas fa-pen"></i>
                     </button>
                 </div>
             </div>
-            <div id="voiceFeedback" class="voice-feedback hidden" style="margin-top: 10px; text-align: center; color: #666;">
+            <div id="voiceFeedback" class="voice-feedback hidden"
+                style="margin-top: 10px; text-align: center; color: #666;">
             </div>
             <div class="back-to-selection-container"
                 style="display: flex; justify-content: space-between; align-items: center; width: 100%; gap: 10px;">
                 <div style="display: flex; align-items: center; flex-grow: 0;">
-                    <button id="backToSelectionFromCardButton" class="secondary-button" style="margin: 0;">選択画面に戻る</button>
+                    <button id="backToSelectionFromCardButton" class="secondary-button"
+                        style="margin: 0;">選択画面に戻る</button>
                 </div>
 
                 <div style="display: flex; align-items: center; gap: 15px;">
@@ -1125,8 +1425,10 @@
                 <div class="memo-header">
                     <h4><i class="fas fa-pen"></i> 手書きスペース</h4>
                     <div class="memo-controls">
-                        <button id="clearMemoBtn" class="btn btn-sm btn-outline-danger" style="border-radius: 20px;"><i class="fas fa-eraser"></i> 消去</button>
-                        <button id="closeMemoBtn" class="btn btn-sm btn-outline-secondary" style="border-radius: 20px;"><i class="fas fa-times"></i> 閉じる</button>
+                        <button id="clearMemoBtn" class="btn btn-sm btn-outline-danger" style="border-radius: 20px;"><i
+                                class="fas fa-eraser"></i> 消去</button>
+                        <button id="closeMemoBtn" class="btn btn-sm btn-outline-secondary"
+                            style="border-radius: 20px;"><i class="fas fa-times"></i> 閉じる</button>
                     </div>
                 </div>
                 <div class="canvas-container">
@@ -1497,7 +1799,7 @@
     .voice-btn-pc {
         display: flex !important;
     }
-    
+
     .memo-btn-pc {
         display: flex !important;
     }
@@ -1517,11 +1819,11 @@
         .voice-btn-pc {
             display: none !important;
         }
-        
+
         .memo-btn-pc {
             display: none !important;
         }
-        
+
         .memo-side-container {
             display: none !important;
         }
@@ -1570,7 +1872,8 @@
         align-items: flex-start;
         justify-content: center;
         width: 100%;
-        max-width: 1200px; /* 広げておく */
+        max-width: 1200px;
+        /* 広げておく */
         margin: 0 auto;
         transition: all 0.3s ease;
     }
@@ -1583,7 +1886,7 @@
         display: flex;
         flex-direction: column;
         /* 画面の高さに収める (ヘッダー等を考慮) */
-        height: calc(100vh - 140px); 
+        height: calc(100vh - 140px);
         max-height: 850px;
         min-height: 450px;
     }
@@ -1596,13 +1899,16 @@
     .card {
         flex: 1;
         overflow-y: auto;
-        display: block; /* FlexからBlockに変更してスクロールの挙動を安定させる */
+        display: block;
+        /* FlexからBlockに変更してスクロールの挙動を安定させる */
         min-height: 0 !important;
         margin-bottom: 15px !important;
-        padding: 0 !important; /* 内部ラッパーで余白をとる */
+        padding: 0 !important;
+        /* 内部ラッパーで余白をとる */
         box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05) !important;
         border-radius: 15px !important;
-        scrollbar-width: thin; /* Firefox用 */
+        scrollbar-width: thin;
+        /* Firefox用 */
         scrollbar-color: #cbd5e0 transparent;
     }
 
@@ -1610,9 +1916,11 @@
     .card::-webkit-scrollbar {
         width: 6px;
     }
+
     .card::-webkit-scrollbar-track {
         background: transparent;
     }
+
     .card::-webkit-scrollbar-thumb {
         background-color: #cbd5e0;
         border-radius: 10px;
@@ -1623,8 +1931,10 @@
         min-height: 100%;
         display: flex;
         flex-direction: column;
-        justify-content: flex-start; /* 上寄せにすることで余白の違和感を解消 */
-        padding: 60px 40px; /* 上部に適度な余白を確保 */
+        justify-content: flex-start;
+        /* 上寄せにすることで余白の違和感を解消 */
+        padding: 60px 40px;
+        /* 上部に適度な余白を確保 */
         box-sizing: border-box;
     }
 

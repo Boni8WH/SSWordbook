@@ -1,0 +1,476 @@
+{% extends "base.html" %}
+{% block title %}問題一覧 - {{ app_name }}{% endblock %}
+
+{% block head_extra %}
+<link
+    href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@700&family=Kaisei+Tokumin:wght@400;700&display=swap"
+    rel="stylesheet">
+<style>
+    /* Standarized Flexbox Style for Header (from weak_problem) */
+    .page-header {
+        display: flex;
+        align-items: baseline;
+        justify-content: flex-start;
+        margin-bottom: 2rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        background: transparent;
+        position: relative;
+        z-index: 2;
+        text-align: left;
+        flex-wrap: wrap;
+        gap: 15px;
+    }
+
+    .header-left {
+        display: flex;
+        align-items: baseline;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    .page-title {
+        font-family: 'Shippori Mincho', serif;
+        font-size: clamp(1.5rem, 4vw, 2rem);
+        font-weight: 700;
+        color: #1a1a2e;
+        letter-spacing: 0.1em;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        text-shadow: none;
+        padding: 0;
+    }
+
+    .page-title i {
+        color: #6366f1;
+        margin-right: 0.4em;
+        font-size: 0.9em;
+        filter: drop-shadow(0 0 5px rgba(99, 102, 241, 0.4));
+    }
+
+    .page-subtitle {
+        font-family: 'Kaisei Tokumin', serif;
+        color: #8c909e;
+        font-size: 0.8rem;
+        margin-left: 1rem;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        border-left: 2px solid #6366f1;
+        padding-left: 1rem;
+        margin-top: 0;
+    }
+
+    @media (max-width: 768px) {
+        .page-header {
+            justify-content: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.8rem;
+            padding-top: 5px;
+        }
+
+        .header-left {
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 0;
+            gap: 2px;
+        }
+
+        .page-title {
+            font-size: 1.3rem;
+        }
+
+        .page-subtitle {
+            margin-left: 0;
+            border-left: none;
+            padding-left: 0;
+            margin-top: 0;
+            border-top: none;
+            padding-top: 0;
+            font-size: 0.7rem;
+        }
+
+        .header-home-btn {
+            position: absolute;
+            left: 0;
+            top: 5px;
+            padding: 6px 12px !important;
+        }
+
+        .header-home-btn.ms-auto {
+            margin-left: 0 !important;
+        }
+    }
+
+    /* 出題範囲の章リスト（カード型） */
+    .chapters-container {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+        max-height: 40vh;
+        overflow-y: auto;
+        padding-right: 5px;
+        margin-bottom: 1.5rem;
+    }
+
+    .chapter-item {
+        background: white;
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+        overflow: hidden;
+        transition: all 0.3s ease;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+    }
+
+    .chapter-item:hover {
+        border-color: #a0aec0;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    }
+
+    .chapter-header {
+        padding: 10px 18px;
+        background: #fcfcfc;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        cursor: pointer;
+        border-bottom: 1px solid transparent;
+    }
+
+    .chapter-item.expanded .chapter-header {
+        border-bottom-color: #e2e8f0;
+        background: #f8f9fa;
+    }
+
+    .chapter-title {
+        font-weight: 700;
+        font-size: 1.1rem;
+        color: #2d3748;
+    }
+
+    .chapter-options {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+    }
+
+    .select-all-chapter-btn {
+        background: rgba(102, 126, 234, 0.1);
+        color: #667eea;
+        border: none;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .select-all-chapter-btn:hover {
+        background: rgba(102, 126, 234, 0.2);
+    }
+
+    .unit-list {
+        padding: 0 20px;
+        background: white;
+        display: none;
+    }
+    
+    .chapter-item.expanded .unit-list {
+        display: block;
+    }
+
+    .unit-item {
+        padding: 12px 0;
+        border-bottom: 1px solid #f0f2f5;
+        display: flex;
+        align-items: center;
+    }
+
+    .unit-item:last-child {
+        border-bottom: none;
+    }
+
+    .unit-item input[type="checkbox"] {
+        width: 18px;
+        height: 18px;
+        margin-right: 12px;
+        cursor: pointer;
+        accent-color: #667eea;
+    }
+
+    .unit-item label {
+        color: #4a5568;
+        cursor: pointer;
+        flex: 1;
+        font-size: 0.95rem;
+    }
+
+    /* 表示ボタン */
+    .btn-show {
+        background: linear-gradient(135deg, #6366f1, #4f46e5);
+        color: white;
+        border: none;
+        border-radius: 16px;
+        padding: 14px 20px;
+        font-size: 1.05rem;
+        font-weight: 700;
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        box-shadow: 0 6px 18px rgba(99, 102, 241, 0.35);
+        letter-spacing: 0.04em;
+        transition: all 0.3s ease;
+        margin-bottom: 2rem;
+    }
+
+    .btn-show:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 25px rgba(99, 102, 241, 0.45);
+        color: white;
+    }
+
+    /* 答えのモザイク */
+    .answer-blur {
+        filter: blur(4px);
+        cursor: pointer;
+        transition: filter 0.2s;
+        user-select: none;
+        background-color: #f0f0f0;
+        padding: 0 4px;
+        border-radius: 3px;
+    }
+
+    .answer-blur.revealed {
+        filter: none;
+        background-color: transparent;
+    }
+
+    .hidden {
+        display: none !important;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="page-header">
+        <div class="header-left">
+            <h1 class="page-title"><i class="fas fa-list"></i>問題一覧</h1>
+            <div class="page-subtitle">Problem List</div>
+        </div>
+        <a href="{{ url_for('index') }}"
+            class="header-home-btn btn btn-sm btn-outline-secondary rounded-pill px-3 shadow-sm d-none d-md-inline-flex ms-auto">
+            <i class="fas fa-arrow-left"></i><span class="ms-1">ホーム</span>
+        </a>
+        <a href="{{ url_for('index') }}"
+            class="header-home-btn btn btn-sm btn-outline-secondary rounded-pill px-3 shadow-sm d-md-none">
+            <i class="fas fa-arrow-left"></i>
+        </a>
+    </div>
+
+    <div class="card shadow-sm mb-4 border-0">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="m-0 fw-bold text-secondary"><i class="fas fa-book-open me-2"></i>出題範囲を選択</h5>
+                <button id="resetSelectionBtn" class="btn btn-sm btn-outline-secondary rounded-pill px-3" type="button">
+                    <i class="fas fa-undo"></i> リセット
+                </button>
+            </div>
+            
+            <div class="chapters-container">
+                {% for chapter_num, chapter in chapter_data.items() %}
+                <div class="chapter-item" data-chapter-num="{{ chapter_num }}">
+                    <div class="chapter-header">
+                        <span class="chapter-title">{{ chapter.name }}</span>
+                        <div class="chapter-options">
+                            <button class="select-all-chapter-btn" data-chapter="{{ chapter_num }}"
+                                type="button">全て選択</button>
+                            <span class="toggle-icon">▶</span>
+                        </div>
+                    </div>
+                    <div class="unit-list">
+                        {% for unit_num, unit in chapter.units.items() %}
+                        {% if unit.enabled %}
+                        <div class="unit-item">
+                            <input type="checkbox" id="unit-{{ chapter_num }}-{{ unit_num }}" value="{{ unit_num }}"
+                                data-chapter="{{ chapter_num }}" class="unit-checkbox">
+                            <label for="unit-{{ chapter_num }}-{{ unit_num }}">
+                                {{ unit_num }}. {{ unit.categoryName }}
+                            </label>
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <button id="showProblemsBtn" class="btn-show">
+                <i class="fas fa-search"></i> 選択した単元の問題を表示
+            </button>
+        </div>
+    </div>
+
+    <div id="loadingIndicator" class="text-center py-4 hidden">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <p class="mt-2 text-muted">問題を読み込み中...</p>
+    </div>
+
+    <div id="resultsArea" class="card shadow-sm border-0 hidden">
+        <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+            <h5 class="m-0 fw-bold text-dark"><i class="fas fa-list-ul me-2 text-primary"></i>問題リスト (<span id="resultCount">0</span>問)</h5>
+            <button id="toggleAllAnswersBtn" class="btn btn-sm btn-outline-secondary rounded-pill px-3">
+                全ての答えを表示 / 隠す
+            </button>
+        </div>
+        <div class="card-body p-0">
+            <ul id="problemList" class="list-group list-group-flush border-0 bg-transparent">
+                <!-- JavaScriptで挿入 -->
+            </ul>
+            <div id="emptyMessage" class="alert alert-info m-3 hidden">
+                該当する問題がありません。別の単元を選択してください。
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // 「問題を表示」ボタンの処理
+        document.getElementById('showProblemsBtn').addEventListener('click', loadSelectedProblems);
+        
+        // リセットボタンの処理
+        document.getElementById('resetSelectionBtn').addEventListener('click', function() {
+            // すべてのチェックボックスのチェックを外す
+            document.querySelectorAll('.unit-checkbox').forEach(cb => {
+                cb.checked = false;
+            });
+            // 章の展開を閉じる
+            document.querySelectorAll('.chapter-item.expanded').forEach(item => {
+                item.classList.remove('expanded');
+                const icon = item.querySelector('.toggle-icon');
+                if (icon) icon.textContent = '▶';
+            });
+            // 全て選択ボタンのテキストをリセット
+            document.querySelectorAll('.select-all-chapter-btn').forEach(btn => {
+                btn.textContent = '全て選択';
+            });
+            // 結果エリアを非表示
+            document.getElementById('resultsArea').classList.add('hidden');
+            document.getElementById('emptyMessage').classList.add('hidden');
+            document.getElementById('problemList').innerHTML = '';
+        });
+
+        // 全ての答えをトグルするボタン
+        document.getElementById('toggleAllAnswersBtn').addEventListener('click', function() {
+            const blurs = document.querySelectorAll('.answer-blur');
+            if (blurs.length === 0) return;
+            
+            // 最初の要素がモザイク状態かどうかで判定
+            const isRevealed = blurs[0].classList.contains('revealed');
+            
+            blurs.forEach(blur => {
+                if (isRevealed) {
+                    blur.classList.remove('revealed');
+                } else {
+                    blur.classList.add('revealed');
+                }
+            });
+        });
+    });
+
+    let globalWordData = null;
+
+    async function loadSelectedProblems() {
+        const selectedCheckboxes = document.querySelectorAll('.unit-checkbox:checked');
+        if (selectedCheckboxes.length === 0) {
+            alert('少なくとも1つの単元を選択してください。');
+            return;
+        }
+
+        // 選択された章・単元のペアを収集
+        const selectedUnits = Array.from(selectedCheckboxes).map(cb => ({
+            chapter: cb.getAttribute('data-chapter'),
+            number: cb.value
+        }));
+
+        document.getElementById('loadingIndicator').classList.remove('hidden');
+        document.getElementById('resultsArea').classList.add('hidden');
+        document.getElementById('emptyMessage').classList.add('hidden');
+        const listContainer = document.getElementById('problemList');
+        listContainer.innerHTML = '';
+
+        try {
+            // 単語データがまだロードされていなければフェッチ
+            if (!globalWordData) {
+                const response = await fetch('/api/word_data');
+                const data = await response.json();
+                globalWordData = Array.isArray(data) ? data : (data.word_data || []);
+            }
+
+            // 選択された単元に合致する問題、かつ enabled が true で答えが空でないものを抽出
+            const filteredProblems = globalWordData.filter(word => {
+                if (!word.enabled || !word.answer || word.answer.trim() === '') return false;
+                
+                return selectedUnits.some(u => 
+                    String(word.chapter) === String(u.chapter) && 
+                    String(word.number) === String(u.number)
+                );
+            });
+
+            document.getElementById('loadingIndicator').classList.add('hidden');
+            document.getElementById('resultsArea').classList.remove('hidden');
+            document.getElementById('resultCount').textContent = filteredProblems.length;
+
+            if (filteredProblems.length === 0) {
+                document.getElementById('emptyMessage').classList.remove('hidden');
+            } else {
+                renderProblemsList(filteredProblems, listContainer);
+                
+                // 自動で結果エリアまでスクロール
+                setTimeout(() => {
+                    document.getElementById('resultsArea').scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 100);
+            }
+
+        } catch (error) {
+            console.error('Error loading problems:', error);
+            document.getElementById('loadingIndicator').classList.add('hidden');
+            alert('問題データの読み込みに失敗しました。');
+        }
+    }
+
+    function renderProblemsList(problems, container) {
+        problems.forEach((problem, index) => {
+            const li = document.createElement('li');
+            li.className = 'list-group-item p-3 border-bottom';
+
+            li.innerHTML = `
+                <div class="d-flex align-items-start">
+                    <span class="badge bg-secondary me-3 mt-1">${index + 1}</span>
+                    <div class="w-100">
+                        <div class="fw-bold mb-2 text-dark fs-5" style="line-height: 1.5;">
+                            ${problem.question}
+                        </div>
+                        <div class="text-muted fs-5">
+                            <span class="answer-blur" onclick="this.classList.toggle('revealed')">
+                                ${problem.answer}
+                            </span>
+                            <span class="ms-2 text-secondary" style="font-size: 0.7em;">(タップで答えを切り替え)</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+            container.appendChild(li);
+        });
+    }
+</script>
+{% endblock %}

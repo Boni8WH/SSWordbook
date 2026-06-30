@@ -1,0 +1,471 @@
+{% extends "base.html" %}
+{% block title %}完璧問題 - {{ app_name }}{% endblock %}
+
+{% block head_extra %}
+<link
+    href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@700&family=Kaisei+Tokumin:wght@400;700&display=swap"
+    rel="stylesheet">
+<style>
+    .page-header {
+        display: flex;
+        align-items: baseline;
+        justify-content: flex-start;
+        margin-bottom: 2rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        background: transparent;
+        position: relative;
+        z-index: 2;
+        text-align: left;
+        flex-wrap: wrap;
+        gap: 15px;
+    }
+
+    .header-left {
+        display: flex;
+        align-items: baseline;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    .page-title {
+        font-family: 'Shippori Mincho', serif;
+        font-size: clamp(1.5rem, 4vw, 2rem);
+        font-weight: 700;
+        color: #1a1a2e;
+        letter-spacing: 0.1em;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        text-shadow: none;
+        padding: 0;
+    }
+
+    .page-title i {
+        color: #6366f1;
+        margin-right: 0.4em;
+        font-size: 0.9em;
+        filter: drop-shadow(0 0 5px rgba(99, 102, 241, 0.4));
+    }
+
+    .header-info-group {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+
+    .info-badge {
+        background: rgba(99, 102, 241, 0.1);
+        color: #6366f1;
+        padding: 5px 12px;
+        border-radius: 20px;
+        font-size: 0.9rem;
+        font-weight: bold;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        border: 1px solid rgba(99, 102, 241, 0.2);
+    }
+
+    .info-badge.count-badge {
+        background: rgba(46, 204, 113, 0.1);
+        color: #27ae60;
+        border-color: rgba(46, 204, 113, 0.2);
+    }
+
+    .chapter-card {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+        padding: 20px;
+        margin-bottom: 20px;
+        border: 1px solid #e2e8f0;
+    }
+
+    .chapter-title {
+        font-size: 1.25rem;
+        font-weight: bold;
+        color: #2d3748;
+        margin-bottom: 15px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #edf2f7;
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        transition: all 0.2s ease;
+    }
+
+    .chapter-card.collapsed .chapter-title {
+        margin-bottom: 0;
+        padding-bottom: 0;
+        border-bottom-color: transparent;
+    }
+
+    .chapter-card.collapsed .chapter-content {
+        display: none;
+    }
+
+    .unit-group {
+        margin-top: 15px;
+        margin-bottom: 20px;
+    }
+    .unit-group:last-child {
+        margin-bottom: 0;
+    }
+    .unit-name {
+        font-size: 1.05rem;
+        font-weight: 700;
+        color: #4a5568;
+        padding-bottom: 5px;
+        border-bottom: 1px dashed #e2e8f0;
+        margin-bottom: 10px;
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        transition: all 0.2s ease;
+    }
+    .unit-group.collapsed .word-list {
+        display: none;
+    }
+    .unit-group.collapsed .unit-toggle-icon {
+        transform: rotate(-90deg);
+    }
+    .unit-toggle-icon {
+        transition: transform 0.2s ease;
+        color: #718096;
+        font-size: 0.85em;
+    }
+
+    .chapter-card.collapsed .toggle-icon {
+        transform: rotate(-90deg);
+    }
+    
+    .toggle-icon {
+        transition: transform 0.2s ease;
+        color: #718096;
+    }
+
+    .word-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+
+    .word-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 0;
+        border-bottom: 1px solid #edf2f7;
+    }
+
+    .word-item:last-child {
+        border-bottom: none;
+        padding-bottom: 0;
+    }
+
+    .word-info {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        min-width: 0;
+        flex: 1;
+        margin-right: 15px;
+    }
+
+    .word-question {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #2d3748;
+        word-break: break-word;
+    }
+
+    .word-answer {
+        font-size: 0.95rem;
+        color: #4a5568;
+        word-break: break-word;
+    }
+
+    .word-meta {
+        font-size: 0.85rem;
+        color: #718096;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .remove-btn {
+        background: #fff;
+        color: #e53e3e;
+        border: 1px solid #fc8181;
+        padding: 6px 12px;
+        border-radius: 6px;
+        font-size: 0.9rem;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+    }
+
+    .remove-btn:hover {
+        background: #fff5f5;
+        border-color: #e53e3e;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 50px 20px;
+        color: #718096;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="page-header">
+        <div class="header-left">
+            <h1 class="page-title"><i class="fas fa-check-double"></i> 完璧問題リスト</h1>
+        </div>
+        <div class="header-info-group">
+            <span class="info-badge">
+                <i class="fas fa-user"></i> {{ current_user_name }}
+            </span>
+            <span class="info-badge count-badge">
+                <i class="fas fa-layer-group"></i> 除外中: <span id="perfectCount">0</span> 問
+            </span>
+        </div>
+    </div>
+
+    <div id="loadingIndicator" class="text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">読み込み中...</span>
+        </div>
+        <p class="mt-2 text-muted">データを読み込んでいます...</p>
+    </div>
+
+    <div id="perfectListContainer" style="display: none;"></div>
+</div>
+
+<script>
+    function toggleChapter(titleElement) {
+        const card = titleElement.closest('.chapter-card');
+        card.classList.toggle('collapsed');
+    }
+
+    function toggleUnit(unitElement) {
+        const group = unitElement.closest('.unit-group');
+        group.classList.toggle('collapsed');
+    }
+
+    function generateProblemId(word) {
+        try {
+            const chapter = String(word.chapter || '0').padStart(3, '0');
+            const number = String(word.number || '0').padStart(3, '0');
+            const question = String(word.question || '');
+            const answer = String(word.answer || '');
+            const questionClean = question.substring(0, 15).replace(/[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/g, '');
+            const answerClean = answer.substring(0, 10).replace(/[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/g, '');
+            return `${chapter}-${number}-${questionClean}-${answerClean}`;
+        } catch (error) {
+            const chapter = String(word.chapter || '0').padStart(3, '0');
+            const number = String(word.number || '0').padStart(3, '0');
+            return `${chapter}-${number}-error`;
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', async () => {
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const container = document.getElementById('perfectListContainer');
+        const countSpan = document.getElementById('perfectCount');
+
+        try {
+            // データ取得
+            const [wordRes, progressRes] = await Promise.all([
+                fetch('/api/word_data'),
+                fetch('/api/load_quiz_progress')
+            ]);
+
+            const words = await wordRes.json();
+            const progress = await progressRes.json();
+
+            if (progress.status !== 'success') {
+                throw new Error("プログレスの取得に失敗しました");
+            }
+
+            const history = progress.problemHistory || {};
+            const now = new Date();
+
+            // 完璧問題の抽出
+            const perfectWords = [];
+            words.forEach(word => {
+                const wid = generateProblemId(word);
+                const h = history[wid];
+                if (h && h.perfect_until) {
+                    if (h.perfect_until === 'forever') {
+                        perfectWords.push({ word, history: h, remaining: '自分で解除するまで' });
+                    } else {
+                        const until = new Date(h.perfect_until);
+                        if (until > now) {
+                            const diffDays = Math.ceil((until - now) / (1000 * 60 * 60 * 24));
+                            perfectWords.push({ word, history: h, remaining: `あと ${diffDays} 日` });
+                        }
+                    }
+                }
+            });
+
+            countSpan.textContent = perfectWords.length;
+
+            if (perfectWords.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-check-circle" style="font-size: 3rem; color: #cbd5e0; margin-bottom: 1rem;"></i>
+                        <h4>除外中の問題はありません</h4>
+                        <p>「完璧」にチェックした問題がここに表示されます。</p>
+                    </div>
+                `;
+            } else {
+                // グループ化
+                const grouped = {};
+                perfectWords.forEach(pw => {
+                    const ch = pw.word.chapter === 'S' ? '歴史総合' : `第${pw.word.chapter}章`;
+                    const catName = pw.word.category || '未分類';
+                    if (!grouped[ch]) grouped[ch] = {};
+                    if (!grouped[ch][catName]) grouped[ch][catName] = [];
+                    grouped[ch][catName].push(pw);
+                });
+
+                // HTML生成
+                let html = '';
+                for (const [chName, units] of Object.entries(grouped)) {
+                    let chCount = 0;
+                    for (const items of Object.values(units)) {
+                        chCount += items.length;
+                    }
+
+                    html += `<div class="chapter-card collapsed">
+                        <div class="chapter-title" onclick="toggleChapter(this)">
+                            <span>${chName} <span class="badge bg-secondary" style="font-size: 0.8rem; margin-left: 10px;">${chCount} 問</span></span>
+                            <span class="toggle-icon">▼</span>
+                        </div>
+                        <div class="chapter-content">
+                    `;
+
+                    for (const [unitName, items] of Object.entries(units)) {
+                        html += `
+                            <div class="unit-group collapsed">
+                                <div class="unit-name" onclick="toggleUnit(this)">
+                                    <span>${unitName} <span class="badge bg-light text-dark" style="font-size: 0.75rem; margin-left: 10px; border: 1px solid #cbd5e0;">${items.length} 問</span></span>
+                                    <span class="unit-toggle-icon">▼</span>
+                                </div>
+                                <ul class="word-list">
+                        `;
+                        items.forEach(item => {
+                            const wid = generateProblemId(item.word);
+                            html += `
+                                <li class="word-item" id="item-${wid}">
+                                    <div class="word-info">
+                                        <div class="word-question">${item.word.question}</div>
+                                        <div class="word-answer">${item.word.answer}</div>
+                                        <div class="word-meta">
+                                            <i class="fas fa-clock"></i> 除外期間: ${item.remaining}
+                                        </div>
+                                    </div>
+                                    <button class="remove-btn" onclick="removePerfect('${wid}')">
+                                        <i class="fas fa-undo"></i> 解除
+                                    </button>
+                                </li>
+                            `;
+                        });
+                        html += `</ul></div>`;
+                    }
+                    html += `</div></div>`;
+                }
+                container.innerHTML = html;
+            }
+
+            loadingIndicator.style.display = 'none';
+            container.style.display = 'block';
+
+        } catch (error) {
+            console.error(error);
+            loadingIndicator.innerHTML = `<p class="text-danger"><i class="fas fa-exclamation-triangle"></i> データの読み込みに失敗しました。</p>`;
+        }
+    });
+
+    async function removePerfect(wid) {
+        if (!confirm('この問題を除外リストから解除し、次回のテストから出題されるようにしますか？')) return;
+
+        try {
+            const res = await fetch('/api/remove_perfect', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ wordIdentifiers: [wid] })
+            });
+            const data = await res.json();
+
+            if (data.status === 'success') {
+                const li = document.getElementById(`item-${wid}`);
+                if (li) {
+                    const ul = li.closest('.word-list');
+                    const unitGroup = li.closest('.unit-group');
+                    const card = li.closest('.chapter-card');
+                    li.remove();
+
+                    // カウント更新
+                    const countSpan = document.getElementById('perfectCount');
+                    countSpan.textContent = parseInt(countSpan.textContent) - 1;
+
+                    // Chapterのカウントバッジ更新
+                    const chBadge = card.querySelector('.chapter-title .badge');
+                    if (chBadge) {
+                        const current = parseInt(chBadge.textContent);
+                        if (current > 1) {
+                            chBadge.textContent = `${current - 1} 問`;
+                        }
+                    }
+
+                    // Unitのカウントバッジ更新
+                    const unitBadge = unitGroup.querySelector('.unit-name .badge');
+                    if (unitBadge) {
+                        const current = parseInt(unitBadge.textContent);
+                        if (current > 1) {
+                            unitBadge.textContent = `${current - 1} 問`;
+                        }
+                    }
+
+                    if (ul.children.length === 0) {
+                        unitGroup.remove();
+                    }
+
+                    if (card.querySelectorAll('.word-item').length === 0) {
+                        card.remove();
+                    }
+
+                    if (document.querySelectorAll('.word-item').length === 0) {
+                        document.getElementById('perfectListContainer').innerHTML = `
+                            <div class="empty-state">
+                                <i class="fas fa-check-circle" style="font-size: 3rem; color: #cbd5e0; margin-bottom: 1rem;"></i>
+                                <h4>除外中の問題はありません</h4>
+                                <p>「完璧」にチェックした問題がここに表示されます。</p>
+                            </div>
+                        `;
+                    }
+                }
+            } else {
+                alert('エラーが発生しました: ' + data.message);
+            }
+        } catch (error) {
+            console.error(error);
+            alert('通信エラーが発生しました。');
+        }
+    }
+</script>
+{% endblock %}

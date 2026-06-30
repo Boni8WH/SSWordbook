@@ -21,7 +21,8 @@
                 総合スコア = <span class="condition">マスタースコア + 正答率スコア + 継続性スコア + 精度ボーナス</span>
             </div>
         </div>
-        <div style="margin-top: 12px; padding: 10px; background: #fff3e0; border-radius: 6px; border: 1px solid #ffe0b2;">
+        <div
+            style="margin-top: 12px; padding: 10px; background: #fff3e0; border-radius: 6px; border: 1px solid #ffe0b2;">
             <strong>ポイント：</strong>正答率スコアと精度ボーナスには <strong>Wilson Score（信頼度調整）</strong>が適用されます。
             回答数が少ないうちは正答率が保守的に評価されるため、たくさん問題を解くほど正当に評価されます。
         </div>
@@ -50,21 +51,36 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <tr><td style="padding: 6px; border: 1px solid #ddd; text-align: center;">5問</td>
+                    <tr>
+                        <td style="padding: 6px; border: 1px solid #ddd; text-align: center;">5問</td>
                         <td style="padding: 6px; border: 1px solid #ddd; text-align: center;">100%</td>
-                        <td style="padding: 6px; border: 1px solid #ddd; text-align: center; color: #e74c3c;"><strong>約57%</strong></td></tr>
-                    <tr><td style="padding: 6px; border: 1px solid #ddd; text-align: center;">10問</td>
+                        <td style="padding: 6px; border: 1px solid #ddd; text-align: center; color: #e74c3c;">
+                            <strong>約57%</strong></td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 6px; border: 1px solid #ddd; text-align: center;">10問</td>
                         <td style="padding: 6px; border: 1px solid #ddd; text-align: center;">100%</td>
-                        <td style="padding: 6px; border: 1px solid #ddd; text-align: center; color: #e67e22;"><strong>約72%</strong></td></tr>
-                    <tr><td style="padding: 6px; border: 1px solid #ddd; text-align: center;">50問</td>
+                        <td style="padding: 6px; border: 1px solid #ddd; text-align: center; color: #e67e22;">
+                            <strong>約72%</strong></td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 6px; border: 1px solid #ddd; text-align: center;">50問</td>
                         <td style="padding: 6px; border: 1px solid #ddd; text-align: center;">100%</td>
-                        <td style="padding: 6px; border: 1px solid #ddd; text-align: center; color: #27ae60;"><strong>約93%</strong></td></tr>
-                    <tr><td style="padding: 6px; border: 1px solid #ddd; text-align: center;">500問</td>
+                        <td style="padding: 6px; border: 1px solid #ddd; text-align: center; color: #27ae60;">
+                            <strong>約93%</strong></td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 6px; border: 1px solid #ddd; text-align: center;">500問</td>
                         <td style="padding: 6px; border: 1px solid #ddd; text-align: center;">80%</td>
-                        <td style="padding: 6px; border: 1px solid #ddd; text-align: center; color: #27ae60;"><strong>約76%</strong></td></tr>
-                    <tr><td style="padding: 6px; border: 1px solid #ddd; text-align: center;">1000問</td>
+                        <td style="padding: 6px; border: 1px solid #ddd; text-align: center; color: #27ae60;">
+                            <strong>約76%</strong></td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 6px; border: 1px solid #ddd; text-align: center;">1000問</td>
                         <td style="padding: 6px; border: 1px solid #ddd; text-align: center;">85%</td>
-                        <td style="padding: 6px; border: 1px solid #ddd; text-align: center; color: #27ae60;"><strong>約83%</strong></td></tr>
+                        <td style="padding: 6px; border: 1px solid #ddd; text-align: center; color: #27ae60;">
+                            <strong>約83%</strong></td>
+                    </tr>
                 </tbody>
             </table>
         </div>
@@ -116,7 +132,8 @@
                 <li><strong>連続計算</strong>：区間内でも細かく評価</li>
             </ul>
             <div class="example-box">
-                <strong>例：</strong> 1000回答で正答率85% → 調整後約83% → 350 + (0.83 - 0.8) × 1500 = 350 + 45 = <strong>395点</strong>
+                <strong>例：</strong> 1000回答で正答率85% → 調整後約83% → 350 + (0.83 - 0.8) × 1500 = 350 + 45 =
+                <strong>395点</strong>
             </div>
         </div>
 
@@ -225,42 +242,98 @@
         </div>
     </div>
 
-    <!-- 設計思想セクション -->
-    <div class="philosophy-section">
-        <h3>⚖️ 設計思想</h3>
-        <div class="philosophy-content">
-            <p class="philosophy-main">
-                学習行動に応じてリアルタイムで変動する動的評価システム。<br>
-                Wilson Scoreによる信頼度調整で、回答数が少ない場合の過大評価を防ぎ、<br>
-                継続的に学習した人が正当に評価される公平な仕組みです。
-            </p>
-            <div class="fairness-features">
-                <div class="feature-item">
-                    <i class="fas fa-shield-alt text-info"></i>
-                    <span>Wilson Scoreで少数回答の過大評価を防止</span>
-                </div>
-                <div class="feature-item">
-                    <i class="fas fa-chart-line text-success"></i>
-                    <span>100問マスターごとの段階的大幅スコアアップ</span>
-                </div>
-                <div class="feature-item">
-                    <i class="fas fa-running text-warning"></i>
-                    <span>継続的な学習量をしっかり評価</span>
-                </div>
-                <div class="feature-item">
-                    <i class="fas fa-award text-primary"></i>
-                    <span>高正答率の学習にボーナス付与</span>
-                </div>
+    <!-- 4択問題モードと自己評価モードの判定仕様セクション -->
+    <div class="component-card" style="border-left-color: #007bff; margin-bottom: 30px;">
+        <div class="component-header">
+            <h4><span class="component-label" style="background: #007bff;">⚡</span> 4択問題モードと回答スピードによるスコア調整</h4>
+            <span class="feature-badge" style="background: #007bff; color: white;">学習モードの自動切替</span>
+        </div>
+        <p style="margin-bottom: 12px; line-height: 1.6;">
+            学習時の状況や回答スピードに応じて、出題形式（4択問題または自己採点）と、正解時のスコア（正答値）への反映倍率が動的に変化します。
+        </p>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px; margin-bottom: 15px;">
+            <!-- 1. 自己採点型への移行基準 -->
+            <div style="padding: 15px; background: #e8f5e9; border-radius: 8px; border: 1px solid #a5d6a7; line-height: 1.5;">
+                <strong style="color: #2e7d32;"><i class="fas fa-toggle-on"></i> 自己採点（記述・想起）モードへの移行</strong><br>
+                <span style="font-size: 0.9rem; color: #495057; display: block; margin-top: 5px;">
+                    単語の回答履歴において、<strong>「正答率が50％以上」</strong>になると、その問題は自動的に4択モードから自己採点モードに切り替わります。<br>
+                    <small style="color: #666; display: block; margin-top: 5px;">※ 正答率が50%未満の単語や、まだ回答したことがない単語は、補助として4つの選択肢から選ぶ「4択問題モード」で出題されます。</small>
+                </span>
             </div>
+
+            <!-- 2. 解答スピードによる倍率 -->
+            <div style="padding: 15px; background: #fff3e0; border-radius: 8px; border: 1px solid #ffe0b2; line-height: 1.5;">
+                <strong style="color: #e65100;"><i class="fas fa-stopwatch"></i> 4択問題の解答スピードによるスコア倍率</strong><br>
+                <span style="font-size: 0.9rem; color: #495057; display: block; margin-top: 5px;">
+                    4択問題モード（制限時間7秒）で正解した際、回答にかかった時間に応じて、進捗状況（正答値）への加算値に以下の倍率が適用されます。
+                </span>
+                <table style="width: 100%; margin-top: 10px; border-collapse: collapse; font-size: 0.85rem;">
+                    <thead>
+                        <tr style="background: rgba(0,0,0,0.03);">
+                            <th style="padding: 4px; border-bottom: 1px solid #ddd; text-align: left;">回答時間</th>
+                            <th style="padding: 4px; border-bottom: 1px solid #ddd; text-align: right;">正答値への加算値</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td style="padding: 4px; border-bottom: 1px dotted #ddd;">⏱️ <strong>3秒以内</strong></td>
+                            <td style="padding: 4px; border-bottom: 1px dotted #ddd; text-align: right; color: #2e7d32; font-weight: bold;">+1.0（等倍）</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 4px; border-bottom: 1px dotted #ddd;">⏱️ <strong>5秒以内</strong></td>
+                            <td style="padding: 4px; border-bottom: 1px dotted #ddd; text-align: right; color: #f57c00; font-weight: bold;">+0.9（90%）</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 4px;">⏱️ <strong>5秒超 〜 7秒未満</strong></td>
+                            <td style="padding: 4px; text-align: right; color: #c62828; font-weight: bold;">+0.8（80%）</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="example-box">
+            <strong>学習のコツ：</strong> 瞬時に正答できるほど評価（加算値）が高くなるため、<strong>素早い回答（瞬発的な記憶）</strong>を意識して学習し、正答率50%以上の<strong>自己採点モードへのステップアップ</strong>を目指しましょう。
         </div>
     </div>
 
-    <!-- 戻るボタン -->
-    <div class="back-section">
-        <a href="{{ url_for('progress_page') }}" class="btn btn-primary">
-            <i class="fas fa-arrow-left"></i> 進捗ページに戻る
-        </a>
-    </div>
+        <!-- 設計思想セクション -->
+        <div class="philosophy-section">
+            <h3>⚖️ 設計思想</h3>
+            <div class="philosophy-content">
+                <p class="philosophy-main">
+                    学習行動に応じてリアルタイムで変動する動的評価システム。<br>
+                    Wilson Scoreによる信頼度調整で、回答数が少ない場合の過大評価を防ぎ、<br>
+                    継続的に学習した人が正当に評価される公平な仕組みです。
+                </p>
+                <div class="fairness-features">
+                    <div class="feature-item">
+                        <i class="fas fa-shield-alt text-info"></i>
+                        <span>Wilson Scoreで少数回答の過大評価を防止</span>
+                    </div>
+                    <div class="feature-item">
+                        <i class="fas fa-chart-line text-success"></i>
+                        <span>100問マスターごとの段階的大幅スコアアップ</span>
+                    </div>
+                    <div class="feature-item">
+                        <i class="fas fa-running text-warning"></i>
+                        <span>継続的な学習量をしっかり評価</span>
+                    </div>
+                    <div class="feature-item">
+                        <i class="fas fa-award text-primary"></i>
+                        <span>高正答率の学習にボーナス付与</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 戻るボタン -->
+        <div class="back-section">
+            <a href="{{ url_for('progress_page') }}" class="btn btn-primary">
+                <i class="fas fa-arrow-left"></i> 進捗ページに戻る
+            </a>
+        </div>
 </section>
 
 <style>
