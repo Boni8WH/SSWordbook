@@ -42,20 +42,20 @@ load_dotenv()
 # Gemini API設定
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
 
-import feedparser
-import numpy as np
-from google.genai import types
+# feedparser: 遅延インポート (update_world_news内でのみ使用)
+# numpy: 削除 (pure Pythonのmathモジュールで代替)
+# google.genai types: 遅延インポート (AI関連関数内でのみ使用)
 
 # Check if memory usage exceeds this threshold (MB)
-MEMORY_THRESHOLD_MB = 350
+MEMORY_THRESHOLD_MB = 300
 
 
 # In-memory Caches
 ROOM_SETTING_CACHE = {} # {room_number: {'data': dict, 'timestamp': float}}
 WORD_DATA_CACHE = {}    # {filename: {'data': list, 'timestamp': float}}
-CACHE_TTL = 300         # 5 minutes
-MAX_WORD_DATA_CACHE_SIZE = 5      # Limit number of large CSVs in memory
-MAX_ROOM_SETTING_CACHE_SIZE = 100 # Limit number of room settings in memory
+CACHE_TTL = 180         # 3 minutes (reduced for 512MB)
+MAX_WORD_DATA_CACHE_SIZE = 2      # Limit number of large CSVs in memory (reduced for 512MB)
+MAX_ROOM_SETTING_CACHE_SIZE = 50  # Limit number of room settings in memory (reduced for 512MB)
 
 # ニュース更新状態の追跡
 NEWS_UPDATE_LOCK = threading.Lock()
@@ -66,8 +66,7 @@ from datetime import datetime, timedelta
 from html.parser import HTMLParser
 import html
 # import pykakasi (Removed to save 300MB memory)
-import MeCab
-import unidic_lite
+# MeCab, unidic_lite: 遅延インポート (get_katakana_from_mecab内でのみ使用)
 from sqlalchemy import inspect, text, func, case, cast, Integer, bindparam
 from sqlalchemy.orm import joinedload, deferred
 from datetime import date, datetime, timedelta
@@ -1211,18 +1210,7 @@ def _create_column_view_table():
             pass # print("✅ column_viewテーブルは既に存在します")
     except Exception as e:
         print(f"⚠️ ColumnView作成エラー: {e}")
-        
-        if 'read_columns' not in columns:
-            print("🔄 User: read_columnsカラムを追加します...")
-            with db.engine.connect() as conn:
-                with conn.begin(): # トランザクション
-                    conn.execute(text("ALTER TABLE \"user\" ADD COLUMN read_columns TEXT DEFAULT '[]' NOT NULL"))
-            print("✅ User: read_columnsカラム追加完了")
-        else:
-            pass # print("✅ User: read_columnsカラムは既に存在します")
-            
-    except Exception as e:
-        print(f"⚠️ Userマイグレーションエラー (read_columns): {e}")
+
 
 def _add_all_unlocked_column_to_room_setting():
     """RoomSettingテーブルにis_all_unlockedカラムを追加するマイグレーション関数"""
@@ -1629,6 +1617,7 @@ def update_world_news():
             try:
                 response = requests.get(feed["url"], timeout=10)
                 response.encoding = 'utf-8'
+                import feedparser
                 parsed = feedparser.parse(response.text)
                 
                 # トークン節約のため、各ソースから最新10件のみに絞る
@@ -3075,15 +3064,7 @@ def load_word_data_for_room(room_number):
         print(f"Error loading word data for room {room_number}: {e}")
         return []
         
-        # ★デバッグログ: 最初の数件を表示
-        # if filtered_word_data:
-        #     print(f"🔍 load_word_data_for_room: {len(filtered_word_data)} words loaded.")
-        #     print(f"   First word: {filtered_word_data[0]}")
-        # else:
-        #     print("⚠️ load_word_data_for_room: No words loaded.")
-        
-        return filtered_word_data
-        
+
     except Exception as e:
         print(f"❌ 読み込みエラー: {e}")
         db.session.rollback()
@@ -15264,6 +15245,7 @@ def admin_delete_correction_request(request_id):
 def essay_ocr():
     """アップロードされた画像から手書き文字を読み取り、HTML形式で返す"""
     import PIL.Image
+    from google.genai import types  # 遅延インポート（メモリ節約）
     if not GEMINI_API_KEY:
         return jsonify({'status': 'error', 'message': 'Gemini API key not configured'}), 500
 
@@ -15437,7 +15419,7 @@ class TextbookManager:
              print("⚠️ Vector DB not found. Run scripts/build_vector_db.py")
 
     def search_relevant_sections(self, query, top_k=3):
-        """Vector Search for retrieval"""
+        """Vector Search for retrieval (numpy不要・pure Python実装)"""
         # 0. Ensure text loaded (for logic consistency if needed later)
         self._ensure_textbook_loaded()
 
@@ -15459,7 +15441,7 @@ class TextbookManager:
                 model="models/gemini-embedding-001",
                 contents=query
             )
-            query_vector = np.array(result.embeddings[0].values)
+            query_vector = result.embeddings[0].values  # list of floats
         except Exception as e:
             print(f"⚠️ Query embedding failed: {e}")
             # Unload vectors even on fail
@@ -15468,19 +15450,22 @@ class TextbookManager:
             return []
 
         try:
-            # 3. Cosine Similarity Calculation
-            # (Since vectors are normalized, dot product is sufficient, but let's be safe)
+            # 3. Cosine Similarity Calculation (pure Python, no numpy)
+            # Pre-compute query vector norm
+            norm_q = math.sqrt(sum(x * x for x in query_vector))
+            
             scores = []
             for item in self.vectors:
-                vec = np.array(item['vector'])
-                # Cosine similarity: (A . B) / (||A||*||B||)
-                # Assuming embeddings are not guaranteed normalized:
-                norm_q = np.linalg.norm(query_vector)
-                norm_v = np.linalg.norm(vec)
+                vec = item['vector']  # already a list of floats
+                # Dot product
+                dot = sum(a * b for a, b in zip(query_vector, vec))
+                # Vector norm
+                norm_v = math.sqrt(sum(x * x for x in vec))
+                
                 if norm_q == 0 or norm_v == 0:
                     score = 0
                 else:
-                    score = np.dot(query_vector, vec) / (norm_q * norm_v)
+                    score = dot / (norm_q * norm_v)
                 
                 scores.append((score, item))
         except Exception as sim_err:
@@ -15498,8 +15483,6 @@ class TextbookManager:
         
         # Log results for verification
         print(f"🔍 Vector Search Results for: {query[:20]}...")
-        # for s, item in top_items:
-        #     print(f"   - [{s:.4f}] {item['title']}")
             
         # Clean up large objects explicitly
         self.vectors = None # Important: Unload vectors to free memory
@@ -15609,6 +15592,7 @@ def consume_ai_ticket(user):
 def essay_grade():
     """論述問題の添削を行う"""
     import PIL.Image
+    from google.genai import types  # 遅延インポート（メモリ節約）
     if not GEMINI_API_KEY:
         return jsonify({'status': 'error', 'message': 'Gemini API key not configured'}), 500
 
@@ -16737,6 +16721,9 @@ def get_full_vocabulary():
 def get_katakana_from_mecab(text):
     """MeCab + unidic-lite を使用してカタカナに変換する"""
     try:
+        # 遅延インポート（メモリ節約: ~30MB）
+        import MeCab
+        import unidic_lite
         # Initialize MeCab with unidic-lite dictionary
         # Memory usage is low (~15MB), so initializing here is fine.
         # If massive requests come, we might want to make it a global/thread-local instance,
@@ -25231,20 +25218,6 @@ def api_remove_perfect():
         print(f"Error removing perfect status: {e}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
-if __name__ == '__main__':
-    try:
-        # サーバー起動
-        port = int(os.environ.get('PORT', 5001))
-        debug_mode = os.environ.get('RENDER') != 'true'
-        
-        logger.info(f"🌐 サーバーを起動します: http://0.0.0.0:{port}")
-        
-        app.run(host='0.0.0.0', port=port, debug=debug_mode)
-        
-    except Exception as e:
-        logger.error(f"💥 起動失敗: {e}")
-        import traceback
-        traceback.print_exc()
 
 @app.route('/admin/weak_problems_report')
 def admin_weak_problems_report():
@@ -25464,3 +25437,18 @@ def api_admin_weak_problems_aggregated():
     except Exception as e:
         print(f"Error in api_admin_weak_problems_aggregated: {e}")
         return jsonify(status='error', message=str(e)), 500
+
+if __name__ == '__main__':
+    try:
+        # サーバー起動
+        port = int(os.environ.get('PORT', 5001))
+        debug_mode = os.environ.get('RENDER') != 'true'
+        
+        logger.info(f"🌐 サーバーを起動します: http://0.0.0.0:{port}")
+        
+        app.run(host='0.0.0.0', port=port, debug=debug_mode)
+        
+    except Exception as e:
+        logger.error(f"💥 起動失敗: {e}")
+        import traceback
+        traceback.print_exc()

@@ -20,7 +20,6 @@ python-dotenv
 reportlab
 qrcode[pil]
 feedparser
-numpy
 psutil
 mecab-python3
 unidic-lite
